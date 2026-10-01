@@ -1,10 +1,11 @@
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { describeFileSummary, summarizeFilePayload } from './outputFilePayload'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Folder } from 'lucide-react'
-import { listAllFolders, type FolderSummary } from '../../api/folders'
+import { listAllFolders } from '../../api/folders'
 import { saveResultToFolder, type SaveOutputFormat } from '../../api/workflows'
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 interface Props {
@@ -26,31 +27,29 @@ const FORMAT_OPTIONS: { value: SaveOutputFormat; label: string; ext: string }[] 
 
 export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPreview, onClose, onSaved }: Props) {
   const { activeProjectRootFolder } = useWorkspace()
-  const [folders, setFolders] = useState<FolderSummary[]>([])
+  const { data: folderData, loading, error: folderError, load: reloadFolders } = useAdminQuery(listAllFolders)
+  const folders = useMemo(() => [...(folderData ?? [])].sort((a, b) => a.path.localeCompare(b.path)), [folderData])
+  const pending = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
   const [folderUuid, setFolderUuid] = useState('')
   const [format, setFormat] = useState<SaveOutputFormat>('pdf')
   const [fileName, setFileName] = useState('')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    listAllFolders()
-      .then(list => {
-        const sorted = [...list].sort((a, b) => a.path.localeCompare(b.path))
-        setFolders(sorted)
-        // In a project, default to its folder so results land back in the
-        // project (and get re-indexed for chat) — the enrich flywheel.
-        const projectMatch = activeProjectRootFolder
-          && sorted.some(f => f.uuid === activeProjectRootFolder)
-        setFolderUuid(projectMatch ? activeProjectRootFolder : (sorted[0]?.uuid ?? ''))
-      })
-      .catch(() => setFolders([]))
-      .finally(() => setLoading(false))
-  }, [activeProjectRootFolder])
+    if (!folderData) return
+    setFolderUuid(current => {
+      if (folders.some(folder => folder.uuid === current)) return current
+      return folders.some(folder => folder.uuid === activeProjectRootFolder) ? activeProjectRootFolder! : (folders[0]?.uuid ?? '')
+    })
+  }, [activeProjectRootFolder, folderData, folders])
+
+  useEffect(() => { if (error) { errorRef.current?.focus(); errorRef.current?.scrollIntoView?.({ block: 'nearest' }) } }, [error])
 
   usePanelEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pending.current) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -63,7 +62,8 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
   }, [workflowName, fileName])
 
   const handleSubmit = async () => {
-    if (!folderUuid) return
+    if (!folderUuid || loading || folderError || pending.current) return
+    pending.current = true
     setSaving(true)
     setError(null)
     try {
@@ -77,6 +77,7 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
     } finally {
+      pending.current = false
       setSaving(false)
     }
   }
@@ -95,10 +96,11 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
   }, [outputPreview])
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4" style={{ zIndex: 700 }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+        ref={dialogRef} tabIndex={-1}
+        className="bg-white rounded-lg shadow-xl w-full max-w-md min-w-0 max-h-[90dvh] overflow-y-auto p-5"
         role="dialog"
         aria-modal="true"
         aria-labelledby="save-output-dialog-title"
@@ -108,15 +110,17 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
             <Folder size={18} className="text-gray-500" />
             Save output to folder
           </h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-600 rounded">
+          <button type="button" disabled={saving} onClick={onClose} aria-label="Close" className="p-1 text-gray-500 hover:text-gray-700 rounded">
             <X size={18} />
           </button>
         </div>
 
+        <fieldset disabled={saving} className="min-w-0 border-0 p-0 m-0">
+        {folderError && <p role="alert" className="mb-4 text-sm text-red-800">{folderError} <button onClick={reloadFolders} className="underline">Retry folders</button></p>}
         {previewText && (
           <div className="mb-4">
             <div className="text-xs font-medium text-gray-500 mb-1">Output preview</div>
-            <pre className="bg-gray-50 border border-gray-200 rounded-md p-2 text-xs text-gray-700 max-h-32 overflow-auto whitespace-pre-wrap break-words">
+            <pre tabIndex={0} aria-label="Workflow output preview" className="bg-gray-50 border border-gray-200 rounded-md p-2 text-xs text-gray-700 max-h-32 overflow-auto whitespace-pre-wrap break-words">
               {previewText.length > 600 ? previewText.slice(0, 600) + '…' : previewText}
             </pre>
           </div>
@@ -128,11 +132,11 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
             id="save-output-folder"
             value={folderUuid}
             onChange={e => setFolderUuid(e.target.value)}
-            disabled={loading || folders.length === 0}
+            disabled={loading || !!folderError || folders.length === 0}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
           >
             {loading && <option value="">Loading folders…</option>}
-            {!loading && folders.length === 0 && <option value="">No folders available</option>}
+            {!loading && folders.length === 0 && <option value="">{folderError ? 'Folders unavailable' : 'No folders available'}</option>}
             {folders.map(f => (
               <option key={f.uuid} value={f.uuid}>
                 {f.path}
@@ -165,14 +169,13 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
             value={fileName}
             onChange={e => setFileName(e.target.value)}
             placeholder="2026-05-12_my_workflow_results"
-            aria-invalid={!!error}
             aria-describedby={error ? 'save-output-error' : undefined}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
           />
           <div className="text-xs text-gray-500 mt-1">Extension is added automatically.</div>
         </div>
 
-        {error && <div id="save-output-error" role="alert" className="text-xs text-red-600 mb-2">{error}</div>}
+        {error && <div ref={errorRef} tabIndex={-1} id="save-output-error" role="alert" className="text-xs text-red-600 mb-2">{error}</div>}
 
         <div className="flex justify-end gap-2 mt-4">
           <button
@@ -183,12 +186,13 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || !folderUuid}
+            disabled={saving || loading || !!folderError || !folderUuid}
             className="px-4 py-2 text-sm font-bold text-highlight-text bg-highlight hover:brightness-90 rounded-lg disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
+        </fieldset>
       </div>
       </FocusTrap>
     </div>

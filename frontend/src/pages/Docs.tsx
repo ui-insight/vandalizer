@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
+import { FocusTrap } from '../components/shared/PanelFocusTrap'
 import { Footer } from '../components/layout/Footer'
 import { PresentSidebar } from './present/components/PresentSidebar'
 import { CostEstimator } from './docs/CostEstimator'
@@ -24,8 +25,8 @@ import {
 
 const sections = [
   { id: 'getting-started', label: 'Getting Started', icon: BookOpen },
+  { id: 'user-guide', label: 'Task examples', icon: FileText },
   { id: 'installation', label: 'Installation & Self-Hosting', icon: Server },
-  { id: 'user-guide', label: 'User Guide', icon: FileText },
   { id: 'administration', label: 'Administration', icon: Settings },
   { id: 'cost-estimator', label: 'Cost Estimator', icon: Calculator },
   { id: 'architecture', label: 'Architecture', icon: Layers },
@@ -43,83 +44,31 @@ type SectionId = (typeof sections)[number]['id']
 function GettingStarted() {
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-white">Getting Started</h2>
+      <h2 className="text-3xl font-bold text-white">Review a proposal with its sources</h2>
       <p className="text-gray-300 text-lg leading-relaxed">
-        Vandalizer is an open-source, AI-powered document intelligence platform built for research
-        administration. Upload documents, run LLM-powered extraction workflows, chat with your
-        documents via RAG, and collaborate across teams.
+        Start with a sponsor notice or proposal you are allowed to use. Find a requirement,
+        inspect the supporting passage, then reuse the check or hand the result to a colleague.
+        Training is optional; you can begin in the workspace.
       </p>
-
-      <h3 className="text-xl font-bold text-white mt-8">Capabilities</h3>
-      <ul className="space-y-2 text-gray-300">
-        <li className="flex items-start gap-2">
-          <span className="text-[#f1b300] mt-1">&#x2022;</span>
-          <span>
-            <strong className="text-white">Structured Extraction</strong>: pull dates,
-            budgets, requirements, and more from PDFs into clean structured data
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-[#f1b300] mt-1">&#x2022;</span>
-          <span>
-            <strong className="text-white">Workflow Engine</strong>: chain extraction tasks
-            into repeatable pipelines with dependency resolution
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-[#f1b300] mt-1">&#x2022;</span>
-          <span>
-            <strong className="text-white">RAG Chat</strong>: ask questions against your
-            document collection with citation-backed answers
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-[#f1b300] mt-1">&#x2022;</span>
-          <span>
-            <strong className="text-white">Team Collaboration</strong>: multi-tenant
-            workspaces with role-based access and shared libraries
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-[#f1b300] mt-1">&#x2022;</span>
-          <span>
-            <strong className="text-white">Self-Hosted</strong>: run on your own
-            infrastructure with full control over your data
-          </span>
-        </li>
-      </ul>
-
-      <h3 className="text-xl font-bold text-white mt-8">Quickstart</h3>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div className="text-gray-500"># Clone the repository</div>
-        <div>
-          git clone https://github.com/ui-insight/vandalizer.git && cd vandalizer
-        </div>
-        <div className="mt-3 text-gray-500"># Start infrastructure</div>
-        <div>docker compose up -d redis mongo chromadb</div>
-        <div className="mt-3 text-gray-500"># Install backend dependencies & run</div>
-        <div>cp backend/.env.example backend/.env && make backend-install && cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
-        <div className="mt-3 text-gray-500"># In another terminal, start frontend</div>
-        <div>cd frontend && npm install && npm run dev</div>
+      <ol className="space-y-5 list-decimal pl-6 text-gray-300">
+        <li><strong className="text-white">Open your source.</strong> In Files, upload a document and wait for processing.
+          Open it to confirm the text is readable. If text is missing, resolve that before relying on an answer.</li>
+        <li><strong className="text-white">Ask a specific question.</strong> In Chat, confirm the selected documents or
+          knowledge base. Try: “What is the submission deadline, including time zone? Show the supporting passage.”</li>
+        <li><strong className="text-white">Check the evidence.</strong> Open the answer’s source reference and compare it
+          with the document. Check dates, conditions and conflicting passages. An answer without support needs review.</li>
+        <li><strong className="text-white">Reuse a check.</strong> Keep the file open and choose a workflow or extraction
+          from Library. Review its inputs before Run. A workflow combines tasks; an extraction returns named fields,
+          such as deadline and budget limit.</li>
+        <li><strong className="text-white">Hand off with context.</strong> Use the result’s copy/export action where available,
+          include the source and unresolved questions, and share through your team’s usual process. Workflows with a
+          human-review step send an item to Reviews for the assigned colleague.</li>
+      </ol>
+      <div className="flex flex-wrap gap-4">
+        <a href="/" className="rounded-lg bg-[#f1b300] px-4 py-3 font-semibold text-black">Open workspace</a>
+        <a href="#user-guide" className="py-3 text-[#f1b300] underline">Task examples and recovery</a>
       </div>
-
-      <h3 className="text-xl font-bold text-white mt-8">Prerequisites</h3>
-      <ul className="space-y-1 text-gray-300 text-sm">
-        <li>
-          <span className="text-[#f1b300]">&#x2022;</span> Python &ge; 3.11, &lt; 3.13
-        </li>
-        <li>
-          <span className="text-[#f1b300]">&#x2022;</span> Node.js &ge; 20
-        </li>
-        <li>
-          <span className="text-[#f1b300]">&#x2022;</span> Docker & Docker Compose
-        </li>
-        <li>
-          <span className="text-[#f1b300]">&#x2022;</span>{' '}
-          <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">uv</code>{' '}
-          package manager
-        </li>
-      </ul>
+      <p className="text-sm text-gray-400">Setting up a deployment? See <a href="#installation" className="underline">Installation &amp; Self-Hosting</a>.</p>
     </div>
   )
 }
@@ -143,7 +92,7 @@ function Installation() {
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">.env</code> and
         configure the following:
       </p>
-      <div className="overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Scrollable documentation example" className="overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead>
             <tr className="border-b border-white/10 text-gray-400">
@@ -177,14 +126,14 @@ function Installation() {
       </p>
 
       <h3 className="text-xl font-bold text-white mt-8">Docker Compose (Recommended)</h3>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div className="text-gray-500"># Start all infrastructure services</div>
+      <div tabIndex={0} role="region" aria-label="Command example" className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
+        <div className="text-gray-400"># Start all infrastructure services</div>
         <div>docker compose up -d redis mongo chromadb</div>
-        <div className="mt-3 text-gray-500"># Start the backend</div>
+        <div className="mt-3 text-gray-400"># Start the backend</div>
         <div>make backend-install && cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
-        <div className="mt-3 text-gray-500"># Start Celery workers</div>
+        <div className="mt-3 text-gray-400"># Start Celery workers</div>
         <div>./run_celery.sh start</div>
-        <div className="mt-3 text-gray-500"># Start the frontend</div>
+        <div className="mt-3 text-gray-400"># Start the frontend</div>
         <div>cd frontend && npm install && npm run dev</div>
       </div>
 
@@ -192,8 +141,8 @@ function Installation() {
       <p className="text-gray-300 leading-relaxed">
         For production, use uvicorn with multiple workers:
       </p>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div>uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4 <span className="text-gray-500"># Production uvicorn server</span></div>
+      <div tabIndex={0} role="region" aria-label="Command example" className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
+        <div>uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4 <span className="text-gray-400"># Production uvicorn server</span></div>
       </div>
 
       <h3 className="text-xl font-bold text-white mt-8">Infrastructure Requirements</h3>
@@ -224,59 +173,22 @@ function Installation() {
 }
 
 function UserGuide() {
-  return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-white">User Guide</h2>
-
-      <h3 className="text-xl font-bold text-white mt-8">Uploading Documents</h3>
-      <p className="text-gray-300 leading-relaxed">
-        Drag and drop files into the workspace or use the upload button. Supported formats include
-        PDF, DOCX, XLSX, and HTML. Documents are processed asynchronously. Text is extracted,
-        chunked, and embedded into ChromaDB for RAG search.
-      </p>
-
-      <h3 className="text-xl font-bold text-white mt-8">Extractions</h3>
-      <p className="text-gray-300 leading-relaxed mb-4">
-        Vandalizer supports two extraction strategies:
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-[#262626] rounded-lg p-5 border border-white/5">
-          <h4 className="text-white font-bold mb-2">One-Pass Extraction</h4>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            A single LLM call produces structured output directly from the document. Fast and
-            efficient for straightforward extraction tasks.
-          </p>
-        </div>
-        <div className="bg-[#262626] rounded-lg p-5 border border-white/5">
-          <h4 className="text-white font-bold mb-2">Two-Pass Extraction</h4>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            A &ldquo;thinking&rdquo; draft pass followed by a structured final extraction. Higher
-            accuracy for complex documents with nuanced requirements.
-          </p>
-        </div>
-      </div>
-
-      <h3 className="text-xl font-bold text-white mt-8">Chat & RAG</h3>
-      <p className="text-gray-300 leading-relaxed">
-        The chat interface lets you ask questions against your uploaded documents. Vandalizer uses
-        Retrieval-Augmented Generation to find relevant document chunks and generate citation-backed
-        answers. Conversations are persisted and can be continued later.
-      </p>
-
-      <h3 className="text-xl font-bold text-white mt-8">Library</h3>
-      <p className="text-gray-300 leading-relaxed">
-        Save and organize reusable prompts, extraction templates, and workflow configurations in the
-        Library. Library items can be shared across your team.
-      </p>
-
-      <h3 className="text-xl font-bold text-white mt-8">Teams</h3>
-      <p className="text-gray-300 leading-relaxed">
-        Organize work into Teams. Teams provide role-based access control
-        (owner/admin/member) and scope documents, workflows, and folders for
-        multi-tenant collaboration.
-      </p>
-    </div>
-  )
+  const examples = [
+    { id: 'project-scope', title: 'Check a proposal in a project', text: 'Open Projects and select the project. Confirm the project name and the documents included in Chat before asking about the proposal. Project membership controls access; a project selection does not establish that every document is readable.' },
+    { id: 'library-tools', title: 'Choose a reusable Library tool', text: 'Keep the document in Files, open Library, and inspect the tool’s description and required input. Use an extraction for named values such as “Budget limit”; use a workflow for a sequence such as summarize, compare and request review. A shared tool still needs checking against your sponsor and document.' },
+    { id: 'validation', title: 'Check a tool before relying on it', text: 'In the tool’s Validate section, supply representative examples and expected results. Run the check and inspect failures against the source. A completed run means execution finished; validation evidence only describes the examples tested. Tuning proposals do not establish correctness on new documents.' },
+    { id: 'human-review', title: 'Review output for a colleague', text: 'Open Reviews, select an assigned item and read its instructions, sources and proposed output. Edit before approving when a correction is needed and explain unresolved issues in comments. Approval records a workflow decision; it does not publish a proposal or certify compliance.' },
+    { id: 'status-meanings', title: 'Understand status and quality labels', text: 'Shared or accepted means an item is available to its permitted audience. Checked or validated describes recorded test evidence; open the results to inspect scope, failures and expected answers. Available or ready describes access and processing state. Completed means execution finished. Approved in Reviews records a human decision and may allow the workflow to continue; inspect its subsequent status. None of these labels establishes correctness on a new document or certifies compliance.' },
+    { id: 'source-recovery', title: 'Recover from missing or incomplete sources', text: 'If a file is still processing, wait for its status to update. Open the extracted text and compare it with the original. If a scan or table is incomplete, use a readable version or ask for help through Support. In Knowledge, review source health before asking questions. Never interpret a missing answer as proof that the requirement is absent.' },
+  ]
+  return <div className="space-y-6">
+    <h2 className="text-3xl font-bold text-white">Task examples and recovery</h2>
+    {examples.map(example => <section key={example.id} id={example.id} tabIndex={-1} className="scroll-mt-24 space-y-2">
+      <h3 className="text-xl font-bold text-white">{example.title}</h3>
+      <p className="text-gray-300 leading-relaxed">{example.text}</p>
+    </section>)}
+    <a href="/" className="inline-flex text-[#f1b300] underline">Return to workspace</a>
+  </div>
 }
 
 function Administration() {
@@ -324,10 +236,10 @@ function Administration() {
         Celery Flower provides a real-time web UI for monitoring task queues, worker status, and task
         history. It is started automatically with the Celery workers:
       </p>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div>./run_celery.sh start &nbsp; <span className="text-gray-500"># Starts workers + Flower</span></div>
-        <div>./run_celery.sh status &nbsp;<span className="text-gray-500"># Check worker status</span></div>
-        <div>./run_celery.sh logs &nbsp;&nbsp; <span className="text-gray-500"># Tail all worker logs</span></div>
+      <div tabIndex={0} role="region" aria-label="Command example" className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
+        <div>./run_celery.sh start &nbsp; <span className="text-gray-400"># Starts workers + Flower</span></div>
+        <div>./run_celery.sh status &nbsp;<span className="text-gray-400"># Check worker status</span></div>
+        <div>./run_celery.sh logs &nbsp;&nbsp; <span className="text-gray-400"># Tail all worker logs</span></div>
       </div>
     </div>
   )
@@ -339,7 +251,7 @@ function Architecture() {
       <h2 className="text-3xl font-bold text-white">Architecture</h2>
 
       <h3 className="text-xl font-bold text-white mt-8">System Overview</h3>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-xs sm:text-sm text-gray-300 overflow-x-auto leading-relaxed">
+      <div tabIndex={0} role="region" aria-label="Command example" className="bg-[#262626] rounded-lg p-4 font-mono text-xs sm:text-sm text-gray-300 overflow-x-auto leading-relaxed">
         <pre>{`┌─────────────┐     ┌─────────────┐     ┌──────────────┐
 │   React     │────▶│  FastAPI    │────▶│   MongoDB    │
 │   Frontend  │     │  Backend    │     │              │
@@ -414,7 +326,7 @@ function Architecture() {
           <div key={queue} className="bg-[#262626] rounded-lg p-3 border border-white/5">
             <div className="flex items-center justify-between mb-1">
               <code className="text-[#f1b300] text-sm font-bold">{queue}</code>
-              <span className="text-xs text-gray-500">{workers}</span>
+              <span className="text-xs text-gray-400">{workers}</span>
             </div>
             <p className="text-gray-400 text-xs">{desc}</p>
           </div>
@@ -472,7 +384,7 @@ function Contributing() {
           href="https://github.com/ui-insight/vandalizer/blob/main/CONTRIBUTING.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#f1b300] hover:underline"
+          className="text-[#f1b300] underline hover:no-underline"
         >
           Contributing Guide
         </a>{' '}
@@ -480,14 +392,14 @@ function Contributing() {
       </p>
 
       <h3 className="text-xl font-bold text-white mt-8">Development Setup</h3>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div className="text-gray-500"># Backend</div>
+      <div tabIndex={0} role="region" aria-label="Command example" className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
+        <div className="text-gray-400"># Backend</div>
         <div>cp backend/.env.example backend/.env && make backend-install</div>
         <div>docker compose up -d redis mongo chromadb</div>
         <div>cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
-        <div className="mt-3 text-gray-500"># Frontend</div>
+        <div className="mt-3 text-gray-400"># Frontend</div>
         <div>cd frontend && npm install && npm run dev</div>
-        <div className="mt-3 text-gray-500"># Celery workers</div>
+        <div className="mt-3 text-gray-400"># Celery workers</div>
         <div>./run_celery.sh start</div>
       </div>
 
@@ -559,7 +471,7 @@ function About() {
           href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2427549"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#f1b300] hover:underline"
+          className="text-[#f1b300] underline hover:no-underline"
         >
           NSF GRANTED program
         </a>.
@@ -641,17 +553,17 @@ export default function Docs() {
   }, [])
 
   return (
-    <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen">
+    <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen [overflow-wrap:anywhere]">
       {/* Fixed top nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <div className="flex items-center gap-6">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
             <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
               Vandalizer
             </Link>
             <span className="text-sm text-[#f1b300] font-medium">Docs</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-4">
             <a
               href="https://github.com/ui-insight/vandalizer"
               target="_blank"
@@ -663,6 +575,9 @@ export default function Docs() {
             </a>
             {/* Mobile TOC toggle */}
             <button
+              aria-label={mobileMenuOpen ? 'Close documentation navigation' : 'Open documentation navigation'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="docs-mobile-navigation"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2 text-gray-400 hover:text-white"
             >
@@ -674,11 +589,14 @@ export default function Docs() {
 
       {/* Mobile TOC drawer */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/80 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
+        <FocusTrap focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false }}>
+        <div role="dialog" aria-modal="true" aria-label="Documentation navigation" onKeyDown={e => { if (e.key === 'Escape') setMobileMenuOpen(false) }} className="fixed inset-0 z-40 bg-black/80 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
           <div
-            className="absolute top-16 right-0 w-72 bg-[#0a0a0a] border-l border-white/10 h-full overflow-y-auto p-6"
+            id="docs-mobile-navigation"
+            className="absolute top-16 right-0 bottom-0 w-72 max-w-full bg-[#0a0a0a] border-l border-white/10 overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
+            <button type="button" className="mb-4 p-2 text-gray-200" onClick={() => setMobileMenuOpen(false)}>Close navigation</button>
             <div className="mb-4">
               <PresentSidebar onNavigate={() => setMobileMenuOpen(false)} />
             </div>
@@ -704,6 +622,7 @@ export default function Docs() {
             </nav>
           </div>
         </div>
+        </FocusTrap>
       )}
 
       <div className="pt-16 flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -743,6 +662,7 @@ export default function Docs() {
                 <section
                   key={s.id}
                   id={s.id}
+                  tabIndex={-1}
                   className="scroll-mt-24 glass-panel rounded-xl p-6 sm:p-8 border border-white/5"
                   ref={(el) => {
                     if (el) sectionRefs.current.set(s.id, el)

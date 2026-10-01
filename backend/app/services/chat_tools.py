@@ -2361,11 +2361,12 @@ async def approve_workflow_step(
         return gate
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    approval.status = STATUS_APPROVED
-    approval.reviewer_user_id = context.deps.user_id
-    approval.reviewer_comments = comments or ""
-    approval.decision_at = now
-    await approval.save()
+    from app.services.approval_service import update_pending_approval
+    if not await update_pending_approval(approval, {
+        "status": STATUS_APPROVED, "reviewer_user_id": context.deps.user_id,
+        "reviewer_comments": comments or "", "decision_at": now,
+    }):
+        return {"error": "Review changed, was already decided, or its deadline passed. Reopen the review before continuing."}
 
     try:
         from app.celery_app import celery
@@ -2380,7 +2381,7 @@ async def approve_workflow_step(
         return {
             "error": (
                 "The step was marked approved but the workflow couldn't be "
-                "resumed automatically. Try again from the Reviews screen."
+                "resumed automatically. Open Reviews to inspect the recorded decision and ask the workflow owner to check the failed dispatch."
             )
         }
 
@@ -2460,11 +2461,12 @@ async def reject_workflow_step(
         return gate
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    approval.status = STATUS_REJECTED
-    approval.reviewer_user_id = context.deps.user_id
-    approval.reviewer_comments = comments or ""
-    approval.decision_at = now
-    await approval.save()
+    from app.services.approval_service import update_pending_approval
+    if not await update_pending_approval(approval, {
+        "status": STATUS_REJECTED, "reviewer_user_id": context.deps.user_id,
+        "reviewer_comments": comments or "", "decision_at": now,
+    }):
+        return {"error": "Review changed, was already decided, or its deadline passed. Reopen the review before continuing."}
 
     # Mark the workflow run failed, mirroring routers/reviews.py::reject_review.
     try:
@@ -3598,7 +3600,7 @@ async def save_to_folder(
         from app.services import access_control
 
         folder = await access_control.get_authorized_folder(
-            folder_uuid, user, team_access=context.deps.team_access,
+            folder_uuid, user, team_access=context.deps.team_access, contribute=True,
         )
         if not folder:
             return _err(

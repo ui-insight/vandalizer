@@ -216,7 +216,7 @@ describe('ConfigTab — panel inventory', () => {
       'Document Compliance Checks',
       'Document Retention Policy',
     ]) {
-      expect(screen.getByText(heading)).toBeInTheDocument()
+      expect(await screen.findByText(heading)).toBeInTheDocument()
     }
   })
 
@@ -277,7 +277,7 @@ describe('ConfigTab — OCR provider', () => {
     })
     fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
 
-    await screen.findByRole('alert')
+    await screen.findByText(/^OCR options:/)
     expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
   })
 
@@ -526,7 +526,7 @@ describe('ConfigTab — theme save', () => {
     await renderConfigTab()
 
     // Two bound inputs show the colour (a native picker and a hex field).
-    const hexField = screen.getAllByDisplayValue('#eab308')[1]
+    const hexField = await screen.findByRole('textbox', { name: 'Highlight color' })
     fireEvent.change(hexField, { target: { value: '#123456' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Theme' }))
@@ -539,4 +539,51 @@ describe('ConfigTab — theme save', () => {
     expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
     await waitFor(() => expect(mockBrandingRefresh).toHaveBeenCalled())
   })
+})
+
+
+describe('ConfigTab — support contact recovery', () => {
+  it('retains a failed addition and applies the saved contact only after retry succeeds', async () => {
+    await renderConfigTab()
+    fireEvent.click(screen.getByRole('button', { name: 'Add Contact' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Support contact name' }), { target: { value: 'Research support' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Support contact user ID' }), { target: { value: 'research-support' } })
+    mockUpdateSystemConfig.mockRejectedValueOnce(new Error('Support contacts unavailable'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await screen.findByText(/Support contacts unavailable/)
+    expect(screen.getByRole('textbox', { name: 'Support contact name' })).toHaveValue('Research support')
+    expect(screen.queryByRole('button', { name: 'Remove support contact Research support' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await screen.findByRole('button', { name: 'Remove support contact Research support' })
+    mockUpdateSystemConfig.mockRejectedValueOnce(new Error('Removal unavailable'))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove support contact Research support' }))
+    await screen.findByText(/Removal unavailable/)
+    expect(screen.getByRole('button', { name: 'Remove support contact Research support' })).toBeInTheDocument()
+  }, 15000)
+})
+
+
+it('does not permit blank branding defaults to overwrite a failed read', async () => {
+  mockGetThemeConfig.mockRejectedValueOnce(new Error('Branding unavailable'))
+  await renderConfigTab()
+  const retry = await screen.findByRole('button', { name: 'Retry branding settings' })
+  expect(screen.queryByRole('button', { name: 'Save Theme' })).not.toBeInTheDocument()
+  expect(mockUpdateThemeConfig).not.toHaveBeenCalled()
+  fireEvent.click(retry)
+  await screen.findByRole('button', { name: 'Save Theme' })
+  expect(screen.getByRole('textbox', { name: 'Highlight color' })).toHaveValue(THEME.highlight_color)
+})
+
+
+it('retries only the list after an accepted provider edit fails to refresh', async () => {
+  await renderConfigTab()
+  fireEvent.click(screen.getByRole('button', { name: 'Edit provider' }))
+  fireEvent.change(await screen.findByLabelText('Display Name'), { target: { value: 'Updated campus identity' } })
+  mockGetSystemConfig.mockRejectedValueOnce(new Error('Provider list unavailable'))
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+  const retry = await screen.findByRole('button', { name: 'Retry provider list' })
+  expect(mockUpdateOAuthProvider).toHaveBeenCalledTimes(1)
+  fireEvent.click(retry)
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry provider list' })).not.toBeInTheDocument())
+  expect(mockUpdateOAuthProvider).toHaveBeenCalledTimes(1)
 })

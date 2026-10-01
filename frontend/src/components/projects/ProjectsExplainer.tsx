@@ -1,3 +1,4 @@
+import { TaskHelpLink } from '../shared/TaskHelpLink'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { type ReactNode } from 'react'
 import {
@@ -49,6 +50,8 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
           contract, or a review lives in one organized home.
         </p>
       </div>
+
+      <TaskHelpLink topic="project-scope">Worked example: review a proposal in a project</TaskHelpLink>
 
       {/* Animated diagram */}
       <div className="pj-section mt-7" style={{ animationDelay: '160ms' }}>

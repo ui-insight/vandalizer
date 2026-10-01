@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, BarChart3, CheckCircle2, Clock, Minus, Play, RefreshCw,
   ShieldCheck, TrendingDown, TrendingUp, XCircle,
@@ -11,146 +11,130 @@ import {
   acknowledgeAlert, getJudgeCalibration, getQualityAlerts, getQualityByModel,
   getQualityItemDetail, getQualityItems, getQualitySummary, getQualityTimeline,
   getRegressionSuiteRun, getRegressionSuiteRuns, runRegressionSuite,
-  type JudgeSurfaceCalibration, type ModelQualityRow,
-  type QualityAlert, type QualityItem, type QualityItemDetail, type QualitySummary,
-  type QualityTimelinePoint, type RegressionItemResult, type RegressionSuiteRunDetail,
-  type RegressionSuiteRunSummary,
+  type RegressionItemResult, type RegressionSuiteRunDetail,
 } from '../../api/admin'
 import { getModels } from '../../api/config'
-import type { ModelInfo } from '../../types/workflow'
 
 type SuiteRow = RegressionItemResult & { otherScore?: number | null; compareDelta?: number | null }
 import { useToast } from '../../contexts/ToastContext'
 import { relativeTime } from '../../utils/time'
 import { downloadCSV } from './shared/format'
 import { ExportButton, KpiCard, SortableHeader } from './shared/primitives'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
 
 export function QualityTab() {
   const { toast } = useToast()
-  const [summary, setSummary] = useState<QualitySummary | null>(null)
-  const [timeline, setTimeline] = useState<QualityTimelinePoint[]>([])
   const [days, setDays] = useState(90)
-  const [loading, setLoading] = useState(true)
   const [regressionStarting, setRegressionStarting] = useState(false)
+  const starting = useRef(false)
   const [regressionModel, setRegressionModel] = useState('')
-  const [suiteRuns, setSuiteRuns] = useState<RegressionSuiteRunSummary[]>([])
-  const [modelRows, setModelRows] = useState<ModelQualityRow[]>([])
   const [activeSuite, setActiveSuite] = useState<RegressionSuiteRunDetail | null>(null)
   const [compareSuite, setCompareSuite] = useState<RegressionSuiteRunDetail | null>(null)
-  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
-  const [error, setError] = useState<string | null>(null)
-
-  // Alert feed state
-  const [alerts, setAlerts] = useState<QualityAlert[]>([])
-
-  // Per-item quality state
-  const [qualityItems, setQualityItems] = useState<QualityItem[]>([])
-  const [judgeCalibration, setJudgeCalibration] = useState<JudgeSurfaceCalibration[]>([])
+  const [selectedRun, setSelectedRun] = useState('')
+  const [comparisonRun, setComparisonRun] = useState('')
+  const [suiteError, setSuiteError] = useState<string | null>(null)
+  const [comparisonError, setComparisonError] = useState<string | null>(null)
+  const suiteVersion = useRef(0)
+  const comparisonVersion = useRef(0)
+  const acknowledging = useRef(new Set<string>())
+  const [pendingAlerts, setPendingAlerts] = useState<string[]>([])
   const [expandedItem, setExpandedItem] = useState<{ kind: string; id: string } | null>(null)
-  const [itemDetail, setItemDetail] = useState<QualityItemDetail | null>(null)
   const [itemSort, setItemSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'score', dir: 'asc' })
 
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    Promise.all([
-      getQualitySummary(),
-      getQualityTimeline(days),
-      getQualityAlerts(50, false),
-      getQualityItems('score', 'asc', 100),
-    ]).then(([s, t, a, qi]) => {
-      if (cancelled) return
-      setSummary(s)
-      setTimeline(t.timeline)
-      setAlerts(a.alerts)
-      setQualityItems(qi.items)
-    }).catch(e => { if (!cancelled) setError(e?.message || 'Failed to load quality data') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [days])
+  const request = useCallback(() => Promise.all([
+    getQualitySummary(), getQualityTimeline(days), getQualityAlerts(50, false), getQualityItems('score', 'asc', 100),
+  ]), [days])
+  const { data, setData, loading, error, load } = useAdminQuery(request)
+  const summary = data?.[0] ?? null
+  const timeline = data?.[1].timeline ?? []
+  const alerts = data?.[2].alerts ?? []
+  const qualityItems = useMemo(() => data?.[3].items ?? [], [data])
+  // Independent panels expose their own recovery without blanking the whole tab.
+  const calibrationQuery = useAdminQuery(getJudgeCalibration)
+  const judgeCalibration = calibrationQuery.data?.surfaces ?? []
+  const modelsQuery = useAdminQuery(getModels)
+  const availableModels = modelsQuery.data ?? []
+  const runsQuery = useAdminQuery(getRegressionSuiteRuns)
+  const suiteRuns = runsQuery.data?.runs ?? []
+  const loadSuiteRuns = runsQuery.load
+  const modelRequest = useCallback(() => getQualityByModel(days), [days])
+  const modelQuery = useAdminQuery(modelRequest)
+  const modelRows = modelQuery.data?.models ?? []
+  const loadModelRows = modelQuery.load
+  const itemRequest = useCallback(() => expandedItem ? getQualityItemDetail(expandedItem.kind, expandedItem.id) : Promise.resolve(null), [expandedItem])
+  const itemQuery = useAdminQuery(itemRequest)
+  const itemDetail = itemQuery.data
 
-  useEffect(() => load(), [load])
+  useEffect(() => () => { suiteVersion.current++; comparisonVersion.current++ }, [])
 
-  // Judge calibration is fetched separately for the same reason config is: it
-  // is an independent panel, and a failure there must not blank the tab.
-  useEffect(() => {
-    let cancelled = false
-    getJudgeCalibration()
-      .then(d => { if (!cancelled) setJudgeCalibration(d.surfaces) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
-  // Model list for the regression panel's <select>. Uses the same
-  // non-privileged endpoint as the chat model picker — the superadmin-only
-  // system config was used before, which left staff admins with a dropdown
-  // containing only "Default Model" and no way to target a model at all.
-  useEffect(() => {
-    let cancelled = false
-    getModels().then(m => { if (!cancelled) setAvailableModels(m) }).catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
-  const loadSuiteRuns = useCallback(() => {
-    getRegressionSuiteRuns().then(d => setSuiteRuns(d.runs)).catch(() => {})
-  }, [])
-
-  // By-model rollup. Refetched when a sweep finishes so its runs count in.
-  useEffect(() => {
-    if (activeSuite?.status === 'running') return
-    let cancelled = false
-    getQualityByModel(days).then(d => { if (!cancelled) setModelRows(d.models) }).catch(() => {})
-    return () => { cancelled = true }
-  }, [days, activeSuite?.status])
-
-  useEffect(() => {
-    loadSuiteRuns()
-  }, [loadSuiteRuns])
-
-  // While the viewed suite is still running, poll it. The sweep runs in a
-  // Celery task; progress lands on the run document as items complete.
+  // A response for a previously viewed run must never replace the current one.
   useEffect(() => {
     if (activeSuite?.status !== 'running') return
+    let cancelled = false
+    let pending = false
     const runUuid = activeSuite.run_uuid
-    const id = setInterval(() => {
-      getRegressionSuiteRun(runUuid).then(d => {
-        setActiveSuite(d)
-        if (d.status !== 'running') loadSuiteRuns()
-      }).catch(() => { /* transient — keep polling */ })
+    const id = setInterval(async () => {
+      if (pending) return
+      pending = true
+      try {
+        const result = await getRegressionSuiteRun(runUuid)
+        if (cancelled) return
+        setActiveSuite(result)
+        setSuiteError(null)
+        if (result.status !== 'running') { loadSuiteRuns(); loadModelRows() }
+      } catch (reason) {
+        if (!cancelled) setSuiteError(reason instanceof Error ? reason.message : 'Unable to refresh this run.')
+      } finally { pending = false }
     }, 4000)
-    return () => clearInterval(id)
-  }, [activeSuite?.status, activeSuite?.run_uuid, loadSuiteRuns])
+    return () => { cancelled = true; clearInterval(id) }
+  }, [activeSuite?.status, activeSuite?.run_uuid, loadSuiteRuns, loadModelRows])
+
+  const handleViewSuite = async (runUuid: string) => {
+    const version = ++suiteVersion.current
+    comparisonVersion.current++
+    setSelectedRun(runUuid)
+    setComparisonRun('')
+    setComparisonError(null)
+    setCompareSuite(null)
+    setActiveSuite(null)
+    setSuiteError(null)
+    try {
+      const result = await getRegressionSuiteRun(runUuid)
+      if (version === suiteVersion.current) setActiveSuite(result)
+    } catch (reason) {
+      if (version === suiteVersion.current) setSuiteError(reason instanceof Error ? reason.message : 'Unable to load this run.')
+    }
+  }
 
   const handleRunRegression = async () => {
+    if (starting.current) return
+    starting.current = true
     setRegressionStarting(true)
     try {
       const { run_uuid } = await runRegressionSuite(regressionModel || undefined)
-      setCompareSuite(null)
-      setActiveSuite(await getRegressionSuiteRun(run_uuid))
+      // Once accepted, a failed status read must retry this run, not start another.
+      await handleViewSuite(run_uuid)
       loadSuiteRuns()
-    } catch (e) {
-      toast(`Failed to start regression suite: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+    } catch (reason) {
+      toast(`Failed to start regression suite: ${reason instanceof Error ? reason.message : 'unknown error'}`, 'error')
     } finally {
+      starting.current = false
       setRegressionStarting(false)
     }
   }
 
-  const handleViewSuite = async (runUuid: string) => {
-    try {
-      setCompareSuite(null)
-      setActiveSuite(await getRegressionSuiteRun(runUuid))
-    } catch (e) {
-      toast(`Failed to load run: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
-    }
-  }
-
   const handleCompareSuite = async (runUuid: string) => {
-    if (!runUuid) { setCompareSuite(null); return }
+    const version = ++comparisonVersion.current
+    setComparisonRun(runUuid)
+    setComparisonError(null)
+    setCompareSuite(null)
+    if (!runUuid) return
     try {
-      setCompareSuite(await getRegressionSuiteRun(runUuid))
-    } catch (e) {
-      toast(`Failed to load comparison run: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+      const result = await getRegressionSuiteRun(runUuid)
+      if (version === comparisonVersion.current) setCompareSuite(result)
+    } catch (reason) {
+      if (version === comparisonVersion.current) setComparisonError(reason instanceof Error ? reason.message : 'Unable to load comparison.')
     }
   }
 
@@ -169,24 +153,22 @@ export function QualityTab() {
   }, [activeSuite, compareSuite])
 
   const handleAcknowledgeAlert = async (uuid: string) => {
+    if (acknowledging.current.has(uuid)) return
+    acknowledging.current.add(uuid)
+    setPendingAlerts([...acknowledging.current])
     try {
       await acknowledgeAlert(uuid)
-      setAlerts(prev => prev.filter(a => a.uuid !== uuid))
+      setData(previous => previous ? [previous[0], previous[1], { alerts: previous[2].alerts.filter(alert => alert.uuid !== uuid) }, previous[3]] : previous)
     } catch (e) {
       toast(`Failed to acknowledge alert: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+    } finally {
+      acknowledging.current.delete(uuid)
+      setPendingAlerts([...acknowledging.current])
     }
   }
 
-  const handleExpandItem = async (kind: string, id: string) => {
-    if (expandedItem?.kind === kind && expandedItem?.id === id) {
-      setExpandedItem(null)
-      setItemDetail(null)
-      return
-    }
-    setExpandedItem({ kind, id })
-    setItemDetail(null)
-    const detail = await getQualityItemDetail(kind, id)
-    setItemDetail(detail)
+  const handleExpandItem = (kind: string, id: string) => {
+    setExpandedItem(previous => previous?.kind === kind && previous.id === id ? null : { kind, id })
   }
 
   const handleItemSort = (key: string) => {
@@ -218,12 +200,14 @@ export function QualityTab() {
   if (error && !summary) return (
     <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
       <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
-      <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+      <div role="alert" style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+      <button type="button" onClick={load} className="admin-open-record">Retry quality data</button>
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, overflowWrap: 'anywhere' }}>
+      <p style={{ fontSize: 13, color: '#59616b', margin: 0 }}>Recorded validation scores measure performance on test cases. Review the affected item and its evidence before relying on it for a new document.</p>
       {/* Alert Feed Panel */}
       {alerts.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
@@ -247,7 +231,7 @@ export function QualityTab() {
                   key={alert.uuid}
                   style={{
                     padding: '12px 20px', borderBottom: '1px solid #f3f4f6',
-                    display: 'flex', alignItems: 'center', gap: 12,
+                    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12,
                   }}
                 >
                   <span style={{
@@ -258,7 +242,7 @@ export function QualityTab() {
                   }}>
                     {alert.severity}
                   </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{alert.item_name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                       {alert.message}
@@ -281,11 +265,13 @@ export function QualityTab() {
                       )}
                     </div>
                   </div>
-                  <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 11, color: '#59616b', flexShrink: 0, whiteSpace: 'nowrap' }}>
                     {alert.created_at ? relativeTime(alert.created_at) : '-'}
                   </span>
                   <button
                     onClick={() => handleAcknowledgeAlert(alert.uuid)}
+                    aria-label={`Acknowledge alert for ${alert.item_name}`}
+                    disabled={pendingAlerts.includes(alert.uuid)}
                     style={{
                       padding: '4px 12px', borderRadius: 'var(--ui-radius, 12px)',
                       border: '1px solid #e5e7eb', background: '#fff', fontSize: 12,
@@ -316,9 +302,10 @@ export function QualityTab() {
           <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Quality Timeline</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <select
+              aria-label="Quality time range"
               value={days}
               onChange={e => setDays(Number(e.target.value))}
-              style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+              style={{ maxWidth: '100%', padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
             >
               <option value={30}>30 days</option>
               <option value={60}>60 days</option>
@@ -327,7 +314,7 @@ export function QualityTab() {
               <option value={365}>1 year</option>
               <option value={730}>2 years</option>
             </select>
-            <ExportButton onClick={() => downloadCSV(
+            <ExportButton disabled={loading || !!error} onClick={() => downloadCSV(
               `quality-timeline-${days}d.csv`,
               ['Date', 'Avg Score', 'Run Count', 'Items Validated'],
               timeline.map(p => [p.date, p.avg_score, p.run_count, p.items_validated]),
@@ -335,7 +322,7 @@ export function QualityTab() {
           </div>
         </div>
         {timeline.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#59616b', fontSize: 13 }}>
             No validation data yet. Run validation on items to see the timeline.
           </div>
         ) : (
@@ -360,11 +347,12 @@ export function QualityTab() {
         <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 16px' }}>
           Run validation on all verified items to detect quality regressions after model or configuration changes.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <select
+            aria-label="Regression model"
             value={regressionModel}
             onChange={e => setRegressionModel(e.target.value)}
-            style={{ padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', minWidth: 200 }}
+            style={{ padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', minWidth: 0, maxWidth: '100%', flex: '0 1 280px' }}
           >
             <option value="">Default Model</option>
             {availableModels.map((m, i) => (
@@ -373,24 +361,28 @@ export function QualityTab() {
           </select>
           <button
             onClick={handleRunRegression}
-            disabled={regressionStarting || activeSuite?.status === 'running'}
+            disabled={regressionStarting || (!!selectedRun && !activeSuite) || activeSuite?.status === 'running'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)',
               border: 'none', background: '#111827', color: '#fff',
               fontSize: 13, fontWeight: 600,
-              cursor: (regressionStarting || activeSuite?.status === 'running') ? 'wait' : 'pointer',
-              opacity: (regressionStarting || activeSuite?.status === 'running') ? 0.6 : 1,
+              cursor: (regressionStarting || (!!selectedRun && !activeSuite) || activeSuite?.status === 'running') ? 'wait' : 'pointer',
+              opacity: (regressionStarting || (!!selectedRun && !activeSuite) || activeSuite?.status === 'running') ? 0.6 : 1,
             }}
           >
-            {(regressionStarting || activeSuite?.status === 'running') ? (
-              <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
+            {(regressionStarting || (!!selectedRun && !activeSuite) || activeSuite?.status === 'running') ? (
+              <><RefreshCw size={14} /> {regressionStarting ? 'Starting…' : activeSuite?.status === 'running' ? 'Running…' : 'Awaiting run status'}</>
             ) : (
               <><Play size={14} /> Run Regression Suite</>
             )}
           </button>
         </div>
 
+        {modelsQuery.error && <ReadFailure message={modelsQuery.error} retry={modelsQuery.load} label="Retry models" />}
+        {runsQuery.error && <ReadFailure message={runsQuery.error} retry={loadSuiteRuns} label="Retry suite history" />}
+        {suiteError && <ReadFailure message={`Run ${selectedRun}: ${suiteError}`} retry={() => handleViewSuite(selectedRun)} label="Retry run status" />}
+        {selectedRun && !activeSuite && !suiteError && <p role="status">Loading selected run…</p>}
         {suiteRuns.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {suiteRuns.map(run => {
@@ -399,6 +391,7 @@ export function QualityTab() {
                 <button
                   key={run.run_uuid}
                   onClick={() => handleViewSuite(run.run_uuid)}
+                  aria-pressed={selectedRun === run.run_uuid}
                   title={run.started_at ? new Date(run.started_at).toLocaleString() : undefined}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -409,7 +402,7 @@ export function QualityTab() {
                   }}
                 >
                   <span style={{ fontWeight: 600 }}>{run.model || 'default'}</span>
-                  <span style={{ opacity: 0.75 }}>
+                  <span>
                     {run.status === 'running'
                       ? `${run.completed_items}/${run.total_items || '?'}…`
                       : run.status === 'failed'
@@ -417,7 +410,7 @@ export function QualityTab() {
                         : run.mean_score != null ? `${run.mean_score}%` : '—'}
                   </span>
                   {run.started_at && (
-                    <span style={{ opacity: 0.55 }}>{relativeTime(run.started_at)}</span>
+                    <span>{relativeTime(run.started_at)}</span>
                   )}
                 </button>
               )
@@ -439,7 +432,7 @@ export function QualityTab() {
                   ? <>Progress: <strong>{activeSuite.completed_items}/{activeSuite.total_items || '?'}</strong></>
                   : <>Total: <strong>{activeSuite.total_items}</strong></>}
               </span>
-              <span style={{ color: '#16a34a' }}>Succeeded: <strong>{activeSuite.succeeded}</strong></span>
+              <span style={{ color: '#15803d' }}>Succeeded: <strong>{activeSuite.succeeded}</strong></span>
               <span style={{ color: '#dc2626' }}>Failed: <strong>{activeSuite.failed}</strong></span>
               {activeSuite.mean_score != null && (
                 <span style={{ color: '#111827', fontSize: 15 }}>
@@ -447,12 +440,12 @@ export function QualityTab() {
                 </span>
               )}
               {activeSuite.status === 'completed' && suiteRuns.some(r => r.status === 'completed' && r.run_uuid !== activeSuite.run_uuid) && (
-                <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280' }}>
+                <label style={{ marginLeft: 'auto', display: 'flex', flexWrap: 'wrap', maxWidth: '100%', alignItems: 'center', gap: 6, color: '#6b7280' }}>
                   Compare with
                   <select
-                    value={compareSuite?.run_uuid ?? ''}
+                    value={comparisonRun}
                     onChange={e => handleCompareSuite(e.target.value)}
-                    style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+                    style={{ maxWidth: '100%', padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
                   >
                     <option value="">—</option>
                     {suiteRuns
@@ -471,6 +464,7 @@ export function QualityTab() {
                 {activeSuite.error}
               </div>
             )}
+            {comparisonError && <ReadFailure message={comparisonError} retry={() => handleCompareSuite(comparisonRun)} label="Retry comparison" />}
             {compareSuite && suiteComparison && (
               <div style={{ marginBottom: 12, fontSize: 13, color: '#6b7280' }}>
                 Mean: <strong style={{ color: '#111827' }}>{activeSuite.model || 'default'} {activeSuite.mean_score != null ? `${activeSuite.mean_score}%` : '—'}</strong>
@@ -478,7 +472,7 @@ export function QualityTab() {
                 <strong style={{ color: '#111827' }}>{compareSuite.model || 'default'} {compareSuite.mean_score != null ? `${compareSuite.mean_score}%` : '—'}</strong>
               </div>
             )}
-            <div style={{ overflowX: 'auto' }}>
+            <TableRegion label="Regression suite results — scroll for more columns">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
@@ -525,13 +519,13 @@ export function QualityTab() {
                         )}
                         <td style={{
                           padding: '8px 12px', textAlign: 'right', fontWeight: 600,
-                          color: delta == null ? '#9ca3af' : delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#9ca3af',
+                          color: delta == null ? '#59616b' : delta > 0 ? '#15803d' : delta < 0 ? '#dc2626' : '#59616b',
                         }}>
                           {delta == null ? '-' : delta > 0 ? `+${delta}` : delta}
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                           {r.status === 'ok' ? (
-                            <CheckCircle2 size={16} color="#16a34a" />
+                            <CheckCircle2 size={16} color="#15803d" />
                           ) : (
                             <span style={{ fontSize: 11, color: '#dc2626' }}>{r.status}</span>
                           )}
@@ -541,7 +535,7 @@ export function QualityTab() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableRegion>
           </div>
         )}
       </div>
@@ -552,12 +546,12 @@ export function QualityTab() {
         <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 12px' }}>
           Validation quality over the last {days} days, grouped by the model that executed each run.
         </p>
-        {modelRows.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+        {modelQuery.error ? <ReadFailure message={modelQuery.error} retry={modelQuery.load} label="Retry model performance" /> : modelQuery.loading ? <p role="status">Loading model performance…</p> : modelRows.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: '#59616b', fontSize: 13 }}>
             No validation runs in this window yet.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <TableRegion label="Quality by model — scroll for more columns">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
@@ -571,13 +565,13 @@ export function QualityTab() {
               </thead>
               <tbody>
                 {modelRows.map((row, i) => {
-                  const scoreColor = row.avg_score >= 90 ? '#16a34a'
+                  const scoreColor = row.avg_score >= 90 ? '#15803d'
                     : row.avg_score >= 70 ? '#2563eb'
-                    : row.avg_score >= 50 ? '#f59e0b'
+                    : row.avg_score >= 50 ? '#92400e'
                     : '#dc2626'
                   return (
                     <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 500, color: row.model ? '#111827' : '#9ca3af' }}
+                      <td style={{ padding: '8px 12px', fontWeight: 500, color: row.model ? '#111827' : '#59616b' }}
                         title={row.model ? undefined : 'Runs that recorded no task model — older history, and workflow validations graded over mixed-model executions'}>
                         {row.model || '(unattributed)'}
                       </td>
@@ -597,7 +591,7 @@ export function QualityTab() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         )}
       </div>
 
@@ -607,11 +601,11 @@ export function QualityTab() {
           Per-Item Quality ({qualityItems.length})
         </div>
         {qualityItems.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+          <div style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 13 }}>
             No quality items found. Validate items to see them here.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <TableRegion label="Quality by item — scroll for more columns">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -627,10 +621,10 @@ export function QualityTab() {
               <tbody>
                 {sortedQualityItems.map(item => {
                   const isExpanded = expandedItem?.kind === item.item_kind && expandedItem?.id === item.item_id
-                  const scoreColor = item.quality_score == null ? '#9ca3af'
-                    : item.quality_score >= 90 ? '#16a34a'
+                  const scoreColor = item.quality_score == null ? '#59616b'
+                    : item.quality_score >= 90 ? '#15803d'
                     : item.quality_score >= 70 ? '#2563eb'
-                    : item.quality_score >= 50 ? '#f59e0b'
+                    : item.quality_score >= 50 ? '#92400e'
                     : '#dc2626'
                   const tierColors: Record<string, { bg: string; text: string }> = {
                     excellent: { bg: '#dcfce7', text: '#166534' },
@@ -642,13 +636,12 @@ export function QualityTab() {
                   return (
                     <React.Fragment key={`${item.item_kind}-${item.item_id}`}>
                       <tr
-                        onClick={() => handleExpandItem(item.item_kind, item.item_id)}
                         style={{
-                          borderBottom: '1px solid #f3f4f6', cursor: 'pointer',
+                          borderBottom: '1px solid #f3f4f6',
                           background: isExpanded ? '#f9fafb' : undefined,
                         }}
                       >
-                        <td style={{ padding: '10px 16px', fontWeight: 500 }}>{item.display_name}</td>
+                        <td style={{ padding: '10px 16px', fontWeight: 500 }}><button type="button" className="admin-open-record" aria-expanded={isExpanded} onClick={() => handleExpandItem(item.item_kind, item.item_id)} aria-label={`View quality for ${item.display_name}`}>{item.display_name}</button></td>
                         <td style={{ padding: '10px 16px' }}>
                           <span style={{
                             fontSize: 11, padding: '1px 8px', borderRadius: 9999,
@@ -671,9 +664,9 @@ export function QualityTab() {
                           ) : '-'}
                         </td>
                         <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          {item.trend === 'up' && <TrendingUp size={16} color="#16a34a" />}
+                          {item.trend === 'up' && <TrendingUp size={16} color="#15803d" />}
                           {item.trend === 'down' && <TrendingDown size={16} color="#dc2626" />}
-                          {item.trend === 'flat' && <Minus size={16} color="#9ca3af" />}
+                          {item.trend === 'flat' && <Minus size={16} color="#59616b" />}
                         </td>
                         <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280' }}>
                           {item.last_validated_at ? relativeTime(item.last_validated_at) : '-'}
@@ -687,8 +680,8 @@ export function QualityTab() {
                         <tr>
                           <td colSpan={7} style={{ padding: 0, background: '#f9fafb' }}>
                             <div style={{ padding: '16px 20px' }}>
-                              {!itemDetail ? (
-                                <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: 13 }}>
+                              {itemQuery.error ? <ReadFailure message={itemQuery.error} retry={itemQuery.load} label="Retry item quality" /> : !itemDetail ? (
+                                <div style={{ textAlign: 'center', padding: '20px 0', color: '#59616b', fontSize: 13 }}>
                                   Loading detail...
                                 </div>
                               ) : (
@@ -700,7 +693,7 @@ export function QualityTab() {
                                   }}>
                                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Score Timeline</div>
                                     {itemDetail.history.length === 0 ? (
-                                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: 12 }}>
+                                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#59616b', fontSize: 12 }}>
                                         No history available.
                                       </div>
                                     ) : (
@@ -729,7 +722,7 @@ export function QualityTab() {
                                   }}>
                                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Model Comparison</div>
                                     {itemDetail.model_comparison.length === 0 ? (
-                                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: 12 }}>
+                                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#59616b', fontSize: 12 }}>
                                         No model data available.
                                       </div>
                                     ) : (
@@ -742,11 +735,11 @@ export function QualityTab() {
                                           }}>
                                             <div>
                                               <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{mc.model}</div>
-                                              <div style={{ fontSize: 11, color: '#9ca3af' }}>{mc.run_count} run{mc.run_count !== 1 ? 's' : ''}</div>
+                                              <div style={{ fontSize: 11, color: '#59616b' }}>{mc.run_count} run{mc.run_count !== 1 ? 's' : ''}</div>
                                             </div>
                                             <div style={{
                                               fontSize: 18, fontWeight: 700, fontFamily: 'ui-monospace, monospace',
-                                              color: mc.avg_score >= 90 ? '#16a34a' : mc.avg_score >= 70 ? '#2563eb' : mc.avg_score >= 50 ? '#f59e0b' : '#dc2626',
+                                              color: mc.avg_score >= 90 ? '#15803d' : mc.avg_score >= 70 ? '#2563eb' : mc.avg_score >= 50 ? '#92400e' : '#dc2626',
                                             }}>
                                               {mc.avg_score}%
                                             </div>
@@ -766,12 +759,12 @@ export function QualityTab() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         )}
       </div>
 
       {/* Judge Calibration */}
-      {judgeCalibration.length > 0 && (
+      {(calibrationQuery.loading || calibrationQuery.error || judgeCalibration.length > 0) && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
           <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px' }}>Judge Calibration</h3>
           <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 16px' }}>
@@ -780,9 +773,11 @@ export function QualityTab() {
             runs on — <strong>not</strong> against your models. A model shown as unmeasured
             carries no agreement figure at all, rather than borrowing one.
           </p>
+          {calibrationQuery.error && <ReadFailure message={calibrationQuery.error} retry={calibrationQuery.load} label="Retry judge calibration" />}
+          {calibrationQuery.loading && <p role="status">Loading calibration…</p>}
           {judgeCalibration.map(surface => (
             <div key={surface.surface} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
                   {surface.surface}
                 </span>
@@ -845,7 +840,7 @@ export function QualityTab() {
       {/* Monitoring Status */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
         <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 16px' }}>Monitoring Status</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
           <div style={{
             padding: 16, borderRadius: 'var(--ui-radius, 12px)', background: '#f0fdf4',
             border: '1px solid #bbf7d0', textAlign: 'center',
@@ -853,7 +848,7 @@ export function QualityTab() {
             <div style={{ fontSize: 28, fontWeight: 700, color: '#166534', fontFamily: 'ui-monospace, monospace' }}>
               {qualityItems.length}
             </div>
-            <div style={{ fontSize: 12, color: '#15803d', fontWeight: 500, marginTop: 4 }}>Total Monitored Items</div>
+            <div style={{ fontSize: 12, color: '#15803d', fontWeight: 500, marginTop: 4 }}>Loaded items (up to 100)</div>
           </div>
           <div style={{
             padding: 16, borderRadius: 'var(--ui-radius, 12px)', background: '#fffbeb',
@@ -862,7 +857,7 @@ export function QualityTab() {
             <div style={{ fontSize: 28, fontWeight: 700, color: '#92400e', fontFamily: 'ui-monospace, monospace' }}>
               {alerts.length}
             </div>
-            <div style={{ fontSize: 12, color: '#a16207', fontWeight: 500, marginTop: 4 }}>Items with Alerts</div>
+            <div style={{ fontSize: 12, color: '#a16207', fontWeight: 500, marginTop: 4 }}>Open alerts (up to 50)</div>
           </div>
           <div style={{
             padding: 16, borderRadius: 'var(--ui-radius, 12px)', background: '#fef2f2',
@@ -871,10 +866,14 @@ export function QualityTab() {
             <div style={{ fontSize: 28, fontWeight: 700, color: '#991b1b', fontFamily: 'ui-monospace, monospace' }}>
               {qualityItems.filter(i => i.stale).length}
             </div>
-            <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500, marginTop: 4 }}>Stale Items</div>
+            <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500, marginTop: 4 }}>Stale loaded items</div>
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+function ReadFailure({ message, retry, label }: { message: string; retry: () => void; label: string }) {
+  return <div style={{ margin: '8px 0', fontSize: 13, color: '#991b1b' }}><p role="alert">{message}</p><button type="button" className="admin-open-record" onClick={retry}>{label}</button></div>
 }

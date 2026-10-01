@@ -2095,6 +2095,7 @@ async def revert_workflow_optimization(
 ):
     """Restore the config_override that was in effect before this run applied."""
     import datetime as _dt
+    from app.models.workflow import Workflow
 
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
@@ -2107,7 +2108,15 @@ async def revert_workflow_optimization(
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
 
-    wf.config_override = run.previous_override
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
-    await wf.save()
-    return {"ok": True, "reverted_to": wf.config_override}
+    if (wf.config_override or {}).get("from_run_uuid") != run_uuid:
+        if wf.config_override == run.previous_override:
+            return {"ok": True, "reverted_to": wf.config_override}
+        raise HTTPException(status_code=409, detail="A different configuration is now active. Refresh before reverting it.")
+    reverted_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
+    result = await Workflow.get_motor_collection().update_one(
+        {"_id": wf.id, "config_override": wf.config_override},
+        {"$set": {"config_override": run.previous_override, "config_override_set_at": reverted_at}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=409, detail="The configuration changed during this request. Refresh before reverting it.")
+    return {"ok": True, "reverted_to": run.previous_override}

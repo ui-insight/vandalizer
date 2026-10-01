@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createReview } from './harness.mjs'
-const review = await createReview({ output: '../artifacts/visual-review/welcome-paths', baseURL: 'http://127.0.0.1:5189' })
+const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state, capture } = review
 state.first = true
 try {

@@ -193,7 +193,7 @@ export function AttachmentList({
   const hidden = expanded ? 0 : Math.max(0, docChips.length - DOCS_SHOWN_COLLAPSED)
 
   return (
-    <div className="flex flex-wrap gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2">
+    <div role="region" aria-label="Conversation sources" tabIndex={0} className="chat-attachment-list flex flex-wrap gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2">
       {scopeChips}
       {hidden ? docChips.slice(0, DOCS_SHOWN_COLLAPSED) : docChips}
       {hidden > 0 && (

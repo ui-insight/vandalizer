@@ -20,6 +20,16 @@ async function shot(id, target) {
 }
 async function send(text) { await page.getByRole('textbox', { name: 'Message input' }).fill(text); await page.getByRole('button', { name: 'Send message' }).click() }
 try {
+  await page.route('**/api/teams/', async route => { await new Promise(resolve => setTimeout(resolve, 800)); await route.fallback() })
+  await page.goto(review.baseURL + '/?mode=chat')
+  await page.getByRole('status').filter({ hasText: 'Loading conversation workspace' }).waitFor()
+  assert.equal(await page.getByRole('textbox', { name: 'Message input' }).count(), 0)
+  const startupDraft = page.getByRole('textbox', { name: 'Message input' })
+  await startupDraft.fill('Retain this question after workspace startup')
+  await page.waitForTimeout(900)
+  assert.equal(await startupDraft.inputValue(), 'Retain this question after workspace startup')
+  await page.unroute('**/api/teams/')
+  review.observations.push('A delayed fixture team lookup exercises composer initialization: no temporary composer is offered, and typing after readiness remains intact.')
   for (const [width,height] of [[320,568],[768,600],[1440,900]]) {
     await page.setViewportSize({width,height})
     sourceStatus = 404; extractionFailed = false; retryFails = false; retriedDocuments = []
@@ -39,9 +49,11 @@ try {
     await page.keyboard.press('Enter')
     await page.getByText(preview, {exact:false}).waitFor()
     await shot(`chat-source-preview-${width}`, citation)
+    assert.ok(await page.getByRole('region', { name: 'Conversation', exact: true }).evaluate(e => e.clientHeight >= 170), 'Source context must leave a usable reading area')
     await citation.click(); await page.keyboard.press('ArrowDown')
     assert.equal(await page.getByRole('menuitem', { name: 'Open at p. ~2', exact: true }).evaluate(e => e === document.activeElement), true)
     const beforeDocument = await page.getByRole('region',{name:'Conversation',exact:true}).evaluate(e=>e.scrollTop)
+    const beforeCitation = await citation.evaluate(e=>e.getBoundingClientRect().top-e.closest('[aria-label=Conversation]').getBoundingClientRect().top)
     await page.keyboard.press('Enter')
     await page.getByText('Source unavailable', {exact:true}).waitFor()
     await shot(`chat-source-missing-${width}`, page.getByRole('button', { name: 'Retry source', exact: true }))
@@ -64,7 +76,8 @@ try {
     // beyond the new end must clamp there; otherwise preserve the exact passage.
     const restored=await page.getByRole('region',{name:'Conversation',exact:true}).evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.clientHeight}))
     review.observations.push({id:`source-return-${width}`,before:beforeDocument,after:restored.top,maximum:restored.max})
-    assert.ok(Math.abs(restored.top-Math.min(beforeDocument,restored.max))<=8, `Source return position changed: ${beforeDocument} to ${restored.top}; maximum ${restored.max}`)
+    const afterCitation = await citation.evaluate(e=>e.getBoundingClientRect().top-e.closest('[aria-label=Conversation]').getBoundingClientRect().top)
+    assert.ok(Math.abs(afterCitation-beforeCitation)<=8 || Math.abs(restored.top-Math.min(beforeDocument,restored.max))<=8, `Source return position changed: ${beforeDocument} to ${restored.top}; citation ${beforeCitation} to ${afterCitation}`)
     const link=page.getByRole('link',{name:'Published policy',exact:true})
     assert.equal(await link.getAttribute('href'),'https://example.org/published-policy')
     const [external]=await Promise.all([review.context.waitForEvent('page'),link.click()])

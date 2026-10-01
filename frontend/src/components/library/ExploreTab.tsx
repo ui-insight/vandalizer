@@ -190,7 +190,7 @@ export function ItemDetailModal({
                 </span>
               </div>
               <h2 className="text-xl font-bold">{item.display_name || item.name}</h2>
-              <p className="mt-1.5 text-sm text-gray-700">{item.description || 'Purpose not described.'}</p>
+              <p className="mt-1.5 text-sm text-gray-700">{item.description || 'The author has not described the task. Open the setup and inspect its inputs and output before saving or running it.'}</p>
             </div>
             <button type="button" disabled={!!adopting} onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-gray-200 text-gray-600 hover:text-gray-900">
               <X className="h-5 w-5" />
@@ -414,7 +414,7 @@ function CatalogCard({
         </div>
       </div>
 
-      <p className="text-sm text-gray-700 mb-3">{item.description || 'Purpose not described.'}</p>
+      <p className="text-sm text-gray-700 mb-3">{item.description || 'The author has not described the task. Open the setup and inspect its inputs and output before saving or running it.'}</p>
       <CatalogUsage item={item} compact />
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <QualityBadge

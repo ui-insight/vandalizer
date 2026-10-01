@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 
 import * as auditApi from '../../api/audit'
-import type { AuditLogEntry } from '../../api/audit'
 
 export function AuditTab() {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [loadedOnce, setLoadedOnce] = useState(false)
   const [actionFilter, setActionFilter] = useState('')
   const [debouncedActionFilter, setDebouncedActionFilter] = useState('')
   const [resourceTypeFilter, setResourceTypeFilter] = useState('')
@@ -29,21 +25,11 @@ export function AuditTab() {
   // Clear any pending debounce timer on unmount so it can't fire after teardown.
   useEffect(() => () => { if (actionDebounce.current) clearTimeout(actionDebounce.current) }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    auditApi.queryAuditLog({ action: debouncedActionFilter || undefined, resource_type: resourceTypeFilter || undefined, skip: page * limit, limit })
-      .then(data => {
-        if (cancelled) return
-        setEntries(data.entries)
-        setTotal(data.total)
-        setLoadedOnce(true)
-      })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load audit log') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [page, debouncedActionFilter, resourceTypeFilter])
+  const request = useCallback(() => auditApi.queryAuditLog({ action: debouncedActionFilter || undefined, resource_type: resourceTypeFilter || undefined, skip: page * limit, limit }), [page, debouncedActionFilter, resourceTypeFilter])
+  const { data, loading, error, load } = useAdminQuery(request)
+  const entries = data?.entries ?? []
+  const total = data?.total ?? 0
+  const loadedOnce = !!data
 
   const ACTION_COLORS: Record<string, string> = {
     'document.create': '#dcfce7', 'document.delete': '#fee2e2',
@@ -59,37 +45,38 @@ export function AuditTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-          Audit Log {loadedOnce && <span style={{ fontSize: 14, fontWeight: 400, color: '#9ca3af' }}>({total} entries)</span>}
+          Audit Log {loadedOnce && <span style={{ fontSize: 14, fontWeight: 400, color: '#59616b' }}>({total} entries)</span>}
         </h2>
         <a href={auditApi.exportAuditLog({ action: actionFilter, resource_type: resourceTypeFilter })}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', textDecoration: 'none' }}>
           <Download size={14} /> Export CSV
         </a>
       </div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <input type="text" value={actionFilter} onChange={e => handleActionFilterChange(e.target.value)}
-          placeholder="Filter by action…" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }} />
-        <select value={resourceTypeFilter} onChange={e => { setResourceTypeFilter(e.target.value); setPage(0) }}
-          style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <input type="text" aria-label="Filter audit actions" value={actionFilter} onChange={e => handleActionFilterChange(e.target.value)}
+          placeholder="Filter by action…" style={{ maxWidth: '100%', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }} />
+        <select aria-label="Filter audit resources" value={resourceTypeFilter} onChange={e => { setResourceTypeFilter(e.target.value); setPage(0) }}
+          style={{ maxWidth: '100%', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}>
           <option value="">All resources</option>
           {['document','folder','workflow','extraction','knowledge_base','credential','automation','chat','library_item','user','team','config','organization','approval'].map(r => (
             <option key={r} value={r}>{r.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
           ))}
         </select>
       </div>
+      <p style={{ fontSize: 13, color: '#59616b', marginBottom: 12 }}>Recorded actions show who did what and when. An event does not establish that a document or result is correct. Export includes all matching events.</p>
       {error && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
           padding: '10px 14px', borderRadius: 8, background: '#fef2f2',
           border: '1px solid #fecaca', color: '#991b1b', fontSize: 13,
         }}>
-          <AlertCircle size={14} /> {error}
+          <span role="alert"><AlertCircle size={14} /> {error}</span><button type="button" onClick={load} className="admin-open-record">Retry audit log</button>
         </div>
       )}
       <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <TableRegion label="Audit events — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               {['Time','Action','Actor','Resource','Details'].map(h => (
@@ -99,11 +86,11 @@ export function AuditTab() {
           </thead>
           <tbody>
             {loading && !loadedOnce ? (
-              <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af' }}>Loading…</td></tr>
+              <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#59616b' }}>Loading…</td></tr>
             ) : error && !loadedOnce ? (
               <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#dc2626' }}>Failed to load audit log</td></tr>
             ) : entries.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af' }}>No entries found</td></tr>
+              <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#59616b' }}>No entries found</td></tr>
             ) : entries.map(entry => (
               <tr key={entry.uuid} style={{ borderBottom: '1px solid #f3f4f6' }}>
                 <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', color: '#6b7280' }}>
@@ -117,18 +104,18 @@ export function AuditTab() {
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{entry.actor_user_id}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>
                   {entry.resource_name || entry.resource_id || '-'}
-                  <span style={{ marginLeft: 6, fontSize: 11, color: '#9ca3af' }}>{entry.resource_type}</span>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: '#59616b' }}>{entry.resource_type}</span>
                 </td>
-                <td style={{ padding: '10px 14px', color: '#6b7280', fontSize: 12, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {Object.keys(entry.detail).length > 0 ? JSON.stringify(entry.detail).slice(0, 80) : '-'}
+                <td style={{ padding: '10px 14px', color: '#59616b', fontSize: 12, minWidth: 180, maxWidth: 360 }}>
+                  {Object.keys(entry.detail).length > 0 ? <details><summary style={{ cursor: 'pointer' }}>View event details</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{JSON.stringify(entry.detail, null, 2)}</pre></details> : 'No details recorded'}
                 </td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></TableRegion>
       </div>
       {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
           <span style={{ fontSize: 13, color: '#6b7280' }}>Page {page + 1} of {totalPages}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}

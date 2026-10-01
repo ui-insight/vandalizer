@@ -38,7 +38,7 @@ try {
       const title = page.getByRole('button', { name: variant.name, exact: true })
       const card = page.getByRole('article').filter({ has: title })
       if (variant.id === 'prompt') await card.getByText('Prompt', { exact: true }).waitFor()
-      if (variant.id === 'unknown') await card.getByText('Purpose not described.', { exact: true }).waitFor()
+      if (variant.id === 'unknown') await card.getByText(/The author has not described the task/).waitFor()
       await title.focus(); await page.keyboard.press('Enter')
       const dialog = page.getByRole('dialog', { name: variant.name, exact: true })
       const summary = dialog.getByRole('region', { name: 'Inputs and output', exact: true })

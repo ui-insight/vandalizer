@@ -1,19 +1,8 @@
-import { usePanelEffect } from '../shared/usePanelEffect'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Award, Sparkles, Star, Zap } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { CompletionResult } from '../../types/certification'
-
-const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
-  novice:     { label: 'Novice',     color: '#9ca3af' },
-  apprentice: { label: 'Apprentice', color: '#60a5fa' },
-  builder:    { label: 'Builder',    color: '#34d399' },
-  designer:   { label: 'Designer',   color: '#a78bfa' },
-  engineer:   { label: 'Engineer',   color: '#f472b6' },
-  specialist: { label: 'Specialist', color: '#fb923c' },
-  expert:     { label: 'Expert',     color: '#f43f5e' },
-  master:     { label: 'Master',     color: '#eab308' },
-  architect:  { label: 'Architect',  color: '#eab308' },
-}
+import { LEVEL_CONFIG } from './constants'
 
 function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; size?: number }) {
   return (
@@ -44,14 +33,9 @@ export function CelebrationOverlay({
 }) {
   const levelConfig = LEVEL_CONFIG[result.level] || LEVEL_CONFIG.novice
 
-  usePanelEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onDismiss])
-
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss}>
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false }}>
+    <div role="dialog" aria-modal="true" aria-label={result.certified ? 'Course complete' : 'Module complete'} className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onDismiss() } }}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 cert-fade-in" />
 
@@ -74,7 +58,7 @@ export function CelebrationOverlay({
 
       {/* Content */}
       <div
-        className="relative bg-white p-8 max-w-md w-full mx-4 text-center cert-pop-in"
+        className="relative bg-white p-5 sm:p-8 max-w-md w-full mx-4 max-h-[90dvh] overflow-y-auto text-center cert-pop-in"
         style={{ borderRadius: 'var(--ui-radius, 12px)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -162,5 +146,6 @@ export function CelebrationOverlay({
         </button>
       </div>
     </div>
+    </FocusTrap>
   )
 }

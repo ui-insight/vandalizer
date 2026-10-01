@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useCallback, useMemo, useState, useRef } from 'react'
 import { AlertCircle, Award, Lock, RefreshCw, Unlock } from 'lucide-react'
 import {
   getCertificationProgressList, setCertificationUnlock,
@@ -10,28 +12,14 @@ import { ExportButton, SearchInput, UserAvatar } from './shared/primitives'
 
 export function CertificationsTab() {
   const { toast } = useToast()
-  const [items, setItems] = useState<CertificationProgressItem[]>([])
-  const [capped, setCapped] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [busyUser, setBusyUser] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await getCertificationProgressList()
-      setItems(data.items)
-      setCapped(data.capped)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load certification progress')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { refresh() }, [refresh])
+  const busyRef = useRef(false)
+  const request = useCallback(() => getCertificationProgressList(), [])
+  const { data, setData, loading, error, load: refresh } = useAdminQuery(request)
+  const items = useMemo(() => data?.items ?? [], [data])
+  const capped = data?.capped ?? false
 
   const filtered = useMemo(() => {
     if (!search.trim()) return items
@@ -44,15 +32,18 @@ export function CertificationsTab() {
   }, [items, search])
 
   const toggleUnlock = async (item: CertificationProgressItem) => {
+    if (busyRef.current) return
+    busyRef.current = true
     setBusyUser(item.user_id)
     try {
       await setCertificationUnlock(item.user_id, !item.unlocked)
-      setItems(prev => prev.map(p =>
+      setData(prev => prev ? { ...prev, items: prev.items.map(p =>
         p.user_id === item.user_id ? { ...p, unlocked: !item.unlocked } : p
-      ))
+      ) } : prev)
     } catch (e) {
       toast(`Failed to ${item.unlocked ? 're-lock' : 'unlock'} certification for ${item.name || item.user_id}: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
     } finally {
+      busyRef.current = false
       setBusyUser(null)
     }
   }
@@ -83,16 +74,17 @@ export function CertificationsTab() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
         <div style={{ flex: 1 }} />
         <button
           onClick={refresh}
+          disabled={!!busyUser}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           <RefreshCw size={14} /> Refresh
         </button>
-        <ExportButton onClick={handleExport} />
+        <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
@@ -110,13 +102,13 @@ export function CertificationsTab() {
             padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca',
             color: '#991b1b', fontSize: 13,
           }}>
-            <AlertCircle size={14} /> {error}
+            <span role="alert"><AlertCircle size={14} /> {error}</span>
           </div>
         )}
         {filtered.length === 0 ? (
-          !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No users have started the certification yet.</div>
+          !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>{search.trim() ? 'No users match this search.' : 'No users have started the certification yet.'}</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Certification progress — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
@@ -164,11 +156,11 @@ export function CertificationsTab() {
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {p.certified ? (
-                        <span title={p.certified_at ? `Certified ${formatDate(p.certified_at)}` : 'Certified'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 13, fontWeight: 600 }}>
+                        <span title={p.certified_at ? `Certified ${formatDate(p.certified_at)}` : 'Certified'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#15803d', fontSize: 13, fontWeight: 600 }}>
                           <Award size={14} /> Yes
                         </span>
                       ) : (
-                        <span style={{ color: '#9ca3af', fontSize: 13 }}>—</span>
+                        <span style={{ color: '#59616b', fontSize: 13 }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>
@@ -177,7 +169,8 @@ export function CertificationsTab() {
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                       <button
                         onClick={() => toggleUnlock(p)}
-                        disabled={busyUser === p.user_id}
+                        disabled={!!busyUser}
+                        aria-label={`${p.unlocked ? 'Re-lock' : 'Unlock'} prerequisites for ${p.name || p.email || p.user_id}`}
                         title={p.unlocked
                           ? 'Re-lock prerequisites for this user'
                           : 'Unlock all units so this user can select any module without prerequisites'}
@@ -200,7 +193,7 @@ export function CertificationsTab() {
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
 

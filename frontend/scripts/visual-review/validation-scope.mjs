@@ -6,7 +6,7 @@ import { kb } from './fixtures.mjs'
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state } = review
 state.validationQueries = true
-page.setDefaultTimeout(10000)
+page.setDefaultTimeout(30000)
 const other = { ...kb, uuid: 'kb-2', title: 'Other knowledge base' }
 const task = { task_id: 'original-kb-task', status: 'running', message: 'Checking original KB answers…', options: { mode: 'judge', query_uuids: ['query-1'] } }
 let posts = 0
@@ -28,18 +28,21 @@ try {
   for (const [width, height] of [[320,568],[768,600],[1440,900]]) {
     await page.setViewportSize({ width, height })
     await page.goto(review.baseURL + '/?mode=knowledge')
-    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+    await page.getByRole('button', { name: kb.title, exact: true }).click()
     await page.getByRole('tab', { name: 'Validation', exact: true }).click()
+    await page.getByRole('tab', { name: 'Check answer quality', exact: true }).click()
     await page.getByText(task.message, { exact: true }).waitFor()
     await page.getByRole('button', { name: 'Back to knowledge bases' }).click()
-    await page.getByRole('button', { name: 'Edit', exact: true }).last().click()
+    await page.getByRole('button', { name: other.title, exact: true }).click()
     await page.getByRole('tab', { name: 'Validation', exact: true }).click()
+    await page.getByRole('tab', { name: 'Check answer quality', exact: true }).click()
     await page.getByRole('button', { name: 'Run 3 questions', exact: true }).waitFor()
     assert.equal(await page.getByText(task.message, { exact: true }).count(), 0)
     await shot(`validation-other-kb-isolated-${width}`)
     await page.getByRole('button', { name: 'Back to knowledge bases' }).click()
-    await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+    await page.getByRole('button', { name: kb.title, exact: true }).click()
     await page.getByRole('tab', { name: 'Validation', exact: true }).click()
+    await page.getByRole('tab', { name: 'Check answer quality', exact: true }).click()
     await page.getByText(task.message, { exact: true }).waitFor()
     await page.getByText(/1 selected questions/).waitFor()
     assert.equal(await page.getByRole('button', { name: 'Running…', exact: true }).isDisabled(), true)

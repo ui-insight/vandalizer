@@ -1,3 +1,4 @@
+import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
@@ -89,6 +90,7 @@ interface Props {
   streamSegments?: StreamSegment[]
   /** Callback to inject a message into the chat (used for confirmation buttons) */
   onSendMessage?: (message: string) => boolean | void
+  approvalHistory?: Record<string, ApprovalRecord>
 }
 
 /** The nearest ancestor that clips its contents horizontally.
@@ -127,7 +129,7 @@ export function menuAlignmentFor(
 export function ChatMessage({
   message, messageIndex, conversationUuid, streamingThinking,
   thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
-  toolResults, streamSegments, onSendMessage,
+  toolResults, streamSegments, onSendMessage, approvalHistory,
 }: Props) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
@@ -486,7 +488,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
-                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} />
+                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} />
                     </div>
                   )
                 }
@@ -525,6 +527,7 @@ export function ChatMessage({
                     toolResults={results}
                     isStreaming={isStreamingProp}
                     onConfirm={onSendMessage}
+                    approvalHistory={approvalHistory}
                   />
                 )
               })()}

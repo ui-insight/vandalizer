@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Palette } from 'lucide-react'
 import { getThemeConfig, updateThemeConfig } from '../../../api/config'
 import type { ThemeConfig } from '../../../api/config'
 import { useBranding, DEFAULT_ORG_NAME, DEFAULT_ICON_URL } from '../../../contexts/BrandingContext'
+import { getAccessibleOnLight, getContrastTextColor } from '../../../utils/color'
 import { fileToConstrainedDataUrl } from '../../../utils/imageResize'
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputStyle } from './styles'
 
@@ -41,8 +42,16 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
   const [themeSaved, setThemeSaved] = useState(false)
   const [themeError, setThemeError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const [themeLoading, setThemeLoading] = useState(true)
+  const [themeLoadError, setThemeLoadError] = useState<string | null>(null)
+  const themeRequest = useRef(0)
+  const savePending = useRef(false)
+  const themeRevision = useRef(0)
+  const loadTheme = useCallback(() => {
+    const request = ++themeRequest.current
+    setThemeLoading(true); setThemeLoadError(null)
     getThemeConfig().then(t => {
+      if (request !== themeRequest.current) return
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
       setThemeOrgName(t.org_name || '')
@@ -50,10 +59,15 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
       setThemeLogo(t.logo_data_url || '')
       setThemeIcon(t.icon_data_url || '')
       setThemeIconHideInNav(!!t.icon_hide_in_nav)
-    }).catch(() => {})
+    }).catch(reason => { if (request === themeRequest.current) setThemeLoadError(reason instanceof Error ? reason.message : 'Could not load saved branding.') })
+      .finally(() => { if (request === themeRequest.current) setThemeLoading(false) })
   }, [])
+  useEffect(() => { const requestRef = themeRequest; loadTheme(); return () => { requestRef.current++ } }, [loadTheme])
 
   const handleSaveTheme = async () => {
+    if (savePending.current || themeLoading || themeLoadError) return
+    savePending.current = true
+    const revision = themeRevision.current
     setThemeSaving(true)
     setThemeSaved(false)
     setThemeError(null)
@@ -69,11 +83,12 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
       })
       applyThemeToDOM(updated)
       await branding.refresh()
-      setThemeSaved(true)
+      setThemeSaved(revision === themeRevision.current)
       setTimeout(() => setThemeSaved(false), 3000)
     } catch (e) {
       setThemeError(e instanceof Error ? e.message : 'Failed to save theme')
     } finally {
+      savePending.current = false
       setThemeSaving(false)
     }
   }
@@ -121,41 +136,44 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
     }
   }
 
+  if (themeLoading) return <div style={sectionStyle}><p role="status" style={sectionBodyStyle}>Loading saved branding…</p></div>
+  if (themeLoadError) return <div style={sectionStyle}><p role="alert" style={sectionBodyStyle}>{themeLoadError} Branding changes are unavailable until saved settings load. <button onClick={loadTheme} style={{ textDecoration: 'underline' }}>Retry branding settings</button></p></div>
+
   return (
-    <div style={sectionStyle}>
+    <div onChangeCapture={() => { themeRevision.current++; setThemeSaved(false) }} style={sectionStyle}>
       <div style={sectionHeaderStyle}>
         <Palette size={18} color="#6b7280" /> UI Theme &amp; Branding
       </div>
       <div style={sectionBodyStyle}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 20 }}>
           <div>
             <label style={labelStyle}>Highlight Color</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input type="color" value={themeColor} onChange={e => setThemeColor(e.target.value)} style={{ height: 40, width: 56, borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', cursor: 'pointer' }} />
-              <input type="text" value={themeColor} onChange={e => setThemeColor(e.target.value)} style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace' }} />
+              <input aria-label="Highlight color picker" type="color" value={themeColor} onChange={e => setThemeColor(e.target.value)} style={{ height: 40, width: 56, borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', cursor: 'pointer' }} />
+              <input aria-label="Highlight color" type="text" value={themeColor} onChange={e => setThemeColor(e.target.value)} style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace' }} />
             </div>
           </div>
           <div>
             <label style={labelStyle}>Corner Radius: {themeRadius}px</label>
-            <input type="range" min={0} max={24} value={themeRadius} onChange={e => setThemeRadius(Number(e.target.value))} style={{ width: '100%', marginTop: 8, accentColor: 'var(--highlight-color, #eab308)' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+            <input aria-label="Corner radius" type="range" min={0} max={24} value={themeRadius} onChange={e => setThemeRadius(Number(e.target.value))} style={{ width: '100%', marginTop: 8, accentColor: 'var(--highlight-color, #eab308)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280', marginTop: 4 }}>
               <span>0px (sharp)</span>
               <span>24px (round)</span>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 20, marginTop: 20 }}>
           <div>
             <label style={labelStyle}>Organization Name</label>
             <input
               type="text"
-              value={themeOrgName}
+              aria-label="Organization name" value={themeOrgName}
               onChange={e => setThemeOrgName(e.target.value)}
               placeholder={DEFAULT_ORG_NAME}
               style={inputStyle}
             />
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
               The institution behind this deployment. Shown in the header, login page and footer, and credited on anything
               exported from here. Leave blank to keep "Vandalizer".
             </div>
@@ -164,19 +182,19 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
             <label style={labelStyle}>Assistant Name</label>
             <input
               type="text"
-              value={themeAppName}
+              aria-label="Assistant name" value={themeAppName}
               onChange={e => setThemeAppName(e.target.value)}
               placeholder={themeOrgName.trim() || DEFAULT_ORG_NAME}
               style={inputStyle}
             />
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
               What the tool calls itself when it speaks &mdash; "Ask <em>name</em> anything...", the chat greeting, the
               browser tab. Leave blank to use the organization name.
             </div>
           </div>
           <div>
             <label style={labelStyle}>Logo</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
               <div style={{
                 width: 180, height: 56, borderRadius: 'var(--ui-radius, 12px)',
                 border: '1px solid #e5e7eb', background: '#f9fafb',
@@ -217,7 +235,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
                 )}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
               Wordmark-style image works best. PNG with transparency recommended. Large images are automatically resized to fit.
             </div>
             {themeLogoError && (
@@ -226,7 +244,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
           </div>
           <div>
             <label style={labelStyle}>Icon / Mascot</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
               <div style={{
                 width: 56, height: 56, borderRadius: 'var(--ui-radius, 12px)',
                 border: '1px solid #e5e7eb', background: '#f9fafb',
@@ -267,7 +285,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
                 )}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
               Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments — once you set an organization name or logo, leave this blank to hide it, or upload your own.
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', marginTop: 8, cursor: 'pointer' }}>
@@ -292,15 +310,15 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
           Vandalizer is open source under the GPL v3 license and developed at the University of Idaho with support from the NSF GRANTED program (Award #2427549). Even with your custom branding applied, the footer will continue to credit the Vandalizer project and acknowledge NSF funding.
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-          <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: 'var(--highlight-text-color, #000)', fontWeight: 600, fontSize: 13 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 16 }}>
+          <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: getContrastTextColor(themeColor), fontWeight: 600, fontSize: 13 }}>
             Sample Button
           </div>
-          <div style={{ border: `2px solid ${themeColor}`, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: themeColor, fontWeight: 600, fontSize: 13 }}>
+          <div style={{ border: `2px solid ${themeColor}`, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: getAccessibleOnLight(themeColor), fontWeight: 600, fontSize: 13 }}>
             Outline Button
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 16 }}>
           <button
             onClick={handleSaveTheme}
             disabled={themeSaving}
@@ -312,7 +330,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
           >
             {themeSaving ? 'Saving...' : 'Save Theme'}
           </button>
-          {themeSaved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Theme saved!</span>}
+          {themeSaved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Theme saved!</span>}
         </div>
         {themeError && (
           <div role="alert" style={{ marginTop: 12, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>

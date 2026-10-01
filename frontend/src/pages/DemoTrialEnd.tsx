@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useSearch, useNavigate } from '@tanstack/react-router'
 import {
   Sparkles,
@@ -10,6 +10,7 @@ import {
   Heart,
   Rocket,
 } from 'lucide-react'
+import { ApiError } from '../api/client'
 import { Footer } from '../components/layout/Footer'
 import { useAuth } from '../hooks/useAuth'
 import { getTrialEndInfo, requestTrialExtension } from '../api/demo'
@@ -37,6 +38,9 @@ export default function DemoTrialEnd() {
   const [info, setInfo] = useState<TrialEndInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [invalidLink, setInvalidLink] = useState(false)
+  const [readAttempt, setReadAttempt] = useState(0)
+  const pending = useRef(false)
   const [submitting, setSubmitting] = useState(false)
   const [extended, setExtended] = useState(false)
   const [loginUrl, setLoginUrl] = useState<string | null>(null)
@@ -44,22 +48,27 @@ export default function DemoTrialEnd() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
-    if (!token) {
-      setError('No trial token provided.')
-      setLoading(false)
-      return
-    }
-    getTrialEndInfo(token)
-      .then(setInfo)
-      .catch(() => setError('This link is invalid or has expired.'))
-      .finally(() => setLoading(false))
-  }, [token])
+    let cancelled = false
+    setInfo(null); setError(''); setInvalidLink(false); setAnswers({}); setExtended(false); setLoginUrl(null); setGrantedTokens(null)
+    if (!token) { setInvalidLink(true); setError('No trial token provided.'); setLoading(false); return }
+    setLoading(true)
+    getTrialEndInfo(token).then(value => { if (!cancelled) { setInfo(value);  } })
+      .catch(reason => { if (!cancelled) {
+        const invalid = reason instanceof ApiError && [400, 403, 404, 410].includes(reason.status)
+        setInvalidLink(invalid)
+        setError(invalid ? 'This link is invalid or has expired.' : reason instanceof Error ? reason.message : 'Could not load trial details. Retry in a moment.')
+      } })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token, readAttempt])
 
   function updateAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
   async function handleExtend(notes?: Record<string, unknown>) {
+    if (pending.current) return
+    pending.current = true
     setError('')
     setSubmitting(true)
     try {
@@ -70,6 +79,7 @@ export default function DemoTrialEnd() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not extend your trial.')
     } finally {
+      pending.current = false
       setSubmitting(false)
     }
   }
@@ -147,14 +157,15 @@ export default function DemoTrialEnd() {
       <div className="relative z-10 pt-28 pb-16">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="flex justify-center py-20">
+            <div role="status" aria-label="Loading trial details" className="flex justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-[#f1b300]" />
             </div>
           ) : error && !info ? (
             <div className="text-center py-20">
               <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-white mb-4">Invalid Link</h2>
-              <p className="text-gray-400">{error}</p>
+              <h2 className="text-2xl font-bold text-white mb-4">{invalidLink ? 'Invalid Link' : 'Unable to load'}</h2>
+              <p role="alert" className="text-gray-400">{error}</p>
+              {!invalidLink && <button onClick={() => setReadAttempt(value => value + 1)} className="mt-4 rounded-lg bg-white/10 px-6 py-3 font-bold text-white">Retry trial details</button>}
               <Link
                 to="/landing"
                 search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }}
@@ -208,7 +219,7 @@ export default function DemoTrialEnd() {
                     it for a proper spin.
                   </p>
                   {error && (
-                    <div className="mb-4 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+                    <div role="alert" className="mb-4 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
                       {error}
                     </div>
                   )}
@@ -227,7 +238,7 @@ export default function DemoTrialEnd() {
                       </>
                     )}
                   </button>
-                  <p className="mt-3 text-xs text-gray-500">
+                  <p className="mt-3 text-xs text-gray-400">
                     Adds {formatTokens(info.topup_tokens)} tokens, instantly. No time limit.
                   </p>
                 </div>

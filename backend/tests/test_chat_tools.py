@@ -1250,6 +1250,8 @@ def _make_approval(status="pending"):
     from app.models.approval import STATUS_PENDING
 
     approval = MagicMock()
+    approval.id = "approval-id"
+    approval.expires_at = None
     approval.uuid = "appr-1"
     approval.status = status or STATUS_PENDING
     approval.step_name = "Manager sign-off"
@@ -1322,14 +1324,17 @@ class TestApproveWorkflowStep:
         ctx = _make_context()
         approval = _make_approval()
         fake_celery = MagicMock()
-        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+        with patch("app.services.approval_service.ApprovalRequest") as ClaimModel, \
+             patch("app.models.approval.ApprovalRequest") as MockAR, \
              patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True), \
              patch("app.celery_app.celery", fake_celery):
+            ClaimModel.get_motor_collection.return_value.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
             MockAR.find_one = AsyncMock(return_value=approval)
             result = await approve_workflow_step(ctx, "appr-1", confirmed=True)
 
         assert result["status"] == "approved"
-        approval.save.assert_awaited_once()
+        approval.save.assert_not_awaited()
+        ClaimModel.get_motor_collection.return_value.update_one.assert_awaited_once()
         fake_celery.send_task.assert_called_once()
 
 
@@ -1342,15 +1347,18 @@ class TestRejectWorkflowStep:
         approval = _make_approval()
         fake_result = MagicMock()
         fake_result.save = AsyncMock()
-        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+        with patch("app.services.approval_service.ApprovalRequest") as ClaimModel, \
+             patch("app.models.approval.ApprovalRequest") as MockAR, \
              patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True), \
              patch("app.models.workflow.WorkflowResult") as MockWR:
+            ClaimModel.get_motor_collection.return_value.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
             MockAR.find_one = AsyncMock(return_value=approval)
             MockWR.get = AsyncMock(return_value=fake_result)
             result = await reject_workflow_step(ctx, "appr-1", comments="missing budget", confirmed=True)
 
         assert result["status"] == "rejected"
-        approval.save.assert_awaited_once()
+        approval.save.assert_not_awaited()
+        ClaimModel.get_motor_collection.return_value.update_one.assert_awaited_once()
         assert fake_result.status == "failed"
 
     @pytest.mark.asyncio

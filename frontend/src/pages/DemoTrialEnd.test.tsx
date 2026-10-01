@@ -1,3 +1,4 @@
+import { ApiError } from '../api/client'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import DemoTrialEnd from './DemoTrialEnd'
@@ -93,7 +94,7 @@ describe('DemoTrialEnd', () => {
   })
 
   it('invalid token: shows an error state', async () => {
-    mockGetTrialEndInfo.mockRejectedValueOnce(new Error('nope'))
+    mockGetTrialEndInfo.mockRejectedValueOnce(new ApiError(404, 'nope'))
 
     render(<DemoTrialEnd />)
 

@@ -21,7 +21,7 @@ export function LeftPanel() {
   const {
     selectedDocUuids, selectedDocNames, selectedFolderUuids, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
-    setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest,
+    setProcessingDoc, setSelectedDocsProcessing, updateDocumentReadiness, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
     focusChat, openWorkflow, openExtraction, activateKB,
     activeProjectRootFolder, activeProjectTitle, activeProjectTeamId,
@@ -403,6 +403,7 @@ export function LeftPanel() {
             }}
             onSelectionChange={handleSelectionChange}
             onDocNamesChange={handleDocNamesChange}
+            onDocumentReadinessChange={updateDocumentReadiness}
             onFolderSelectionChange={handleFolderSelectionChange}
             onFolderNamesChange={handleFolderNamesChange}
             onSelectionProcessingChange={handleSelectionProcessingChange}

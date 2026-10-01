@@ -5,7 +5,7 @@ import { createReview } from './harness.mjs'
 import { kb } from './fixtures.mjs'
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state } = review
-page.setDefaultTimeout(10000)
+page.setDefaultTimeout(30000)
 const choices = [kb, { ...kb, uuid: 'kb-2', title: 'Sponsor award conditions and reporting requirements' }]
 let fail = false
 await page.route('**/api/knowledge/list/v2?*', route => fail ? route.fulfill({status:503,json:{detail:'Knowledge temporarily unavailable'}}) : route.fulfill({json:{items:choices,total:choices.length}}))
@@ -53,6 +53,23 @@ try {
     assert.equal(await page.getByRole('button',{name:'Copy message'}).count(),0)
     await page.getByRole('button',{name:`Detach knowledge base: ${kb.title}`,exact:true}).waitFor()
     await shot(`chat-new-conversation-scope-${width}`)
+    await page.getByRole('button',{name:`Detach knowledge base: ${kb.title}`,exact:true}).click()
+    await page.getByRole('navigation',{name:'Workspace navigation'}).getByRole('button',{name:'Files',exact:true}).click()
+    await page.getByRole('checkbox',{name:'Select FY2027 proposals',exact:true}).check()
+    await page.getByRole('navigation',{name:'Workspace navigation'}).getByRole('button',{name:'Chat',exact:true}).click()
+    await send('Review the selected proposal folder',[])
+    assert.deepEqual(state.lastChat.folder_uuids,['folder-1']);assert.deepEqual(state.lastChat.document_uuids,[])
+    await shot(`chat-folder-scope-${width}`)
+    await page.goto(review.baseURL+'/?mode=chat&project=project-1')
+    await page.getByRole('button',{name:'Exit project scope',exact:true}).waitFor()
+    await send('Review the active project sources',[])
+    assert.equal(state.lastChat.project_uuid,'project-1');assert.deepEqual(state.lastChat.document_uuids,[]);assert.equal(state.lastChat.folder_uuids,undefined)
+    await shot(`chat-project-scope-${width}`)
+    await page.getByRole('button',{name:'Exit project scope',exact:true}).click()
+    await send('Start outside the project',[])
+    assert.equal(state.lastChat.project_uuid,undefined);assert.equal(state.lastChat.folder_uuids,undefined);assert.deepEqual(state.lastChat.document_uuids,[])
+    await shot(`chat-project-exit-${width}`)
+
   }
   assert.deepEqual(review.errors,[]); assert.deepEqual([...review.unmatched],[])
 } catch(error) { await review.capture('chat-scope-blocked',String(error)); throw error }

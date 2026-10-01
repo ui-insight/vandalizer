@@ -56,7 +56,7 @@ export function QualityBadge({
 
   return (
     <span
-      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title}
+      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title || 'Recorded quality describes the examples tested. Sharing eligibility and completed execution do not establish correctness on new documents.'}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

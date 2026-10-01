@@ -37,7 +37,7 @@ try {
     current = structuredClone(kb); fail = ''; requests = []
     await page.setViewportSize({ width, height })
     await page.goto(review.baseURL + '/?mode=knowledge')
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: kb.title, exact: true }).click()
     fail = 'search'; await page.getByRole('button', { name: 'Add Documents', exact: true }).click()
     await page.getByRole('button', { name: 'Retry search', exact: true }).waitFor()
     await shot(`source-intake-search-error-${width}`, page.getByRole('button', { name: 'Retry search', exact: true }))

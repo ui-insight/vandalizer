@@ -46,6 +46,8 @@ vi.mock('./CelebrationOverlay', () => ({
   CelebrationOverlay: () => <div>Module Complete!</div>,
 }))
 
+vi.mock('../shared/PanelFocusTrap', () => ({ FocusTrap: ({ children }: { children: React.ReactNode }) => children }))
+
 import { CertificationPanel } from './CertificationPanel'
 
 function progressWith(stars: number, completed = true): CertificationProgress {

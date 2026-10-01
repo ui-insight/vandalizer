@@ -151,7 +151,7 @@ try {
  assert.equal(await page.getByRole('textbox',{name:'New project name'}).inputValue(),'')
  await page.getByRole('button').filter({hasText:'Project created while viewing files'}).first().waitFor()
  await shot('navigation-created-project-return-320')
- assert.equal(touches.length,3)
+ assert.equal(touches.length,0,'Opening an existing workflow must not record a run or change last-used')
  assert.deepEqual(review.errors,[]);assert.deepEqual([...review.unmatched],[])
  review.observations.push('Retained Library filters/80-row scroll/editor Back+Forward; project draft/search/sort/scroll; Knowledge selected questions and unsaved answer/modal; automation filters; file selection and chat draft at 320/768/1440px. Hidden modal releases keyboard focus. Synthetic APIs, no real writes or executions.')
 } catch(error){await page.screenshot({path:resolve(review.out,'navigation-retention-blocked.png')});throw error}

@@ -91,14 +91,15 @@ describe('RunHistoryTab — workflow run output', () => {
     expect(vi.mocked(downloadResults)).toHaveBeenCalledWith('sess-abc', 'json', { parseStructured: false })
   })
 
-  it('shows a fallback when the persisted result is gone', async () => {
+  it('offers retry when the persisted result cannot be read', async () => {
     mockGetWorkflowStatus.mockRejectedValue(new Error('Not found'))
 
     renderTab([makeRun()])
     fireEvent.click(await screen.findByRole('button', { expanded: false }))
 
     await waitFor(() => {
-      expect(screen.getByText('Output is no longer available for this run.')).toBeTruthy()
+      expect(screen.getByRole('alert')).toHaveTextContent('Not found')
+      expect(screen.getByRole('button', { name: 'Retry run output' })).toBeTruthy()
     })
   })
 
@@ -135,4 +136,15 @@ describe('RunHistoryTab — extraction runs (unchanged behavior)', () => {
     await screen.findByText('completed')
     expect(screen.queryByRole('button', { expanded: false })).toBeNull()
   })
+})
+
+
+it('retries a failed history read instead of claiming there are no runs', async () => {
+  const fetchHistory = vi.fn().mockRejectedValueOnce(new Error('History unavailable')).mockResolvedValueOnce({ runs: [makeRun()] })
+  render(<RunHistoryTab fetchHistory={fetchHistory} type="workflow" />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('History unavailable')
+  expect(screen.queryByText(/No runs yet/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry run history' }))
+  expect(await screen.findByText('completed')).toBeTruthy()
+  expect(fetchHistory).toHaveBeenCalledTimes(2)
 })

@@ -59,10 +59,10 @@ type KBHistoryItem = {
 const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
 
 const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
-  { id: 'autovalidate', label: 'Improve retrieval', icon: Sparkles },
   { id: 'queries', label: 'Test questions' },
   { id: 'run', label: 'Check answer quality' },
   { id: 'history', label: 'History' },
+  { id: 'autovalidate', label: 'Advanced: improve retrieval', icon: Sparkles },
 ]
 
 /** Provenance summary for the score chip in the validation header. We surface
@@ -85,7 +85,7 @@ type LatestQualitySummary = {
 }
 
 export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, onRunCompleted, collapsed = false, onToggleCollapsed }: Props) {
-  const [tab, setTab] = useState<Tab>('run')
+  const [tab, setTab] = useState<Tab>('queries')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
   // Persisted uuid of the run shown in the Run-now tab, so its results can be
@@ -224,7 +224,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   const scoreColor =
     latestScore == null ? 'var(--workspace-muted)'
     : latestScore >= 90 ? 'var(--workspace-success)'
-    : latestScore >= 70 ? '#3b82f6'
+    : latestScore >= 70 ? '#1d4ed8'
     : latestScore >= 50 ? 'var(--workspace-warning)'
     : 'var(--workspace-danger)'
 
@@ -351,7 +351,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5,
         }}
       >
-        Add test questions, check answer quality, then compare retrieval settings if needed.
+        Choose representative questions and expected answers → check answer quality → inspect failures. Advanced retrieval tuning is optional.
       </div>
 
       {/* Tabs */}

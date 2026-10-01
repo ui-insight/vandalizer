@@ -877,6 +877,11 @@ class TestGetTeamAccessContext:
 
 
 class TestGetAuthorizedFolder:
+    @pytest.fixture(autouse=True)
+    def no_project_scope(self):
+        with patch("app.services.access_control.find_folder_project", new=AsyncMock(return_value=None)):
+            yield
+
     async def test_not_found_returns_none(self):
         user = _make_user("user1")
 

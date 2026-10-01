@@ -46,14 +46,15 @@ export function RightPanel({ hideTabs = false }: { hideTabs?: boolean }) {
             <button
               key={tab}
               onClick={() => setActiveRightTab(tab)}
+              style={{ fontSize: 'var(--workspace-font-control)' }}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-4 text-sm cursor-pointer transition-colors',
+                'min-w-0 flex-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 py-3 cursor-pointer transition-colors',
                 activeRightTab === tab
                   ? 'bg-highlight text-highlight-text font-black'
                   : 'text-white font-black hover:bg-[#363636]',
               )}
             >
-              {tab === 'assistant' ? <><MessageSquare className="h-4 w-4" /> Assistant</> : <><BookOpen className="h-4 w-4" /> Library</>}
+              {tab === 'assistant' ? <><MessageSquare size={16} aria-hidden="true" /><span className="min-w-0 break-words">Assistant</span></> : <><BookOpen size={16} aria-hidden="true" /><span className="min-w-0 break-words">Library</span></>}
             </button>
           ))}
         </div>}

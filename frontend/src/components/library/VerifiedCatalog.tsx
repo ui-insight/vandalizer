@@ -1,3 +1,4 @@
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -10,7 +11,6 @@ import { listVerifiedItems, updateItemMetadata, unverifyItem, listCollections, a
 import type { CatalogPreviewItem } from '../../api/library'
 import type { VerifiedCatalogItem, VerifiedCollection } from '../../types/library'
 import { listOrganizationsFlat } from '../../api/organizations'
-import type { Organization } from '../../api/organizations'
 import { useConfirm } from '../shared/useConfirm'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
@@ -56,16 +56,17 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
   const [description, setDescription] = useState(item.description || '')
   const [markdown, setMarkdown] = useState(item.markdown || '')
   const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(item.organization_ids || [])
-  const [allOrgs, setAllOrgs] = useState<Organization[]>([])
+  const { data: orgData, error: orgError, load: reloadOrgs } = useAdminQuery(listOrganizationsFlat)
+  const allOrgs = orgData?.organizations ?? []
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
-  useEffect(() => {
-    listOrganizationsFlat().then(data => setAllOrgs(data.organizations)).catch(() => {})
-  }, [])
+  const pending = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   usePanelEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pending.current) onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
@@ -77,6 +78,8 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
   }
 
   const handleSave = async () => {
+    if (pending.current) return
+    pending.current = true; setSaveError(null)
     setSaving(true)
     try {
       await updateItemMetadata(item.kind, item.item_id, {
@@ -87,25 +90,29 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
       })
       onSaved()
       onClose()
-    } finally {
+    } catch (reason) { setSaveError(reason instanceof Error ? reason.message : 'Could not save metadata. Your draft is preserved.') } finally {
+      pending.current = false
       setSaving(false)
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 700 }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label="Edit Metadata" className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Edit Metadata" className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90dvh] min-w-0 flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h3 className="text-base font-semibold text-gray-900">Edit Metadata</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button type="button" disabled={saving} onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
+        <fieldset disabled={saving} className="flex min-h-0 min-w-0 flex-1 flex-col border-0 p-0 m-0">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div className="text-xs text-gray-500 flex items-center gap-2">
+          {saveError && <p role="alert" className="text-sm text-red-800">{saveError} Your draft is preserved; retry Save.</p>}
+          {orgError && <p role="alert" className="text-sm text-red-800">Organization choices could not load. Existing assignments are retained. <button onClick={reloadOrgs} className="underline">Retry organizations</button></p>}
+          <div className="text-xs text-gray-600 flex flex-wrap items-center gap-2">
             <KindBadge kind={item.kind} />
-            <span className="font-mono">{item.name}</span>
+            <span className="font-mono break-all">{item.name}</span>
           </div>
           <div>
             <label htmlFor="metadata-display-name" className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
@@ -199,6 +206,7 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
+        </fieldset>
       </div>
       </FocusTrap>
     </div>
@@ -208,14 +216,18 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
 function CollectionPicker({
   itemId,
   collections,
-  onAdded,
+  onAdded, unavailable = false,
 }: {
   itemId: string
   collections: VerifiedCollection[]
   onAdded: () => void
+  unavailable?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const pending = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -227,17 +239,20 @@ function CollectionPicker({
   }, [open])
 
   const handleAdd = async (colId: string) => {
-    await addToCollection(colId, itemId)
-    onAdded()
-    setOpen(false)
+    if (pending.current) return
+    pending.current = true; setBusy(true); setError(null)
+    try { await addToCollection(colId, itemId); onAdded(); setOpen(false) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not add to the collection. Retry the choice.') }
+    finally { pending.current = false; setBusy(false) }
   }
 
   // Filter to collections that don't already contain this item
   const available = collections.filter(c => !c.item_ids.includes(itemId))
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" onKeyDown={event => { if (event.key === 'Escape' && !busy) { setOpen(false); ref.current?.querySelector('button')?.focus() } }}>
       <button
+        disabled={busy || unavailable} aria-expanded={open}
         onClick={() => setOpen(!open)}
         className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
         title="Add to Collection"
@@ -245,7 +260,8 @@ function CollectionPicker({
         <FolderPlus className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 z-20 w-52 max-w-[calc(100vw-64px)] bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+          {error && <p role="alert" className="p-3 text-xs text-red-800">{error}</p>}
           {available.length === 0 ? (
             <div className="px-3 py-2 text-xs text-gray-500">
               {collections.length === 0 ? 'No collections exist' : 'Already in all collections'}
@@ -254,6 +270,7 @@ function CollectionPicker({
             available.map(col => (
               <button
                 key={col.id}
+                disabled={busy}
                 onClick={() => handleAdd(col.id)}
                 className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 truncate"
               >
@@ -270,14 +287,16 @@ function CollectionPicker({
 export function VerifiedCatalog() {
   const confirm = useConfirm()
   const { toast } = useToast()
-  const [items, setItems] = useState<VerifiedCatalogItem[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('')
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
   const [orgMap, setOrgMap] = useState<Record<string, string>>({})
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
+  const { data: collectionData, error: collectionError, load: refreshCollections } = useAdminQuery(listCollections)
+  const collections = collectionData?.collections ?? []
+  const [pageIndex, setPageIndex] = useState(0)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const removePending = useRef(false)
   const [importPreview, setImportPreview] = useState<CatalogPreviewItem[] | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -291,34 +310,15 @@ export function VerifiedCatalog() {
         setOrgMap(map)
       })
       .catch(() => {})
-    refreshCollections()
   }, [])
 
-  const refreshCollections = () => {
-    listCollections().then(d => setCollections(d.collections)).catch(() => {})
-  }
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await listVerifiedItems({
-        kind: kindFilter || undefined,
-        search: searchQuery || undefined,
-        limit: 200,
-      })
-      setItems(data.items)
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false)
-    }
-  }, [kindFilter, searchQuery])
-
-  useEffect(() => {
-    refresh()
-  }, [refresh])
+  const request = useCallback(() => listVerifiedItems({ kind: kindFilter || undefined, search: searchQuery || undefined, skip: pageIndex * 200, limit: 200 }), [kindFilter, searchQuery, pageIndex])
+  const { data, loading, error, load: refresh } = useAdminQuery(request)
+  const items = data?.items ?? []
+  const shown = items.filter(item => meetsQualityFilter(item.quality_tier, qualityFilter))
 
   const handleUnverify = async (item: VerifiedCatalogItem) => {
+    if (removePending.current) return
     const ok = await confirm({
       title: 'Stop sharing with everyone?',
       message: (
@@ -330,8 +330,11 @@ export function VerifiedCatalog() {
       destructive: true,
     })
     if (!ok) return
-    await unverifyItem(item.kind, item.item_id)
-    refresh()
+    if (removePending.current) return
+    removePending.current = true; setRemoving(item.item_id)
+    try { await unverifyItem(item.kind, item.item_id); refresh() }
+    catch (reason) { toast(reason instanceof Error ? reason.message : 'Could not stop sharing. Retry the change.', 'error') }
+    finally { removePending.current = false; setRemoving(null) }
   }
 
   return (
@@ -343,17 +346,18 @@ export function VerifiedCatalog() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPageIndex(0) }}
             placeholder="Search shared items..."
             aria-label="Search shared items"
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {([['', 'All'], ['workflow', 'Workflows'], ['search_set', 'Extractions'], ['knowledge_base', 'Knowledge Bases']] as [KindFilter, string][]).map(([val, label]) => (
             <button
               key={val}
-              onClick={() => setKindFilter(val)}
+              aria-pressed={kindFilter === val}
+              onClick={() => { setKindFilter(val); setPageIndex(0) }}
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                 kindFilter === val
                   ? 'bg-gray-900 text-white border-gray-900'
@@ -412,24 +416,26 @@ export function VerifiedCatalog() {
         </div>
       </div>
 
-      {loading ? (
+      {collectionError && <p role="alert" className="mb-3 text-sm text-red-800">Collection choices unavailable. <button onClick={refreshCollections} className="underline">Retry collection choices</button></p>}
+      {data && data.total > 200 && <div className="mb-3 flex flex-wrap gap-3 text-sm"><span>Page {pageIndex + 1} of {Math.ceil(data.total / 200)}. Quality filtering applies to this page.</span><button disabled={pageIndex === 0} onClick={() => setPageIndex(value => value - 1)}>Previous page</button><button disabled={(pageIndex + 1) * 200 >= data.total} onClick={() => setPageIndex(value => value + 1)}>Next page</button></div>}
+      {error ? <p role="alert" className="p-3 text-sm text-red-800">{error} <button onClick={refresh} className="underline">Retry catalog</button></p> : loading ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
-      ) : items.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-12 text-center">
-          No shared items found.
+          No shared items match these filters on this page.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.filter(i => meetsQualityFilter(i.quality_tier, qualityFilter)).map((item) => (
+          {shown.map((item) => (
             <div
               key={item.id}
               className="border border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 transition-colors"
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <ShieldCheck className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm font-semibold text-gray-900 truncate">
+                    <span className="text-sm font-semibold text-gray-900 break-words">
                       {item.display_name || item.name}
                     </span>
                   </div>
@@ -486,10 +492,11 @@ export function VerifiedCatalog() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0 w-full sm:w-auto">
                   <CollectionPicker
                     itemId={item.item_id}
                     collections={collections}
+                    unavailable={!!collectionError}
                     onAdded={refreshCollections}
                   />
                   <button
@@ -500,6 +507,7 @@ export function VerifiedCatalog() {
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
+                    disabled={removing !== null}
                     onClick={() => handleUnverify(item)}
                     className="p-1.5 rounded hover:bg-red-50 text-red-500"
                     title="Unverify"

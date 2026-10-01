@@ -76,7 +76,7 @@ function applyTheme(theme: ThemeConfig) {
   root.style.setProperty('--highlight-hover', getHoverColor(theme.highlight_color))
   // Accessible variant of the brand color for use as text/icons on light
   // backgrounds (the raw highlight often fails 4.5:1 on white — e.g. #eab308).
-  root.style.setProperty('--highlight-on-light', getAccessibleOnLight(theme.highlight_color))
+  root.style.setProperty('--highlight-on-light', getAccessibleOnLight(theme.highlight_color, '#f3f4f6'))
   // And the mirror image, for the near-black auth/marketing surfaces (a dark
   // brand color — e.g. #163A64 — is ~1.6:1 on #0a0a0a).
   root.style.setProperty('--highlight-on-dark', getAccessibleOnDark(theme.highlight_color))

@@ -5,6 +5,7 @@ Uses pymongo (sync) for DB access.
 """
 
 import fnmatch
+import hashlib
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -44,7 +45,8 @@ def create_folder_watch_trigger(
 ) -> dict:
     """Create a pending trigger event for a folder-watched document.
 
-    Returns the inserted trigger event dict.
+    Returns the event for this document arrival. Repeated ingestion callbacks
+    reuse it; an intentional rerun gets its own manual event.
     """
     db = get_sync_db()
     folder_watch_config = (workflow_doc.get("input_config") or {}).get("folder_watch", {})
@@ -65,9 +67,19 @@ def create_folder_watch_trigger(
         },
         "process_after": now + timedelta(seconds=delay_seconds),
     }
-    result = db.workflow_trigger_event.insert_one(event)
-    event["_id"] = result.inserted_id
-    return event
+    # A deterministic primary key makes the upsert atomic without requiring
+    # an index migration. Include the folder and action so moving the same
+    # document to another watched folder or changing the action is distinct.
+    identity = "\0".join(str(value) for value in (
+        "folder_watch", automation_id or "legacy", workflow_doc["_id"],
+        document_doc["_id"], document_doc.get("folder", ""),
+    ))
+    event["_id"] = ObjectId(hashlib.sha256(identity.encode()).digest()[:12])
+    from pymongo import ReturnDocument
+    return db.workflow_trigger_event.find_one_and_update(
+        {"_id": event["_id"]}, {"$setOnInsert": event},
+        upsert=True, return_document=ReturnDocument.AFTER,
+    )
 
 
 def create_m365_trigger(workflow_doc: dict, work_item_doc: dict) -> dict:

@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Pencil, X, FolderOpen, Search, ExternalLink, Star } from 'lucide-react'
 import {
   listCollections, createCollection, updateCollection, deleteCollection,
   addToCollection, removeFromCollection, listVerifiedItems,
 } from '../../api/library'
-import type { VerifiedCollection, VerifiedCatalogItem } from '../../types/library'
+import type { VerifiedCollection } from '../../types/library'
 import { AuthorChip } from '../shared/AuthorChip'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { useConfirm } from '../shared/useConfirm'
 
 export function CollectionsManager() {
   const confirm = useConfirm()
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -26,50 +25,45 @@ export function CollectionsManager() {
 
   // Add item state
   const [showAddItem, setShowAddItem] = useState(false)
-  const [verifiedItems, setVerifiedItems] = useState<VerifiedCatalogItem[]>([])
   const [addSearch, setAddSearch] = useState('')
-  const [loadingItems, setLoadingItems] = useState(false)
 
   const workspace = useOptionalWorkspace()
 
-  // Lookup map: item_id → VerifiedCatalogItem
-  const itemMap = useMemo(() => {
-    const m = new Map<string, VerifiedCatalogItem>()
-    for (const v of verifiedItems) m.set(v.item_id, v)
-    return m
-  }, [verifiedItems])
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [colData, itemData] = await Promise.all([listCollections(), listVerifiedItems({ limit: 200 })])
-      setCollections(colData.collections)
-      setVerifiedItems(itemData.items)
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false)
+  const request = useCallback(async () => {
+    const [colData, itemData] = await Promise.all([listCollections(), listVerifiedItems({ limit: 200 })])
+    const items = [...itemData.items]
+    while (items.length < itemData.total) {
+      const next = await listVerifiedItems({ skip: items.length, limit: 200 })
+      if (!next.items.length) break
+      items.push(...next.items)
     }
+    return { collections: colData.collections, items, total: itemData.total }
   }, [])
-
-  useEffect(() => {
-    refresh()
-  }, [refresh])
+  const { data, loading, error, load: refresh } = useAdminQuery(request)
+  const collections = data?.collections ?? []
+  const verifiedItems = useMemo(() => data?.items ?? [], [data])
+  const loadingItems = loading
+  const itemMap = useMemo(() => new Map(verifiedItems.map(item => [item.item_id, item])), [verifiedItems])
+  const pending = useRef(false)
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const change = async (write: () => Promise<unknown>, accepted?: () => void) => {
+    if (pending.current) return
+    pending.current = true; setSaving(true); setActionError(null)
+    try { await write(); accepted?.(); refresh() }
+    catch (reason) { setActionError(reason instanceof Error ? reason.message : 'Could not save the collection change. Your draft is preserved; retry the change.') }
+    finally { pending.current = false; setSaving(false) }
+  }
 
   const selected = collections.find(c => c.id === selectedId) || null
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return
     setCreating(true)
-    try {
-      await createCollection({ title: newTitle.trim(), description: newDescription.trim() || undefined })
-      setNewTitle('')
-      setNewDescription('')
-      setShowCreate(false)
-      refresh()
-    } finally {
-      setCreating(false)
-    }
+    await change(() => createCollection({ title: newTitle.trim(), description: newDescription.trim() || undefined }), () => {
+      setNewTitle(''); setNewDescription(''); setShowCreate(false)
+    })
+    setCreating(false)
   }
 
   const handleDelete = async (id: string) => {
@@ -86,24 +80,16 @@ export function CollectionsManager() {
       destructive: true,
     })
     if (!ok) return
-    await deleteCollection(id)
-    if (selectedId === id) setSelectedId(null)
-    refresh()
+    await change(() => deleteCollection(id), () => { if (selectedId === id) setSelectedId(null) })
   }
 
   const handleSaveEdit = async () => {
     if (!editingId || !editTitle.trim()) return
-    await updateCollection(editingId, {
-      title: editTitle.trim(),
-      description: editDescription.trim() || undefined,
-    })
-    setEditingId(null)
-    refresh()
+    await change(() => updateCollection(editingId, { title: editTitle.trim(), description: editDescription.trim() || undefined }), () => setEditingId(null))
   }
 
   const handleToggleFeatured = async (col: VerifiedCollection) => {
-    await updateCollection(col.id, { featured: !col.featured })
-    refresh()
+    await change(() => updateCollection(col.id, { featured: !col.featured }))
   }
 
   const startEdit = (col: VerifiedCollection) => {
@@ -112,29 +98,12 @@ export function CollectionsManager() {
     setEditDescription(col.description || '')
   }
 
-  const handleOpenAddItem = async () => {
-    setShowAddItem(true)
-    if (verifiedItems.length === 0) {
-      setLoadingItems(true)
-      try {
-        const data = await listVerifiedItems({ limit: 200 })
-        setVerifiedItems(data.items)
-      } finally {
-        setLoadingItems(false)
-      }
-    }
-  }
-
+  const handleOpenAddItem = () => { setShowAddItem(true) }
   const handleAddItem = async (itemId: string) => {
-    if (!selectedId) return
-    await addToCollection(selectedId, itemId)
-    refresh()
+    if (selectedId) await change(() => addToCollection(selectedId, itemId))
   }
-
   const handleRemoveItem = async (itemId: string) => {
-    if (!selectedId) return
-    await removeFromCollection(selectedId, itemId)
-    refresh()
+    if (selectedId) await change(() => removeFromCollection(selectedId, itemId))
   }
 
   const filteredVerified = addSearch
@@ -148,9 +117,11 @@ export function CollectionsManager() {
   const collectionItemIds = new Set(selected?.item_ids || [])
 
   return (
-    <div>
+    <fieldset disabled={saving} className="min-w-0 border-0 p-0 m-0">
+      {actionError && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{actionError}</p>}
+      {saving && <p role="status" className="mb-3 text-sm text-gray-700">Saving collection change…</p>}
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
         <div className="text-sm text-gray-500">{collections.length} collection{collections.length !== 1 ? 's' : ''}</div>
         <button
           onClick={() => setShowCreate(!showCreate)}
@@ -205,7 +176,7 @@ export function CollectionsManager() {
         </div>
       )}
 
-      {loading ? (
+      {error ? <p role="alert" className="p-3 text-sm text-red-800">{error} <button onClick={refresh} className="underline">Retry collections</button></p> : loading ? (
         <div className="text-sm text-gray-500 py-8 text-center">Loading...</div>
       ) : collections.length === 0 ? (
         <div className="text-sm text-gray-500 py-12 text-center">
@@ -220,19 +191,9 @@ export function CollectionsManager() {
             return (
               <div key={col.id} className="border border-gray-200 rounded-lg bg-white">
                 <div
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={isSelected}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
-                  onClick={() => setSelectedId(isSelected ? null : col.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      setSelectedId(isSelected ? null : col.id)
-                    }
-                  }}
+                  className={`p-4 transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       {isEditing ? (
                         <div className="space-y-2" onClick={e => e.stopPropagation()}>
@@ -266,9 +227,9 @@ export function CollectionsManager() {
                           </div>
                         </div>
                       ) : (
-                        <>
-                          <div className="flex items-center gap-2 mb-1">
-                            <FolderOpen className="h-4 w-4 text-gray-400 shrink-0" />
+                        <button type="button" aria-expanded={isSelected} onClick={() => setSelectedId(isSelected ? null : col.id)} className="w-full text-left rounded focus-visible:ring-2 focus-visible:ring-gray-600">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <FolderOpen className="h-4 w-4 text-gray-600 shrink-0" />
                             <span className="text-sm font-semibold text-gray-900">{col.title}</span>
                             {col.featured && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 font-medium">Featured</span>
@@ -280,7 +241,7 @@ export function CollectionsManager() {
                           {col.description && (
                             <p className="text-xs text-gray-600 ml-6 line-clamp-2">{col.description}</p>
                           )}
-                        </>
+                        </button>
                       )}
                     </div>
                     {!isEditing && (
@@ -288,7 +249,7 @@ export function CollectionsManager() {
                         <button
                           type="button"
                           onClick={() => handleToggleFeatured(col)}
-                          className={`p-1.5 rounded hover:bg-yellow-50 ${col.featured ? 'text-yellow-500' : 'text-gray-400'}`}
+                          className={`p-1.5 rounded hover:bg-yellow-50 ${col.featured ? 'text-yellow-700' : 'text-gray-600'}`}
                           title={col.featured ? 'Remove from featured' : 'Mark as featured'}
                           aria-label={col.featured ? 'Remove from featured' : 'Mark as featured'}
                         >
@@ -337,13 +298,13 @@ export function CollectionsManager() {
                           const item = itemMap.get(itemId)
                           return (
                             <div key={itemId} className="flex items-center justify-between px-3 py-2 bg-white rounded border border-gray-200 gap-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
                                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
                                   item?.kind === 'workflow' ? 'bg-purple-50 text-purple-700' : item?.kind === 'search_set' ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500'
                                 }`}>
                                   {item?.kind === 'workflow' ? 'WF' : item?.kind === 'search_set' ? 'EX' : '?'}
                                 </span>
-                                <span className="text-sm text-gray-900 truncate">
+                                <span className="w-full text-sm text-gray-900 break-words">
                                   {item?.display_name || item?.name || itemId}
                                 </span>
                                 {item?.quality_tier && (
@@ -400,7 +361,7 @@ export function CollectionsManager() {
                           </button>
                         </div>
                         <div className="relative mb-2">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-600" />
                           <input
                             type="text"
                             aria-label="Search shared items to add"
@@ -420,7 +381,7 @@ export function CollectionsManager() {
                                 onClick={() => handleAddItem(v.item_id)}
                                 className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded hover:bg-gray-50 text-left"
                               >
-                                <span className="truncate">{v.display_name || v.name}</span>
+                                <span className="break-words min-w-0">{v.display_name || v.name}</span>
                                 <span className={`ml-2 text-xs px-1.5 py-0.5 rounded shrink-0 ${
                                   v.kind === 'workflow' ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'
                                 }`}>
@@ -442,6 +403,6 @@ export function CollectionsManager() {
           })}
         </div>
       )}
-    </div>
+    </fieldset>
   )
 }

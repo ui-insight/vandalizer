@@ -1,3 +1,4 @@
+import type { ApprovalRecord } from './approvalHistory'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
@@ -1104,11 +1105,13 @@ export function ToolStatusLine({
   result,
   isActive,
   onConfirm,
+  approvalHistory,
 }: {
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
   onConfirm?: (message: string) => boolean | void
+  approvalHistory?: ApprovalRecord
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
@@ -1143,7 +1146,7 @@ export function ToolStatusLine({
       setDecisionError('The decision could not be sent. Try again.')
     }
   }
-  const executionLabel = needsConfirmation ? decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval'
+  const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
     : canceled ? 'Canceled' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
@@ -1318,7 +1321,10 @@ export function ToolStatusLine({
         {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
       </div>}
       {artifact && <button type="button" className="chat-action-btn" style={{ margin: "var(--workspace-space-8) 0 var(--workspace-space-8) var(--workspace-space-20)" }} onClick={artifact.open}>{artifact.label}</button>}
-      {needsConfirmation && (
+      {needsConfirmation && approvalHistory && <section className="agent-approval" aria-label="Earlier action decision">
+        <strong>{approvalHistory.label}</strong><p>{approvalHistory.detail}</p>
+      </section>}
+      {needsConfirmation && !approvalHistory && (
         <section className="agent-approval" aria-label="Review proposed action">
           <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
           <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>
@@ -1344,9 +1350,10 @@ interface Props {
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
   onConfirm?: (message: string) => boolean | void
+  approvalHistory?: Record<string, ApprovalRecord>
 }
 
-export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm }: Props) {
+export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm, approvalHistory }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   if (toolCalls.length === 0 && toolResults.length === 0) return null
@@ -1381,7 +1388,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
           <div key={callId}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
               <div style={{ flex: 1 }}>
-                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} />
+                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} />
               </div>
               {expandable && (
                 <button

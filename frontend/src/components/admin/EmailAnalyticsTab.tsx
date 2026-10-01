@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Send, XCircle, CheckCircle2, AlertCircle,
 } from 'lucide-react'
@@ -7,30 +7,17 @@ import {
   Legend,
 } from 'recharts'
 import { getEmailAnalytics } from '../../api/admin'
-import type { EmailAnalyticsResponse } from '../../api/admin'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
 import { downloadCSV, formatDateTime, formatNumber } from './shared/format'
 import {
   KpiCard, ExportButton, TimeRangeSelector,
 } from './shared/primitives'
 
 export function EmailAnalyticsTab() {
-  const [data, setData] = useState<EmailAnalyticsResponse | null>(null)
   const [days, setDays] = useState(30)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    getEmailAnalytics(days)
-      .then(d => { if (!cancelled) setData(d) })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load email analytics') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [days])
-
-  useEffect(() => load(), [load])
+  const request = useCallback(() => getEmailAnalytics(days), [days])
+  const { data, loading, error, load } = useAdminQuery(request)
 
   if (loading && !data) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading email analytics...</div>
@@ -39,7 +26,7 @@ export function EmailAnalyticsTab() {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
         <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
-        <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+        <div role="alert" style={{ fontSize: 14, color: '#991b1b' }}>{error} <button onClick={load} style={{ textDecoration: 'underline' }}>Retry email analytics</button></div>
       </div>
     )
   }
@@ -48,8 +35,8 @@ export function EmailAnalyticsTab() {
   const successPct = (data.success_rate * 100).toFixed(1)
   const overallHealthColor =
     data.total_sent + data.total_failed === 0 ? '#6b7280'
-    : data.success_rate >= 0.99 ? '#22c55e'
-    : data.success_rate >= 0.9 ? '#f59e0b' : '#ef4444'
+    : data.success_rate >= 0.99 ? '#15803d'
+    : data.success_rate >= 0.9 ? '#92400e' : '#b91c1c'
 
   const handleExport = () => {
     const dailyRows = data.by_day.map(p => [p.date, p.sent, p.failed])
@@ -101,9 +88,9 @@ export function EmailAnalyticsTab() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        <KpiCard label="Sent" value={formatNumber(data.total_sent)} icon={Send} color="#22c55e" />
-        <KpiCard label="Failed" value={formatNumber(data.total_failed)} icon={XCircle} color="#ef4444" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
+        <KpiCard label="Sent" value={formatNumber(data.total_sent)} icon={Send} color="#15803d" />
+        <KpiCard label="Failed" value={formatNumber(data.total_failed)} icon={XCircle} color="#b91c1c" />
         <KpiCard label="Success Rate" value={`${successPct}%`} icon={CheckCircle2} color={overallHealthColor} />
       </div>
 
@@ -113,12 +100,12 @@ export function EmailAnalyticsTab() {
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={data.by_day}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={40} allowDecimals={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={v => v.slice(5)} />
+            <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} width={40} allowDecimals={false} />
             <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Area type="monotone" dataKey="sent" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} name="Sent" />
-            <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.25} name="Failed" />
+            <Area type="monotone" dataKey="sent" stackId="1" stroke="#15803d" fill="#15803d" fillOpacity={0.2} name="Sent" />
+            <Area type="monotone" dataKey="failed" stackId="1" stroke="#b91c1c" fill="#b91c1c" fillOpacity={0.25} name="Failed" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -133,52 +120,52 @@ export function EmailAnalyticsTab() {
             No emails sent in this window.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Email counts by type"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: '#fafafa' }}>
               <tr>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
-                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Sent</th>
-                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Failed</th>
-                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Success Rate</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Sent</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Failed</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Success Rate</th>
               </tr>
             </thead>
             <tbody>
               {data.by_type.map(row => {
                 const rate = row.success_rate * 100
                 const color = row.sent + row.failed === 0 ? '#6b7280'
-                  : row.success_rate >= 0.99 ? '#22c55e'
-                  : row.success_rate >= 0.9 ? '#f59e0b' : '#ef4444'
+                  : row.success_rate >= 0.99 ? '#15803d'
+                  : row.success_rate >= 0.9 ? '#92400e' : '#b91c1c'
                 return (
                   <tr key={row.email_type} style={{ borderTop: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '10px 16px', fontSize: 13, color: '#111827' }}>{row.email_type}</td>
                     <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>{row.sent}</td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace', color: row.failed > 0 ? '#ef4444' : '#6b7280' }}>{row.failed}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace', color: row.failed > 0 ? '#b91c1c' : '#6b7280' }}>{row.failed}</td>
                     <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace', color, fontWeight: 600 }}>{rate.toFixed(1)}%</td>
                   </tr>
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
 
       {/* Recent failures */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <AlertCircle size={16} color="#ef4444" /> Recent Failures
+          <AlertCircle size={16} color="#b91c1c" /> Recent Failures
         </div>
         {data.recent_failures.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
-            No failures in this window. Deliverability is healthy.
+            No recorded failures in this window.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Recent email failures"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: '#fafafa' }}>
               <tr>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Recipient</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Error</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Recipient</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
+                <th scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Error</th>
               </tr>
             </thead>
             <tbody>
@@ -187,11 +174,11 @@ export function EmailAnalyticsTab() {
                   <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDateTime(f.created_at)}</td>
                   <td style={{ padding: '10px 16px', fontSize: 13, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{f.recipient}</td>
                   <td style={{ padding: '10px 16px', fontSize: 13, color: '#374151' }}>{f.email_type}</td>
-                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#ef4444', fontFamily: 'ui-monospace, monospace', maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.error || ''}>{f.error || '-'}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#b91c1c', fontFamily: 'ui-monospace, monospace', maxWidth: 420, overflowWrap: 'anywhere' }} title={f.error || ''}>{f.error || '-'}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
     </div>

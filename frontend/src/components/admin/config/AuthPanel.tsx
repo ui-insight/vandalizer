@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Lock, Plus, Globe, Pencil, Trash2 } from 'lucide-react'
 import { useConfirm } from '../../shared/useConfirm'
 import {
@@ -51,6 +51,30 @@ export function AuthPanel({
   const [samlMetaError, setSamlMetaError] = useState('')
   const [providerError, setProviderError] = useState('')
 
+  const providerPending = useRef(false)
+  const [providerSaving, setProviderSaving] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [refreshingProviders, setRefreshingProviders] = useState(false)
+  const refreshPending = useRef(false)
+  const refreshProviders = async () => {
+    if (refreshPending.current) return
+    refreshPending.current = true; setRefreshingProviders(true)
+    setRefreshError(null)
+    try { onConfigReplace(await getSystemConfig()) }
+    catch (reason) { setRefreshError(reason instanceof Error ? reason.message : 'Could not refresh saved providers.') }
+    finally { refreshPending.current = false; setRefreshingProviders(false) }
+  }
+  const commitProviderChange = async (write: () => Promise<unknown>, afterSave: () => void) => {
+    if (providerPending.current || refreshError) return
+    providerPending.current = true; setProviderSaving(true); setProviderError('')
+    try {
+      await write()
+      afterSave()
+      await refreshProviders()
+    } catch (reason) { setProviderError(reason instanceof Error ? reason.message : 'Could not save provider changes.') }
+    finally { providerPending.current = false; setProviderSaving(false) }
+  }
+
   /** Return a message if the provider form is missing a required field, else ''. */
   const providerValidationError = (p: { provider: string; display_name: string; client_id: string; idp_entity_id: string; idp_sso_url: string; idp_x509_cert: string }): string => {
     if (!p.display_name.trim()) return 'Display name is required.'
@@ -96,18 +120,10 @@ export function AuthPanel({
   const handleAddProvider = async () => {
     const validationError = providerValidationError(newProvider)
     if (validationError) { setProviderError(validationError); return }
-    setProviderError('')
-    try {
-      await addOAuthProvider(newProvider as unknown as Record<string, unknown>)
-      // Refresh config
-      const c = await getSystemConfig()
-      onConfigReplace(c)
+    await commitProviderChange(() => addOAuthProvider(newProvider as unknown as Record<string, unknown>), () => {
       setNewProvider({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '', jit_provisioning: true })
-      setSamlMeta('')
-      setShowAddProvider(false)
-    } catch (e) {
-      setProviderError(e instanceof Error ? e.message : 'Failed to add provider')
-    }
+      setSamlMeta(''); setShowAddProvider(false)
+    })
   }
 
   const handleDeleteProvider = async (index: number) => {
@@ -129,13 +145,9 @@ export function AuthPanel({
       onError('Could not find the provider to delete — refresh and try again.')
       return
     }
-    try {
-      await deleteOAuthProvider(providerId)
-      const c = await getSystemConfig()
-      onConfigReplace(c)
-    } catch (e) {
-      onError(e instanceof Error ? e.message : 'Failed to delete provider')
-    }
+    await commitProviderChange(() => deleteOAuthProvider(providerId), () => {
+      if (editingProviderId === providerId) setEditingProviderId(null)
+    })
   }
 
   const handleEditProvider = (index: number) => {
@@ -176,15 +188,7 @@ export function AuthPanel({
       setProviderError('Could not find the provider to update — refresh and try again.')
       return
     }
-    setProviderError('')
-    try {
-      await updateOAuthProvider(editingProviderId, editingProvider as unknown as Record<string, unknown>)
-      const c = await getSystemConfig()
-      onConfigReplace(c)
-      setEditingProviderId(null)
-    } catch (e) {
-      setProviderError(e instanceof Error ? e.message : 'Failed to update provider')
-    }
+    await commitProviderChange(() => updateOAuthProvider(editingProviderId, editingProvider as unknown as Record<string, unknown>), () => setEditingProviderId(null))
   }
 
   return (
@@ -195,7 +199,7 @@ export function AuthPanel({
       <div style={sectionBodyStyle}>
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>Auth Methods</label>
-          <div style={{ display: 'flex', gap: 16 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
             {['password', 'oauth'].map(m => {
               // Disable unchecking the last remaining method — an empty
               // auth_methods list disables every login path with no
@@ -235,9 +239,11 @@ export function AuthPanel({
           </button>
         </div>
 
+        {refreshError && <p role="alert" style={{ color: '#991b1b', marginBottom: 12 }}>The provider change was saved, but the list could not refresh: {refreshError} <button type="button" disabled={refreshingProviders} onClick={refreshProviders} style={{ textDecoration: 'underline' }}>Retry provider list</button></p>}
+        {providerError && !showAddProvider && !editingProviderId && <p role="alert" style={{ color: '#991b1b' }}>{providerError}</p>}
         {/* OAuth Providers */}
-        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <fieldset disabled={providerSaving || refreshingProviders || !!refreshError} style={{ border: 0, minWidth: 0, margin: 0, padding: 0, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>OAuth / SAML Providers</label>
             <button
               onClick={() => setShowAddProvider(!showAddProvider)}
@@ -259,7 +265,7 @@ export function AuthPanel({
                 return (
                 <div key={i}>
                   <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
                     padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
                     border: '1px solid #e5e7eb',
                   }}>
@@ -277,7 +283,7 @@ export function AuthPanel({
                         type="button"
                         aria-label="Edit provider"
                         onClick={() => isEditingThisRow ? setEditingProviderId(null) : handleEditProvider(i)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: 4 }}
                       >
                         <Pencil size={16} aria-hidden="true" />
                       </button>
@@ -294,7 +300,7 @@ export function AuthPanel({
                   {isEditingThisRow && (
                     <div style={{ marginTop: 8, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
                       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Edit Provider</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
                         <div>
                           <label htmlFor={`admin-oauth-edit-${i}-type`} style={labelStyle}>Type</label>
                           <select
@@ -398,17 +404,17 @@ export function AuthPanel({
               })}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#9ca3af', padding: '8px 0' }}>No providers configured.</div>
+            <div style={{ fontSize: 13, color: '#4b5563', padding: '8px 0' }}>No providers configured.</div>
           )}
 
           {showAddProvider && (
             <div style={{ marginTop: 12, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>New Provider</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Type</label>
                   <select
-                    value={newProvider.provider}
+                    aria-label="Provider type" value={newProvider.provider}
                     onChange={e => setNewProvider({ ...newProvider, provider: e.target.value })}
                     style={inputStyle}
                   >
@@ -419,17 +425,17 @@ export function AuthPanel({
                 </div>
                 <div>
                   <label style={labelStyle}>Display Name</label>
-                  <input value={newProvider.display_name} onChange={e => setNewProvider({ ...newProvider, display_name: e.target.value })} style={inputStyle} />
+                  <input aria-label="Provider display name" value={newProvider.display_name} onChange={e => setNewProvider({ ...newProvider, display_name: e.target.value })} style={inputStyle} />
                 </div>
                 {newProvider.provider !== 'saml' && (
                   <>
                     <div>
                       <label style={labelStyle}>Client ID</label>
-                      <input value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
+                      <input aria-label="Provider client ID" value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
                     </div>
                     <div>
                       <label style={labelStyle}>Client Secret</label>
-                      <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                      <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" aria-label="Provider client secret" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
@@ -440,7 +446,7 @@ export function AuthPanel({
                 {newProvider.provider === 'azure' && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Tenant ID</label>
-                    <input value={newProvider.tenant_id} onChange={e => setNewProvider({ ...newProvider, tenant_id: e.target.value })} style={inputStyle} />
+                    <input aria-label="Provider tenant ID" value={newProvider.tenant_id} onChange={e => setNewProvider({ ...newProvider, tenant_id: e.target.value })} style={inputStyle} />
                   </div>
                 )}
                 {newProvider.provider === 'saml' && (
@@ -467,15 +473,15 @@ export function AuthPanel({
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>IdP Entity ID</label>
-                      <input value={newProvider.idp_entity_id} onChange={e => setNewProvider({ ...newProvider, idp_entity_id: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/shibboleth" />
+                      <input aria-label="Provider IdP entity ID" value={newProvider.idp_entity_id} onChange={e => setNewProvider({ ...newProvider, idp_entity_id: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/shibboleth" />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>IdP SSO URL</label>
-                      <input value={newProvider.idp_sso_url} onChange={e => setNewProvider({ ...newProvider, idp_sso_url: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/profile/SAML2/Redirect/SSO" />
+                      <input aria-label="Provider IdP SSO URL" value={newProvider.idp_sso_url} onChange={e => setNewProvider({ ...newProvider, idp_sso_url: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/profile/SAML2/Redirect/SSO" />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>IdP x509 Certificate</label>
-                      <textarea value={newProvider.idp_x509_cert} onChange={e => setNewProvider({ ...newProvider, idp_x509_cert: e.target.value })} style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace', fontSize: 11 }} placeholder="-----BEGIN CERTIFICATE-----" />
+                      <textarea aria-label="Provider IdP certificate" value={newProvider.idp_x509_cert} onChange={e => setNewProvider({ ...newProvider, idp_x509_cert: e.target.value })} style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace', fontSize: 11 }} placeholder="-----BEGIN CERTIFICATE-----" />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Service Provider details (give these to your IdP administrator)</label>
@@ -527,7 +533,7 @@ export function AuthPanel({
               </div>
             </div>
           )}
-        </div>
+        </fieldset>
       </div>
     </div>
   )

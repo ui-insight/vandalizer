@@ -41,6 +41,7 @@ htmlcov/
 /.python-version
 /data/
 *.log
+npm-debug.log.*
 /logs/
 /pids/
 *.db

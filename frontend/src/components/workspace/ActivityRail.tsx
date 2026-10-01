@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   Award,
@@ -64,7 +64,7 @@ function StatusIcon({ status }: { status: ActivityEvent['status'] }) {
 function statusMetaClass(status: ActivityEvent['status']) {
   switch (status) {
     case 'completed':
-      return 'text-[#1a7f37]'
+      return 'text-[#166534]'
     case 'failed':
       return 'text-[#b3261e]'
     default:
@@ -101,13 +101,15 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
 }
 
 export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: () => void }) {
-  const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid } = useWorkspace()
-  const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
+  const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid, openWorkflowId, openExtractionId } = useWorkspace()
+  const { activities, loading, error, refresh, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
   const confirm = useConfirm()
+  const deletePending = useRef(false)
+  const [deleting, setDeleting] = useState(false)
   // The mobile drawer always needs its labels; a collapsed rail inside a
   // full-width drawer would waste space and make the activity list opaque.
   const visualDocked = forceExpanded ? false : forceDocked || railDocked
@@ -121,6 +123,8 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
       e.stopPropagation()
+      if (deletePending.current) return
+      deletePending.current = true
       const activity = activities.find(a => a.id === id)
       const label = activity?.type === 'conversation'
         ? 'this conversation'
@@ -135,7 +139,8 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
         confirmLabel: 'Delete',
         destructive: true,
       })
-      if (!ok) return
+      if (!ok) { deletePending.current = false; return }
+      setDeleting(true)
       try {
         await deleteActivity(id)
         // If the deleted activity is the conversation currently open in
@@ -150,6 +155,9 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
         }
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to delete activity', 'error')
+      } finally {
+        deletePending.current = false
+        setDeleting(false)
       }
       refresh()
     },
@@ -157,12 +165,22 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   )
 
   const { openActivity: handleClick } = useOpenActivity()
-
-  const isRunning = (status: ActivityEvent['status']) =>
-    status === 'running' || status === 'queued'
+  const [returnActivity, setReturnActivity] = useState(() => {
+    try { return sessionStorage.getItem('activity-return-id') } catch { return null }
+  })
+  const railRef = useRef<HTMLElement>(null)
+  const previousTool = useRef(openWorkflowId || openExtractionId)
+  useEffect(() => {
+    const tool = openWorkflowId || openExtractionId
+    if (previousTool.current && !tool) {
+      railRef.current?.querySelector<HTMLButtonElement>('[data-activity-return="true"]')?.focus({ preventScroll: true })
+    }
+    previousTool.current = tool
+  }, [openWorkflowId, openExtractionId])
 
   return (
     <aside
+      ref={railRef}
       aria-label="Activity"
       className="flex h-full flex-col border-l border-[#d8d8d8] bg-panel-bg"
     >
@@ -216,7 +234,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               rail stays quiet for the many users who never review anything.
               The always-present entry point is the account menu. */}
           {pendingReviews > 0 && (
-            <div
+            <button type="button" aria-label={`${pendingReviews} reviews waiting on you`}
               onClick={() => { onNavigate?.(); navigate({ to: '/reviews' }) }}
               title={`${pendingReviews} approval${pendingReviews === 1 ? '' : 's'} waiting on you`}
               className={cn(
@@ -248,9 +266,16 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
                   </span>
                 </>
               )}
-            </div>
+            </button>
           )}
           <div className="h-[5px]" />
+          {loading && activities.length === 0 && <p role="status" className="px-2 text-xs text-[#59616b]">Loading activity…</p>}
+          {error && <div role="alert" className="px-2 text-xs text-red-800">
+            {!visualDocked && <p>{error} {activities.length > 0 ? 'Showing the last loaded activity.' : ''}</p>}
+            <button type="button" aria-label="Retry activity" disabled={loading} className="underline" onClick={() => void refresh()}>{visualDocked ? 'Retry' : 'Retry activity'}</button>
+          </div>}
+          {!loading && !error && activities.length === 0 && !visualDocked && <p className="px-2 text-xs text-[#59616b]">No activity yet. Start a conversation or run a tool to see it here.</p>}
+
 
           {activities.map((activity) => {
             const awaitingReview = activeReviewUuid(activity)
@@ -258,8 +283,6 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             const stale = isStale(activity, staleThresholdMinutes)
             // A paused run is not "running": the shimmer would claim work is
             // happening while it sits on a reviewer, possibly for days.
-            const running = isRunning(activity.status) && !stale && !awaitingReview
-            const titleFresh = freshTitleIds.has(activity.id)
             // "queued" renders the clock — the honest icon for a run parked on
             // a person. The spinner would imply a worker is still churning.
             const effectiveStatus: ActivityEvent['status'] =
@@ -285,102 +308,44 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               ? 'Generating title…'
               : (activity.title || activity.type)
 
+            const statusLabel = stale ? 'Timed out' : awaitingReview ? 'Awaiting approval' : {
+              queued: 'Queued', running: 'Running', completed: 'Completed', failed: 'Failed', canceled: 'Cancelled',
+            }[activity.status]
+            const failureReason = staleTooltip || (activity.status === 'failed' ? activity.error : '')
             return (
-              <div
-                key={activity.id}
-                onClick={() => { onNavigate?.(); handleClick(activity) }}
-                title={rowTooltip}
-                className={cn(
-                  'rail-shimmer-running group relative flex items-center gap-2 rounded-lg cursor-pointer',
-                  'transition-[background-color,box-shadow] duration-200',
-                  visualDocked ? 'justify-center p-2' : 'p-2',
-                  running
-                    ? 'text-white'
-                    : 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
-                )}
-                style={
-                  running
-                    ? {
-                        background: `linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%)`,
-                        backgroundSize: '200% 100%',
-                        animation: 'rail-shimmer 8s linear infinite',
-                      }
-                    : undefined
-                }
-              >
-                {/* Type icon */}
-                <div className={cn(
-                  'relative shrink-0 w-4 text-center',
-                  running ? 'text-white' : awaitingReview ? 'text-[#806600]' : visualDocked ? 'text-[#999]' : 'text-[#333]',
-                )}>
-                  <Icon className="h-4 w-4" />
-                  {awaitingReview && visualDocked && (
-                    <span
-                      className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
-                      style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
-                    />
+              <div key={activity.id} className="activity-entry">
+                <button
+                  type="button"
+                  aria-label={`Open ${displayTitle}: ${statusLabel}`}
+                  data-activity-return={returnActivity === activity.id || undefined}
+                  onClick={() => {
+                    setReturnActivity(activity.id)
+                    try { sessionStorage.setItem('activity-return-id', activity.id) } catch { /* Storage can be unavailable. */ }
+                    onNavigate?.(); handleClick(activity)
+                  }}
+                  title={rowTooltip || `${displayTitle} — ${statusLabel}`}
+                  className={cn('activity-entry__open', visualDocked && 'activity-entry__open--compact')}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {!visualDocked && (
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs leading-[1.4] break-words line-clamp-2">{displayTitle}</span>
+                      <span className={cn('flex items-center gap-1 mt-1 text-xs font-semibold', statusMetaClass(effectiveStatus))}>
+                        <StatusIcon status={effectiveStatus} />{statusLabel}
+                      </span>
+                      {failureReason && <span className="block text-xs mt-1 text-[#59616b] break-words">{failureReason} Open to review.</span>}
+                    </span>
                   )}
-                </div>
-
+                </button>
                 {!visualDocked && (
-                  <>
-                    {/* Title + status — clamp to 2 lines so AI titles can
-                        breathe without blowing out the rail width. */}
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          'text-xs leading-[1.4] break-words line-clamp-2',
-                          running ? 'text-white' : 'text-[#111]',
-                          // Shimmer when the AI title just arrived (one-shot)
-                          // or while we're waiting for it to generate (loops
-                          // via title-shimmer-loop).
-                          titleFresh && !running ? 'title-shimmer' : '',
-                          awaitingTitle ? 'title-shimmer-loop' : '',
-                        )}
-                        onAnimationEnd={titleFresh ? () => markTitleShimmered(activity.id) : undefined}
-                      >
-                        {displayTitle}
-                      </div>
-                      {awaitingReview && (
-                        <div className="text-xs leading-[1.4] font-semibold text-[#806600]">
-                          Awaiting approval →
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status icon */}
-                    <div
-                      className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(effectiveStatus))}
-                      title={rowTooltip ?? (activity.status === 'failed' && activity.error ? activity.error : undefined)}
-                    >
-                      <StatusIcon status={effectiveStatus} />
-                    </div>
-
-                    {/* Delete button - always visible for failed/canceled/stale, hover for others */}
-                    <button
-                      onClick={(e) => handleDelete(e, activity.id)}
-                      className={cn(
-                        'absolute right-1 top-1/2 -translate-y-1/2 z-[1]',
-                        'flex items-center justify-center',
-                        'rounded p-1',
-                        'transition-[opacity,color,background-color] duration-200',
-                        stale || activity.status === 'failed' || activity.status === 'canceled'
-                          ? 'opacity-70 pointer-events-auto hover:opacity-100'
-                          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-                        'text-[#7a7f87] hover:text-[#444]',
-                        running
-                          ? 'bg-white/30 backdrop-blur-sm hover:bg-white/50'
-                          : 'bg-white/90 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-white/95',
-                      )}
-                      title={staleTooltip
-                        ? `Delete - ${staleTooltip}`
-                        : activity.status === 'failed' && activity.error
-                          ? `Delete - Error: ${activity.error}`
-                          : 'Delete'}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    aria-label={`Delete activity: ${displayTitle}`}
+                    onClick={e => handleDelete(e, activity.id)}
+                    className="activity-entry__delete"
+                    title="Delete activity"
+                  ><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                 )}
               </div>
             )
@@ -390,7 +355,9 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
 
       {/* Certification badge footer */}
       <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
-        <div
+        <button
+          type="button"
+          aria-label="Open learning panel"
           onClick={() => { onNavigate?.(); togglePanel() }}
           title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
@@ -414,13 +381,13 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             ) : certStarted ? (
               <>
                 <span className="text-xs font-semibold text-[#111]">{certConfig.label}</span>
-                <span className="text-xs text-[#999]">{certXp} XP</span>
+                <span className="text-xs text-[#59616b]">{certXp} XP</span>
               </>
             ) : (
               <span className="text-xs font-semibold text-[#444]">Get Certified</span>
             )
           )}
-        </div>
+        </button>
       </div>
     </aside>
   )

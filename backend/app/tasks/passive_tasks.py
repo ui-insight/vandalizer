@@ -163,11 +163,9 @@ def process_pending_triggers(self) -> dict:
                 if run_docs and not any(d.get("raw_text") for d in run_docs):
                     still_processing = any(d.get("processing") for d in run_docs)
                     created = event.get("created_at")
-                    try:
-                        waited = (now - created).total_seconds() if created else 0
-                    except TypeError:
-                        # Legacy events may carry a naive created_at.
-                        waited = 0
+                    if created and created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                    waited = (now - created).total_seconds() if created else 0
                     if still_processing and waited < 300:
                         db.workflow_trigger_event.update_one(
                             {"_id": event["_id"]},
@@ -187,10 +185,12 @@ def process_pending_triggers(self) -> dict:
                     continue
 
             # Queue for execution
-            db.workflow_trigger_event.update_one(
-                {"_id": event["_id"]},
+            claim = db.workflow_trigger_event.update_one(
+                {"_id": event["_id"], "status": "pending"},
                 {"$set": {"status": "queued", "queued_at": now}},
             )
+            if claim.modified_count == 0:
+                continue
 
             execute_workflow_passive.delay(str(event["_id"]))
             processed += 1
@@ -426,6 +426,20 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     if not event:
         return {"error": "Trigger event not found"}
 
+    # Celery can redeliver a message. Only the queued event may start an
+    # attempt; another worker, a completed run, or a delayed retry owns every
+    # other state. Claim before creating results or performing any step.
+    if event.get("status") != "queued":
+        return {"status": event.get("status"), "event_id": str(event["_id"]),
+                "workflow_result_id": str(event["workflow_result"]) if event.get("workflow_result") else None}
+    now = datetime.now(timezone.utc)
+    claim = db.workflow_trigger_event.update_one(
+        {"_id": event["_id"], "status": "queued"},
+        {"$set": {"status": "running", "started_at": now}},
+    )
+    if claim.modified_count == 0:
+        return {"status": "already_claimed", "event_id": str(event["_id"])}
+
     workflow = db.workflow.find_one({"_id": event.get("workflow")})
     if not workflow:
         db.workflow_trigger_event.update_one(
@@ -434,19 +448,12 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         )
         return {"error": "Workflow not found"}
 
-    now = datetime.now(timezone.utc)
     sys_config = db.system_config.find_one() or {}
     # Bound before the try so the failure handler can reference it even when the
     # run dies before the result document is created.
     result_id = None
 
     try:
-        # Mark running
-        db.workflow_trigger_event.update_one(
-            {"_id": event["_id"]},
-            {"$set": {"status": "running", "started_at": now}},
-        )
-
         # Create WorkflowResult
         # The run records which automation and trigger event produced it, so
         # a reaper that finds it dead later can tell the person who set the
@@ -552,7 +559,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         )
 
         # Update event
-        started_at = event.get("started_at") or now
+        started_at = now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000)
         db.workflow_trigger_event.update_one(
             {"_id": event["_id"]},
@@ -607,7 +614,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             )
 
         completed_at = datetime.now(timezone.utc)
-        started_at = event.get("started_at") or now
+        started_at = now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000) if started_at else 0
 
         doc_ids = event.get("documents", [])

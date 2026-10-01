@@ -1,16 +1,11 @@
-import { Fragment, useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from '../shared/panelPortal'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  AppWindow,
   Award,
   ChevronLeft,
   Cog,
   GripHorizontal,
-  Maximize2,
-  PanelBottom,
-  PanelLeft,
-  PanelRight,
   ShieldCheck,
   Star,
   Target,
@@ -29,6 +24,7 @@ import { ModuleDetail } from './ModuleDetail'
 import { JourneyMap } from './JourneyMap'
 import { useModuleLock } from './useModuleLock'
 import { MODULES } from './modules'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -128,12 +124,12 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 // Mode toggle buttons
 // ---------------------------------------------------------------------------
 
-const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] = [
-  { mode: 'floating', label: 'Float \u2014 a movable window you can drag anywhere', icon: AppWindow },
-  { mode: 'fullscreen', label: 'Full screen \u2014 fill this browser window', icon: Maximize2 },
-  { mode: 'docked-left', label: 'Pin to the left edge of the screen', icon: PanelLeft },
-  { mode: 'docked-right', label: 'Pin to the right edge of the screen', icon: PanelRight },
-  { mode: 'docked-bottom', label: 'Pin along the bottom of the screen', icon: PanelBottom },
+const PANEL_POSITIONS: { mode: PanelMode; label: string }[] = [
+  { mode: 'floating', label: 'Floating window' },
+  { mode: 'fullscreen', label: 'Full screen' },
+  { mode: 'docked-left', label: 'Dock left' },
+  { mode: 'docked-right', label: 'Dock right' },
+  { mode: 'docked-bottom', label: 'Dock bottom' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -146,6 +142,19 @@ export function CertificationPanel() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const uid = user?.user_id || ''
+  const panelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const panel = panelRef.current
+    panel?.focus({ preventScroll: true })
+    return () => {
+      requestAnimationFrame(() => {
+        if (!panel?.isConnected && previous?.isConnected && (document.activeElement === document.body || panel?.contains(document.activeElement))) previous.focus({ preventScroll: true })
+      })
+    }
+  }, [isOpen])
+
 
   // Module interaction state — persist across reloads, scoped by user
   const [activeModule, setActiveModuleState] = useState<string | null>(() => {
@@ -330,6 +339,7 @@ export function CertificationPanel() {
   const handleDragEnd = () => { dragRef.current = null }
 
   const activeModuleDef = MODULES.find(m => m.id === activeModule)
+  const nextLessonModule = MODULES.find(module => !progress?.modules[module.id]?.completed && !isModuleLocked(module.id))
 
   if (!isOpen) return null
 
@@ -347,7 +357,7 @@ export function CertificationPanel() {
     borderRadius: mode === 'floating' ? 'var(--ui-radius, 12px)' : undefined,
     ...(mode === 'floating'
       ? {
-          width: 540,
+          width: 'min(540px, calc(100vw - 16px))',
           height: '80vh',
           maxHeight: 740,
           top: dragPos ? dragPos.y : '50%',
@@ -355,9 +365,9 @@ export function CertificationPanel() {
           transform: dragPos ? undefined : 'translate(-50%, -50%)',
         }
       : mode === 'docked-left'
-        ? { width: 440 }
+        ? { width: 'min(440px, 100vw)' }
         : mode === 'docked-right'
-          ? { width: 440 }
+          ? { width: 'min(440px, 100vw)' }
           : mode === 'docked-bottom'
             ? { height: 360 }
             : {}),
@@ -413,6 +423,24 @@ export function CertificationPanel() {
   ) : (
     // CURRICULUM VIEW — compact hero + journey map + level strip
     <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-4">
+      <section className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700" aria-label="Learn a useful task">
+        <h3 className="font-semibold text-gray-900">Check a proposal requirement</h3>
+        <p className="mt-1 text-xs text-gray-600">Optional walkthrough · allow about 5 minutes</p>
+        <ol className="my-3 list-decimal space-y-1 pl-5">
+          <li>Open or upload a proposal document in Files.</li>
+          <li>Ask: “What budget restrictions does this document state? Cite the passages.”</li>
+          <li>Open each source reference and compare the answer with the original wording.</li>
+        </ol>
+        <p className="text-xs text-gray-600">If evidence is missing, check the source before using the answer. Export the conversation for a colleague to review.</p>
+        <button type="button" onClick={closePanel} className="mt-3 rounded-md border border-gray-300 px-3 py-2 font-medium text-gray-900">Try in the workspace</button>
+      </section>
+      {nextLessonModule && <section className="rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-xs text-gray-600">Next in your optional course{nextLessonModule.estimatedMinutes ? ` · about ${nextLessonModule.estimatedMinutes} minutes` : ''}</p>
+        <button type="button" onClick={() => handleModuleClick(nextLessonModule.id)} className="mt-2 text-left text-sm font-semibold text-gray-900 underline underline-offset-4">Continue: {nextLessonModule.title}</button>
+        <p className="mt-1 text-xs text-gray-600">Your place is saved when you leave.</p>
+      </section>}
+      <details>
+      <summary className="cursor-pointer text-sm font-medium text-gray-700">Course progress and credential</summary>
       {/* Compact hero */}
       {progress?.certified ? (
         <CertifiedBanner />
@@ -441,6 +469,8 @@ export function CertificationPanel() {
           </div>
         </div>
       )}
+
+      </details>
 
       {/* Journey Map */}
       <div>
@@ -494,11 +524,12 @@ export function CertificationPanel() {
         />
       )}
 
-      <div data-cert-panel className={containerClass} style={containerStyle}>
+      <FocusTrap active={mode === 'fullscreen'} focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false, initialFocus: () => panelRef.current!, fallbackFocus: () => panelRef.current!, returnFocusOnDeactivate: false }}>
+      <div ref={panelRef} tabIndex={-1} role={mode === 'fullscreen' ? 'dialog' : 'region'} aria-modal={mode === 'fullscreen' ? true : undefined} aria-label="Learning and certification" data-cert-panel className={containerClass} style={containerStyle} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); closePanel() } }}>
         {/* Title bar */}
         <div
           className={cn(
-            'flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 shrink-0 select-none',
+            'flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-gray-200 shrink-0 select-none',
             mode === 'floating' && 'cursor-grab active:cursor-grabbing',
           )}
           style={mode === 'floating' ? { borderRadius: 'var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0' } : undefined}
@@ -511,28 +542,13 @@ export function CertificationPanel() {
           <span className="text-sm font-bold text-gray-900 flex-1">Certification</span>
 
           {/* Mode toggles */}
-          <div className="flex items-center gap-0.5" onPointerDown={e => e.stopPropagation()}>
-            {MODE_ICONS.map(({ mode: m, icon: Icon, label }) => (
-              <Fragment key={m}>
-                {/* The three pin buttons are near-identical glyphs — a divider
-                    at least separates them from float/full-screen as a group. */}
-                {m === 'docked-left' && <div aria-hidden="true" className="w-px h-4 bg-gray-200 mx-0.5" />}
-                <button
-                  type="button"
-                  onClick={() => setMode(m)}
-                  title={label}
-                  aria-label={label}
-                  aria-pressed={mode === m}
-                  className={cn(
-                    'p-1.5 rounded-md transition-colors',
-                    mode === m ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-50',
-                  )}
-                >
-                  <Icon size={14} aria-hidden="true" />
-                </button>
-              </Fragment>
-            ))}
-            <div aria-hidden="true" className="w-px h-4 bg-gray-200 mx-0.5" />
+          <div className="order-2 flex basis-full items-center justify-between gap-2 sm:order-none sm:basis-auto" onPointerDown={e => e.stopPropagation()}>
+            <label className="flex items-center gap-1 text-xs text-gray-600">
+              <span className="sm:sr-only">Learning panel position</span>
+              <select value={mode} onChange={event => setMode(event.target.value as PanelMode)} className="min-w-0 max-w-[128px] rounded-md border border-gray-300 bg-white p-1.5 text-gray-800">
+                {PANEL_POSITIONS.map(position => <option key={position.mode} value={position.mode}>{position.label}</option>)}
+              </select>
+            </label>
             {/* The second-monitor ask: an explicit pop-out, not a mode the
                 user has to discover by opening another browser tab herself. */}
             <button
@@ -549,7 +565,7 @@ export function CertificationPanel() {
             </button>
           </div>
 
-          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" aria-label="Back to badge" className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50 ml-1">
+          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Return to workspace — lesson progress is saved" aria-label="Return to workspace" className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50 ml-1">
             <X size={14} aria-hidden="true" />
           </button>
         </div>
@@ -557,6 +573,7 @@ export function CertificationPanel() {
         {/* Panel body */}
         {panelContent}
       </div>
+      </FocusTrap>
 
       {/* Celebration overlay — always full-screen via portal */}
       {completionResult && (

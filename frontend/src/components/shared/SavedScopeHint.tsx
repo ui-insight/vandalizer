@@ -5,5 +5,6 @@ export function SavedScopeHint({ scope, kind, dark = false }: { scope: string; k
     : scope === 'team'
       ? `${label} owned by or shared with your team.`
       : 'Shared with everyone. Save an item to Mine.'
-  return <p className="saved-scope-hint" data-dark={dark}>{text}</p>
+  const reuse = kind === 'tools' && scope !== 'explore' ? ' Saved references follow the original; Duplicate and Add to my library create separate copies.' : ''
+  return <p className="saved-scope-hint" data-dark={dark}>{text}{reuse}</p>
 }

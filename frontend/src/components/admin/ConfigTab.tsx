@@ -59,7 +59,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
     <div style={{ marginBottom: 20, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
         {report.ready
-          ? <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+          ? <ShieldCheck size={18} style={{ color: '#15803d' }} />
           : <AlertCircle size={18} style={{ color: '#d97706' }} />}
         <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>
           {report.ready ? 'System ready' : 'Finish setting up your workspace'}
@@ -71,7 +71,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
         )}
         <div style={{ flex: 1 }} />
         {onDismiss && (
-          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
+          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: 2 }}>
             <X size={16} />
           </button>
         )}
@@ -85,7 +85,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
             <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderTop: '1px solid #f8fafc' }}>
               <div style={{ marginTop: 1 }}>
                 {done
-                  ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                  ? <CheckCircle2 size={18} style={{ color: '#15803d' }} />
                   : broken
                     ? <XCircle size={18} style={{ color: '#dc2626' }} />
                     : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
@@ -96,7 +96,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9999, background: pill.bg, color: pill.fg }}>{pill.label}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{item.summary}</div>
-                {!done && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
+                {!done && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
               </div>
               {!done && (
                 <button
@@ -135,6 +135,8 @@ export function ConfigTab() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const savePending = useRef(false)
+  const configRevision = useRef(0)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -362,6 +364,7 @@ export function ConfigTab() {
   }, [loadConfig])
 
   const handleSaveConfig = async () => {
+    if (savePending.current) return
     // Parse before touching the saving state so a malformed options blob fails
     // loudly at the field rather than being silently dropped from the payload.
     let parsedOcrOptions: Record<string, unknown> = {}
@@ -380,6 +383,8 @@ export function ConfigTab() {
       }
     }
     setOcrOptionsError(null)
+    savePending.current = true
+    const revision = configRevision.current
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -424,13 +429,14 @@ export function ConfigTab() {
         web_search_endpoint: webSearchEndpoint,
         ...(webSearchApiKeyDirty ? { web_search_api_key: webSearchApiKey } : {}),
       })
-      setSaved(true)
+      setSaved(revision === configRevision.current)
       setTimeout(() => setSaved(false), 3000)
       void refreshReadiness()
       void refreshOcrReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
+      savePending.current = false
       setSaving(false)
     }
   }
@@ -491,15 +497,25 @@ export function ConfigTab() {
     }
   }
 
+  const contactPending = useRef(false)
+  const [contactsSaving, setContactsSaving] = useState(false)
+  const [contactsError, setContactsError] = useState<string | null>(null)
   const saveSupportContacts = async (contacts: typeof supportContacts) => {
+    if (contactPending.current) return false
+    contactPending.current = true
+    setContactsSaving(true)
+    setContactsError(null)
     try {
       await updateSystemConfig({ support_contacts: contacts } as Record<string, unknown>)
+      setSupportContacts(contacts)
+      return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save support contacts')
-    }
+      setContactsError(e instanceof Error ? e.message : 'Failed to save support contacts')
+      return false
+    } finally { contactPending.current = false; setContactsSaving(false) }
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading config...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#4b5563' }}>Loading config...</div>
 
   // Structural guard: without this, a failed load left `cfg` null but still
   // rendered the form against pristine useState defaults, and Save would
@@ -533,11 +549,11 @@ export function ConfigTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div onChangeCapture={() => { configRevision.current++; setSaved(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowWrap: 'anywhere' }}>
       {/* Sticky save bar */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 20,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #e5e7eb',
         padding: '12px 20px', margin: '0 0 -4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -546,7 +562,7 @@ export function ConfigTab() {
           <Settings size={16} color="#6b7280" /> System Configuration
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Configuration saved!</span>}
           <button
             onClick={handleSaveConfig}
             disabled={saving}
@@ -562,7 +578,7 @@ export function ConfigTab() {
       </div>
 
       {error && (
-        <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+        <div role="alert" style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -603,12 +619,12 @@ export function ConfigTab() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Play size={18} color="#6b7280" /> Prompt Playground
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#4b5563' }}>
             — send a prompt to a configured model and see the raw round-trip
           </span>
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label htmlFor="admin-playground-system" style={labelStyle}>System Prompt (optional)</label>
@@ -664,7 +680,7 @@ export function ConfigTab() {
                 <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
               </button>
               {playgroundResult && (
-                <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.6 }}>
                   <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
                   <div>Latency: {playgroundResult.latency_ms} ms</div>
                   {playgroundResult.tokens && (
@@ -685,7 +701,7 @@ export function ConfigTab() {
           )}
 
           {playgroundResult && (
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   Request sent
@@ -761,7 +777,7 @@ ${playgroundResult.request.user_prompt}`}
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR Endpoint</label>
             <input
-              type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
+              type="url" aria-label="OCR endpoint" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
               placeholder={ocrProvider === 'docling' ? 'https://docling.example.edu' : 'https://...'}
               style={{ ...inputStyle, maxWidth: 500 }}
             />
@@ -835,11 +851,11 @@ ${playgroundResult.request.user_prompt}`}
             <input
               type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
               name="vandalizer-ocr-api-key"
-              value={ocrApiKey} onChange={e => { setOcrApiKey(e.target.value); setOcrApiKeyDirty(true) }}
+              aria-label="OCR API key" value={ocrApiKey} onChange={e => { setOcrApiKey(e.target.value); setOcrApiKeyDirty(true) }}
               placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
             <button
               onClick={handleTestOcr}
               disabled={ocrTesting || !ocrEndpoint}
@@ -898,13 +914,13 @@ ${playgroundResult.request.user_prompt}`}
           {/* Web Search — powers the agentic chat web_search tool */}
           <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #f0f0f0' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Web Search</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 16 }}>
               Lets the chat assistant search the web when an answer isn't in the user's documents or knowledge bases. The assistant favors local sources first and only reaches for the web when needed.
             </div>
             <div>
               <label style={labelStyle}>Provider</label>
               <select
-                value={webSearchProvider} onChange={e => setWebSearchProvider(e.target.value)}
+                aria-label="Web search provider" value={webSearchProvider} onChange={e => setWebSearchProvider(e.target.value)}
                 style={{ ...inputStyle, maxWidth: 500, background: '#fff', cursor: 'pointer' }}
               >
                 <option value="">Disabled</option>
@@ -917,7 +933,7 @@ ${playgroundResult.request.user_prompt}`}
             <div style={{ marginTop: 12 }}>
               <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional, defaults to api.tavily.com)' : webSearchProvider === 'mindrouter' ? ' (optional, defaults to mindrouter.uidaho.edu/v1/search)' : ''}</label>
               <input
-                type="url" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
+                type="url" aria-label="Web search endpoint" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
                 placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : webSearchProvider === 'mindrouter' ? 'https://mindrouter.uidaho.edu/v1/search' : 'https://...'}
                 style={{ ...inputStyle, maxWidth: 500 }}
               />
@@ -927,11 +943,11 @@ ${playgroundResult.request.user_prompt}`}
               <input
                 type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
                 name="vandalizer-web-search-api-key"
-                value={webSearchApiKey} onChange={e => { setWebSearchApiKey(e.target.value); setWebSearchApiKeyDirty(true) }}
+                aria-label="Web search API key" value={webSearchApiKey} onChange={e => { setWebSearchApiKey(e.target.value); setWebSearchApiKeyDirty(true) }}
                 placeholder="API key..." style={{ ...inputStyle, maxWidth: 500 }}
               />
             </div>
-            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
               <button
                 onClick={handleTestWebSearch}
                 disabled={webSearchTesting || !webSearchProvider}
@@ -951,7 +967,7 @@ ${playgroundResult.request.user_prompt}`}
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 10 }}>
               Note: Test Search and chat use the saved configuration — click Save above before testing new values.
             </div>
           </div>
@@ -969,7 +985,7 @@ ${playgroundResult.request.user_prompt}`}
           <Cpu size={18} color="#6b7280" /> Extraction Configuration
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div onChangeCapture={() => { configRevision.current++; setSaved(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowWrap: 'anywhere' }}>
             {/* Mode */}
             <div>
               <label style={labelStyle}>Extraction Mode</label>
@@ -1005,7 +1021,7 @@ ${playgroundResult.request.user_prompt}`}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                  <select value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
+                  <select aria-label="One-pass model" value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
                     <option value="">Default</option>
                     {cfg?.available_models?.map(m => (
                       <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -1016,9 +1032,9 @@ ${playgroundResult.request.user_prompt}`}
             ) : (
               <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Two-Pass Settings</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 1 (Draft)</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>Pass 1 (Draft)</div>
                     <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                       <input type="checkbox" checked={twoPassP1Thinking} onChange={e => setTwoPassP1Thinking(e.target.checked)} style={checkStyle} />
                       Thinking
@@ -1029,7 +1045,7 @@ ${playgroundResult.request.user_prompt}`}
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                      <select aria-label="First-pass model" value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
                         <option value="">Default</option>
                         {cfg?.available_models?.map(m => (
                           <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -1038,7 +1054,7 @@ ${playgroundResult.request.user_prompt}`}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 2 (Final)</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>Pass 2 (Final)</div>
                     <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                       <input type="checkbox" checked={twoPassP2Thinking} onChange={e => setTwoPassP2Thinking(e.target.checked)} style={checkStyle} />
                       Thinking
@@ -1049,7 +1065,7 @@ ${playgroundResult.request.user_prompt}`}
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                      <select aria-label="Second-pass model" value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
                         <option value="">Default</option>
                         {cfg?.available_models?.map(m => (
                           <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -1071,7 +1087,7 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ marginTop: 12, paddingLeft: 24 }}>
                   <label style={labelStyle}>Max Keys Per Chunk</label>
                   <input
-                    type="number" min={1} max={100} value={maxKeysPerChunk}
+                    type="number" min={1} max={100} aria-label="Maximum fields per chunk" value={maxKeysPerChunk}
                     onChange={e => setMaxKeysPerChunk(Number(e.target.value))}
                     style={{ ...inputStyle, maxWidth: 120 }}
                   />
@@ -1092,7 +1108,7 @@ ${playgroundResult.request.user_prompt}`}
                   <input type="checkbox" checked={useImages} onChange={e => setUseImages(e.target.checked)} style={checkStyle} />
                   Use Document Images (Multimodal)
                 </label>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, paddingLeft: 24 }}>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4, paddingLeft: 24 }}>
                   Send document files directly to multimodal LLMs instead of OCR text. Requires a multimodal model to be selected for extraction.
                 </div>
               </div>
@@ -1112,22 +1128,22 @@ ${playgroundResult.request.user_prompt}`}
               <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
               Require validation before verification submission
             </label>
-            <p style={{ fontSize: 12, color: '#6b7280', margin: '-8px 0 0' }}>
+            <p style={{ fontSize: 12, color: '#4b5563', margin: '-8px 0 0' }}>
               The three thresholds below apply only while that box is checked. Unchecked, anything can be submitted and the examiner decides.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Min Extraction Accuracy (%)</label>
-                <input type="number" min={0} max={100} value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} aria-label="Minimum extraction accuracy percent" value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
               </div>
               <div>
                 <label style={labelStyle}>Min Extraction Consistency (%)</label>
-                <input type="number" min={0} max={100} value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} aria-label="Minimum extraction consistency percent" value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
               </div>
               <div>
                 <label style={labelStyle}>Min Workflow Grade</label>
-                <select value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
+                <select aria-label="Minimum workflow grade" value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
                   <option value="A">A</option>
                   <option value="B">B</option>
                   <option value="C">C</option>
@@ -1139,18 +1155,18 @@ ${playgroundResult.request.user_prompt}`}
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Excellent threshold</label>
-                  <input type="number" min={0} max={100} value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} aria-label="Excellent score threshold" value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
                 </div>
                 <div>
                   <label style={labelStyle}>Good threshold</label>
-                  <input type="number" min={0} max={100} value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} aria-label="Good score threshold" value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
                 </div>
                 <div>
                   <label style={labelStyle}>Fair threshold</label>
-                  <input type="number" min={0} max={100} value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} aria-label="Fair score threshold" value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
                 </div>
               </div>
             </div>
@@ -1175,29 +1191,31 @@ ${playgroundResult.request.user_prompt}`}
           </button>
         </div>
         <div style={sectionBodyStyle}>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: '#4b5563', marginBottom: 12 }}>
             People listed here will receive email alerts and in-app notifications when new support tickets are created. They will also have access to the Support Center to manage all tickets.
           </p>
+          {contactsError && <p role="alert" style={{ color: '#991b1b', marginBottom: 12 }}>{contactsError} Your saved contacts have not changed. Retry the change.</p>}
           {supportContacts.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {supportContacts.map((c, i) => (
                 <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
                   padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
                   border: '1px solid #e5e7eb',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{c.name}</span>
-                    <span style={{ fontSize: 13, color: '#6b7280' }}>{c.email}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{c.user_id}</span>
+                    <span style={{ fontSize: 13, color: '#4b5563' }}>{c.email}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#4b5563', fontWeight: 600 }}>{c.user_id}</span>
                   </div>
                   <button
                     onClick={() => {
                       const updated = supportContacts.filter((_, idx) => idx !== i)
-                      setSupportContacts(updated)
                       saveSupportContacts(updated)
                     }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                    disabled={contactsSaving}
+                    aria-label={`Remove support contact ${c.name}`}
                     title="Remove contact"
                   >
                     <Trash2 size={16} />
@@ -1206,35 +1224,36 @@ ${playgroundResult.request.user_prompt}`}
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#9ca3af' }}>No support contacts configured.</div>
+            <div style={{ fontSize: 13, color: '#4b5563' }}>No support contacts configured.</div>
           )}
           {showAddContact && (
             <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Add Support Contact</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Name</label>
-                  <input value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact name" value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>User ID</label>
-                  <input value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact user ID" value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Email</label>
-                  <input value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="jdoe@example.com" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact email" value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="jdoe@example.com" style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!newContact.name.trim() || !newContact.user_id.trim()) return
                     const updated = [...supportContacts, { ...newContact }]
-                    setSupportContacts(updated)
-                    saveSupportContacts(updated)
-                    setShowAddContact(false)
+                    if (await saveSupportContacts(updated)) {
+                      setShowAddContact(false)
+                      setNewContact({ name: '', user_id: '', email: '' })
+                    }
                   }}
-                  disabled={!newContact.name.trim() || !newContact.user_id.trim()}
+                  disabled={contactsSaving || !newContact.name.trim() || !newContact.user_id.trim()}
                   style={{
                     padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                     background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -1244,6 +1263,7 @@ ${playgroundResult.request.user_prompt}`}
                   Add
                 </button>
                 <button
+                  disabled={contactsSaving}
                   onClick={() => setShowAddContact(false)}
                   style={{ padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer' }}
                 >
@@ -1261,7 +1281,7 @@ ${playgroundResult.request.user_prompt}`}
           <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
             When enabled, every uploaded document is scanned in chunks by an LLM
             against the policy below. Documents containing sensitive or policy-violating
             content are flagged in the document library.
@@ -1283,13 +1303,13 @@ ${playgroundResult.request.user_prompt}`}
               <div>
                 <label style={labelStyle}>Compliance policy (sent to the validator LLM)</label>
                 <textarea
-                  value={complianceRules}
+                  aria-label="Compliance rules" value={complianceRules}
                   onChange={e => setComplianceRules(e.target.value)}
                   placeholder="Describe what content should be flagged…"
                   rows={6}
                   style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
                 />
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
                   Plain English. The validator decides whether each chunk passes or fails based on this rule set.
                 </div>
               </div>
@@ -1299,7 +1319,7 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={500}
-                    value={complianceChunkSize}
+                    aria-label="Compliance chunk size" value={complianceChunkSize}
                     onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
                     style={inputStyle}
                   />
@@ -1309,7 +1329,7 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={0}
-                    value={complianceChunkOverlap}
+                    aria-label="Compliance chunk overlap" value={complianceChunkOverlap}
                     onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
                     style={inputStyle}
                   />
@@ -1347,7 +1367,7 @@ ${playgroundResult.request.user_prompt}`}
             >
               {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {complianceSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -1358,7 +1378,7 @@ ${playgroundResult.request.user_prompt}`}
           <ShieldCheck size={18} color="#6b7280" /> Document Retention Policy
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
             When enforcement is on, documents are auto-scheduled for soft-deletion after their
             classification-specific retention window. Soft-deleted documents become unrecoverable
             after the grace period expires. Items on retention hold are never auto-deleted.
@@ -1380,7 +1400,7 @@ ${playgroundResult.request.user_prompt}`}
                 </div>
                 <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+                    <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', textAlign: 'left' }}>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Tier</th>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Retention (days)</th>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Grace before purge (days)</th>
@@ -1459,13 +1479,13 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                   Other retention windows
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
                   <div>
                     <label style={labelStyle}>Activity logs (days)</label>
                     <input
                       type="number"
                       min={0}
-                      value={activityRetentionDays}
+                      aria-label="Activity retention days" value={activityRetentionDays}
                       onChange={e => setActivityRetentionDays(Number(e.target.value) || 0)}
                       style={inputStyle}
                     />
@@ -1475,7 +1495,7 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={chatRetentionDays}
+                      aria-label="Chat retention days" value={chatRetentionDays}
                       onChange={e => setChatRetentionDays(Number(e.target.value) || 0)}
                       style={inputStyle}
                     />
@@ -1485,7 +1505,7 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={workflowResultRetentionDays}
+                      aria-label="Workflow result retention days" value={workflowResultRetentionDays}
                       onChange={e => setWorkflowResultRetentionDays(Number(e.target.value) || 0)}
                       style={inputStyle}
                     />
@@ -1495,7 +1515,7 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={staleActivityMinutes}
+                      aria-label="Stale activity threshold minutes" value={staleActivityMinutes}
                       onChange={e => setStaleActivityMinutes(Number(e.target.value) || 0)}
                       style={inputStyle}
                     />
@@ -1537,13 +1557,13 @@ ${playgroundResult.request.user_prompt}`}
             >
               {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
             </button>
-            {retentionSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {retentionSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
 
       {/* Save config button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
         <button
           onClick={handleSaveConfig}
           disabled={saving}
@@ -1555,7 +1575,7 @@ ${playgroundResult.request.user_prompt}`}
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>
-        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Configuration saved!</span>}
       </div>
     </div>
   )

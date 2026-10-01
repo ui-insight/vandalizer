@@ -1,3 +1,5 @@
+import { TaskHelpLink } from '../shared/TaskHelpLink'
+import { PanelEditorSurface } from '../shared/PanelEditorSurface'
 import { SHARE_LABEL } from '../../lib/catalogLabels'
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -39,8 +41,9 @@ import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { listCredentials } from '../../api/credentials'
-import type { Credential, CredentialType } from '../../types/credential'
+import type { CredentialType } from '../../types/credential'
 import { CredentialQuickCreateModal } from './CredentialQuickCreateModal'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
@@ -414,16 +417,16 @@ export function WorkflowEditorPanel() {
     const message = verifiedBlock
       ? (
         <>
-          This workflow is verified — edits would change the verified version. Make a copy to edit?
+          This workflow is accepted for sharing. Make an independent copy to edit it.
           <br /><br />
-          Your copy will be saved to your team.
+          Your independent copy will be saved to {user?.current_team ? 'your current team’s Library' : 'Mine in Library'}. Later edits stay separate.
         </>
       )
       : (
         <>
           This workflow is shared with you. Make a copy to edit?
           <br /><br />
-          Your copy will be saved to your team.
+          Your independent copy will be saved to {user?.current_team ? 'your current team’s Library' : 'Mine in Library'}. Later edits stay separate.
         </>
       )
     void confirm({ message, confirmLabel: 'Make a copy' }).then((ok) => {
@@ -665,7 +668,7 @@ export function WorkflowEditorPanel() {
         if (uuids.length === 0) {
           if (activeProjectUuid) {
             uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
-            if (uuids.length === 0) {
+            if (uuids.length === 0 && fixedDocCount === 0) {
               toast('No files in this project to run on yet', 'info')
               return
             }
@@ -708,8 +711,10 @@ export function WorkflowEditorPanel() {
     }
   }
 
+  const duplicatingRef = useRef(false)
   const handleMakeCopy = async () => {
-    if (!openWorkflowId || duplicating) return
+    if (!openWorkflowId || duplicatingRef.current) return
+    duplicatingRef.current = true
     setDuplicating(true)
     try {
       const copy = (await duplicateWorkflow(openWorkflowId, openWorkflowShareToken ?? undefined)) as { id?: string }
@@ -723,6 +728,7 @@ export function WorkflowEditorPanel() {
       const msg = err instanceof Error ? err.message : 'Failed to copy workflow'
       toast(msg, 'error')
     } finally {
+      duplicatingRef.current = false
       setDuplicating(false)
     }
   }
@@ -753,9 +759,13 @@ export function WorkflowEditorPanel() {
   // --- render ---
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
+    <div className="workflow-editor flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative', containerType: 'inline-size' }}>
+      {/* Keep a usable canvas when enlarged text makes the header/run controls
+          taller than the pane. The whole setup can scroll; editors still cover
+          the visible pane rather than an off-screen part of that scroll area. */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {/* ===== HEADER ===== */}
-      <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
+      <div className="workflow-editor__header" style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {editingTitle ? (
             <input
@@ -796,8 +806,7 @@ export function WorkflowEditorPanel() {
                       ? 'Shared with everyone: make a copy to edit'
                       : 'Shared with you: make a copy to edit'
                   }
-                  onClick={() => { void handleMakeCopy() }}
-                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                  style={{ display: 'inline-flex', alignItems: 'center' }}
                 >
                   <ShieldCheck style={{ width: 14, height: 14, color: '#b45309' }} />
                 </span>
@@ -873,7 +882,7 @@ export function WorkflowEditorPanel() {
             <X style={{ width: 20, height: 20 }} />
           </button>
         </div>
-        {editingDesc ? (
+        {(activeTab === 'design' || editingDesc) && (editingDesc ? (
           <textarea
             aria-label="Workflow description"
             ref={descInputRef}
@@ -915,7 +924,7 @@ export function WorkflowEditorPanel() {
             <Pencil style={{ width: 12, height: 12 }} />
             <span>Add a description</span>
           </button>
-        ) : null}
+        ) : null)}
       </div>
 
       {/* ===== TAB BAR ===== */}
@@ -951,7 +960,7 @@ export function WorkflowEditorPanel() {
                 tabBarRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
               }}
               style={{
-                padding: tabsCompact ? '12px 12px' : '12px 20px', fontSize: 'var(--workspace-font-control)',
+                padding: tabsCompact ? '10px 8px' : '12px 20px', fontSize: 'var(--workspace-font-control)',
                 fontWeight: activeTab === tab.key ? 700 : 500,
                 fontFamily: 'inherit', background: 'none', border: 'none',
                 borderBottom: activeTab === tab.key
@@ -966,7 +975,7 @@ export function WorkflowEditorPanel() {
               }}
             >
               <TabIcon style={{ width: 14, height: 14 }} />
-              {!tabsCompact && tab.label}
+              {tab.label}
               {tabDot && (
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -990,9 +999,10 @@ export function WorkflowEditorPanel() {
       </div>
 
       {/* ===== TAB CONTENT ===== */}
-      <div id="wf-tabpanel" role="tabpanel" aria-labelledby={`wf-tab-${activeTab}`} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div id="wf-tabpanel" role="tabpanel" aria-labelledby={`wf-tab-${activeTab}`} style={{ flex: '1 0 240px', overflowY: 'auto', minHeight: 240 }}>
         {activeTab === 'design' && (
           <>
+            {!canManage && <p style={{ margin: '12px 24px', padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, color: '#334155', fontSize: 12 }}>This shared workflow is view-only. Running uses its current shared version. Save an independent copy to {user?.current_team ? 'Team Library' : 'Mine'} to edit; later changes to the original will not update your copy.</p>}
             <DesignCanvas
               workflow={workflow}
               selectedDocCount={selectedDocUuids.length}
@@ -1085,6 +1095,7 @@ export function WorkflowEditorPanel() {
         )}
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} canManage={canManage} onRefresh={refresh} />}
+        {activeTab === 'validate' && <div className="px-6 pt-3"><TaskHelpLink topic="validation">Choose examples and inspect validation results</TaskHelpLink></div>}
         {activeTab === 'validate' && (
           hasSteps ? (
             <ValidateTab
@@ -1160,8 +1171,8 @@ export function WorkflowEditorPanel() {
         </div>
       )}
 
-      {/* ===== BOTTOM TOOLBAR (Run) ===== */}
-      <div style={{ flexShrink: 0, padding: 15, backgroundColor: '#fff', boxShadow: '0 0px 23px -8px rgb(211,211,211)' }}>
+      {/* Keep the run controls with task setup; validation and history have their own actions. */}
+      {(activeTab === 'design' || activeTab === 'input' || runner.running) && <div style={{ flexShrink: 0, padding: 15, backgroundColor: '#fff', boxShadow: '0 0px 23px -8px rgb(211,211,211)' }}>
         {isTextInput ? (
           <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
             <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
@@ -1310,11 +1321,13 @@ export function WorkflowEditorPanel() {
             ) : (
               <>
                 <Copy style={{ width: 14, height: 14 }} />
-                Save a copy to my library
+                Save a copy to {user?.current_team ? 'Team Library' : 'Mine'}
               </>
             )}
           </button>
         )}
+      </div>}
+
       </div>
 
       {/* ===== EDIT STEP OVERLAY ===== */}
@@ -1510,6 +1523,12 @@ function DesignCanvas({
       padding: '30px 30px 150px 30px',
       minHeight: '100%',
     }}>
+      <section aria-label="Workflow run overview" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--workspace-border)', borderRadius: 8, background: '#fff', color: '#374151', fontSize: 13, lineHeight: 1.5 }}>
+        <strong>Before running</strong>
+        <p style={{ margin: '4px 0' }}>Deliverable steps: {(workflow.steps.some(step => step.is_output) ? workflow.steps.filter(step => step.is_output) : workflow.steps.filter(step => step.tasks.length > 0).slice(-1)).map(step => step.name).join(', ') || 'None configured'}.</p>
+        <p style={{ margin: '4px 0' }}>{workflow.steps.some(step => step.tasks.some(task => task.name === 'Approval')) ? `Pauses for human review in: ${workflow.steps.filter(step => step.tasks.some(task => task.name === 'Approval')).map(step => step.name).join(', ')}.` : 'No human-review step is configured.'}</p>
+        <details><summary style={{ cursor: 'pointer' }}>How steps and tasks work</summary><p style={{ margin: '4px 0' }}>Steps run in order. Tasks within a step run together, using the step’s input unless a task has its own input override. Open a step’s Input and Output sections to inspect its sources and combined result.</p></details>
+      </section>
       {/* Trigger pill */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={{
@@ -1566,11 +1585,12 @@ function DesignCanvas({
 
       {/* Workflow-level model — the default every step runs on. A step with its
           own Model Override still wins (see the task editor). */}
-      <div style={{
+      <details style={{
         backgroundColor: '#fff', border: "1px solid var(--workspace-border)",
         borderRadius: 'var(--ui-radius, 8px)', padding: 15,
         boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
       }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Advanced: model selection · {defaultModel || 'Automatic'}</summary>
         <label htmlFor="workflow-default-model" style={{
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
           fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)',
@@ -1601,7 +1621,7 @@ function DesignCanvas({
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
           Runs every step on this model. A step with its own model override keeps it.
         </div>
-      </div>
+      </details>
 
       {/* Step cards — filter out empty "Document" trigger steps (auto-prepended at execution time) */}
       {(() => {
@@ -1773,7 +1793,6 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
   return (
     <div
       ref={cardRef}
-      onClick={onClick}
       style={{
         position: 'relative',
         backgroundColor: isExplicitOutput ? undefined : '#fff',
@@ -1791,6 +1810,7 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
         opacity: isDragging ? 0.4 : 1,
       }}
     >
+      <button type="button" className="card-open-action" aria-label={`Open step: ${step.name}`} onClick={onClick} />
       <Connector position="top" />
       <Connector position="bottom" />
       {dropIndicator && (
@@ -1823,7 +1843,7 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             }}
             onDragEnd={onDragEnd}
             style={{
-              display: 'flex', alignItems: 'center', cursor: 'grab',
+              position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', cursor: 'grab',
               color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
               flexShrink: 0, marginLeft: -6, marginRight: -6,
             }}
@@ -1870,7 +1890,7 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
           </div>
         </div>
         {/* Move up/down buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', flexShrink: 0 }}>
           <button
             type="button"
             aria-label="Move step up"
@@ -2107,16 +2127,14 @@ function EditStepOverlay({
   }
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000,
-      backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-    }}>
+    <PanelEditorSurface label={`Edit step: ${step.name}`} onClose={onClose} layer={1000}>
+      <p style={{ margin: 0, padding: '12px 24px 0', color: '#59616b', fontSize: 12 }}>Workflow design → Step settings</p>
       {/* Header */}
       <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-24) 0", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {editingName ? (
             <input
-              aria-label="Workflow name"
+              aria-label="Step name"
               ref={nameInputRef}
               value={nameValue}
               onChange={e => setNameValue(e.target.value)}
@@ -2156,7 +2174,7 @@ function EditStepOverlay({
         <div style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368', marginTop: 'var(--workspace-space-4)' }}>Build this step of the workflow</div>
 
         {/* Step tab bar */}
-        <div role="tablist" aria-label="Step settings" style={{ display: 'flex', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-12)' }}>
+        <div role="tablist" aria-label="Step settings" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-12)' }}>
           {STEP_TABS.map(t => (
             <button
               key={t.key}
@@ -2173,7 +2191,7 @@ function EditStepOverlay({
                 borderBottom: stepTab === t.key
                   ? '2px solid var(--highlight-color, #eab308)'
                   : '2px solid transparent',
-                color: stepTab === t.key ? 'var(--highlight-color, #eab308)' : '#6b7280',
+                color: stepTab === t.key ? 'var(--highlight-on-light, #806600)' : '#6b7280',
               }}
             >
               {t.label}
@@ -2187,7 +2205,7 @@ function EditStepOverlay({
         id="step-tabpanel"
         role="tabpanel"
         aria-labelledby={`step-tab-${stepTab}`}
-        style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-24) var(--workspace-space-24) 200px" }}
+        style={{ flex: '1 0 240px', minHeight: 240, overflowY: 'auto', padding: 'var(--workspace-space-24)' }}
       >
         {stepTab === 'basic' && (
           <>
@@ -2213,15 +2231,15 @@ function EditStepOverlay({
                 return (
                   <div
                     key={task.id}
-                    onClick={() => onEditTask(task)}
                     style={{
-                      backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
+                      position: 'relative', backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
                       padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-8)',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                       display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
                       cursor: 'pointer',
                     }}
                   >
+                    <button type="button" className="card-open-action" aria-label={`Edit task: ${String(task.data?.name || task.name)}`} onClick={() => onEditTask(task)} />
                     <div style={{
                       width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)',
                       backgroundColor: color + '18',
@@ -2266,7 +2284,7 @@ function EditStepOverlay({
                     </div>
                     {canManage && (
                       <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
-                        background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex',
+                        position: 'relative', zIndex: 2, background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex',
                       }}>
                         <Trash2 style={{ width: 14, height: 14 }} />
                       </button>
@@ -2277,10 +2295,10 @@ function EditStepOverlay({
 
               {/* Add task button — hidden when the workflow is read-only */}
               {canManage && (
-                <div
+                <button type="button"
                   onClick={onAddTask}
                   style={{
-                    backgroundColor: 'var(--color-panel-dark)', color: '#fff',
+                    width: '100%', border: 'none', fontFamily: 'inherit', backgroundColor: 'var(--color-panel-dark)', color: '#fff',
                     borderRadius: 'var(--ui-radius, 8px)',
                     padding: 'var(--workspace-space-16)', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
@@ -2291,7 +2309,7 @@ function EditStepOverlay({
                   <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>
                     {step.tasks.length > 0 ? 'ADD A TASK' : 'ADD YOUR FIRST TASK'}
                   </span>
-                </div>
+                </button>
               )}
             </div>
           </>
@@ -2399,7 +2417,7 @@ function EditStepOverlay({
       <div style={{
         flexShrink: 0, padding: 15, backgroundColor: '#fff',
         boxShadow: '0 0px 23px -8px rgb(211,211,211)',
-        display: 'flex', justifyContent: 'space-between',
+        display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', justifyContent: 'space-between',
       }}>
         {canManage ? (
           <button
@@ -2436,7 +2454,7 @@ function EditStepOverlay({
           onClose={onCloseTaskPicker}
         />
       )}
-    </div>
+    </PanelEditorSurface>
   )
 }
 
@@ -2560,10 +2578,7 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
   const hideTooltip = () => setTooltip(null)
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001,
-      backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-    }}>
+    <PanelEditorSurface label="Add a task" onClose={onClose} layer={1001}>
       {/* Header */}
       <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2738,7 +2753,7 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
           <div style={{ opacity: 0.9 }}>{tooltip.task.description}</div>
         </div>
       )}
-    </div>
+    </PanelEditorSurface>
   )
 }
 
@@ -3234,21 +3249,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   const { selectedDocNames } = useWorkspace()
 
   // Credentials (API Node auth_strategy picker)
-  const [credentials, setCredentials] = useState<Credential[] | null>(null)
+  const credentialRequest = useCallback(() => task.name === 'APINode' ? listCredentials() : Promise.resolve([]), [task.name])
+  const { data: credentials, error: credentialError, loading: credentialsLoading, load: reloadCredentials } = useAdminQuery(credentialRequest)
   const [credentialModalOpen, setCredentialModalOpen] = useState(false)
-  const reloadCredentials = useCallback(() => {
-    return listCredentials()
-      .then(list => { setCredentials(list); return list })
-      .catch(() => { setCredentials([]); return [] as Credential[] })
-  }, [])
-  useEffect(() => {
-    if (task.name !== 'APINode') return
-    let cancelled = false
-    listCredentials()
-      .then(list => { if (!cancelled) setCredentials(list) })
-      .catch(() => { if (!cancelled) setCredentials([]) })
-    return () => { cancelled = true }
-  }, [task.name])
 
   // Team members (Approval Gate assignee picker)
   const [approvalTeamMembers, setApprovalTeamMembers] = useState<{ user_id: string; name: string | null; email: string | null; role: string }[]>([])
@@ -3662,10 +3665,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   }
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002,
-      backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
-    }}>
+    <PanelEditorSurface label={`Edit task: ${String(task.data?.name || task.name)}`} onClose={onClose} layer={1002}>
+      <p style={{ margin: 0, padding: '12px 20px 0', color: '#59616b', fontSize: 12, overflowWrap: 'anywhere' }}>Step: {step?.name || 'Current step'} → Task settings</p>
       {/* Header */}
       <div style={{
         padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0,
@@ -4501,8 +4502,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   />
                   <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
-                    Insert the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, e.g.
-                    {' '}<code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'.../records/{{ inputs.output.id }}'}</code>. Works in URL, Headers, and Request Body.
+                    Insert the previous step's output with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, e.g.
+                    {' '}<code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'.../records/{{ inputs.output.id }}'}</code>. Works in URL, Headers, and Request Body.
                   </p>
                 </div>
                 <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
@@ -4569,9 +4570,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     return (
                       <div>
                         <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'stretch' }}>
-                          <div style={{ position: 'relative', flex: 1 }}>
+                          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                             <select
                               aria-label="Credential"
+                              disabled={credentialsLoading || !!credentialError}
                               value={getTextValue('credential_id') || ''}
                               onChange={e => setTextValue('credential_id', e.target.value)}
                               style={{
@@ -4580,7 +4582,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                                 color: '#374151', appearance: 'none', paddingRight: 'var(--workspace-space-32)',
                               }}
                             >
-                              <option value="">Select a credential...</option>
+                              <option value="">{credentialsLoading ? 'Loading credentials…' : credentialError ? 'Credentials unavailable' : 'Select a credential…'}</option>
+                              {getTextValue('credential_id') && !matching.some(c => c.id === getTextValue('credential_id')) && <option value={getTextValue('credential_id')}>Configured connection unavailable</option>}
                               {matching.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                               ))}
@@ -4606,7 +4609,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                             New
                           </button>
                         </div>
-                        {credentials && matching.length === 0 && (
+                        {credentialError && <p role="alert" className="mt-2 text-sm text-red-800">{credentialError} <button type="button" onClick={reloadCredentials} className="underline">Retry credentials</button></p>}
+                        {!credentialsLoading && !credentialError && getTextValue('credential_id') && !matching.some(c => c.id === getTextValue('credential_id')) && <p role="alert" className="mt-2 text-sm text-red-800">This workflow references a connection that is unavailable to your account or no longer exists. Ask the integration maintainer to restore access or choose a replacement before running it.</p>}
+                        {!credentialError && credentials && matching.length === 0 && (
                           <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
                             No matching credentials yet. Click <strong>New</strong> to create one.
                           </p>
@@ -4642,7 +4647,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   />
                   <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
-                    A JSON Request Body is sent with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>Content-Type: application/json</code> automatically. Add it here only to override.
+                    A JSON Request Body is sent with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>Content-Type: application/json</code> automatically. Add it here only to override.
                   </p>
                 </div>
                 <div>
@@ -4662,8 +4667,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   />
                   <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
-                    Wrap the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, and it's inserted as JSON, so
-                    {' '}<code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{"records": {{ inputs.output }}}'}</code> stays valid. Don't add your own quotes around it.
+                    Wrap the previous step's output with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, and it's inserted as JSON, so
+                    {' '}<code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{"records": {{ inputs.output }}}'}</code> stays valid. Don't add your own quotes around it.
                     {' '}Leave this blank on a POST/PUT/PATCH and the upstream output is sent as the body automatically.
                   </p>
                 </div>
@@ -5348,11 +5353,11 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
             border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#f9fafb',
             color: '#6b7280', textAlign: 'center',
           }}>
-            View-only — use "Save a copy to my library" to edit this workflow
+            View-only — use "Save a copy to {user?.current_team ? 'Team Library' : 'Mine'}" to edit this workflow
           </div>
         )}
       </div>
-    </div>
+    </PanelEditorSurface>
   )
 }
 
@@ -5382,42 +5387,69 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   const [approvalComments, setApprovalComments] = useState('')
   const [approvalProcessing, setApprovalProcessing] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
+  const [approvalLoadError, setApprovalLoadError] = useState<string | null>(null)
+  const approvalRequestVersion = useRef(0)
+  const approvalDecisionPending = useRef(false)
   const [showSaveToFolder, setShowSaveToFolder] = useState(false)
+  const downloadButtonRef = useRef<HTMLButtonElement>(null)
   const { toast } = useToast()
   // Deciding here clears the same queue the nav badge counts.
   const { refresh: refreshReviewCount } = useMyReviewCount()
 
+  const approvalId = isPendingApproval ? status?.approval_request_id : undefined
+  const loadApproval = useCallback(() => {
+    const version = ++approvalRequestVersion.current
+    setApproval(null)
+    setApprovalLoadError(null)
+    if (!approvalId) return
+    getReview(approvalId).then(result => {
+      if (version === approvalRequestVersion.current) setApproval(result)
+    }).catch(reason => {
+      if (version === approvalRequestVersion.current) setApprovalLoadError(reason instanceof Error ? reason.message : 'Unable to load the review.')
+    })
+  }, [approvalId])
   useEffect(() => {
-    if (!isPendingApproval || !status?.approval_request_id) return
-    getReview(status.approval_request_id).then(setApproval).catch(() => {})
-  }, [isPendingApproval, status?.approval_request_id])
+    const guard = approvalRequestVersion
+    setApprovalComments('')
+    setApprovalError(null)
+    loadApproval()
+    return () => { guard.current++ }
+  }, [loadApproval])
 
   const handleApprove = async () => {
-    if (!approval) return
+    if (!approval || approval.status !== 'pending' || approvalDecisionPending.current) return
+    approvalDecisionPending.current = true
+    approvalRequestVersion.current++
+    const version = approvalRequestVersion.current
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
       await approveReview(approval.uuid, { comments: approvalComments })
-      setApproval({ ...approval, status: 'approved' })
+      if (version === approvalRequestVersion.current) setApproval({ ...approval, status: 'approved' })
       void refreshReviewCount()
     } catch (e) {
-      setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
+      if (version === approvalRequestVersion.current) setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
     } finally {
+      approvalDecisionPending.current = false
       setApprovalProcessing(false)
     }
   }
 
   const handleReject = async () => {
-    if (!approval) return
+    if (!approval || approval.status !== 'pending' || approvalDecisionPending.current) return
+    approvalDecisionPending.current = true
+    approvalRequestVersion.current++
+    const version = approvalRequestVersion.current
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
       await rejectReview(approval.uuid, approvalComments)
-      setApproval({ ...approval, status: 'rejected' })
+      if (version === approvalRequestVersion.current) setApproval({ ...approval, status: 'rejected' })
       void refreshReviewCount()
     } catch (e) {
-      setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
+      if (version === approvalRequestVersion.current) setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
     } finally {
+      approvalDecisionPending.current = false
       setApprovalProcessing(false)
     }
   }
@@ -5564,7 +5596,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
         {isPendingApproval && status?.approval_request_id && (
           <a
             href={`/reviews/${status.approval_request_id}`}
-            style={{ fontSize: 'var(--workspace-font-meta)', color: '#0ea5e9', textDecoration: 'none' }}
+            style={{ fontSize: 'var(--workspace-font-meta)', color: '#0369a1', textDecoration: 'underline' }}
           >
             Open full review →
           </a>
@@ -5578,10 +5610,10 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             <>
               {approval.status !== 'pending' ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
-                  color: approval.status === 'approved' ? '#16a34a' : '#dc2626' }}>
+                  color: approval.status === 'approved' ? '#15803d' : '#991b1b' }}>
                   {approval.status === 'approved'
-                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved. Workflow resuming.</>
-                    : <><XCircle style={{ width: 16, height: 16 }} /> Rejected</>
+                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approval recorded. Waiting for the workflow status to update.</>
+                    : <><XCircle style={{ width: 16, height: 16 }} /> {approval.status === 'rejected' ? 'Rejected' : approval.status === 'expired' ? 'Review expired' : 'Review escalated'}</>
                   }
                 </div>
               ) : (
@@ -5599,7 +5631,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                   {Object.keys(approval.data_for_review).length > 0 && (
                     <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
                       <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 'var(--workspace-space-4)' }}>Data for Review</div>
-                      <pre style={{ backgroundColor: '#f9fafb', border: "1px solid var(--workspace-border)",
+                      <pre tabIndex={0} role="region" aria-label="Approval data for review" style={{ backgroundColor: '#f9fafb', border: "1px solid var(--workspace-border)",
                         borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)',
                         overflowX: 'auto', maxHeight: 200, overflowY: 'auto' }}>
                         {JSON.stringify(approval.data_for_review, null, 2)}
@@ -5612,6 +5644,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                     </label>
                     <textarea
                       aria-label="Comments"
+                      disabled={approvalProcessing}
                       value={approvalComments}
                       onChange={e => setApprovalComments(e.target.value)}
                       rows={2}
@@ -5630,7 +5663,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                       disabled={approvalProcessing}
                       style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                         padding: "7px var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                        backgroundColor: '#16a34a', color: '#fff',
+                        backgroundColor: '#15803d', color: '#fff',
                         fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: approvalProcessing ? 'not-allowed' : 'pointer',
                         opacity: approvalProcessing ? 0.6 : 1, fontFamily: 'inherit' }}
                     >
@@ -5654,7 +5687,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               )}
             </>
           ) : (
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>Loading approval details…</div>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#59616b' }}>{approvalLoadError ? <><p role="alert">{approvalLoadError}</p><button type="button" onClick={loadApproval} style={{ textDecoration: 'underline' }}>Retry approval details</button></> : 'Loading approval details…'}</div>
           )}
         </div>
       )}
@@ -5712,6 +5745,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             <FileOutputCard summary={fileSummary} downloadHref={fileDownloadHref} />
           ) : (
             <div
+              role="region" aria-label="Workflow output" tabIndex={0}
               className="chat-markdown"
               style={{
                 backgroundColor: '#f9fafb', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
@@ -5725,7 +5759,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           {stepWarningsPanel}
           {fillReportPanel}
           {apiRequestPanel}
-          <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center' }}>
+          <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', alignItems: 'flex-start' }}>
           {fileSummary ? (
             <a
               href={fileDownloadHref}
@@ -5743,8 +5777,10 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               Download {fileSummary.filename}
             </a>
           ) : (
-          <div style={{ position: 'relative', display: 'inline-block' }}>
+          <div onKeyDown={event => { if (event.key === 'Escape') { setShowDownloadPopup(false); downloadButtonRef.current?.focus() } }} style={{ minWidth: 0, maxWidth: '100%' }}>
             <button
+              ref={downloadButtonRef}
+              aria-expanded={showDownloadPopup}
               onClick={() => setShowDownloadPopup(!showDownloadPopup)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-8) var(--workspace-space-16)",
@@ -5758,9 +5794,9 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             </button>
             {showDownloadPopup && sessionId && (
               <div style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: 'var(--workspace-space-4)',
+                maxHeight: '45vh', overflowY: 'auto', marginTop: 'var(--workspace-space-4)',
                 backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, minWidth: 200,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 0, width: '100%', maxWidth: 320,
                 padding: "var(--workspace-space-4) 0",
               }}>
                 {([
@@ -6183,7 +6219,7 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
       {/* Download all completed outputs as a ZIP of JSON files. Shown as soon as
           any run finishes, so completed outputs are grabbable mid-batch. */}
       {batchId && completedCount > 0 && (
-        <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', alignItems: 'flex-start' }}>
           <a
             href={downloadBatchResults(batchId, 'json', { shareToken })}
             style={{
@@ -6874,10 +6910,10 @@ const GRADE_COLORS: Record<string, { bg: string; text: string }> = {
 }
 
 const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  PASS: { bg: '#dcfce7', text: '#16a34a', label: 'PASS' },
-  FAIL: { bg: '#fee2e2', text: '#dc2626', label: 'FAIL' },
-  WARN: { bg: '#fef3c7', text: '#ca8a04', label: 'WARN' },
-  SKIP: { bg: '#f3f4f6', text: '#6b7280', label: 'SKIP' },
+  PASS: { bg: '#dcfce7', text: '#166534', label: 'PASS' },
+  FAIL: { bg: '#fee2e2', text: '#991b1b', label: 'FAIL' },
+  WARN: { bg: '#fef3c7', text: '#92400e', label: 'WARN' },
+  SKIP: { bg: '#f3f4f6', text: '#4b5563', label: 'SKIP' },
 }
 
 
@@ -7016,7 +7052,7 @@ function ValidateTab({
   // test data and the per-check diagnostic run are collapsible support
   // sections so first-time users see exactly one button.
   const [setupOpen, setSetupOpen] = useState(false)
-  const [diagOpen, setDiagOpen] = useState(false)
+  const [diagOpen, setDiagOpen] = useState(true)
 
   // A stale plan needs user attention — pop the setup section open so the
   // StalePlanBanner inside it isn't hidden behind the collapse.
@@ -7531,28 +7567,9 @@ function ValidateTab({
         Validate & Improve
       </div>
       <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>
-        One click runs this workflow against your test data, scores the output, and tries
-        better settings. Expand the sections below to edit test data or dig into individual checks.
+        Choose representative inputs, supply expected outputs and quality checks, then run a check and inspect problems. Optional tuning follows the routine checks.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-
-        {/* Validate & improve (autovalidate) — THE validation flow. Its baseline
-            trial scores the current config; tuning and one-click apply are part
-            of the same run. The wizard walks new users through missing test
-            data, so this works as the only button people ever need. */}
-        {workflowId && (
-          <WorkflowAutovalidatePanel
-            workflowId={workflowId}
-            canManage={canValidate}
-            canApply={canApply}
-            testDataSummary={{
-              inputs: inputs.length,
-              expectedOutputs: expectedOutputs.length,
-              checks: planChecks.length,
-            }}
-            onOpenTestData={() => setSetupOpen(true)}
-          />
-        )}
 
         {error && (
           <div role="alert" style={{
@@ -8136,8 +8153,7 @@ function ValidateTab({
 
         {/* ---- Detailed check results (diagnostic, collapsible) ----
             Runs the validation plan as-is against the current config and shows
-            per-check pass/fail. The official score and tuning live in
-            "Validate & improve" above. */}
+            per-check pass/fail. Optional tuning follows the routine results. */}
         <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff' }}>
           <button
             type="button"
@@ -8153,8 +8169,8 @@ function ValidateTab({
               ? <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
               : <ChevronRight style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />}
             <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Detailed check results</span>
-            <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap' }}>
-              run checks one-by-one to debug a low score
+            <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#59616b' }}>
+              check current settings
             </span>
           </button>
           {diagOpen && (
@@ -8265,6 +8281,11 @@ function ValidateTab({
         {/* ---- Validation Results ---- */}
         {gradeInfo && (
           <>
+            <section aria-label="Workflow validation review summary" style={{ padding: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
+              <strong>What to review</strong>
+              <p>{checks.length} recorded checks: {checks.filter(check => check.status === 'FAIL').length} failed, {checks.filter(check => check.status === 'WARN').length} need review, {checks.filter(check => check.status === 'SKIP').length} skipped.</p>
+              <p>Read failed and warning details in Check Results, then compare the affected step’s output with its expected answer and source. Skipped checks provide no correctness evidence. This result describes the tested inputs and plan; it does not apply tuning changes.</p>
+            </section>
             {/* Grade badge */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-16)',
@@ -8620,6 +8641,24 @@ function ValidateTab({
           </div>
           )}
         </div>
+        <section aria-label="Advanced: tune workflow">
+          <h3 style={{ fontWeight: 600 }}>Advanced: tune workflow</h3>
+          <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBlock: 8 }}>Optional: compare alternative settings using additional model calls. Review the wizard’s budget, grader and application options before starting. Routine checks above evaluate current settings and record quality history. Tuning can propose or apply different settings according to the options you choose.</p>
+        {workflowId && (
+          <WorkflowAutovalidatePanel
+            workflowId={workflowId}
+            canManage={canValidate}
+            canApply={canApply}
+            testDataSummary={{
+              inputs: inputs.length,
+              expectedOutputs: expectedOutputs.length,
+              checks: planChecks.length,
+            }}
+            onOpenTestData={() => setSetupOpen(true)}
+          />
+        )}
+
+        </section>
       </div>
 
       {/* Document Picker Dialog */}

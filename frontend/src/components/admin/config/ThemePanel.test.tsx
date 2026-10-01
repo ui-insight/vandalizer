@@ -56,12 +56,10 @@ beforeEach(() => {
 })
 
 describe('ThemePanel — load', () => {
-  it('renders the seeded values, then the theme endpoint takes over', async () => {
+  it('waits for authoritative theme values before allowing edits', async () => {
     render(<ThemePanel initialColor="#ff0000" initialRadius={4} />)
 
-    // Seeded from the system config while the theme request is in flight.
-    expect(hexField()).toHaveValue('#ff0000')
-    expect(screen.getByText('Corner Radius: 4px')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Theme' })).toBeNull()
 
     // The theme endpoint is authoritative — it also carries the org name.
     await waitFor(() => expect(hexField()).toHaveValue('#eab308'))
@@ -85,13 +83,15 @@ describe('ThemePanel — load', () => {
     expect(assistantNameField()).toHaveValue('')
   })
 
-  it('keeps the seeded values when the theme request fails', async () => {
+  it('blocks saving defaults after a failed theme read and offers retry', async () => {
     mockGetThemeConfig.mockRejectedValue(new Error('offline'))
     render(<ThemePanel initialColor="#ff0000" initialRadius={4} />)
 
-    await waitFor(() => expect(mockGetThemeConfig).toHaveBeenCalled())
-    expect(hexField()).toHaveValue('#ff0000')
-    expect(screen.getByText('Corner Radius: 4px')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('offline')
+    expect(screen.queryByRole('button', { name: 'Save Theme' })).toBeNull()
+    mockGetThemeConfig.mockResolvedValueOnce({ ...THEME })
+    fireEvent.click(screen.getByRole('button', { name: 'Retry branding settings' }))
+    await waitFor(() => expect(hexField()).toHaveValue('#eab308'))
   })
 })
 
@@ -99,7 +99,7 @@ describe('ThemePanel — save', () => {
   it('sends the edited theme, applies it to the DOM and refreshes branding', async () => {
     mockUpdateThemeConfig.mockResolvedValue({ ...THEME, highlight_color: '#123456', ui_radius: '20px' })
     render(<ThemePanel initialColor="#eab308" initialRadius={12} />)
-    await waitFor(() => expect(mockGetThemeConfig).toHaveBeenCalled())
+    await screen.findByDisplayValue('Test University')
 
     fireEvent.change(hexField(), { target: { value: '#123456' } })
     fireEvent.change(screen.getByDisplayValue('Test University'), { target: { value: '  Real University  ' } })
@@ -139,7 +139,7 @@ describe('ThemePanel — save', () => {
 
   it('sends the corner radius as a px string', async () => {
     render(<ThemePanel initialColor="#eab308" initialRadius={12} />)
-    await waitFor(() => expect(mockGetThemeConfig).toHaveBeenCalled())
+    await screen.findByDisplayValue('Test University')
 
     fireEvent.change(screen.getByRole('slider'), { target: { value: '20' } })
     expect(screen.getByText('Corner Radius: 20px')).toBeInTheDocument()
@@ -153,7 +153,7 @@ describe('ThemePanel — save', () => {
   it('surfaces a failed save instead of leaving the admin with no feedback', async () => {
     mockUpdateThemeConfig.mockRejectedValue(new Error('network unreachable'))
     render(<ThemePanel initialColor="#eab308" initialRadius={12} />)
-    await waitFor(() => expect(mockGetThemeConfig).toHaveBeenCalled())
+    await screen.findByDisplayValue('Test University')
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Theme' }))
 

@@ -1,33 +1,22 @@
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
-import { getWorkflowEvents, type PaginatedWorkflows } from '../../api/admin'
+import { getWorkflowEvents } from '../../api/admin'
 import { downloadCSV, formatDateTime, formatDuration, formatNumber } from './shared/format'
 import { ExportButton, SearchInput, StatusBadge, UserAvatar } from './shared/primitives'
 
 export function WorkflowsTab() {
-  const [data, setData] = useState<PaginatedWorkflows | null>(null)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<string>('')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    getWorkflowEvents(page, status || undefined, search || undefined)
-      .then(res => { if (!cancelled) setData(res) })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load workflow events') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [page, status, search])
-
-  useEffect(() => load(), [load])
+  const request = useCallback(() => getWorkflowEvents(page, status || undefined, search || undefined), [page, status, search])
+  const { data, loading, error, load } = useAdminQuery(request)
 
   const handleSearchChange = (v: string) => {
     setSearchInput(v)
@@ -58,13 +47,13 @@ export function WorkflowsTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Summary stats row */}
       {summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 110px), 1fr))', gap: 12 }}>
           {[
             { label: 'Total', value: formatNumber(summary.total), color: '#374151' },
-            { label: 'Success Rate', value: `${summary.success_rate}%`, color: '#16a34a' },
-            { label: 'Avg Duration', value: formatDuration(summary.avg_duration_ms), color: '#3b82f6' },
+            { label: 'Completion Rate', value: `${summary.success_rate}%`, color: '#15803d' },
+            { label: 'Avg Duration', value: formatDuration(summary.avg_duration_ms), color: '#1d4ed8' },
             { label: 'Failed', value: formatNumber(summary.failed), color: '#dc2626' },
-            { label: 'Total Tokens', value: formatNumber(summary.total_tokens), color: '#8b5cf6' },
+            { label: 'Total Tokens', value: formatNumber(summary.total_tokens), color: '#6d28d9' },
           ].map(s => (
             <div key={s.label} style={{
               background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
@@ -77,11 +66,14 @@ export function WorkflowsTab() {
         </div>
       )}
 
+      <p style={{ margin: 0, fontSize: 13, color: '#59616b' }}>Completion records finished execution, not correctness. Inspect failed events for the reason; CSV includes only the loaded page.</p>
+
       {/* Filters + search */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {filters.map(f => (
           <button
             key={f}
+            aria-pressed={status === f}
             onClick={() => { setStatus(f); setPage(1) }}
             style={{
               padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
@@ -95,16 +87,17 @@ export function WorkflowsTab() {
         ))}
         <div style={{ flex: 1 }} />
         <SearchInput value={searchInput} onChange={handleSearchChange} placeholder="Search workflows..." />
-        <ExportButton onClick={handleExport} />
+        <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        {loading && !data ? (
+        {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading workflows...</div>
-        ) : error && !data ? (
+        ) : error ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
             <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
-            <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+            <div role="alert" style={{ fontSize: 14, color: '#991b1b' }}>{error}</div>
+            <button type="button" onClick={load} className="admin-open-record">Retry workflows</button>
           </div>
         ) : !data || data.items.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No workflow events found.</div>
@@ -119,7 +112,7 @@ export function WorkflowsTab() {
                 <AlertCircle size={14} /> {error}
               </div>
             )}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <TableRegion label="Workflow events — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                   <th style={{ padding: '10px 8px', width: 28 }} />
@@ -136,9 +129,9 @@ export function WorkflowsTab() {
                 {data.items.map(ev => {
                   const isExpanded = expandedId === ev.id
                   return (
-                    <tr key={ev.id} tabIndex={0} role="button" aria-expanded={isExpanded} aria-label="Toggle event details" onClick={() => setExpandedId(isExpanded ? null : ev.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : ev.id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                        {isExpanded ? <ChevronDown size={14} color="#6b7280" /> : <ChevronRight size={14} color="#9ca3af" />}
+                        <button type="button" className="admin-open-record" aria-expanded={isExpanded} aria-controls="workflow-event-detail" aria-label={`Details for ${ev.title || 'Untitled workflow'} · ${formatDateTime(ev.started_at)} · ${ev.status}`} onClick={() => setExpandedId(isExpanded ? null : ev.id)}>{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>
                       </td>
                       <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
                       <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>{ev.title || 'Untitled'}</td>
@@ -147,7 +140,7 @@ export function WorkflowsTab() {
                           <UserAvatar name={ev.user_name || ev.user_email} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500 }}>{ev.user_name || 'Unknown'}</div>
-                            {ev.team_name && <div style={{ fontSize: 11, color: '#9ca3af' }}>{ev.team_name}</div>}
+                            {ev.team_name && <div style={{ fontSize: 11, color: '#59616b' }}>{ev.team_name}</div>}
                           </div>
                         </div>
                       </td>
@@ -161,15 +154,16 @@ export function WorkflowsTab() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></TableRegion>
 
             {/* Expanded detail - rendered below table as an info panel */}
             {expandedId && (() => {
               const ev = data.items.find(e => e.id === expandedId)
               if (!ev) return null
               return (
-                <div style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, fontSize: 13 }}>
+                <section id="workflow-event-detail" aria-label={`Event details: ${ev.title || 'Untitled workflow'}`} style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                  <h2 style={{ fontSize: 16, marginBottom: 12 }}>{ev.title || 'Untitled workflow'}</h2>
+                  <div className="admin-detail-grid" style={{ fontSize: 13 }}>
                     <div>
                       <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>User ID</div>
                       <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{ev.user_id}</div>
@@ -208,14 +202,14 @@ export function WorkflowsTab() {
                       {ev.error}
                     </div>
                   )}
-                </div>
+                </section>
               )
             })()}
 
             {/* Pagination */}
             {data.pages > 1 && (
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
                 padding: '12px 16px', borderTop: '1px solid #e5e7eb',
               }}>
                 <span style={{ fontSize: 13, color: '#6b7280' }}>

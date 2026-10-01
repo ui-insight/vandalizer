@@ -924,7 +924,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
           padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
@@ -984,8 +984,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             )}
           </div>
         )}
-        <div style={{
-          flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
+        <div role="region" aria-label="Extracted document text" tabIndex={0} style={{
+          flex: 1, minHeight: 0, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
         }}>
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -1026,7 +1026,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             </div>
           ) : (
             <div style={{
-              padding: "var(--workspace-space-32) 48px",
+              padding: "var(--workspace-space-24) clamp(12px, 4vw, 48px)",
               maxWidth: 800,
               margin: '0 auto',
               fontSize: `calc(var(--workspace-font-body) * ${zoomLevel})`,
@@ -1135,7 +1135,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
           padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
@@ -1194,7 +1194,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
         padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
@@ -1230,8 +1230,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       )}
 
       {/* PDF pages container */}
-      <div style={{
-        flex: 1, overflow: 'auto', backgroundColor: '#525659',
+      <div role="region" aria-label="PDF document pages" tabIndex={0} style={{
+        flex: 1, minHeight: 0, overflow: 'auto', backgroundColor: '#525659',
         position: 'relative',
       }}>
         <div ref={containerRef} style={{ paddingBottom: 'var(--workspace-space-20)' }} />

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useAuth } from '../../hooks/useAuth'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import {
-  AlertCircle, ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronUp, Cpu, FileText, MessageSquare, Plus, Users, XCircle,
+  AlertCircle, ArrowLeft, Building2, CheckCircle2, Cpu, FileText, MessageSquare, Plus, Users, XCircle,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,10 +16,9 @@ import { getTeamMembers } from '../../api/teams'
 import {
   getTeamLeaderboard,
   getTeamDetail,
-  getSystemConfig, updateSystemConfig,
+  updateSystemConfig,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
   type TeamLeaderboardItem,
-  type TeamDetailResponse,
   type AdminTeamItem, type IsolatedUserItem,
 } from '../../api/admin'
 import { downloadCSV, formatDate, formatDateTime, formatDuration, formatNumber } from './shared/format'
@@ -27,23 +29,10 @@ import {
 type TeamSortKey = 'name' | 'tokens_total' | 'workflows_completed' | 'active_users' | 'member_count' | 'avg_latency_ms'
 
 function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void }) {
-  const [data, setData] = useState<TeamDetailResponse | null>(null)
   const [days, setDays] = useState(30)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    getTeamDetail(teamId, days)
-      .then(res => { if (!cancelled) setData(res) })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [teamId, days])
-
-  useEffect(() => load(), [load])
+  const request = useCallback(() => getTeamDetail(teamId, days), [teamId, days])
+  const { data, loading, error, load } = useAdminQuery(request)
 
   const prev = data?.previous_period
   const maxMemberTokens = (data?.members ?? []).reduce((max, m) => Math.max(max, m.tokens_total), 1)
@@ -54,7 +43,8 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
       <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
         <ArrowLeft size={16} /> Back to Teams
       </button>
-      <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Error: {error}</div>
+      <div role="alert" style={{ padding: 20, color: '#991b1b' }}>Error: {error}</div>
+      <button type="button" onClick={load} className="admin-open-record">Retry team details</button>
     </div>
   )
   if (!data) return null
@@ -62,12 +52,12 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Back + header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
           <ArrowLeft size={16} /> Back to Teams
         </button>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', overflowWrap: 'anywhere' }}>
         <div style={{
           width: 44, height: 44, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -115,7 +105,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
       </div>
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="admin-metrics-grid">
         <KpiCard label="Conversations" value={formatNumber(data.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: data.conversations, previous: prev.conversations } : undefined} />
         <KpiCard label="Workflows Completed" value={formatNumber(data.workflows_completed)} icon={CheckCircle2} color="#22c55e" trend={prev ? { current: data.workflows_completed, previous: prev.workflows_completed } : undefined} />
         <KpiCard label="Active Users" value={formatNumber(data.active_users)} icon={Users} color="#06b6d4" trend={prev ? { current: data.active_users, previous: prev.active_users } : undefined} />
@@ -131,8 +121,8 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={data.timeseries}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#59616b' }} tickFormatter={v => v.slice(5)} />
+              <YAxis tick={{ fontSize: 11, fill: '#59616b' }} width={50} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
               <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
               <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
@@ -148,7 +138,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
             Members ({data.members.length})
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Team members usage — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Member</th>
@@ -188,7 +178,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
 
@@ -198,7 +188,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
             Recent Workflows
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Recent team workflows — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
@@ -221,7 +211,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
     </div>
@@ -229,6 +219,9 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
 }
 
 export function TeamsTab() {
+  const { user } = useAuth()
+  const canSetDefault = !!user?.is_admin
+  const mutationKeys = useRef(new Set<string>())
   const confirm = useConfirm()
   const { toast } = useToast()
   const [subTab, setSubTab] = useState<'manage' | 'stats' | 'isolated'>('manage')
@@ -266,6 +259,9 @@ export function TeamsTab() {
   const [assignTargets, setAssignTargets] = useState<Record<string, string>>({})
   const [assignLoading, setAssignLoading] = useState<Record<string, boolean>>({})
 
+  const [memberErrors, setMemberErrors] = useState<Record<string, string>>({})
+  const [removingUser, setRemovingUser] = useState<string | null>(null)
+
   // Per-team add-user error messages
   const [addUserErrors, setAddUserErrors] = useState<Record<string, string>>({})
 
@@ -278,7 +274,7 @@ export function TeamsTab() {
       setAllTeams(res.items)
       setAllTeamsCapped(res.capped)
       const def = res.items.find(x => x.is_default)
-      if (def) setDefaultTeamUuid(def.uuid)
+      setDefaultTeamUuid(def?.uuid ?? '')
     }).catch(e => { if (!cancelled) setAllTeamsError(e?.message || 'Failed to load teams') })
       .finally(() => { if (!cancelled) setLoadingAll(false) })
     return () => { cancelled = true }
@@ -304,16 +300,7 @@ export function TeamsTab() {
   useEffect(() => {
     const cancelAllTeams = refreshAllTeams()
     const cancelIsolated = refreshIsolated()  // Load eagerly so badge shows immediately
-    let cfgCancelled = false
-    getSystemConfig().then(cfg => {
-      if (cfgCancelled) return
-      if (cfg.default_team_id) setDefaultTeamUuid(cfg.default_team_id)
-    }).catch(() => {})
-    return () => {
-      cancelAllTeams()
-      cancelIsolated()
-      cfgCancelled = true
-    }
+    return () => { cancelAllTeams(); cancelIsolated() }
   }, [refreshAllTeams, refreshIsolated])
 
   const refreshStats = useCallback(() => {
@@ -335,7 +322,8 @@ export function TeamsTab() {
   }, [subTab, refreshStats])
 
   const handleCreateTeam = async () => {
-    if (!newTeamName.trim()) return
+    if (!newTeamName.trim() || mutationKeys.current.has('create')) return
+    mutationKeys.current.add('create')
     setCreating(true)
     try {
       await adminCreateTeam(newTeamName.trim())
@@ -344,11 +332,14 @@ export function TeamsTab() {
     } catch (e) {
       toast(`Failed to create team: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
     } finally {
+      mutationKeys.current.delete('create')
       setCreating(false)
     }
   }
 
   const handleSetDefault = async (teamUuid: string) => {
+    if (!canSetDefault || mutationKeys.current.has('default')) return
+    mutationKeys.current.add('default')
     setSettingDefault(true)
     try {
       await updateSystemConfig({ default_team_id: teamUuid === defaultTeamUuid ? '' : teamUuid })
@@ -357,25 +348,30 @@ export function TeamsTab() {
     } catch (e) {
       toast(`Failed to update default team: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
     } finally {
+      mutationKeys.current.delete('default')
       setSettingDefault(false)
     }
   }
 
-  const handleExpandTeam = async (teamUuid: string) => {
-    if (expandedTeamUuid === teamUuid) {
-      setExpandedTeamUuid(null)
-      return
-    }
-    setExpandedTeamUuid(teamUuid)
-    if (!teamMembers[teamUuid]) {
+  const loadMembers = async (teamUuid: string) => {
+    setMemberErrors(prev => ({ ...prev, [teamUuid]: '' }))
+    try {
       const members = await getTeamMembers(teamUuid)
       setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
+    } catch (e) {
+      setMemberErrors(prev => ({ ...prev, [teamUuid]: e instanceof Error ? e.message : 'Unable to load members' }))
     }
+  }
+  const handleExpandTeam = (teamUuid: string) => {
+    if (expandedTeamUuid === teamUuid) { setExpandedTeamUuid(null); return }
+    setExpandedTeamUuid(teamUuid)
+    if (!teamMembers[teamUuid]) void loadMembers(teamUuid)
   }
 
   const handleAddUser = async (teamUuid: string) => {
     const userId = (addUserInputs[teamUuid] || '').trim()
-    if (!userId) return
+    if (!userId || mutationKeys.current.has(`add:${teamUuid}`)) return
+    mutationKeys.current.add(`add:${teamUuid}`)
     setAddUserErrors(prev => ({ ...prev, [teamUuid]: '' }))
     setAddUserLoading(prev => ({ ...prev, [teamUuid]: true }))
     try {
@@ -389,11 +385,13 @@ export function TeamsTab() {
       const msg = e instanceof Error ? e.message : 'User not found'
       setAddUserErrors(prev => ({ ...prev, [teamUuid]: msg }))
     } finally {
+      mutationKeys.current.delete(`add:${teamUuid}`)
       setAddUserLoading(prev => ({ ...prev, [teamUuid]: false }))
     }
   }
 
   const handleRemoveUser = async (teamUuid: string, userId: string, userName: string) => {
+    if (mutationKeys.current.has('remove')) return
     const ok = await confirm({
       title: 'Remove user from team?',
       message: (
@@ -404,7 +402,9 @@ export function TeamsTab() {
       confirmLabel: 'Remove',
       destructive: true,
     })
-    if (!ok) return
+    if (!ok || mutationKeys.current.has('remove')) return
+    mutationKeys.current.add('remove')
+    setRemovingUser(userId)
     try {
       await adminRemoveUserFromTeam(teamUuid, userId)
       const members = await getTeamMembers(teamUuid)
@@ -413,12 +413,16 @@ export function TeamsTab() {
       refreshIsolated()
     } catch (e) {
       toast(`Failed to remove ${userName} from team: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+    } finally {
+      mutationKeys.current.delete('remove')
+      setRemovingUser(null)
     }
   }
 
   const handleAssignIsolated = async (userId: string) => {
     const teamUuid = assignTargets[userId]
-    if (!teamUuid) return
+    if (!teamUuid || mutationKeys.current.has(`assign:${userId}`)) return
+    mutationKeys.current.add(`assign:${userId}`)
     setAssignLoading(prev => ({ ...prev, [userId]: true }))
     try {
       await adminAddUserToTeam(teamUuid, userId)
@@ -426,6 +430,7 @@ export function TeamsTab() {
     } catch (e) {
       toast(`Failed to assign user to team: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
     } finally {
+      mutationKeys.current.delete(`assign:${userId}`)
       setAssignLoading(prev => ({ ...prev, [userId]: false }))
     }
   }
@@ -487,7 +492,7 @@ export function TeamsTab() {
           const btns = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
           btns[next]?.focus()
         }}
-        style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', maxWidth: '100%', background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}
       >
         <button type="button" role="tab" id="admin-teams-tab-manage" aria-controls="admin-teams-panel-manage" aria-selected={subTab === 'manage'} tabIndex={subTab === 'manage' ? 0 : -1} style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
         <button type="button" role="tab" id="admin-teams-tab-stats" aria-controls="admin-teams-panel-stats" aria-selected={subTab === 'stats'} tabIndex={subTab === 'stats' ? 0 : -1} style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
@@ -502,13 +507,15 @@ export function TeamsTab() {
           {/* Create team */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Create New Team</div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
+                aria-label="New team name"
+                disabled={creating}
                 value={newTeamName}
                 onChange={e => setNewTeamName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
                 placeholder="Team name (e.g. Research Administration)"
-                style={{ flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+                style={{ flex: '1 1 180px', minWidth: 0, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
               />
               <button
                 onClick={handleCreateTeam}
@@ -531,7 +538,7 @@ export function TeamsTab() {
             <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
               All Teams ({allTeams.length})
               <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
-                Click a team to manage its members. Star to set as the default for new users.
+                Open a team to manage its members. {canSetDefault ? 'Set Default chooses the team for new users.' : 'A platform admin can change the default team for new users.'}
               </span>
             </div>
             {allTeamsCapped && (
@@ -545,19 +552,18 @@ export function TeamsTab() {
                 padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca',
                 color: '#991b1b', fontSize: 13,
               }}>
-                <AlertCircle size={14} /> {allTeamsError}
+                <span role="alert"><AlertCircle size={14} /> {allTeamsError}</span><button onClick={refreshAllTeams} className="admin-open-record">Retry teams</button>
               </div>
             )}
             {loadingAll ? (
-              <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+              <div style={{ padding: 32, textAlign: 'center', color: '#59616b' }}>Loading...</div>
             ) : allTeams.length === 0 ? (
-              !allTeamsError && <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>No teams yet.</div>
+              !allTeamsError && <div style={{ padding: 32, textAlign: 'center', color: '#59616b' }}>No teams yet.</div>
             ) : allTeams.map(team => (
               <div key={team.uuid} style={{ borderBottom: '1px solid #f3f4f6' }}>
                 {/* Team row */}
                 <div
-                  style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-                  onClick={() => handleExpandTeam(team.uuid)}
+                  style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#fafafa')}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}
                 >
@@ -568,21 +574,22 @@ export function TeamsTab() {
                   }}>
                     <Building2 size={16} color={team.is_default ? '#b45309' : '#7c3aed'} />
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }}>
                     <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {team.name}
+                      <button type="button" className="admin-open-record" aria-expanded={expandedTeamUuid === team.uuid} onClick={() => handleExpandTeam(team.uuid)}>{team.name}</button>
                       {team.is_default && (
                         <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
                           Default
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>
+                    <div style={{ fontSize: 12, color: '#59616b', marginTop: 1 }}>
                       {team.member_count} member{team.member_count !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleSetDefault(team.uuid) }}
+                  {canSetDefault && <button
+                    aria-label={`${team.is_default ? 'Remove default team' : 'Set default team'}: ${team.name}`}
+                    onClick={() => handleSetDefault(team.uuid)}
                     disabled={settingDefault}
                     title={team.is_default ? 'Remove as default' : 'Set as default for new users'}
                     style={{
@@ -594,8 +601,7 @@ export function TeamsTab() {
                     }}
                   >
                     {team.is_default ? '★ Default' : '☆ Set Default'}
-                  </button>
-                  {expandedTeamUuid === team.uuid ? <ChevronUp size={16} color="#9ca3af" /> : <ChevronDown size={16} color="#9ca3af" />}
+                  </button>}
                 </div>
 
                 {/* Expanded member panel */}
@@ -603,8 +609,10 @@ export function TeamsTab() {
                   <div style={{ background: '#f9fafb', borderTop: '1px solid #f3f4f6', padding: '12px 20px' }}>
                     {/* Add user */}
                     <div style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <input
+                          aria-label={`Add user to ${team.name}`}
+                          disabled={addUserLoading[team.uuid]}
                           value={addUserInputs[team.uuid] || ''}
                           onChange={e => {
                             setAddUserInputs(prev => ({ ...prev, [team.uuid]: e.target.value }))
@@ -613,7 +621,7 @@ export function TeamsTab() {
                           onKeyDown={e => e.key === 'Enter' && handleAddUser(team.uuid)}
                           placeholder="User ID or email address..."
                           style={{
-                            flex: 1, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
+                            flex: '1 1 160px', minWidth: 0, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
                             border: `1px solid ${addUserErrors[team.uuid] ? '#fca5a5' : '#d1d5db'}`,
                             borderRadius: 6,
                           }}
@@ -636,15 +644,15 @@ export function TeamsTab() {
                     </div>
 
                     {/* Members list */}
-                    {(teamMembers[team.uuid] || []).length === 0 ? (
-                      <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0' }}>No members yet.</div>
+                    {memberErrors[team.uuid] ? <div><p role="alert" style={{ color: '#991b1b' }}>{memberErrors[team.uuid]}</p><button onClick={() => loadMembers(team.uuid)} className="admin-open-record">Retry members</button></div> : !teamMembers[team.uuid] ? <p role="status">Loading members…</p> : teamMembers[team.uuid].length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#59616b', textAlign: 'center', padding: '8px 0' }}>No members yet.</div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {(teamMembers[team.uuid] || []).map(m => (
                           <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#fff', borderRadius: 6, border: '1px solid #f3f4f6' }}>
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }}>
                               <span style={{ fontSize: 13, fontWeight: 500 }}>{nameWithoutEmail(m.name, m.email) || m.user_id}</span>
-                              {m.email && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{m.email}</span>}
+                              {m.email && <span style={{ fontSize: 12, color: '#59616b', marginLeft: 8 }}>{m.email}</span>}
                             </div>
                             <span style={{
                               fontSize: 11, padding: '2px 7px', borderRadius: 8, fontWeight: 600,
@@ -655,6 +663,8 @@ export function TeamsTab() {
                             </span>
                             {m.role !== 'owner' && (
                               <button
+                                disabled={!!removingUser}
+                                aria-label={`Remove ${m.name || m.email || m.user_id} from ${team.name}`}
                                 onClick={() => handleRemoveUser(team.uuid, m.user_id, m.name || m.user_id)}
                                 style={{ padding: '3px 8px', background: 'transparent', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
                               >
@@ -679,10 +689,10 @@ export function TeamsTab() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <TimeRangeSelector value={statsDays} onChange={setStatsDays} includeAll onRefresh={refreshStats} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <SearchInput value={search} onChange={setSearch} placeholder="Search teams..." />
             <div style={{ flex: 1 }} />
-            <ExportButton onClick={() => downloadCSV(
+            <ExportButton disabled={loadingStats || !!statsError} onClick={() => downloadCSV(
               `teams-${statsDays === 'all' ? 'all' : statsDays + 'd'}.csv`,
               ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
               filteredStats.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
@@ -703,7 +713,7 @@ export function TeamsTab() {
                 padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca',
                 color: '#991b1b', fontSize: 13,
               }}>
-                <AlertCircle size={14} /> {statsError}
+                <span role="alert"><AlertCircle size={14} /> {statsError}</span><button onClick={refreshStats} className="admin-open-record">Retry team usage</button>
               </div>
             )}
             {loadingStats ? (
@@ -711,7 +721,7 @@ export function TeamsTab() {
             ) : filteredStats.length === 0 ? (
               !statsError && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No teams found.</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <TableRegion label="Team leaderboard — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
@@ -724,13 +734,13 @@ export function TeamsTab() {
                 </thead>
                 <tbody>
                   {filteredStats.map((t) => (
-                    <tr key={t.team_id} tabIndex={0} role="button" aria-label={`View team ${t.name || t.team_id}`} onClick={() => setSelectedTeamId(t.team_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTeamId(t.team_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                    <tr key={t.team_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{ width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <Building2 size={16} color="#7c3aed" />
                           </div>
-                          <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
+                          <button type="button" className="admin-open-record" onClick={() => setSelectedTeamId(t.team_id)} aria-label={`View team usage: ${t.name}`}>{t.name}</button>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
@@ -748,7 +758,7 @@ export function TeamsTab() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></TableRegion>
             )}
           </div>
         </div>
@@ -771,11 +781,11 @@ export function TeamsTab() {
               padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca',
               color: '#991b1b', fontSize: 13,
             }}>
-              <AlertCircle size={14} /> {isolatedError}
+              <span role="alert"><AlertCircle size={14} /> {isolatedError}</span><button onClick={refreshIsolated} className="admin-open-record">Retry isolated users</button>
             </div>
           )}
           {loadingIsolated && !isolatedLoaded ? (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+            <div style={{ padding: 32, textAlign: 'center', color: '#59616b' }}>Loading...</div>
           ) : isolated.length === 0 ? (
             !isolatedError && (
               <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
@@ -783,15 +793,17 @@ export function TeamsTab() {
               </div>
             )
           ) : isolated.map(u => (
-            <div key={u.user_id} style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
+            <div key={u.user_id} style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{nameWithoutEmail(u.name, u.email) || u.user_id}</div>
-                {u.email && <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.email}</div>}
+                {u.email && <div style={{ fontSize: 12, color: '#59616b' }}>{u.email}</div>}
               </div>
               <select
+                aria-label={`Team for ${u.name || u.email || u.user_id}`}
+                disabled={assignLoading[u.user_id]}
                 value={assignTargets[u.user_id] || ''}
                 onChange={e => setAssignTargets(prev => ({ ...prev, [u.user_id]: e.target.value }))}
-                style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}
+                style={{ maxWidth: '100%', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}
               >
                 <option value="">Select team...</option>
                 {allTeams.map(t => (

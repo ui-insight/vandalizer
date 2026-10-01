@@ -1,3 +1,5 @@
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { SectionPage } from '../components/layout/SectionPage'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import {
   Shield, ShieldCheck, BarChart3, Users, Building2, Workflow, Settings,
@@ -81,14 +83,24 @@ const TABS: TabDef[] = [
 export default function Admin() {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
-  const [activeTab, setActiveTab] = useState<Tab>('usage')
+  const search = useSearch({ from: '/admin' })
+  const navigate = useNavigate()
+  const activeTab = (search.tab || 'usage') as Tab
+  const setActiveTab = (tab: Tab) => { void navigate({ to: '/admin', search: { tab } }) }
   const [trialEnabled, setTrialEnabled] = useState(false)
   // Only true on the fleet collector instance; hides the Telemetry tab elsewhere.
   const [telemetryCollector, setTelemetryCollector] = useState(false)
+  const [featuresLoading, setFeaturesLoading] = useState(true)
 
   useEffect(() => {
-    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
-    getFeatureFlags().then(f => setTelemetryCollector(!!f.telemetry_collector_enabled)).catch(() => {})
+    let cancelled = false
+    Promise.allSettled([getAuthConfig(), getFeatureFlags()]).then(([auth, features]) => {
+      if (cancelled) return
+      if (auth.status === 'fulfilled') setTrialEnabled(!!auth.value.trial_system_enabled)
+      if (features.status === 'fulfilled') setTelemetryCollector(!!features.value.telemetry_collector_enabled)
+      setFeaturesLoading(false)
+    })
+    return () => { cancelled = true }
   }, [])
 
   const isGlobalAdmin = !!user?.is_admin
@@ -117,34 +129,15 @@ export default function Admin() {
   // without re-scanning TABS on every render.
   const tabByKey = Object.fromEntries(TABS.map(t => [t.key, t])) as Record<Tab, TabDef>
 
-  // Honor ?tab=<key> deep links (e.g. the catalog-update notification). Only a
-  // tab the current user can actually see is honored — an unreachable request
-  // (e.g. ?tab=config for a team admin) leaves activeTab at its default
-  // instead of landing on a tab whose content is fully gated (a blank pane).
-  // The effect re-runs whenever visibility recomputes (so a flag-gated tab
-  // like ?tab=demo can still be honored once its flag resolves), which is why
-  // applying must be one-shot: the param is dropped from the URL on apply, or
-  // every later re-run would yank the user back to the deep-linked tab.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const requested = params.get('tab')
-    if (requested && visibleTabs.some(t => t.key === requested)) {
-      setActiveTab(requested as Tab)
-      params.delete('tab')
-      const qs = params.toString()
-      window.history.replaceState(
-        window.history.state, '',
-        window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash,
-      )
-    }
-  }, [visibleTabs])
-
+  // The URL owns the section so refresh, shared links and browser Back/Forward
+  // restore it. Rendering still checks the current role and feature flags.
   // If the active tab is ever not visible (e.g. feature flags resolve after
   // mount and hide it), fall back to the first visible tab for rendering
   // purposes only — a derived value, not stored state, so there is no setState
   // loop. Clicking a sidebar entry still sets `activeTab` directly since only
   // visible tabs are ever rendered as clickable.
-  const effectiveActiveTab: Tab = visibleTabs.some(t => t.key === activeTab)
+  const waitingForFeature = featuresLoading && !!tabByKey[activeTab]?.requires
+  const effectiveActiveTab: Tab = waitingForFeature || visibleTabs.some(t => t.key === activeTab)
     ? activeTab
     : (visibleTabs[0]?.key ?? activeTab)
 
@@ -164,57 +157,12 @@ export default function Admin() {
 
   return (
     <PageLayout>
-      <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
-        {/* Sidebar */}
-        <nav aria-label="Admin sections" style={{
-          width: 220, flexShrink: 0,
-          borderRight: '1px solid #e5e7eb',
-          backgroundColor: '#fff',
-          padding: '20px 0',
-          borderRadius: 'var(--ui-radius, 12px) 0 0 var(--ui-radius, 12px)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
-            <Shield size={20} color="#6b7280" />
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'}
-            </h1>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
-            {visibleTabs.map(tab => {
-              const Icon = tab.icon
-              const isActive = effectiveActiveTab === tab.key
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 14px', border: 'none', cursor: 'pointer',
-                    fontSize: 14, fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#111827' : '#6b7280',
-                    backgroundColor: isActive ? '#f3f4f6' : 'transparent',
-                    borderRadius: 8, fontFamily: 'inherit',
-                    transition: 'background-color 0.15s, color 0.15s',
-                    width: '100%', textAlign: 'left',
-                    borderLeft: isActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-                  }}
-                >
-                  <Icon size={18} style={{ flexShrink: 0 }} />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-        </nav>
-
-        {/* Content */}
-        <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
+      <SectionPage title={isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'} icon={Shield} label="Admin sections" sections={visibleTabs} active={effectiveActiveTab} onSelect={setActiveTab}>
           <UpdateBanner />
           {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
           {isGlobalAdmin && <TelemetryOptInBanner />}
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div>}>
+            {waitingForFeature && <p role="status">Loading section availability…</p>}
             {effectiveActiveTab === 'usage' && canSee(tabByKey.usage) && <UsageTab />}
             {effectiveActiveTab === 'users' && canSee(tabByKey.users) && <UsersTab />}
             {effectiveActiveTab === 'teams' && canSee(tabByKey.teams) && <TeamsTab />}
@@ -233,8 +181,7 @@ export default function Admin() {
             {effectiveActiveTab === 'telemetry' && canSee(tabByKey.telemetry) && <TelemetryTab />}
             {effectiveActiveTab === 'config' && canSee(tabByKey.config) && <ConfigTab />}
           </Suspense>
-        </div>
-      </div>
+      </SectionPage>
     </PageLayout>
   )
 }

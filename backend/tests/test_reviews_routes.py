@@ -34,6 +34,7 @@ def _make_user(user_id="reviewer1", is_admin=False, current_team=None):
 
 def _make_approval(uuid="appr-1", status="pending", assigned=("reviewer1",)):
     a = MagicMock()
+    a.id = "approval-id"
     a.uuid = uuid
     a.workflow_result_id = "wfr-id"
     a.workflow_id = "wf-id"
@@ -129,6 +130,7 @@ class TestReviewAuthorization:
             MockReviewsUser.find_one = AsyncMock(return_value=user)
             MockReviewsUser.user_id = MagicMock()
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             doc_q = MagicMock(); doc_q.to_list = AsyncMock(return_value=[])
             MockDoc.find = MagicMock(return_value=doc_q)
 
@@ -159,6 +161,7 @@ class TestReviewAuthorization:
              ):
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             # Somebody else's run: no activity row ties this user to it.
             MockActivity.find_one = AsyncMock(return_value=None)
 
@@ -197,6 +200,7 @@ class TestReviewAuthorization:
              ):
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             # Only used to render the requester's display name.
             MockRouterUser.find_one = AsyncMock(return_value=None)
             # The runner's own activity row for this run exists — that is the
@@ -229,6 +233,7 @@ class TestReviewAuthorization:
              ):
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             MockActivity.find_one = AsyncMock(side_effect=RuntimeError("mongo down"))
 
             resp = await client.get(
@@ -253,14 +258,17 @@ class TestApproveWithEdit:
         approval = _make_approval(assigned=("reviewer1",))
         cookies, headers = _auth("reviewer1")
 
-        with patch("app.dependencies.decode_token", return_value={"sub": "reviewer1", "type": "access"}), \
+        with patch("app.services.approval_service.ApprovalRequest") as ClaimModel, \
+             patch("app.dependencies.decode_token", return_value={"sub": "reviewer1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.reviews.ApprovalRequest") as MockApproval, \
              patch("app.routers.reviews.audit_service") as mock_audit, \
              patch("app.routers.reviews._notify_owner", new_callable=AsyncMock), \
              patch.object(celery, "send_task") as mock_send:
+            ClaimModel.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             mock_audit.log_event = AsyncMock()
 
             resp = await client.post(
@@ -274,7 +282,8 @@ class TestApproveWithEdit:
         assert approval.status == "approved"
         assert approval.reviewer_user_id == "reviewer1"
         assert approval.edited_artifact == {"pi": "Dr. Smith"}
-        approval.save.assert_awaited()
+        approval.save.assert_not_awaited()
+        ClaimModel.get_motor_collection.return_value.update_one.assert_awaited_once()
         mock_send.assert_called_once_with(
             "tasks.workflow.resume_after_approval",
             kwargs={"approval_uuid": approval.uuid},
@@ -292,6 +301,7 @@ class TestApproveWithEdit:
              patch("app.routers.reviews.ApprovalRequest") as MockApproval:
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
 
             resp = await client.post(
                 f"/api/reviews/{approval.uuid}/approve",
@@ -321,7 +331,8 @@ class TestRejectEndsApprovalWait:
         approval = _make_approval(assigned=("reviewer1",))
         cookies, headers = _auth("reviewer1")
 
-        with patch("app.dependencies.decode_token", return_value={"sub": "reviewer1", "type": "access"}), \
+        with patch("app.services.approval_service.ApprovalRequest") as ClaimModel, \
+             patch("app.dependencies.decode_token", return_value={"sub": "reviewer1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.reviews.ApprovalRequest") as MockApproval, \
              patch("app.routers.reviews.WorkflowResult") as MockResult, \
@@ -331,8 +342,10 @@ class TestRejectEndsApprovalWait:
                  "app.routers.reviews.approval_service.end_approval_wait",
                  new_callable=AsyncMock,
              ) as mock_end:
+            ClaimModel.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            MockApproval.get_motor_collection.return_value.update_one = AsyncMock(return_value=SimpleNamespace(modified_count=1))
             MockResult.get = AsyncMock(return_value=None)
             mock_audit.log_event = AsyncMock()
 

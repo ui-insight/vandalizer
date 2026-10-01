@@ -159,7 +159,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         </div>
 
         {/* Body */}
-        <div style={{ overflow: 'auto', padding: 'var(--workspace-space-16)', flex: 1 }}>
+        <div role="region" aria-label="Extracted text content" tabIndex={0} style={{ overflow: 'auto', minHeight: 0, padding: 'var(--workspace-space-16)', flex: 1 }}>
           {state.kind === 'loading' && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
               <Loader2
@@ -202,7 +202,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     fontSize: 'var(--workspace-font-body)',
                     fontWeight: 500,
                     backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                    color: '#fff',
+                    color: 'var(--highlight-text-color, #000)',
                     border: 'none',
                     borderRadius: 'var(--workspace-radius-small)',
                     cursor: retrying ? 'not-allowed' : 'pointer',
@@ -258,7 +258,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                       fontSize: 'var(--workspace-font-control)',
                       fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                      color: '#fff',
+                      color: 'var(--highlight-text-color, #000)',
                       border: 'none',
                       borderRadius: 'var(--workspace-radius-small)',
                       cursor: retrying ? 'not-allowed' : 'pointer',

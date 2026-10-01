@@ -208,7 +208,7 @@ export function AutomationEditorPanel() {
             </div>
           ) : (
             <button type="button" aria-label="Rename automation" disabled={!canManage}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: canManage ? 'pointer' : 'default', flex: 1, background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: canManage ? 'pointer' : 'default', flex: '1 1 100%', minWidth: 0, overflowWrap: 'anywhere', background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit' }}
               onClick={() => {
                 if (!canManage) return
                 setTitleValue(automation.name)
@@ -321,8 +321,8 @@ export function AutomationEditorPanel() {
           </div>
         )}
         {/* Description */}
-        <input
-          type="text"
+        <textarea
+          rows={3}
           aria-label="Automation description"
           value={automation.description || ''}
           disabled={!canManage}
@@ -332,7 +332,7 @@ export function AutomationEditorPanel() {
             width: '100%', padding: "var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: '#555e68',
             border: 'none', borderBottom: '1px solid transparent',
             fontFamily: 'inherit', backgroundColor: 'transparent', marginBottom: 'var(--workspace-space-20)',
-            boxSizing: 'border-box',
+            boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.5,
           }}
           onFocus={e => (e.currentTarget.style.borderBottomColor = '#d1d5db')}
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}

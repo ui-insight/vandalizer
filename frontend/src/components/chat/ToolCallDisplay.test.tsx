@@ -89,3 +89,12 @@ describe('workflow run recovery', () => {
     await waitFor(()=>expect(screen.getByText('Copy workflow output: copied')).toBeInTheDocument())
   })
 })
+
+it('renders a historical approval as a nonactionable record even when a callback exists', () => {
+  const confirm = vi.fn()
+  render(<ToolStatusLine call={call} result={result({ needs_confirmation: true, preview: 'Create a workflow' })} onConfirm={confirm} approvalHistory={{ label: 'Workflow created', detail: 'Inspect the result below.' }} />)
+  expect(screen.getByRole('region', { name: 'Earlier action decision' })).toHaveTextContent('Workflow created')
+  expect(screen.queryByRole('button', { name: 'Create workflow' })).toBeNull()
+  expect(screen.queryByText('Your approval is needed')).toBeNull()
+  expect(confirm).not.toHaveBeenCalled()
+})

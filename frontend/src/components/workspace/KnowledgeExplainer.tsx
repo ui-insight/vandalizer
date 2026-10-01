@@ -1,3 +1,4 @@
+import { TaskHelpLink } from '../shared/TaskHelpLink'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Layers, Search, BookOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
@@ -45,7 +46,8 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
           overflowY: 'auto',
         }}
       >
-        {/* Close button */}
+        <TaskHelpLink topic="source-recovery">Help with missing or incomplete sources</TaskHelpLink>
+      {/* Close button */}
         {onClose && (
           <button
             onClick={onClose}

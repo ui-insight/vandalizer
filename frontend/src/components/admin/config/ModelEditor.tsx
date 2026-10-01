@@ -541,18 +541,18 @@ export function ModelEditor({
               return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
                 padding: '10px 16px',
                 background: test ? (test.ok ? '#f0fdf4' : '#fef2f2') : '#f9fafb',
                 borderRadius: expanded ? 'var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0' : 'var(--ui-radius, 12px)',
                 border: '1px solid',
                 borderColor: test ? (test.ok ? '#bbf7d0' : '#fecaca') : '#e5e7eb',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   {/* Identity & capability badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{m.name}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{m.tag}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#4b5563', fontWeight: 600 }}>{m.tag}</span>
                     {defaultModel === m.name && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef9c3', color: '#854d0e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <Star size={11} fill="currentColor" /> Default
@@ -577,7 +577,7 @@ export function ModelEditor({
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#d1fae5', color: '#065f46', fontWeight: 600 }}>API Key ✓</span>
                     )}
                     {m.endpoint && (
-                      <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
+                      <span style={{ fontSize: 11, color: '#4b5563', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
                     )}
                   </div>
                   {/* Characteristic bars (replaces speed / tier / privacy pills) */}
@@ -624,7 +624,7 @@ export function ModelEditor({
                   </button>
                   <button
                     onClick={() => handleEditModel(i)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: 4 }}
                     title="Edit model"
                   >
                     <Pencil size={16} />
@@ -644,7 +644,7 @@ export function ModelEditor({
             })}
           </div>
         ) : (
-          <div style={{ fontSize: 13, color: '#6b7280' }}>No models configured.</div>
+          <div style={{ fontSize: 13, color: '#4b5563' }}>No models configured.</div>
         )}
 
         {models.length > 0 && (
@@ -665,14 +665,14 @@ export function ModelEditor({
                   onError(err instanceof Error ? err.message : String(err))
                 }
               }}
-              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, maxWidth: 320 }}
+              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, width: '100%', minWidth: 0, maxWidth: '100%' }}
             >
               <option value="">Off &mdash; trim documents that don&rsquo;t fit</option>
               {models.map(m => (
                 <option key={m.id} value={m.name}>{m.name}</option>
               ))}
             </select>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: '#4b5563', marginTop: 6 }}>
               When a document is too large for the chosen model, answer with this one instead of trimming the middle out. Pick a model with a large context window. Routing never moves a request to a model with weaker privacy, and the answer says which model was used.
             </div>
           </div>
@@ -696,14 +696,14 @@ export function ModelEditor({
                   onError(err instanceof Error ? err.message : String(err))
                 }
               }}
-              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, maxWidth: 320 }}
+              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, width: '100%', minWidth: 0, maxWidth: '100%' }}
             >
               <option value="">Default model{defaultModel ? ` (${defaultModel})` : ''}</option>
               {models.map(m => (
                 <option key={m.id} value={m.name}>{m.name}</option>
               ))}
             </select>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: '#4b5563', marginTop: 6 }}>
               The model that grades every knowledge-base validation run, whoever starts it. Scores are only comparable when the same model graded them, so change this rarely; History marks where the grader changed.
             </div>
           </div>
@@ -729,7 +729,7 @@ export function ModelEditor({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{isEditing ? 'Edit model' : 'Add a model'}</div>
               {!isEditing && (
-                <div style={{ fontSize: 12, color: '#6b7280' }}>
+                <div style={{ fontSize: 12, color: '#4b5563' }}>
                   {wizardStep === 1 ? 'Step 1 of 2 · Choose a provider' : 'Step 2 of 2 · Configure'}
                 </div>
               )}
@@ -738,10 +738,10 @@ export function ModelEditor({
             {/* STEP 1 — provider picker (new models only) */}
             {wizardStep === 1 && !isEditing && (
               <>
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 12 }}>
                   Choose where this model runs — we&rsquo;ll fill in the technical settings for you.
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 10 }}>
                   {MODEL_PROVIDERS.map(p => (
                     <button
                       key={p.id}
@@ -750,7 +750,7 @@ export function ModelEditor({
                       style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}
                     >
                       <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{p.label}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>{p.blurb}</div>
+                      <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3 }}>{p.blurb}</div>
                     </button>
                   ))}
                 </div>
@@ -790,7 +790,7 @@ export function ModelEditor({
                     <div>
                       <label htmlFor="admin-model-apikey" style={labelStyle}>API key</label>
                       <input id="admin-model-apikey" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder={prov?.keyPlaceholder ?? 'API key'} style={inputStyle} />
-                      {prov?.keyHelp && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{prov.keyHelp}</div>}
+                      {prov?.keyHelp && <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>{prov.keyHelp}</div>}
                     </div>
                   )}
 
@@ -817,7 +817,7 @@ export function ModelEditor({
                 <details style={{ marginTop: 14 }}>
                   <summary style={{ cursor: 'pointer', fontSize: 13, color: '#4b5563', fontWeight: 500 }}>Advanced settings</summary>
                   <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
                       <div>
                         <label htmlFor="admin-model-tag" style={labelStyle}>Tag</label>
                         <input id="admin-model-tag" value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="provider" style={inputStyle} />
@@ -899,7 +899,7 @@ export function ModelEditor({
                           {probingContext ? 'Probing…' : 'Probe endpoint'}
                         </button>
                       </div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
                         The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
                       </div>
                       {probeResult && (
@@ -915,7 +915,7 @@ export function ModelEditor({
                       )}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
                       <div>
                         <label htmlFor="admin-model-timeout" style={labelStyle}>Request timeout (seconds)</label>
                         <input
@@ -927,7 +927,7 @@ export function ModelEditor({
                           placeholder="system default"
                           style={inputStyle}
                         />
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
                           Overrides the shared LLM timeout for this model — raise it for slow self-hosted models. Blank = system default.
                         </div>
                       </div>
@@ -942,7 +942,7 @@ export function ModelEditor({
                           placeholder="auto"
                           style={inputStyle}
                         />
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
                           Tokens reserved for the model&rsquo;s answer; also caps runaway reasoning. More output room means less input room. Blank = scaled to the context window.
                         </div>
                       </div>
@@ -968,7 +968,7 @@ export function ModelEditor({
                           placeholder="provider default"
                           style={inputStyle}
                         />
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
                           How much randomness the model uses. 0 gives the same answer to the same question every time &mdash; use it for extraction and document Q&amp;A. Blank = whatever the provider defaults to (often 0.7).
                         </div>
                       </div>
@@ -1000,7 +1000,7 @@ export function ModelEditor({
                 )}
 
                 {wizardTesting && (
-                  <div role="status" aria-live="polite" style={{ marginTop: 12, fontSize: 13, color: '#6b7280' }}>
+                  <div role="status" aria-live="polite" style={{ marginTop: 12, fontSize: 13, color: '#4b5563' }}>
                     Testing connection…
                   </div>
                 )}
@@ -1010,7 +1010,7 @@ export function ModelEditor({
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
                   {!modelTest ? (
                     <>
                       <button onClick={handleSaveModel} disabled={savingModel || wizardTesting} style={{ ...primaryBtn, opacity: savingModel || wizardTesting ? 0.6 : 1 }}>

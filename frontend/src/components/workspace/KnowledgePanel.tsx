@@ -147,6 +147,8 @@ export function KnowledgePanel() {
   // scroll cap on the Sources list so long source lists become fully visible.
   const [detailView, setDetailView] = useState<'sources' | 'validation'>('sources')
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
+  const [sourceSearch, setSourceSearch] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'attention'>('all')
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const cancelTitleEdit = useRef(false)
   // Single commit path for the inline KB title editor: every exit from edit
@@ -243,6 +245,8 @@ export function KnowledgePanel() {
   useEffect(() => {
     setDetailView('sources')
     setSourcesCollapsed(false)
+    setSourceSearch('')
+    setSourceFilter('all')
     setSourceActionError(null)
     setRenamingSourceUuid(null)
     setRenameDraft('')
@@ -836,12 +840,23 @@ export function KnowledgePanel() {
     // Export serializes the KB's sources. With none it downloads a file nobody
     // can use — the backend refuses it now, so say why before the click.
     const hasSources = selectedKB.total_sources > 0
+    const needsAttention = (source: KnowledgeBaseSource) => source.status !== 'ready'
+      || !!source.truncated || !!source.ingestion_warning_text
+      || source.document_exists === false || !!source.currency?.last_refresh_error
+    const attentionCount = selectedKB.sources.filter(needsAttention).length
+    const sourceQuery = sourceSearch.trim().toLowerCase()
+    const visibleSources = selectedKB.sources.filter(source =>
+      (sourceFilter === 'all' || needsAttention(source)) &&
+      [source.custom_name, source.document_title, source.url_title, source.url, source.source_reference, source.uuid]
+        .some(value => value?.toLowerCase().includes(sourceQuery)))
+
     return (
       <>
       <div className="knowledge-surface" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--workspace-canvas)', position: 'relative' }}>
         {/* Header */}
         <div
           style={{
+            flexWrap: 'wrap',
             minHeight: 54,
             backgroundColor: 'var(--workspace-surface)',
             boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
@@ -864,7 +879,7 @@ export function KnowledgePanel() {
           </button>
           {editingTitle ? (
             <div
-              style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', minWidth: 0 }}
+              style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', minWidth: 0 }}
             >
               <input
                 ref={titleInputRef}
@@ -898,7 +913,7 @@ export function KnowledgePanel() {
               </button>
             </div>
           ) : (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
+            <div style={{ flex: '1 1 140px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
               <span
                 onClick={canManageKB ? () => { setTitleDraft(selectedKB.title); setEditingTitle(true) } : undefined}
                 title={canManageKB ? 'Click to rename' : noManageReason}
@@ -1064,7 +1079,7 @@ export function KnowledgePanel() {
               )}
             </div>
 
-            <div className="kb-health-summary" data-attention={selectedKB.sources_failed > 0} role="status"><strong>{selectedKB.sources_ready} of {selectedKB.total_sources} sources ready</strong>{selectedKB.sources_failed > 0 && <span> · {selectedKB.sources_failed} need attention</span>}<span className="kb-health-caption">{describeKBAvailability(selectedKB)} Answer quality is measured in Validation.</span></div>
+            <div className="kb-health-summary" data-attention={attentionCount > 0} role="status"><strong>{selectedKB.sources_ready} of {selectedKB.total_sources} sources ready</strong>{attentionCount > 0 && <span> · {attentionCount} need attention or are still processing</span>}<span className="kb-health-caption">{attentionCount > 0 ? 'Chat uses indexed text only. Inspect incomplete, unavailable or processing sources below.' : describeKBAvailability(selectedKB)} Answer quality is measured separately in Validation.</span></div>
             {/* Crawling / adding URLs progress banner */}
             {addingUrls && (
               <div role="status" aria-live="polite" style={{
@@ -1378,11 +1393,21 @@ export function KnowledgePanel() {
               />
               </details>
             )}
+            {!sourcesCollapsed && selectedKB.sources.length > 0 && <div className="kb-source-filters">
+              <label>Find a source<input type="search" value={sourceSearch} onChange={event => setSourceSearch(event.target.value)} placeholder="Name or source URL" /></label>
+              <label>Source status<select value={sourceFilter} onChange={event => setSourceFilter(event.target.value as 'all' | 'attention')}>
+                <option value="all">All sources ({selectedKB.sources.length})</option>
+                <option value="attention">Needs attention / processing ({attentionCount})</option>
+              </select></label>
+              <span role="status">Showing {visibleSources.length} of {selectedKB.sources.length}</span>
+            </div>}
             {sourceActionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, margin: "var(--workspace-space-12) 0", overflowWrap: 'anywhere' }}>{sourceActionError}</div>}
             {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-20) 0" }}>
                 No sources added yet. Add documents or URLs above.
               </div>
+            ) : visibleSources.length === 0 ? (
+              <div className="kb-source-empty"><p>No sources match these filters.</p><button type="button" onClick={() => { setSourceSearch(''); setSourceFilter('all') }}>Clear source filters</button></div>
             ) : (
               <div style={{
                 display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)',
@@ -1391,7 +1416,7 @@ export function KnowledgePanel() {
                 maxHeight: undefined, overflowY: 'auto',
                 paddingRight: 'var(--workspace-space-4)',
               }}>
-                {selectedKB.sources.map((source: KnowledgeBaseSource) => {
+                {visibleSources.map((source: KnowledgeBaseSource) => {
                   // A ready-but-truncated source is incomplete: the fetched page
                   // was cut off at the size cap, so it retrieves wrong answers
                   // for anything past the cut. Show an amber warning, not a

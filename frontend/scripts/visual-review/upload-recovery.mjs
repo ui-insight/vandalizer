@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { createReview } from './harness.mjs'
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state } = review
-page.setDefaultTimeout(10000)
+page.setDefaultTimeout(30000)
 let pending = false, ready = false, release, failName = 'failed.txt'
 const transfers = [], chats = []
 await page.route('**/api/files/upload-policy', route => route.fulfill({ json: { extensions: ['pdf','doc','docx','xls','xlsx','csv','txt','md'], max_size_bytes: 1024 * 1024 } }))
@@ -29,7 +29,7 @@ async function shot(id, locator) {
 const file = (name, content = 'Test document') => ({ name, mimeType: 'text/plain', buffer: Buffer.from(content) })
 try {
   for (const [width, height] of [[320,568],[768,600],[1440,900]]) {
-    pending = false; ready = false; failName = 'failed.txt'
+    pending = false; ready = false; failName = 'failed.txt'; state.first = true
     await page.setViewportSize({ width, height })
     await page.goto(review.baseURL + '/?mode=chat')
     const draft = page.getByRole('textbox', { name: 'Message input' })

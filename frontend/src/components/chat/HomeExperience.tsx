@@ -989,7 +989,7 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
     <div className="chat-home first-session-home">
       <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
-        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Start with a conversation. Add sources when you need them, or try a sample.</p></div>
+        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Ask a question, upload a source, or try a sample.</p></div>
       </div>
       <div className="home-primary-actions">
         <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
@@ -1004,6 +1004,12 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
           <SampleAnswerPreview />
         </div>
       </details>
+      <ol className="first-task-steps" aria-label="Your first useful task">
+        <li><strong>1</strong> Upload or try a sample</li>
+        <li><strong>2</strong> Ask a specific question</li>
+        <li><strong>3</strong> Inspect the source</li>
+        <li><strong>4</strong> Export or reuse</li>
+      </ol>
       <div className="home-two-columns">
         <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
           <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />

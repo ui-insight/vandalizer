@@ -22,6 +22,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [serverSheets, setServerSheets] = useState<ServerSheet[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   // Find-in-document state
   const rootRef = useRef<HTMLDivElement>(null)
@@ -124,7 +125,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       })
 
     return () => { cancelled = true }
-  }, [docUuid])
+  }, [docUuid, loadAttempt])
 
   const handleSheetChange = (index: number) => {
     if (serverSheets) showServerSheet(serverSheets, index)
@@ -140,7 +141,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   if (loading) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="status" aria-live="polite" style={{ color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>Loading spreadsheet...</div>
+        <div role="status" aria-live="polite" style={{ color: '#59616b', fontSize: 'var(--workspace-font-body)' }}>Loading spreadsheet...</div>
       </div>
     )
   }
@@ -148,7 +149,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   if (error) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="alert" style={{ color: '#dc2626', fontSize: 'var(--workspace-font-body)' }}>{error}</div>
+        <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-body)', padding: 16 }}><p>{error}</p><button type="button" className="workspace-action" onClick={() => setLoadAttempt(value => value + 1)}>Retry spreadsheet</button></div>
       </div>
     )
   }
@@ -179,7 +180,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
         padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
@@ -203,7 +204,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
       {/* Sheet tabs */}
       {sheets.length > 1 && (
-        <div style={{
+        <div role="group" aria-label="Worksheets" style={{
           display: 'flex', gap: 0, borderBottom: "1px solid var(--workspace-border)",
           backgroundColor: '#f3f4f6', flexShrink: 0, overflowX: 'auto',
         }}>
@@ -211,10 +212,11 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
             <button
               key={name}
               type="button"
+              aria-pressed={i === activeSheet}
               onClick={() => handleSheetChange(i)}
               style={{
                 padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: i === activeSheet ? 600 : 400,
-                color: i === activeSheet ? '#111827' : '#6b7280',
+                color: i === activeSheet ? '#111827' : '#59616b',
                 backgroundColor: i === activeSheet ? '#fff' : 'transparent',
                 borderBottom: i === activeSheet ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
                 border: 'none', borderRight: "1px solid var(--workspace-border)",
@@ -241,14 +243,14 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       )}
 
       {/* Table */}
-      <div ref={tableScrollRef} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
+      <div ref={tableScrollRef} role="region" aria-label={`Spreadsheet: ${sheets[activeSheet] || 'data'}`} tabIndex={0} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
         <div style={{
           transform: `scale(${zoomLevel})`,
           transformOrigin: 'top left',
           width: `${100 / zoomLevel}%`,
         }}>
           {headers.length === 0 && rows.length === 0 ? (
-            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>
+            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 'var(--workspace-font-body)' }}>
               This sheet is empty
             </div>
           ) : (
@@ -260,7 +262,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                   <tr>
                     <th scope="col" style={{
                       padding: "var(--workspace-space-8) var(--workspace-space-12)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-                      color: '#6b7280', backgroundColor: '#f9fafb',
+                      color: '#59616b', backgroundColor: '#f9fafb',
                       borderBottom: "2px solid var(--workspace-border)", borderRight: "1px solid var(--workspace-border)",
                       position: 'sticky', top: 0, zIndex: 2, width: 44,
                     }}>
@@ -297,7 +299,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                   <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
                     <td style={{
                       padding: "var(--workspace-space-6) var(--workspace-space-12)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)',
-                      color: '#6b7280', borderBottom: '1px solid #f3f4f6',
+                      color: '#59616b', borderBottom: '1px solid #f3f4f6',
                       borderRight: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
                     }}>
                       {ri + 1}

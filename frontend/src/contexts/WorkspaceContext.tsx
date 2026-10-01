@@ -1,3 +1,4 @@
+import type { DocumentReadiness } from '../utils/documentReadiness'
 import { validPanelSplit } from '../utils/workspaceLayout'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
@@ -144,6 +145,8 @@ interface ChatStateContextValue {
   // Subset of selectedDocUuids that are still being processed by the upload
   // pipeline. Populated by the file browser so the chat banner can avoid
   // claiming "ready for analysis" while OCR/indexing is still running.
+  documentReadiness: Record<string, DocumentReadiness>
+  updateDocumentReadiness: (docs: DocumentReadiness[]) => void
   selectedDocsProcessing: Array<{ uuid: string; title: string; status: string | null }>
   setSelectedDocsProcessing: (docs: Array<{ uuid: string; title: string; status: string | null }>) => void
 }
@@ -384,6 +387,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
+  const [documentReadiness, setDocumentReadiness] = useState<Record<string, DocumentReadiness>>({})
+  const updateDocumentReadiness = useCallback((docs: DocumentReadiness[]) => {
+    setDocumentReadiness(previous => {
+      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message)
+      if (!changed.length) return previous
+      return { ...previous, ...Object.fromEntries(changed.map(doc => [doc.uuid, doc])) }
+    })
+  }, [])
   const [selectedDocsProcessing, _setSelectedDocsProcessing] = useState<Array<{ uuid: string; title: string; status: string | null }>>([])
   // Wrap the setter so consumers passing a fresh array each render don't
   // trigger needless re-renders of every chat consumer when the contents
@@ -901,6 +912,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
+    documentReadiness, updateDocumentReadiness,
   }), [
     loadConversationId, currentConversationUuid,
     newChatSignal, triggerNewChat,
@@ -910,6 +922,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
+    documentReadiness, updateDocumentReadiness,
   ])
 
   const uiValue = useMemo<UIStateContextValue>(() => ({

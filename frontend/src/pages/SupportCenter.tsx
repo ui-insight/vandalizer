@@ -4,6 +4,8 @@ import {
   ArrowLeft, Check, MessageSquare, Send, Plus, Paperclip, Pencil, X, Loader2, Link2, Tag,
   Eye, UserPlus, Search, Flag, Lock, Layers, Heart, Sparkles, Trash2,
 } from 'lucide-react'
+import { FocusTrap } from '../components/shared/PanelFocusTrap'
+import { useAdminQuery } from '../components/admin/shared/useAdminQuery'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
@@ -11,7 +13,6 @@ import { useConfirm } from '../components/shared/useConfirm'
 import * as supportApi from '../api/support'
 import {
   listPositiveFeedback, getPositiveFeedbackStats,
-  type PositiveFeedbackItem, type PositiveFeedbackStats,
 } from '../api/feedback'
 import type {
   SupportTicket, SupportTicketSummary, SupportAttachment, SupportSearch,
@@ -23,6 +24,7 @@ import type {
 type View = 'list' | 'new' | 'chat' | 'whats_working'
 
 const MAX_BYTES = 10 * 1024 * 1024
+type StaffReplyDraft = { reply: string; internal: boolean; files?: File[]; sending?: boolean; uploading?: boolean }
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return ''
@@ -34,19 +36,19 @@ function timeAgo(dateStr: string | null): string {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  open: '#f59e0b',
-  in_progress: '#3b82f6',
-  closed: '#9ca3af',
+  open: '#92400e',
+  in_progress: '#1d4ed8',
+  closed: '#59616b',
 }
 const PRIORITY_COLORS: Record<string, string> = {
-  low: '#9ca3af',
-  normal: '#3b82f6',
-  high: '#ef4444',
+  low: '#59616b',
+  normal: '#1d4ed8',
+  high: '#b91c1c',
 }
 const CLASSIFICATION_COLORS: Record<string, string> = {
-  bug: '#ef4444',
-  enhancement: '#8b5cf6',
-  feature_request: '#0ea5e9',
+  bug: '#b91c1c',
+  enhancement: '#6d28d9',
+  feature_request: '#0369a1',
 }
 const CLASSIFICATION_LABELS: Record<string, string> = {
   bug: 'Bug',
@@ -92,6 +94,9 @@ export default function SupportCenter() {
   const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTicketUuid, setActiveTicketUuid] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, StaffReplyDraft>>({})
+  const queueVersion = useRef(0)
 
   // Filters are read from the URL rather than held in component state, so they
   // survive a refresh, a trip into a ticket and back, and browser back/forward
@@ -161,7 +166,10 @@ export default function SupportCenter() {
       setLoading(false)
       return
     }
+    const version = ++queueVersion.current
     setLoading(true)
+    setLoadingMore(false)
+    setLoadError(null)
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
       const priorityParam = priorityFilter === 'all' ? undefined : priorityFilter
@@ -176,18 +184,21 @@ export default function SupportCenter() {
         ),
         supportApi.listAllTags(),
       ])
+      if (version !== queueVersion.current) return
       setStats(s)
       setTickets(t.tickets)
       setTotalMatching(t.total)
       setAllTags(tagList.tags)
-    } catch {
-      toast('Failed to load tickets', 'error')
+    } catch (error) {
+      if (version === queueVersion.current) setLoadError(error instanceof Error ? error.message : 'Failed to load tickets')
     } finally {
-      setLoading(false)
+      if (version === queueVersion.current) setLoading(false)
     }
-  }, [isSupportAgent, toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
+  }, [isSupportAgent, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
 
   const loadMore = useCallback(async () => {
+    if (loadingMore) return
+    const version = queueVersion.current
     setLoadingMore(true)
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
@@ -199,6 +210,7 @@ export default function SupportCenter() {
         statusParam, PAGE_SIZE, tickets.length, undefined, tagParam, undefined,
         searchParam, priorityParam, classificationParam,
       )
+      if (version !== queueVersion.current) return
       // Tickets can shift between pages as they're updated (the sort is by
       // updated_at), so dedupe on append rather than trusting the offset.
       setTickets((prev) => {
@@ -207,13 +219,13 @@ export default function SupportCenter() {
       })
       setTotalMatching(t.total)
     } catch {
-      toast('Failed to load more tickets', 'error')
+      if (version === queueVersion.current) toast('Failed to load more tickets. Try Load more again.', 'error')
     } finally {
-      setLoadingMore(false)
+      if (version === queueVersion.current) setLoadingMore(false)
     }
-  }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search, tickets.length])
+  }, [loadingMore, toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search, tickets.length])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); const requests = queueVersion; return () => { requests.current++ } }, [load])
 
   // Keep the URL in sync with the open ticket so agents can copy the address
   // bar (or the explicit Copy link button) and share it with each other.
@@ -271,6 +283,8 @@ export default function SupportCenter() {
           loadingMore={loadingMore}
           stats={stats}
           loading={loading}
+          error={loadError}
+          onRetry={load}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           priorityFilter={priorityFilter}
@@ -306,6 +320,8 @@ export default function SupportCenter() {
         <ChatView
           key={activeTicketUuid}
           ticketUuid={activeTicketUuid}
+          draft={replyDrafts[activeTicketUuid]}
+          onDraftChange={update => setReplyDrafts(drafts => ({ ...drafts, [activeTicketUuid]: typeof update === 'function' ? update(drafts[activeTicketUuid] ?? { reply: '', internal: false }) : update }))}
           onBack={backToList}
         />
       )}
@@ -321,45 +337,31 @@ export default function SupportCenter() {
 // ---------------------------------------------------------------------------
 
 const FEEDBACK_SOURCE_META: Record<string, { label: string; color: string }> = {
-  chat: { label: 'Chat', color: '#3b82f6' },
-  extraction: { label: 'Extraction', color: '#8b5cf6' },
-  product: { label: 'Shared', color: '#ec4899' },
+  chat: { label: 'Chat', color: '#1d4ed8' },
+  extraction: { label: 'Extraction', color: '#6d28d9' },
+  product: { label: 'Shared', color: '#be185d' },
 }
 
 function WhatsWorkingView({ onBack }: { onBack: () => void }) {
-  const { toast } = useToast()
-  const [items, setItems] = useState<PositiveFeedbackItem[]>([])
-  const [stats, setStats] = useState<PositiveFeedbackStats | null>(null)
   const [sourceFilter, setSourceFilter] = useState<'all' | 'chat' | 'extraction' | 'product'>('all')
-  const [loading, setLoading] = useState(true)
+  const request = useCallback(() => Promise.all([listPositiveFeedback(sourceFilter === 'all' ? undefined : sourceFilter, 100), getPositiveFeedbackStats()]), [sourceFilter])
+  const { data, loading, error, load } = useAdminQuery(request)
+  const items = data?.[0].items ?? []
+  const stats = data?.[1] ?? null
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const src = sourceFilter === 'all' ? undefined : sourceFilter
-    Promise.all([listPositiveFeedback(src, 100), getPositiveFeedbackStats()])
-      .then(([feed, s]) => {
-        if (cancelled) return
-        setItems(feed.items)
-        setStats(s)
-      })
-      .catch(() => { if (!cancelled) toast('Failed to load feedback', 'error') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [sourceFilter, toast])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button type="button" onClick={onBack} aria-label="Back to tickets"
-          style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, color: '#6b7280' }}>
+          style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, color: '#59616b' }}>
           <ArrowLeft size={20} />
         </button>
         <Heart size={20} color="#ec4899" />
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>What&rsquo;s Working</h1>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: '#59616b' }}>
             The positive signal users leave — praise, high ratings, and ideas.
           </p>
         </div>
@@ -369,22 +371,22 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
       {stats && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <div style={statCardStyle('#ec4899')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#ec4899' }}>{stats.positive_last_7_days}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Positive · last 7 days</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#be185d' }}>{stats.positive_last_7_days}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Positive · last 7 days</div>
           </div>
           <div style={statCardStyle('#22c55e')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#15803d' }}>
               {stats.thumbs_up_rate == null ? '—' : `${Math.round(stats.thumbs_up_rate * 100)}%`}
             </div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Chat thumbs-up rate</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Chat thumbs-up rate</div>
           </div>
           <div style={statCardStyle('#3b82f6')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{stats.by_source.chat}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Chat up-votes</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#1d4ed8' }}>{stats.by_source.chat}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Chat up-votes</div>
           </div>
           <div style={statCardStyle('#8b5cf6')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6' }}>{stats.by_source.extraction}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Great extractions</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#6d28d9' }}>{stats.by_source.extraction}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Great extractions</div>
           </div>
         </div>
       )}
@@ -395,11 +397,11 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
           const active = sourceFilter === s
           const label = s === 'all' ? 'All' : FEEDBACK_SOURCE_META[s].label
           return (
-            <button key={s} type="button" onClick={() => setSourceFilter(s)}
+            <button key={s} type="button" onClick={() => setSourceFilter(s)} aria-pressed={active}
               style={{
                 padding: '6px 12px', borderRadius: 999, fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', border: `1px solid ${active ? '#ec4899' : '#e5e7eb'}`,
-                background: active ? '#fdf2f8' : '#fff', color: active ? '#be185d' : '#6b7280',
+                background: active ? '#fdf2f8' : '#fff', color: active ? '#be185d' : '#59616b',
               }}>
               {label}
             </button>
@@ -410,17 +412,17 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
       {/* Feed */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)' }}>
             <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
           </div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
+        ) : error ? <div style={{ padding: 20 }}><p role="alert">{error}</p><button type="button" onClick={load} className="admin-open-record">Retry feedback</button></div> : items.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)', fontSize: 14 }}>
             <Sparkles size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.5 }} />
             No positive feedback yet. As users leave praise and high ratings, it lands here.
           </div>
         ) : (
           items.map((it, i) => {
-            const meta = FEEDBACK_SOURCE_META[it.source] ?? { label: it.source, color: '#6b7280' }
+            const meta = FEEDBACK_SOURCE_META[it.source] ?? { label: it.source, color: '#59616b' }
             return (
               <div key={i} style={{
                 padding: '14px 20px', borderBottom: i < items.length - 1 ? '1px solid #f3f4f6' : 'none',
@@ -436,7 +438,7 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
                   <div style={{ fontSize: 14, color: '#111827', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                     {it.message}
                   </div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)', marginTop: 4 }}>
                     {timeAgo(it.created_at)}
                   </div>
                 </div>
@@ -455,7 +457,7 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
 
 function ListView({
   tickets, totalMatching, onLoadMore, loadingMore,
-  stats, loading, statusFilter, onStatusFilterChange,
+  stats, loading, error, onRetry, statusFilter, onStatusFilterChange,
   priorityFilter, onPriorityFilterChange,
   classificationFilter, onClassificationFilterChange,
   tagFilter, onTagFilterChange, allTags,
@@ -468,6 +470,8 @@ function ListView({
   loadingMore: boolean
   stats: Stats | null
   loading: boolean
+  error: string | null
+  onRetry: () => void
   statusFilter: StatusFilter
   onStatusFilterChange: (s: StatusFilter) => void
   priorityFilter: PriorityFilter
@@ -496,17 +500,17 @@ function ListView({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <MessageSquare size={20} color="#6b7280" />
+          <MessageSquare size={20} color="#59616b" />
           <div>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Support Center</h1>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#59616b' }}>
               Triage and respond to all support tickets.
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
           <button
             onClick={onWhatsWorking}
             style={{
@@ -533,22 +537,22 @@ function ListView({
 
       {/* Stats cards */}
       {stats && (
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={statCardStyle('#6b7280')}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+          <div style={statCardStyle('#59616b')}>
             <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Total Tickets</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Total Tickets</div>
           </div>
           <div style={statCardStyle('#f59e0b')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{stats.open}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Open</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#92400e' }}>{stats.open}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Open</div>
           </div>
           <div style={statCardStyle('#3b82f6')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{stats.in_progress}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>In Progress</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#1d4ed8' }}>{stats.in_progress}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>In Progress</div>
           </div>
           <div style={statCardStyle('#22c55e')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>{stats.closed}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Closed</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#15803d' }}>{stats.closed}</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Closed</div>
           </div>
         </div>
       )}
@@ -556,11 +560,11 @@ function ListView({
       {/* Ticket list */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
               {!loading && (
-                <span style={{ fontSize: 13, color: '#6b7280' }}>
+                <span style={{ fontSize: 13, color: '#59616b' }}>
                   {tickets.length < totalMatching
                     ? `Showing ${tickets.length} of ${totalMatching} tickets`
                     : hasFilters
@@ -573,7 +577,7 @@ function ListView({
             <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 380 }}>
               <Search
                 size={14}
-                color="#9ca3af"
+                color="var(--ui-text-muted, #59616b)"
                 style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
               />
               <input
@@ -593,7 +597,7 @@ function ListView({
                   title="Clear search"
                   style={{
                     position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af',
+                    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ui-text-muted, #59616b)',
                     padding: 2, display: 'inline-flex', alignItems: 'center',
                   }}
                 >
@@ -606,7 +610,7 @@ function ListView({
                 onClick={clearAll}
                 style={{
                   fontSize: 12, padding: '4px 10px', borderRadius: 9999,
-                  border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280',
+                  border: '1px solid #e5e7eb', background: '#fff', color: '#59616b',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -624,7 +628,7 @@ function ListView({
                     padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
                     borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
                     background: statusFilter === s ? '#111827' : '#fff',
-                    color: statusFilter === s ? '#fff' : '#6b7280',
+                    color: statusFilter === s ? '#fff' : '#59616b',
                     fontFamily: 'inherit',
                   }}
                 >
@@ -633,7 +637,7 @@ function ListView({
               ))}
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Flag size={12} color="#6b7280" />
+              <Flag size={12} color="#59616b" />
               <select
                 value={priorityFilter}
                 onChange={(e) => onPriorityFilterChange(e.target.value as PriorityFilter)}
@@ -641,7 +645,7 @@ function ListView({
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
                   borderRadius: 9999, background: '#fff',
-                  color: priorityFilter !== 'all' ? '#111827' : '#6b7280',
+                  color: priorityFilter !== 'all' ? '#111827' : '#59616b',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -652,7 +656,7 @@ function ListView({
               </select>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Layers size={12} color="#6b7280" />
+              <Layers size={12} color="#59616b" />
               <select
                 value={classificationFilter}
                 onChange={(e) => onClassificationFilterChange(e.target.value as ClassificationFilter)}
@@ -660,7 +664,7 @@ function ListView({
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
                   borderRadius: 9999, background: '#fff',
-                  color: classificationFilter !== 'all' ? '#111827' : '#6b7280',
+                  color: classificationFilter !== 'all' ? '#111827' : '#59616b',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -671,14 +675,14 @@ function ListView({
               </select>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Tag size={12} color="#6b7280" />
+              <Tag size={12} color="#59616b" />
               <select
                 value={tagFilter}
                 onChange={(e) => onTagFilterChange(e.target.value)}
                 aria-label="Filter by tag"
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
-                  borderRadius: 9999, background: '#fff', color: tagFilter ? '#111827' : '#6b7280',
+                  borderRadius: 9999, background: '#fff', color: tagFilter ? '#111827' : '#59616b',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -692,12 +696,14 @@ function ListView({
         </div>
 
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)' }}>
             <Loader2 size={20} style={{ display: 'inline-block', animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} />
             <span style={{ marginLeft: 8 }}>Loading...</span>
           </div>
+        ) : error ? (
+          <div role="alert" style={{ padding: 20, color: '#991b1b', fontSize: 13 }}>Tickets could not be loaded: {error}. <button type="button" onClick={onRetry} style={{ textDecoration: 'underline' }}>Retry tickets</button></div>
         ) : tickets.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)' }}>
             <MessageSquare size={28} color="#d1d5db" style={{ display: 'block', margin: '0 auto 8px' }} />
             <div style={{ fontSize: 14 }}>
               {activeSearch
@@ -731,6 +737,7 @@ function ListView({
                 <div
                   key={t.uuid}
                   role="button"
+                  aria-label={`Open ticket ${t.ticket_number ?? ''}: ${t.subject}`}
                   tabIndex={0}
                   onClick={() => {
                     if (window.getSelection()?.toString()) return
@@ -743,7 +750,7 @@ function ListView({
                     }
                   }}
                   style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
                     width: '100%', padding: '12px 20px', borderBottom: '1px solid #f3f4f6',
                     background: needsAttention ? '#fffbeb' : '#fff',
                     cursor: 'pointer', textAlign: 'left',
@@ -753,19 +760,19 @@ function ListView({
                   onMouseLeave={(e) => { if (!needsAttention) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                       {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
                       {t.ticket_number != null && (
                         <span
                           style={{
                             fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                            color: '#6b7280', flexShrink: 0,
+                            color: '#59616b', flexShrink: 0,
                           }}
                         >
                           #{t.ticket_number}
                         </span>
                       )}
-                      <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere', flexBasis: '100%' }}>
                         {t.subject}
                       </span>
                       <span style={{
@@ -801,7 +808,7 @@ function ListView({
                         </span>
                       ))}
                     </div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
                       {t.last_message_is_internal_note && (
                         <span
@@ -818,7 +825,7 @@ function ListView({
                       {t.last_message_preview ? ` - ${t.last_message_preview}` : ''}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)', flexShrink: 0, marginLeft: 16 }}>
                     {timeAgo(t.updated_at || t.created_at)}
                   </div>
                 </div>
@@ -920,7 +927,7 @@ function NewTicketView({
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 24 }}>
         <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700 }}>File a Ticket</h2>
-        <p style={{ margin: '0 0 20px', fontSize: 13, color: '#6b7280' }}>
+        <p style={{ margin: '0 0 20px', fontSize: 13, color: '#59616b' }}>
           Drops into the same queue as customer tickets, useful for QA and dogfooding the support flow.
         </p>
 
@@ -1011,7 +1018,7 @@ function NewTicketView({
                     <button
                       type="button"
                       onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ui-text-muted, #59616b)', padding: 2 }}
                       title="Remove"
                     >
                       <X size={12} />
@@ -1059,9 +1066,11 @@ function NewTicketView({
 // ---------------------------------------------------------------------------
 
 function ChatView({
-  ticketUuid, onBack,
+  ticketUuid, onBack, draft, onDraftChange,
 }: {
   ticketUuid: string
+  draft?: StaffReplyDraft
+  onDraftChange: (draft: React.SetStateAction<StaffReplyDraft>) => void
   onBack: () => void
 }) {
   const { user } = useAuth()
@@ -1069,9 +1078,23 @@ function ChatView({
   const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
-  const [reply, setReply] = useState('')
-  const [isInternalNote, setIsInternalNote] = useState(false)
-  const [sending, setSending] = useState(false)
+  const reply = draft?.reply || ''
+  const isInternalNote = draft?.internal || false
+  const setReply = (reply: string) => onDraftChange(previous => ({ ...previous, reply }))
+  const setIsInternalNote = (internal: boolean) => onDraftChange(previous => ({ ...previous, internal }))
+  const sending = draft?.sending ?? false
+  const uploading = draft?.uploading ?? false
+  const pendingFiles = draft?.files ?? []
+  const sendingRef = useRef(sending)
+  const uploadingRef = useRef(uploading)
+  useEffect(() => { sendingRef.current = sending }, [sending])
+  useEffect(() => { uploadingRef.current = uploading }, [uploading])
+  const changingRef = useRef(false)
+  const [changing, setChanging] = useState(false)
+  const editingRef = useRef(false)
+  const subjectSavingRef = useRef(false)
+  const requestVersion = useRef(0)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [previewAttachment, setPreviewAttachment] = useState<SupportAttachment | null>(null)
   const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
@@ -1091,73 +1114,66 @@ function ChatView({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }, [reply])
 
-  // Error toasts persist until dismissed, so the 15s refresh stays silent on
-  // failure — only the initial load reports.
   const loadTicket = useCallback(async (isPoll = false) => {
+    const version = ++requestVersion.current
+    if (!isPoll) setLoading(true)
     try {
       const data = await supportApi.getTicket(ticketUuid)
-      setTicket(data)
-    } catch {
-      if (!isPoll) toast('Failed to load ticket', 'error')
+      if (version === requestVersion.current) { setTicket(data); setLoadError(null) }
+    } catch (reason) {
+      if (version === requestVersion.current) setLoadError(reason instanceof Error ? reason.message : 'Unable to load ticket. Please retry.')
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
-  }, [ticketUuid, toast])
+  }, [ticketUuid])
 
   useEffect(() => {
+    const guard = requestVersion
     loadTicket()
     supportApi.markTicketRead(ticketUuid).catch(() => {})
     const interval = setInterval(() => loadTicket(true), 15000)
-    return () => clearInterval(interval)
+    return () => { guard.current++; clearInterval(interval) }
   }, [loadTicket, ticketUuid])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }, [ticket?.messages.length])
 
   const handleSend = async () => {
-    if (!reply.trim() || sending) return
-    setSending(true)
+    if (!reply.trim() || sending || sendingRef.current) return
+    sendingRef.current = true
+    requestVersion.current++
+    onDraftChange(previous => ({ ...previous, sending: true }))
     try {
       const updated = await supportApi.addMessage(ticketUuid, reply.trim(), {
         isInternalNote: isInternalNote,
       })
+      requestVersion.current++
       setTicket(updated)
-      setReply('')
-      setIsInternalNote(false)
+      onDraftChange(previous => ({ ...previous, reply: previous.reply === reply ? '' : previous.reply, internal: previous.reply === reply ? false : previous.internal }))
     } catch {
       toast('Failed to send message', 'error')
     } finally {
-      setSending(false)
+      sendingRef.current = false
+      onDraftChange(previous => ({ ...previous, sending: false }))
     }
   }
 
-  const handleStatusChange = async (newStatus: string) => {
+  const changeMetadata = async (updates: Parameters<typeof supportApi.updateTicket>[1], failure: string) => {
+    if (changingRef.current) return
+    changingRef.current = true
+    setChanging(true)
+    requestVersion.current++
     try {
-      const updated = await supportApi.updateTicket(ticketUuid, { status: newStatus })
+      const updated = await supportApi.updateTicket(ticketUuid, updates)
+      requestVersion.current++
       setTicket(updated)
-    } catch {
-      toast('Failed to update status', 'error')
-    }
+    } catch { toast(failure, 'error') }
+    finally { changingRef.current = false; setChanging(false) }
   }
-
-  const handlePriorityChange = async (newPriority: string) => {
-    try {
-      const updated = await supportApi.updateTicket(ticketUuid, { priority: newPriority })
-      setTicket(updated)
-    } catch {
-      toast('Failed to update priority', 'error')
-    }
-  }
-
-  const handleClassificationChange = async (newClassification: string) => {
-    try {
-      const updated = await supportApi.updateTicket(ticketUuid, { classification: newClassification })
-      setTicket(updated)
-    } catch {
-      toast('Failed to update type', 'error')
-    }
-  }
+  const handleStatusChange = (status: string) => changeMetadata({ status }, 'Failed to update status')
+  const handlePriorityChange = (priority: string) => changeMetadata({ priority }, 'Failed to update priority')
+  const handleClassificationChange = (classification: string) => changeMetadata({ classification }, 'Failed to update type')
 
   const startEdit = (msg: { uuid: string; content: string }) => {
     setEditingMessageUuid(msg.uuid)
@@ -1170,17 +1186,20 @@ function ChatView({
   }
 
   const saveEdit = async () => {
-    if (!editingMessageUuid) return
+    if (!editingMessageUuid || editingRef.current) return
     const trimmed = editDraft.trim()
     if (!trimmed) return
+    editingRef.current = true
     setSavingEdit(true)
     try {
       const updated = await supportApi.editMessage(ticketUuid, editingMessageUuid, trimmed)
+      requestVersion.current++
       setTicket(updated)
       cancelEdit()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not save edit', 'error')
     } finally {
+      editingRef.current = false
       setSavingEdit(false)
     }
   }
@@ -1194,6 +1213,7 @@ function ChatView({
     }))) return
     try {
       const updated = await supportApi.deleteMessage(ticketUuid, messageUuid)
+      requestVersion.current++
       setTicket(updated)
       toast('Message deleted', 'success')
     } catch (err) {
@@ -1208,44 +1228,54 @@ function ChatView({
   }
 
   const saveSubject = async () => {
-    if (!ticket) return
+    if (!ticket || subjectSavingRef.current) return
     const trimmed = subjectDraft.trim()
     if (!trimmed || trimmed === ticket.subject) {
       setEditingSubject(false)
       return
     }
+    subjectSavingRef.current = true
     setSavingSubject(true)
     try {
       const updated = await supportApi.updateTicket(ticketUuid, { subject: trimmed })
+      requestVersion.current++
       setTicket(updated)
       setEditingSubject(false)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not update subject', 'error')
     } finally {
+      subjectSavingRef.current = false
       setSavingSubject(false)
     }
   }
 
+  const uploadFiles = async (accepted: File[]) => {
+    if (uploading || uploadingRef.current || !accepted.length) return
+    uploadingRef.current = true
+    requestVersion.current++
+    onDraftChange(previous => ({ ...previous, files: accepted, uploading: true }))
+    try {
+      const updated = await supportApi.addAttachment(ticketUuid, accepted)
+      requestVersion.current++
+      setTicket(updated)
+      onDraftChange(previous => ({ ...previous, files: previous.files?.filter(file => !accepted.includes(file)) }))
+      toast(accepted.length === 1 ? 'File attached' : `${accepted.length} files attached`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Upload failed. Retry the retained files.', 'error')
+    } finally {
+      uploadingRef.current = false
+      onDraftChange(previous => ({ ...previous, uploading: false }))
+    }
+  }
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? [])
     if (fileInputRef.current) fileInputRef.current.value = ''
-    if (picked.length === 0) return
-    const accepted: File[] = []
-    for (const f of picked) {
-      if (f.size > MAX_BYTES) { toast(`${f.name} is over 10MB`, 'error'); continue }
-      accepted.push(f)
-    }
-    if (accepted.length === 0) return
-    try {
-      const updated = await supportApi.addAttachment(ticketUuid, accepted)
-      setTicket(updated)
-      toast(
-        accepted.length === 1 ? 'File attached' : `${accepted.length} files attached`,
-        'success',
-      )
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Upload failed', 'error')
-    }
+    const accepted = picked.filter(file => {
+      if (file.size <= MAX_BYTES) return true
+      toast(`${file.name} is over 10MB`, 'error')
+      return false
+    })
+    if (accepted.length) await uploadFiles([...pendingFiles, ...accepted])
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
@@ -1261,6 +1291,7 @@ function ChatView({
     }))) return
     try {
       const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
+      requestVersion.current++
       setTicket(updated)
       toast('Attachment removed', 'success')
     } catch (err) {
@@ -1268,9 +1299,9 @@ function ChatView({
     }
   }
 
-  if (loading) {
+  if (loading && !ticket) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)' }}>
         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading ticket...
       </div>
     )
@@ -1278,8 +1309,9 @@ function ChatView({
 
   if (!ticket) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
-        Ticket not found.
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--ui-text-muted, #59616b)' }}>
+        <p role="alert">{loadError || 'Ticket is unavailable.'}</p>
+        <button type="button" onClick={() => loadTicket()} className="admin-open-record">Retry ticket</button>
         <div style={{ marginTop: 12 }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer' }}>
             Back
@@ -1290,7 +1322,8 @@ function ChatView({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900, minWidth: 0, overflowWrap: 'anywhere' }}>
+      {loadError && <div><p role="alert">Could not refresh this ticket. Showing the last loaded messages. {loadError}</p><button type="button" onClick={() => loadTicket(true)} className="admin-open-record">Retry ticket</button></div>}
       <button
         onClick={onBack}
         style={{
@@ -1312,7 +1345,7 @@ function ChatView({
                   <span
                     style={{
                       fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                      color: '#6b7280',
+                      color: '#59616b',
                     }}
                   >
                     #{ticket.ticket_number}
@@ -1343,7 +1376,7 @@ function ChatView({
                     <span
                       style={{
                         fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        color: '#6b7280', marginRight: 8,
+                        color: '#59616b', marginRight: 8,
                       }}
                     >
                       #{ticket.ticket_number}
@@ -1359,7 +1392,7 @@ function ChatView({
                     title="Edit subject"
                     style={{
                       display: 'inline-flex', alignItems: 'center', padding: 4,
-                      border: 'none', background: 'transparent', color: '#9ca3af', cursor: 'pointer',
+                      border: 'none', background: 'transparent', color: 'var(--ui-text-muted, #59616b)', cursor: 'pointer',
                     }}
                   >
                     <Pencil size={14} />
@@ -1367,13 +1400,13 @@ function ChatView({
                 )}
               </div>
             )}
-            <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: '#59616b', marginTop: 4 }}>
               {ticket.user_name || ticket.user_id}
               {ticket.user_email ? ` (${ticket.user_email})` : ''}
               {' · opened '}{timeAgo(ticket.created_at)}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             <button
               onClick={async () => {
                 const url = `${window.location.origin}/support?ticket=${ticketUuid}`
@@ -1397,7 +1430,8 @@ function ChatView({
             <select
               value={ticket.priority}
               onChange={(e) => handlePriorityChange(e.target.value)}
-              aria-label="Change ticket priority"
+              disabled={changing}
+                aria-label="Change ticket priority"
               title="Priority"
               style={{
                 fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)',
@@ -1412,12 +1446,13 @@ function ChatView({
             <select
               value={ticket.classification ?? ''}
               onChange={(e) => handleClassificationChange(e.target.value)}
-              aria-label="Change ticket type"
+              disabled={changing}
+                aria-label="Change ticket type"
               title="Type"
               style={{
                 fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)',
                 border: '1px solid #d1d5db', fontFamily: 'inherit',
-                color: ticket.classification ? CLASSIFICATION_COLORS[ticket.classification] : '#6b7280',
+                color: ticket.classification ? CLASSIFICATION_COLORS[ticket.classification] : '#59616b',
                 fontWeight: 600,
               }}
             >
@@ -1438,6 +1473,7 @@ function ChatView({
               <select
                 value={ticket.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={changing}
                 aria-label="Change ticket status"
                 style={{ fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontFamily: 'inherit' }}
               >
@@ -1448,6 +1484,7 @@ function ChatView({
             ) : (
               <button
                 onClick={() => handleStatusChange('open')}
+                disabled={changing}
                 style={{
                   fontSize: 12, padding: '4px 10px', borderRadius: 'var(--ui-radius, 12px)',
                   border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
@@ -1459,13 +1496,18 @@ function ChatView({
           </div>
         </div>
 
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '10px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
+          <span>{ticket.assigned_to === user?.user_id ? 'Assigned to you' : ticket.assigned_to ? `Assigned agent: ${ticket.assigned_to}` : 'Unassigned'}</span>
+          {ticket.assigned_to === user?.user_id ? <button type="button" disabled={changing} onClick={() => changeMetadata({ assigned_to: '' }, 'Could not release assignment')} className="admin-open-record">Release assignment</button> : !ticket.assigned_to && user?.user_id ? <button type="button" disabled={changing} onClick={() => changeMetadata({ assigned_to: user.user_id }, 'Could not assign ticket')} className="admin-open-record">Assign to me</button> : null}
+        </div>
         {/* Tag editor — internal-only; ticket owner never sees these */}
         <TagEditor
           tags={ticket.tags ?? []}
           onChange={async (next) => {
             try {
               const updated = await supportApi.updateTicket(ticketUuid, { tags: next })
-              setTicket(updated)
+              requestVersion.current++
+      setTicket(updated)
             } catch {
               toast('Failed to update tags', 'error')
             }
@@ -1473,7 +1515,7 @@ function ChatView({
         />
 
         {/* Watchers — tagged users who follow the ticket. Visible to all parties. */}
-        <WatcherBar ticket={ticket} onChange={setTicket} />
+        <WatcherBar ticket={ticket} onChange={updated => { requestVersion.current++; setTicket(updated) }} />
 
         {/* Messages — agent on right (blue, "Support" label), customer on left */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 520, overflowY: 'auto' }}>
@@ -1496,7 +1538,7 @@ function ChatView({
             const bubbleMaxWidth = isInternal ? '100%' : '85%'
             const labelColor = isInternal
               ? '#92400e'
-              : (isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280')
+              : (isSupport ? '#fff' : '#59616b')
             return (
               <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: bubbleAlign }}>
                 <div style={{
@@ -1508,7 +1550,7 @@ function ChatView({
                   {isInternal && (
                     <div
                       style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
                         gap: 8, marginBottom: 6, paddingBottom: 6,
                         borderBottom: '1px dashed #ca8a04',
                       }}
@@ -1530,7 +1572,7 @@ function ChatView({
                   )}
                   <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: labelColor, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>{m.user_name || m.user_id}</span>
-                    {isSupport && !isInternal && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
+                    {isSupport && !isInternal && <span style={{ fontSize: 12, fontWeight: 500 }}>Support</span>}
                   </div>
                   {isEditing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1554,7 +1596,7 @@ function ChatView({
                           fontSize: 14, padding: '6px 8px', borderRadius: 6,
                           border: '1px solid rgba(0,0,0,0.1)', resize: 'vertical',
                           background: isInternal ? '#fff' : (isSupport ? 'rgba(255,255,255,0.95)' : '#fff'),
-                          color: '#111827', fontFamily: 'inherit', minWidth: 280,
+                          color: '#111827', fontFamily: 'inherit', minWidth: 0, width: '100%',
                         }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
@@ -1565,7 +1607,7 @@ function ChatView({
                             padding: '2px 8px', fontSize: 11, fontWeight: 600,
                             borderRadius: 6, border: 'none', cursor: 'pointer',
                             background: 'transparent',
-                            color: isInternal ? '#92400e' : (isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280'),
+                            color: isInternal ? '#92400e' : (isSupport ? '#fff' : '#59616b'),
                             opacity: savingEdit ? 0.5 : 1,
                           }}
                         >
@@ -1578,7 +1620,7 @@ function ChatView({
                             display: 'inline-flex', alignItems: 'center', gap: 3,
                             padding: '2px 10px', fontSize: 11, fontWeight: 600,
                             borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: isInternal ? '#ca8a04' : (isSupport ? 'rgba(255,255,255,0.25)' : '#2563eb'),
+                            background: isInternal ? '#92400e' : (isSupport ? '#1e40af' : '#2563eb'),
                             color: '#fff',
                             opacity: (savingEdit || !editDraft.trim()) ? 0.5 : 1,
                           }}
@@ -1595,7 +1637,7 @@ function ChatView({
                   ) : (
                     <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
                   )}
-                  <div style={{ fontSize: 10, marginTop: 4, color: isInternal ? '#a16207' : (isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af') }}>
+                  <div style={{ fontSize: 12, marginTop: 4, color: isInternal ? '#a16207' : (isSupport ? '#fff' : 'var(--ui-text-muted, #59616b)') }}>
                     {timeAgo(m.created_at)}
                     {m.edited_at && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(edited)</span>}
                   </div>
@@ -1608,12 +1650,12 @@ function ChatView({
                         title="Edit message"
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 3,
-                          padding: '2px 6px', fontSize: 11, color: '#9ca3af',
+                          padding: '2px 6px', fontSize: 11, color: 'var(--ui-text-muted, #59616b)',
                           background: 'transparent', border: 'none', cursor: 'pointer',
                           borderRadius: 4, fontFamily: 'inherit',
                         }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--ui-text-muted, #59616b)' }}
                       >
                         <Pencil size={10} /> Edit
                       </button>
@@ -1624,12 +1666,12 @@ function ChatView({
                         title="Delete message"
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 3,
-                          padding: '2px 6px', fontSize: 11, color: '#9ca3af',
+                          padding: '2px 6px', fontSize: 11, color: 'var(--ui-text-muted, #59616b)',
                           background: 'transparent', border: 'none', cursor: 'pointer',
                           borderRadius: 4, fontFamily: 'inherit',
                         }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--ui-text-muted, #59616b)' }}
                       >
                         <Trash2 size={10} /> Delete
                       </button>
@@ -1674,6 +1716,7 @@ function ChatView({
           <div ref={messagesEndRef} />
         </div>
 
+        {pendingFiles.length > 0 && <div style={{ padding: '12px 20px', fontSize: 13 }}><p role="status">{uploading ? 'Uploading' : 'Files awaiting upload'}: {pendingFiles.map(file => file.name).join(', ')}</p><p>Ticket attachments are visible to the requester, including when you are drafting an internal note.</p><button type="button" disabled={uploading} onClick={() => uploadFiles(pendingFiles)}>Retry attachments</button></div>}
         {/* Reply input */}
         {ticket.status !== 'closed' ? (
           <div style={{
@@ -1682,10 +1725,11 @@ function ChatView({
             background: isInternalNote ? '#fef9c3' : undefined,
             transition: 'background 120ms ease',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <button
                 type="button"
-                onClick={() => setIsInternalNote((v) => !v)}
+                disabled={sending}
+                onClick={() => setIsInternalNote(!isInternalNote)}
                 title={isInternalNote
                   ? 'This will only be visible to other support agents'
                   : 'Switch to an internal note: visible only to support agents'}
@@ -1694,7 +1738,7 @@ function ChatView({
                   padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
                   border: isInternalNote ? '1px solid #ca8a04' : '1px solid #d1d5db',
                   background: isInternalNote ? '#fde68a' : '#fff',
-                  color: isInternalNote ? '#78350f' : '#6b7280',
+                  color: isInternalNote ? '#78350f' : '#59616b',
                   fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                 }}
               >
@@ -1707,19 +1751,21 @@ function ChatView({
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div className="support-reply-composer">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="Attach file"
+                disabled={uploading}
+                title="Attach file — visible to the requester"
                 aria-label="Attach file"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#59616b', padding: 4 }}
               >
                 <Paperclip size={16} />
               </button>
-              <input ref={fileInputRef} type="file" multiple aria-label="Upload files" onChange={handleFileUpload} style={{ display: 'none' }} />
+              <input ref={fileInputRef} type="file" multiple aria-label="Upload files" disabled={uploading} onChange={handleFileUpload} style={{ display: 'none' }} />
               <textarea
                 ref={replyRef}
+                disabled={sending}
                 aria-label={isInternalNote ? 'Internal note' : 'Reply'}
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
@@ -1727,7 +1773,7 @@ function ChatView({
                 placeholder={isInternalNote ? 'Leave a note for other agents...' : 'Reply as support...'}
                 rows={1}
                 style={{
-                  flex: 1, padding: '8px 12px', fontSize: 14,
+                  flex: 1, minWidth: 0, padding: '8px 12px', fontSize: 14,
                   border: isInternalNote ? '1px solid #ca8a04' : '1px solid #d1d5db',
                   borderRadius: 'var(--ui-radius, 12px)', outline: 'none',
                   background: '#fff',
@@ -1741,7 +1787,7 @@ function ChatView({
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '8px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                  background: isInternalNote ? '#ca8a04' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
+                  background: isInternalNote ? '#92400e' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
                   cursor: reply.trim() && !sending ? 'pointer' : 'not-allowed',
                   opacity: sending ? 0.6 : 1,
                 }}
@@ -1752,13 +1798,13 @@ function ChatView({
             </div>
           </div>
         ) : (
-          <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
+          <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#59616b', textAlign: 'center' }}>
             This ticket is closed. Reopen to send a reply.
           </div>
         )}
 
         {previewAttachment && (
-          <div
+          <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true }}><div role="dialog" aria-modal="true" aria-label={`Attachment: ${previewAttachment.filename}`} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setPreviewAttachment(null) } }}
             onClick={() => setPreviewAttachment(null)}
             style={{
               position: 'fixed', inset: 0, zIndex: 100,
@@ -1768,6 +1814,7 @@ function ChatView({
             <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '95%', maxHeight: '90%' }}>
               <button
                 onClick={() => setPreviewAttachment(null)}
+                aria-label="Close attachment preview"
                 style={{
                   position: 'absolute', top: -8, right: -8, padding: 6,
                   borderRadius: '50%', border: 'none', background: '#fff', cursor: 'pointer',
@@ -1785,7 +1832,7 @@ function ChatView({
                 {previewAttachment.filename}
               </div>
             </div>
-          </div>
+          </div></FocusTrap>
         )}
       </div>
     </div>
@@ -1808,16 +1855,16 @@ function AttachmentChip({
   const removeButton = onDelete && (
     <button
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete() }}
-      title="Remove attachment"
+      title="Remove attachment" aria-label={`Remove attachment ${a.filename}`}
       style={{
         position: 'absolute', top: -6, right: -6,
-        width: 20, height: 20, padding: 0, borderRadius: '50%',
-        border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280',
+        width: 24, height: 24, padding: 0, borderRadius: '50%',
+        border: '1px solid #e5e7eb', background: '#fff', color: '#59616b',
         cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
       }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#59616b' }}
     >
       <X size={11} />
     </button>
@@ -1879,11 +1926,13 @@ function WatcherBar({
   const [adding, setAdding] = useState(false)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const watchers = ticket.watchers ?? []
 
   const submit = async () => {
     const trimmed = email.trim()
-    if (!trimmed || busy) return
+    if (!trimmed || busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     try {
       const updated = await supportApi.addWatcher(ticket.uuid, trimmed)
@@ -1894,17 +1943,20 @@ function WatcherBar({
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not add watcher', 'error')
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   const remove = async (userId: string) => {
+    if (busyRef.current) return
+    busyRef.current = true; setBusy(true)
     try {
       const updated = await supportApi.removeWatcher(ticket.uuid, userId)
       onChange(updated)
     } catch {
       toast('Could not remove watcher', 'error')
-    }
+    } finally { busyRef.current = false; setBusy(false) }
   }
 
   return (
@@ -1912,12 +1964,12 @@ function WatcherBar({
       padding: '8px 20px', borderBottom: '1px solid #e5e7eb', background: '#fafafa',
       display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
     }}>
-      <Eye size={12} color="#6b7280" />
-      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginRight: 4 }}>
+      <Eye size={12} color="#59616b" />
+      <span style={{ fontSize: 11, color: '#59616b', fontWeight: 600, marginRight: 4 }}>
         Watchers
       </span>
       {watchers.length === 0 && !adding && (
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>None</span>
+        <span style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)' }}>None</span>
       )}
       {watchers.map((w) => (
         <span
@@ -1932,10 +1984,10 @@ function WatcherBar({
           {w.name}
           <button
             onClick={() => remove(w.user_id)}
-            title={`Remove ${w.name}`}
+            title={`Remove ${w.name}`} aria-label={`Remove watcher ${w.name}`} disabled={busy}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 16, height: 16, padding: 0, border: 'none', background: 'none',
+              width: 24, height: 24, padding: 0, border: 'none', background: 'none',
               color: '#4338ca', cursor: 'pointer', borderRadius: 9999,
             }}
           >
@@ -1944,11 +1996,10 @@ function WatcherBar({
         </span>
       ))}
       {adding ? (
-        <input
+        <><input
           autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => { if (!busy) { setEmail(''); setAdding(false) } }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); submit() }
             if (e.key === 'Escape') { setEmail(''); setAdding(false) }
@@ -1959,16 +2010,16 @@ function WatcherBar({
           disabled={busy}
           style={{
             fontSize: 12, padding: '2px 8px', border: '1px solid #d1d5db',
-            borderRadius: 9999, outline: 'none', minWidth: 160, fontFamily: 'inherit',
+            borderRadius: 9999, outline: 'none', minWidth: 0, maxWidth: '100%', flex: '1 1 180px', fontFamily: 'inherit',
           }}
-        />
+        /><button type="button" disabled={busy || !email.trim()} onClick={submit} className="admin-open-record">Add watcher</button><button type="button" disabled={busy} onClick={() => { setEmail(''); setAdding(false) }}>Cancel</button></>
       ) : (
         <button
           onClick={() => setAdding(true)}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             fontSize: 12, padding: '2px 8px', borderRadius: 9999,
-            border: '1px dashed #d1d5db', background: 'transparent', color: '#6b7280',
+            border: '1px dashed #d1d5db', background: 'transparent', color: '#59616b',
             cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
@@ -2045,12 +2096,12 @@ export function TagEditor({
       padding: '8px 20px', borderBottom: '1px solid #e5e7eb', background: '#fafafa',
       display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
     }}>
-      <Tag size={12} color="#6b7280" />
-      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginRight: 4 }}>
+      <Tag size={12} color="#59616b" />
+      <span style={{ fontSize: 11, color: '#59616b', fontWeight: 600, marginRight: 4 }}>
         Tags
       </span>
       {tags.length === 0 && !adding && (
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>None</span>
+        <span style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)' }}>None</span>
       )}
       {tags.map((t) => (
         <span
@@ -2120,12 +2171,12 @@ export function TagEditor({
             }}
           >
             {knownTags === null && (
-              <div style={{ fontSize: 12, color: '#9ca3af', padding: '6px 8px' }}>
+              <div style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)', padding: '6px 8px' }}>
                 Loading tags…
               </div>
             )}
             {knownTags !== null && options.length === 0 && (
-              <div style={{ fontSize: 12, color: '#9ca3af', padding: '6px 8px' }}>
+              <div style={{ fontSize: 12, color: 'var(--ui-text-muted, #59616b)', padding: '6px 8px' }}>
                 {query ? 'Already tagged' : 'No existing tags — type to create one'}
               </div>
             )}
@@ -2166,7 +2217,7 @@ export function TagEditor({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
             fontSize: 12, padding: '2px 8px', borderRadius: 9999,
-            border: '1px dashed #d1d5db', background: 'transparent', color: '#6b7280',
+            border: '1px dashed #d1d5db', background: 'transparent', color: '#59616b',
             cursor: 'pointer', fontFamily: 'inherit',
           }}
         >

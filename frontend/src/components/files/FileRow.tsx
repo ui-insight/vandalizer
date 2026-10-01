@@ -1,3 +1,4 @@
+import { documentReadinessMessage } from '../../utils/documentReadiness'
 import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
@@ -165,6 +166,11 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
                 </span>
               )}
             </span>
+            {!stillProcessing && (!doc.valid || doc.task_status === 'error' || doc.ingest_error || doc.extraction_low_quality || doc.ingestion_warning_text) && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.4, color: '#92400e', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+                {documentReadinessMessage(doc)}
+              </p>
+            )}
             {snippet && (
               <span
                 style={{

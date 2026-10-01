@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -8,9 +8,12 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const submitting = useRef(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting.current) return
+    submitting.current = true
     setError('')
     setLoading(true)
     try {
@@ -18,6 +21,7 @@ export function LoginForm() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
+      submitting.current = false
       setLoading(false)
     }
   }
@@ -40,6 +44,7 @@ export function LoginForm() {
         autoComplete="username"
         placeholder="Email"
         required
+        disabled={loading}
         aria-invalid={!!error}
         aria-describedby={error ? 'login-error' : undefined}
         value={userId}
@@ -53,6 +58,7 @@ export function LoginForm() {
         autoComplete="current-password"
         placeholder="Password"
         required
+        disabled={loading}
         aria-invalid={!!error}
         aria-describedby={error ? 'login-error' : undefined}
         value={password}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MessageSquare, Search, Zap, CheckCircle2, XCircle, Users, AlertCircle,
 } from 'lucide-react'
@@ -21,17 +21,20 @@ export function UsageTab() {
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadedDays, setLoadedDays] = useState<number | null>(null)
+  const requestVersion = useRef(0)
 
   const load = useCallback(() => {
+    const version = ++requestVersion.current
     setLoading(true)
     setError(null)
     Promise.all([getUsageStats(days), getUsageTimeseries(days)])
-      .then(([s, ts]) => { setStats(s); setTimeseries(ts) })
-      .catch(e => setError(e?.message || 'Failed to load usage data'))
-      .finally(() => setLoading(false))
+      .then(([s, ts]) => { if (version === requestVersion.current) { setStats(s); setTimeseries(ts); setLoadedDays(days) } })
+      .catch(e => { if (version === requestVersion.current) setError(e?.message || 'Failed to load usage data') })
+      .finally(() => { if (version === requestVersion.current) setLoading(false) })
   }, [days])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); const requests = requestVersion; return () => { requests.current++ } }, [load])
 
   const prev = timeseries?.previous_period
 
@@ -49,7 +52,7 @@ export function UsageTab() {
   ].filter(d => d.value > 0) : []
 
   const handleExport = () => {
-    if (!stats) return
+    if (!stats || loading || error || loadedDays !== days) return
     const dayRows = (timeseries?.days ?? []).map(d => [
       d.date, d.conversations, d.search_runs, d.workflows_started,
       d.workflows_completed, d.workflows_failed, d.tokens_in, d.tokens_out, d.active_users,
@@ -81,7 +84,8 @@ export function UsageTab() {
   if (error && !stats) return (
     <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
       <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
-      <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+      <div role="alert" style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+      <button type="button" onClick={load} style={{ marginTop: 12, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6 }}>Retry usage data</button>
     </div>
   )
 
@@ -91,13 +95,16 @@ export function UsageTab() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />
         <div style={{ flex: 1 }} />
-        <ExportButton onClick={handleExport} />
+        <ExportButton onClick={handleExport} disabled={loading || !!error || loadedDays !== days} />
       </div>
 
+      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#59616b' }}>Use this view to understand activity and investigate workflow failures. Completed means execution finished; it does not establish correct output or a successful submission. Tokens measure model input and output volume, not money or time saved. Return to the <a href="/" style={{ textDecoration: 'underline' }}>workspace</a> and open Activity to inspect your runs; team-level configuration is under Workflows.</p>
+      {loading && stats && <p role="status" style={{ margin: 0, fontSize: 13, color: '#59616b' }}>Loading the selected range. Showing the last loaded {loadedDays}-day window until it is ready.</p>}
+      {error && stats && <p role="alert" style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>Could not load the selected range: {error}. Values below are from the last loaded {loadedDays}-day window. Use Refresh to retry.</p>}
       {stats && (
         <>
           {/* KPI Grid with trend deltas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="admin-metrics-grid">
             <KpiCard label="Conversations" value={formatNumber(stats.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: stats.conversations, previous: prev.conversations } : undefined} />
             <KpiCard label="Search Runs" value={formatNumber(stats.search_runs)} icon={Search} color="#8b5cf6" trend={prev ? { current: stats.search_runs, previous: prev.search_runs } : undefined} />
             <KpiCard label="Workflows Started" value={formatNumber(stats.workflows_started)} icon={Zap} color="#f59e0b" trend={prev ? { current: stats.workflows_started, previous: prev.workflows_started } : undefined} />
@@ -113,8 +120,8 @@ export function UsageTab() {
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={timeseries.days}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ui-text-muted, #59616b)' }} tickFormatter={v => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--ui-text-muted, #59616b)' }} width={50} />
                   <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
                   <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
                   <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
@@ -124,8 +131,9 @@ export function UsageTab() {
             </div>
           )}
 
+          {timeseries?.days.length === 0 && <p style={{ margin: 0, fontSize: 13, color: '#59616b' }}>No daily records were returned for this window. The summary above is shown separately.</p>}
           {/* Token + Workflow donut charts side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="admin-chart-grid">
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Token Breakdown</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 16 }}>
@@ -153,16 +161,17 @@ export function UsageTab() {
 
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Workflow Status</div>
+              <p style={{ fontSize: 12, lineHeight: 1.5, color: '#59616b', margin: '0 0 12px' }}>Completion rate is completed runs divided by started runs in this window. Other includes runs without a completed or failed state.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Success Rate</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Completion Rate</div>
                   <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
                     {stats.workflows_started > 0 ? `${Math.round((stats.workflows_completed / stats.workflows_started) * 100)}%` : '-'}
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Total</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_in + stats.tokens_out)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.workflows_started)}</div>
                 </div>
               </div>
               {workflowDonut.length > 0 && (
@@ -180,22 +189,22 @@ export function UsageTab() {
           </div>
 
           {/* Summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="admin-chart-grid">
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Active Teams</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_teams}</div>
+                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-on-light, #806600)' }}>{stats.active_teams}</div>
                 {prev && <TrendDelta current={stats.active_teams} previous={prev.active_teams} />}
               </div>
-              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {days} days</div>
+              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {loadedDays ?? days} days</div>
             </div>
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Active Users</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_users}</div>
+                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-on-light, #806600)' }}>{stats.active_users}</div>
                 {prev && <TrendDelta current={stats.active_users} previous={prev.active_users} />}
               </div>
-              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {days} days</div>
+              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {loadedDays ?? days} days</div>
             </div>
           </div>
         </>

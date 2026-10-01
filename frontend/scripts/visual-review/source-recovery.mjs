@@ -39,7 +39,7 @@ await page.route('**/api/knowledge/kb-1/source/*/*', async route => {
 })
 async function open() {
   await page.goto(review.baseURL + '/?mode=knowledge')
-  await page.getByRole('button', { name: 'Edit', exact: true }).first().click()
+  await page.getByRole('button', { name: kb.title, exact: true }).click()
   await page.getByRole('tab', { name: /Sources \(/ }).waitFor()
 }
 async function shot(id, locator) {

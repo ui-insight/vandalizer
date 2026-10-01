@@ -1,3 +1,4 @@
+import { InputReadinessNotice } from './InputReadinessNotice'
 import { RetainedPanel } from '../shared/PanelVisibility'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { fitPanelSplit, panelSplitBounds, readCompactPanelChoices, saveCompactPanelChoices } from '../../utils/workspaceLayout'
@@ -30,6 +31,13 @@ export function WorkspaceLayout() {
   const [activityOpen, setActivityOpen] = useState(false)
   const activityNavigating = useRef(false)
   const openActivity = () => { activityNavigating.current = false; setActivityOpen(true) }
+  useEffect(() => {
+    if (activityOpen || !activityNavigating.current) return
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[aria-label="Tools and assistant"]')?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [activityOpen])
   const [panelChoices, setPanelChoices] = useState(readCompactPanelChoices)
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
   const choosePanel = useCallback((mode: string, panel: 'source' | 'tools') => {
@@ -117,7 +125,7 @@ export function WorkspaceLayout() {
   const autoDockRail = !isCompact && viewportWidth < 1100
   const drawerOpen = (isCompact || autoDockRail) && activityOpen
   const railWidth = isCompact ? 0 : railDocked || autoDockRail ? 64 : 220
-  const availableWidth = Math.max(1, viewportWidth - 48 - railWidth - 6)
+  const availableWidth = Math.max(1, viewportWidth - 88 - railWidth - 6)
   const visibleSplit = fitPanelSplit(panelSplit, availableWidth)
   const splitBounds = panelSplitBounds(availableWidth)
   useEffect(() => { setActivityOpen(false) }, [isCompact, autoDockRail])
@@ -198,7 +206,8 @@ export function WorkspaceLayout() {
             />
           )}
 
-          <div role="region" aria-label="Tools and assistant" className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
+          <div role="region" tabIndex={-1} aria-label="Tools and assistant" className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
+            <InputReadinessNotice />
             <div style={{ flex: 1, minHeight: 0 }}><RetainedPanel eager active={!showLeftOnly}><RightPanel hideTabs={isCompact && !isChat} /></RetainedPanel></div>
           </div>
           </div>
@@ -211,7 +220,7 @@ export function WorkspaceLayout() {
             onClick={() => setActivityOpen(false)}
           />
         )}
-        <FocusTrap active={drawerOpen} focusTrapOptions={{ initialFocus: '#close-workspace-activity', escapeDeactivates: false, allowOutsideClick: true, setReturnFocus: node => activityNavigating.current ? false : node, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
+        <FocusTrap active={drawerOpen} focusTrapOptions={{ initialFocus: () => document.querySelector<HTMLElement>('[data-activity-return="true"]') ?? document.getElementById('close-workspace-activity')!, escapeDeactivates: false, allowOutsideClick: true, setReturnFocus: node => activityNavigating.current ? false : node, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
         <div
           aria-label={drawerOpen ? 'Activity' : undefined}
           aria-modal={drawerOpen || undefined}

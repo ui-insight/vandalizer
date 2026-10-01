@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, Workflow, FileSearch, Zap, BookOpen, X, Search } from 'lucide-react'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
-import { listProjectPins, addProjectPin, removeProjectPin } from '../../api/projects'
+import { useProjectPins } from '../../hooks/useProjectPins'
 import type { ProjectPin } from '../../types/project'
 
 const TYPE_META: Record<string, { icon: ComponentType<{ size?: number; className?: string }>; label: string }> = {
@@ -43,30 +43,25 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   const { searchSets } = useSearchSets()
   const { automations } = useAutomations()
   const { knowledgeBases } = useKnowledgeBases()
-  const [pins, setPins] = useState<ProjectPin[]>([])
+  const projectPins = useProjectPins(projectUuid)
+  const { pins, loading, error, refresh } = projectPins
   const [adding, setAdding] = useState(false)
-
-  const load = useCallback(() => {
-    listProjectPins(projectUuid).then(setPins).catch(() => {})
-  }, [projectUuid])
-  useEffect(() => { load() }, [load])
-
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const pinnedSet = new Set(pins.map(key))
-
   const pin = async (pinType: string, targetId: string) => {
-    try {
-      await addProjectPin(projectUuid, { pin_type: pinType, target_id: targetId })
-      load()
-      onChange?.()
-    } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setMutationError(null)
+    try { await projectPins.pin(pinType, targetId); onChange?.() }
+    catch (error) { setMutationError(error instanceof Error ? error.message : 'Could not pin this tool. Try again.') }
+    finally { setPending(false) }
   }
-
   const unpin = async (p: ProjectPin) => {
-    try {
-      await removeProjectPin(projectUuid, p.pin_type, p.target_id)
-      load()
-      onChange?.()
-    } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setMutationError(null)
+    try { await projectPins.unpin(p.pin_type, p.target_id); onChange?.() }
+    catch (error) { setMutationError(error instanceof Error ? error.message : 'Could not unpin this tool. Try again.') }
+    finally { setPending(false) }
   }
 
   const open = (p: ProjectPin) => {
@@ -94,6 +89,8 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
         </button>
       </div>
 
+      {mutationError && <p role="alert" className="mb-3 text-sm text-red-800">{mutationError}</p>}
+      {pending && <p role="status" className="mb-3 text-sm text-gray-600">Updating pinned tools…</p>}
       {adding && (
         <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
           <label className="mb-3 flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1.5 text-sm focus-within:border-highlight">
@@ -117,7 +114,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
         </div>
       )}
 
-      {pins.length === 0 ? (
+      {loading ? <p role="status" className="text-sm text-gray-600">Loading pinned tools…</p> : error ? <p role="alert" className="text-sm text-red-800">{error} <button type="button" className="underline" onClick={() => void refresh()}>Retry pins</button></p> : pins.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
           No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
@@ -133,7 +130,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
                   <div className="truncate text-sm font-medium text-gray-900">{p.name}</div>
                   <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
-                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label="Unpin" className="p-1 text-gray-500 hover:text-red-500">
+                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label={`Unpin ${p.name}`} disabled={pending} className="p-1 text-gray-500 hover:text-red-500">
                   <X size={14} />
                 </button>
               </div>

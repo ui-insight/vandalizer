@@ -328,6 +328,14 @@ export function KBValidationRunTab({
             </div>
           )}
 
+          <section aria-label="Validation review summary" style={{ padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
+            <strong>What to review</strong>
+            <p>{latestRun.num_test_queries} questions checked against {latestRun.num_sources} recorded sources. Recorded verdicts: {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'FAIL').length} failed, {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'WARN').length} need review, {latestRun.retrieval_precision.details.filter(detail => !detail.judge || detail.judge.verdict === 'SKIPPED').length} ungraded.</p>
+            <p>Open the question rows below to compare saved expected answers, generated answers and the grader’s evidence. Start with failed, warning or ungraded rows; a passing score still needs a source check before use.</p>
+            {latestRun.retrieval_precision.details.some(detail => !detail.expected_answer?.trim()) && <p>Some questions have no saved expected answer. Add a reference answer before treating their scores as evidence of correctness.</p>}
+            <p>This check records results for the tested questions; it does not apply tuning settings.</p>
+          </section>
+
           {/* Certified quality headline — same score as the KB quality tile */}
           <CertifiedQualityCard run={latestRun} />
 

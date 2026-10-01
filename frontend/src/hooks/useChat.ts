@@ -134,7 +134,7 @@ export function useChat() {
       unsupportedFiguresRef.current = []
 
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message }])
+      setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
 
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure

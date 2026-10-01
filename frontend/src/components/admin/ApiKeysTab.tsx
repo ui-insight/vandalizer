@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BookOpen, Copy, Download, KeyRound, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -51,49 +54,32 @@ function StatusBadge({ keyItem }: { keyItem: ApiKeyListItem }) {
 export function ApiKeysTab() {
   const { toast } = useToast()
   const confirm = useConfirm()
-  const [keys, setKeys] = useState<ApiKeyListItem[]>([])
-  const [loading, setLoading] = useState(false)
   const [includeRevoked, setIncludeRevoked] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
   const [showDocs, setShowDocs] = useState(false)
 
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listApiKeys(includeRevoked)
-      setKeys(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load keys')
-    } finally {
-      setLoading(false)
-    }
-  }, [includeRevoked])
-
-  useEffect(() => {
-    void reload()
-  }, [reload])
+  const requestKeys = useCallback(() => listApiKeys(includeRevoked), [includeRevoked])
+  const { data, loading, error, load: reload } = useAdminQuery(requestKeys)
+  const keys = data ?? []
+  const revokingRef = useRef(new Set<string>())
+  const [revoking, setRevoking] = useState<string[]>([])
 
   const handleRevoke = async (keyId: string, name: string) => {
-    if (!(await confirm({
-      title: 'Revoke API key',
-      message: `Revoke API key "${name}"? This is immediate and cannot be undone.`,
-      destructive: true,
-    }))) return
+    if (revokingRef.current.has(keyId)) return
+    revokingRef.current.add(keyId); setRevoking([...revokingRef.current])
     try {
+      if (!await confirm({ title: 'Revoke API key', message: `Revoke API key "${name}"? This is immediate and cannot be undone.`, destructive: true })) return
       await revokeApiKey(keyId)
-      await reload()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Revoke failed', 'error')
-    }
+      reload()
+    } catch (reason) { toast(reason instanceof Error ? reason.message : 'Revoke failed', 'error') }
+    finally { revokingRef.current.delete(keyId); setRevoking([...revokingRef.current]) }
   }
 
   return (
     <div>
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
         marginBottom: 24,
       }}>
         <div>
@@ -103,7 +89,7 @@ export function ApiKeysTab() {
             Mounted under <code>/api/mgmt/v1</code>.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <a
             href={API_KEY_SKILL_DOWNLOAD_URL}
             download="SKILL.md"
@@ -134,7 +120,7 @@ export function ApiKeysTab() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', borderRadius: 6,
-              backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
+              backgroundColor: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
               border: 'none', fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -153,15 +139,15 @@ export function ApiKeysTab() {
       </label>
 
       {error && (
-        <div style={{
+        <div role="alert" style={{
           padding: 12, marginBottom: 16, borderRadius: 6,
           backgroundColor: '#fee2e2', color: '#991b1b', fontSize: 13,
-        }}>{error}</div>
+        }}>{error} <button type="button" onClick={reload} style={{ textDecoration: 'underline' }}>Retry API keys</button></div>
       )}
 
       {loading ? (
         <p style={{ color: '#6b7280' }}>Loading…</p>
-      ) : keys.length === 0 ? (
+      ) : error ? null : keys.length === 0 ? (
         <div style={{
           padding: 32, textAlign: 'center', borderRadius: 6,
           border: '1px dashed #d1d5db', color: '#6b7280',
@@ -170,7 +156,7 @@ export function ApiKeysTab() {
           <p>No API keys yet. Create one to give an external service or agentic tool access.</p>
         </div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+        <TableRegion label="Management API keys"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
               <th scope="col" style={{ padding: 8 }}>Name</th>
@@ -201,7 +187,7 @@ export function ApiKeysTab() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {k.scopes.map(s => (
                       <span key={s} style={{
-                        fontSize: 11, padding: '2px 6px', borderRadius: 4,
+                        fontSize: 12, padding: '2px 6px', borderRadius: 4,
                         backgroundColor: '#f3f4f6', fontFamily: 'monospace',
                       }}>{s}</span>
                     ))}
@@ -212,7 +198,7 @@ export function ApiKeysTab() {
                 <td style={{ padding: 8, color: '#6b7280' }}>
                   {formatDateTime(k.last_used_at)}
                   {k.last_used_ip && (
-                    <div style={{ fontSize: 11, fontFamily: 'monospace' }}>{k.last_used_ip}</div>
+                    <div style={{ fontSize: 12, fontFamily: 'monospace' }}>{k.last_used_ip}</div>
                   )}
                 </td>
                 <td style={{ padding: 8, color: '#6b7280' }}>{formatDateTime(k.expires_at)}</td>
@@ -220,6 +206,7 @@ export function ApiKeysTab() {
                   {!k.revoked_at && (
                     <button
                       type="button"
+                      disabled={revoking.includes(k.id)}
                       onClick={() => handleRevoke(k.id, k.name)}
                       style={{
                         padding: 6, border: 'none', background: 'transparent',
@@ -235,7 +222,7 @@ export function ApiKeysTab() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></TableRegion>
       )}
 
       {showCreate && (
@@ -262,86 +249,20 @@ export function ApiKeysTab() {
 }
 
 function DocsModal({ onClose }: { onClose: () => void }) {
-  const [html, setHtml] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-
+  const { data, loading, error, load } = useAdminQuery(getApiKeyDocs)
+  const contentRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    let cancelled = false
-    getApiKeyDocs()
-      .then(res => {
-        if (cancelled) return
-        const rendered = DOMPurify.sanitize(marked.parse(res.markdown) as string)
-        setHtml(rendered)
-      })
-      .catch(e => {
-        if (cancelled) return
-        setErr(e instanceof Error ? e.message : 'Failed to load documentation')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div style={{
-        backgroundColor: 'white', borderRadius: 10,
-        maxWidth: 1080, width: '94%', maxHeight: '92vh',
-        display: 'flex', flexDirection: 'column',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '16px 24px', borderBottom: '1px solid #e5e7eb',
-          flexShrink: 0, backgroundColor: '#fafafa',
-        }}>
-          <div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
-              Management API documentation
-            </h3>
-            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              Mounted at <code style={{
-                fontFamily: 'ui-monospace, monospace', fontSize: 12,
-                backgroundColor: '#fff', padding: '1px 6px', borderRadius: 4,
-                border: '1px solid #e5e7eb',
-              }}>/api/mgmt/v1</code> · scoped, named keys · audited
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close documentation"
-            style={{
-              padding: 6, border: 'none', background: 'transparent',
-              cursor: 'pointer', color: '#6b7280', borderRadius: 4,
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div style={{
-          overflowY: 'auto', padding: '20px 28px',
-        }}>
-          <SkillCallout />
-          {err ? (
-            <div style={{
-              padding: 12, borderRadius: 6,
-              backgroundColor: '#fee2e2', color: '#991b1b', fontSize: 13,
-            }}>{err}</div>
-          ) : html === null ? (
-            <p style={{ color: '#6b7280' }}>Loading…</p>
-          ) : (
-            <div className="mgmt-docs" dangerouslySetInnerHTML={{ __html: html }} />
-          )}
-        </div>
-      </div>
-    </div>
-  )
+    contentRef.current?.querySelectorAll('pre, table').forEach((element, index) => {
+      element.setAttribute('tabindex', '0')
+      element.setAttribute('aria-label', `Documentation ${element.tagName === 'PRE' ? 'code example' : 'table'} ${index + 1}`)
+    })
+  }, [data])
+  return <ModalShell title="Management API documentation" onClose={onClose} wide>
+    <SkillCallout />
+    {error ? <p role="alert" style={{ color: '#991b1b' }}>{error} <button type="button" onClick={load} style={{ textDecoration: 'underline' }}>Retry documentation</button></p>
+      : loading ? <p role="status">Loading documentation…</p>
+        : data && <div ref={contentRef} className="mgmt-docs" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(data.markdown) as string) }} />}
+  </ModalShell>
 }
 
 function SkillCallout() {
@@ -408,6 +329,7 @@ function CreateKeyModal({
   const [scopes, setScopes] = useState<string[]>(['metrics:read'])
   const [expiresAt, setExpiresAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const pending = useRef(false)
   const [err, setErr] = useState<string | null>(null)
 
   const toggle = (scope: string) => {
@@ -415,6 +337,7 @@ function CreateKeyModal({
   }
 
   const submit = async () => {
+    if (pending.current) return
     setErr(null)
     if (!name.trim()) {
       setErr('Name is required')
@@ -424,6 +347,7 @@ function CreateKeyModal({
       setErr('At least one scope is required')
       return
     }
+    pending.current = true
     setSubmitting(true)
     try {
       const created = await createApiKey({
@@ -436,14 +360,16 @@ function CreateKeyModal({
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Failed to create key')
     } finally {
+      pending.current = false
       setSubmitting(false)
     }
   }
 
   return (
-    <ModalShell onClose={onClose} title="Create management API key">
+    <ModalShell onClose={onClose} title="Create management API key" busy={submitting}>
+      <fieldset disabled={submitting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       {err && (
-        <div style={{
+        <div role="alert" style={{
           padding: 8, marginBottom: 12, borderRadius: 4,
           backgroundColor: '#fee2e2', color: '#991b1b', fontSize: 13,
         }}>{err}</div>
@@ -452,6 +378,7 @@ function CreateKeyModal({
       <label htmlFor="apikey-name" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</span>
         <input
+          aria-required="true"
           id="apikey-name"
           type="text"
           value={name}
@@ -475,7 +402,7 @@ function CreateKeyModal({
 
       <div style={{ marginBottom: 12 }}>
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'baseline',
           marginBottom: 6,
         }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>Scopes</span>
@@ -498,7 +425,7 @@ function CreateKeyModal({
             </button>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 6 }}>
           {MGMT_SCOPE_OPTIONS.map(s => (
             <label key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
               <input
@@ -510,7 +437,7 @@ function CreateKeyModal({
             </label>
           ))}
         </div>
-        <p style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
           Action scopes (<code>:run</code>, <code>:write</code>) spend tokens or mutate state, so issue
           read-only first and add the rest only after review.
         </p>
@@ -539,6 +466,7 @@ function CreateKeyModal({
           {submitting ? 'Creating…' : 'Create key'}
         </button>
       </div>
+      </fieldset>
     </ModalShell>
   )
 }
@@ -551,15 +479,17 @@ function TokenRevealModal({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState<string | null>(null)
 
   const copy = async () => {
-    await navigator.clipboard.writeText(created.token)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(false); setCopyError(null)
+    try { await navigator.clipboard.writeText(created.token); setCopied(true) }
+    catch { setCopyError('Could not copy. Select the token text and copy it manually.') }
   }
 
   return (
     <ModalShell onClose={onClose} title="Copy your token now">
+      {copyError && <p role="alert" style={{ color: '#991b1b', marginBottom: 12 }}>{copyError}</p>}
       <div style={{
         padding: 12, marginBottom: 16, borderRadius: 6,
         backgroundColor: '#fef3c7', color: '#92400e', fontSize: 13,
@@ -598,37 +528,27 @@ function TokenRevealModal({
   )
 }
 
-function ModalShell({
-  onClose,
-  title,
-  children,
-}: {
+function ModalShell({ onClose, title, children, busy = false, wide = false }: {
   onClose: () => void
   title: string
   children: React.ReactNode
+  busy?: boolean
+  wide?: boolean
 }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div style={{
-        backgroundColor: 'white', borderRadius: 8, padding: 24,
-        maxWidth: 560, width: '90%', maxHeight: '90vh', overflowY: 'auto',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+  const dialogRef = useRef<HTMLDivElement>(null)
+  return <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
+        onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); if (!busy) onClose() } }}
+        style={{ backgroundColor: 'white', borderRadius: 8, padding: 24, maxWidth: wide ? 1080 : 560, width: '90%', minWidth: 0, maxHeight: '90dvh', overflowY: 'auto', overflowWrap: 'anywhere' }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700 }}>{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Close dialog" style={{
-            padding: 4, border: 'none', background: 'transparent', cursor: 'pointer',
-          }}>
-            <X size={18} aria-hidden="true" />
-          </button>
+          <button type="button" disabled={busy} onClick={onClose} aria-label="Close dialog" style={{ padding: 4, flexShrink: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}><X size={18} aria-hidden="true" /></button>
         </div>
         {children}
       </div>
-    </div>
-  )
+    </FocusTrap>
+  </div>
 }
 
 const inputStyle: React.CSSProperties = {
@@ -638,7 +558,7 @@ const inputStyle: React.CSSProperties = {
 
 const primaryButtonStyle: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 6,
-  backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
+  backgroundColor: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
   border: 'none', fontWeight: 600, cursor: 'pointer',
 }
 
@@ -650,6 +570,6 @@ const cancelButtonStyle: React.CSSProperties = {
 
 const linkButtonStyle: React.CSSProperties = {
   padding: 0, border: 'none', background: 'transparent',
-  color: 'var(--highlight-color, #3b82f6)', fontWeight: 600,
+  color: 'var(--highlight-on-light, #806600)', fontWeight: 600,
   cursor: 'pointer',
 }

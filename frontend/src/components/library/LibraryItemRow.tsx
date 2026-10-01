@@ -163,10 +163,10 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             {item.description}
           </div>
         )}
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-4)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-4)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <span>{kindLabel}</span>
           {item.verified && (
-            <span style={{ color: '#b45309', fontWeight: 500 }}>Shared with everyone</span>
+            <span style={{ color: '#b45309', fontWeight: 500 }}>Saved reference · Shared with everyone</span>
           )}
           {item.created_by && item.created_by.user_id !== user?.user_id && (
             <AuthorChip author={item.created_by} />
@@ -403,6 +403,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                       <MenuItem disabled={busy}
                         icon={<Copy size={14} />}
                         label="Duplicate"
+                        title="Create an independent editable copy in Mine. Later edits stay separate."
                         onClick={() => {
                           onClone(item.id)
                           setMenuOpen(false)
@@ -421,6 +422,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                     <MenuItem disabled={busy}
                       icon={<Copy size={14} />}
                       label="Add to my library"
+                      title="Create an independent copy in Mine. Edits to the team item will not update your copy."
                       onClick={() => {
                         onClone(item.id)
                         setMenuOpen(false)

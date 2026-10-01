@@ -1,3 +1,4 @@
+import { ProjectWorkOverview } from '../projects/ProjectWorkOverview'
 import { FolderKanban, Settings, X } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -46,7 +47,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
             type="button"
             onClick={onOpenManage}
             title="View details, share, rename, leave, or delete this project"
-            style={{ minHeight: 'var(--workspace-control-height)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-12)", cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}
+            style={{ minHeight: 'var(--workspace-control-height)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-12)", cursor: 'pointer', color: '#374151', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}
           >
             <Settings size={14} />
             Manage project
@@ -62,6 +63,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
           <X size={14} />
         </button>
       </div>
+      <ProjectWorkOverview key={activeProjectUuid} uuid={activeProjectUuid} />
     </div>
   )
 }

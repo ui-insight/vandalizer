@@ -1,5 +1,5 @@
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from '../shared/panelPortal'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload, Users, Eye } from 'lucide-react'
@@ -53,7 +53,10 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [step, setStep] = useState<Step>('intent')
   const [intent, setIntent] = useState<Intent | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [error, setError] = useState('')
+  const errorRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (error && !submitting) errorRef.current?.focus() }, [error, submitting])
 
   // Form data
   const [summary, setSummary] = useState(itemTitle ?? '')
@@ -70,7 +73,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const skipValidation = intent === 'help'
 
   usePanelEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !submittingRef.current) onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
@@ -94,6 +97,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const splitLines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean)
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setSubmitting(true)
     setError('')
     try {
@@ -119,6 +124,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Submission failed')
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -138,33 +144,34 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
       onMouseDown={(e) => e.stopPropagation()}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label={shareLabel} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label={shareLabel} className="bg-white rounded-lg shadow-xl max-w-2xl w-full min-w-0 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-green-600" aria-hidden="true" />
             <h3 className="text-base font-semibold text-gray-900">{shareLabel}</h3>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button type="button" disabled={submitting} onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-1 px-5 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="shrink-0 flex flex-wrap items-center gap-1 px-5 py-3 bg-gray-50 border-b border-gray-200">
           {STEPS.map((s, i) => (
             <div key={s.key} className="flex items-center gap-1">
               <button
                 type="button"
                 // Past the first step only once a door is chosen: jumping to
                 // Review with no intent would submit as "everyone" unasked.
-                disabled={intent === null && s.key !== 'intent'}
+                disabled={submitting || (intent === null && s.key !== 'intent')}
+                aria-current={step === s.key ? 'step' : undefined}
                 onClick={() => setStep(s.key)}
                 className={`text-xs font-medium px-2 py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed ${
                   step === s.key
                     ? 'bg-gray-900 text-white'
                     : i < stepIndex
-                      ? 'text-green-600 hover:bg-green-50'
+                      ? 'text-green-700 hover:bg-green-50'
                       : 'text-gray-500'
                 }`}
               >
@@ -176,7 +183,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+        <fieldset disabled={submitting} className="min-w-0 border-0 m-0 p-5 space-y-4">
           <div className="text-xs text-gray-500 flex items-center gap-2 mb-2">
             <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{kindLabel}</span>
             {itemTitle && <span className="font-medium text-gray-700">{itemTitle}</span>}
@@ -250,7 +258,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  placeholder="What does this item do? What problem does it solve?"
+                  placeholder="Example: Check a sponsor notice for deadline and budget requirements. Describe the task, required document and result someone should expect."
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
               </div>
@@ -282,6 +290,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
 
           {step === 'details' && (
             <>
+              <p className="text-sm text-gray-600">Help others judge whether this fits their task. Include one small example input, its expected result and any limitations. Omit confidential source material.</p>
               <div>
                 <label htmlFor="vsm-run-instructions" className="block text-sm font-medium text-gray-700 mb-1">Run Instructions</label>
                 <textarea
@@ -289,7 +298,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                   value={runInstructions}
                   onChange={(e) => setRunInstructions(e.target.value)}
                   rows={3}
-                  placeholder="How should an examiner test this? What documents work best?"
+                  placeholder="Describe the required input and how to run it. Example: Select one sponsor notice, then Run; inspect each deadline against its cited passage."
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
               </div>
@@ -331,6 +340,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
 
           {step === 'details' && (
             <>
+
               <div>
                 <label htmlFor="vsm-example-inputs" className="block text-sm font-medium text-gray-700 mb-1">Example Inputs</label>
                 <textarea
@@ -368,7 +378,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           )}
 
           {step === 'review' && (
-            <div className="space-y-3">
+            <div className="space-y-3 break-words">
               <h4 className="text-sm font-semibold text-gray-900">Review your submission</h4>
               <dl className="space-y-2 text-sm">
                 <div>
@@ -414,13 +424,19 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 {exampleInputs && (
                   <div>
                     <dt className="text-xs font-medium text-gray-500 uppercase">Example Inputs</dt>
-                    <dd className="text-gray-700">{splitLines(exampleInputs).length} item(s)</dd>
+                    <dd className="text-gray-700 whitespace-pre-wrap break-words">{exampleInputs}</dd>
                   </div>
                 )}
                 {expectedOutputs && (
                   <div>
                     <dt className="text-xs font-medium text-gray-500 uppercase">Expected Outputs</dt>
-                    <dd className="text-gray-700">{splitLines(expectedOutputs).length} item(s)</dd>
+                    <dd className="text-gray-700 whitespace-pre-wrap break-words">{expectedOutputs}</dd>
+                  </div>
+                )}
+                {dependencies && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Dependencies</dt>
+                    <dd className="text-gray-700 whitespace-pre-wrap break-words">{dependencies}</dd>
                   </div>
                 )}
                 {intendedUseTags && (
@@ -447,17 +463,19 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 <button type="button" onClick={() => setStep('intent')} className="text-xs text-gray-600 underline shrink-0">Change</button>
               </div>
 
-              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
+              {error && <p ref={errorRef} tabIndex={-1} role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
             </div>
           )}
+        </fieldset>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-t border-gray-200 bg-white">
           <div>
             {canGoBack && (
               <button
                 onClick={goBack}
+                disabled={submitting}
                 className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -465,9 +483,10 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onClose}
+              disabled={submitting}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
@@ -476,7 +495,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !summary.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-md hover:bg-green-800 disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
                 {submitting ? 'Sending...' : skipValidation ? 'Ask for a look' : shareLabel}

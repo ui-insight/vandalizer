@@ -1,0 +1,3025 @@
+{
+  "title": "Vandalizer 5.0 \u2014 fresh RA UI/UX review",
+  "date": "2026-09-30",
+  "commit": "08100ba8",
+  "branch": "major/agentic-chat",
+  "sourceSha256": "86fb8aa3fdb4ae86ffd7392435f518f00534cd2c425825003610a937f605fe2b",
+  "method": "Production frontend served locally; Playwright Chromium with synthetic API fixtures. Fresh heuristic review, screenshots, DOM/keyboard semantics inspection and axe scans. No live model or backend execution.",
+  "rubric": {
+    "ui": "Hierarchy, readability, spacing, visual consistency and responsive layout.",
+    "ux": "Discoverability, keyboard access, scope retention, recovery and completion paths.",
+    "ra": "Observable fit for research-administration tasks, evidence inspection, reuse and handoff. Not measured AI accuracy or demonstrated time savings.",
+    "scale": "9 exceptional; 8 strong with small friction; 7 useful with noticeable friction; 6 substantial learning or accessibility cost; 5 a serious limitation on the tested surface. Half-point grades are reviewer judgments, not precision measurements."
+  },
+  "overall": {
+    "ui": 7.3,
+    "ux": 6.7,
+    "ra": 7.5
+  },
+  "aggregateNote": "Unweighted average of 23 assessed RA-facing areas. Two supporting-role overviews are graded separately and excluded from that average. This is not an all-surfaces 8/10 sign-off.",
+  "surfaces": [
+    {
+      "surface": "Workspace navigation",
+      "ui": 7.5,
+      "ux": 6.5,
+      "ra": 7.5,
+      "works": "The document and tool panes work together; the redundant split icon is gone.",
+      "critique": "Left navigation still requires recognition of five icons. Workflow section labels disappear at the default split width. Add persistent or expandable labels without changing the pane model.",
+      "evidence": [
+        "core/files",
+        "file-journey/file-library-tool-1440"
+      ]
+    },
+    {
+      "surface": "Public entry and sign-in",
+      "ui": 8,
+      "ux": 7.5,
+      "ra": 7,
+      "works": "The landing page has a strong hierarchy and a clear sign-in path.",
+      "critique": "The first screen sells platform breadth rather than a concrete RA outcome. \u201cVerified workflows\u201d also differs from the in-app \u201cshared\u201d and \u201cchecked\u201d language. Authentication submission was not exercised.",
+      "evidence": [
+        "verification/landing",
+        "verification/sign-in"
+      ]
+    },
+    {
+      "surface": "First-session guidance",
+      "ui": 8,
+      "ux": 7.5,
+      "ra": 7.5,
+      "works": "Upload, chat, a sample demo and a tour provide several ways to start.",
+      "critique": "The page still asks the newcomer to choose a knowledge base or build a workflow. Lead with one short proposal-review example and let tool concepts follow the task.",
+      "evidence": [
+        "core/chat-onboarding"
+      ]
+    },
+    {
+      "surface": "Chat and document/KB scope",
+      "ui": 8,
+      "ux": 8,
+      "ra": 8,
+      "works": "Attached scope and source-health warnings are visible. Upload scope is preserved in the outgoing request. Citations and export are available.",
+      "critique": "A source link is useful, but this short synthetic answer does not establish claim-level grounding on real sponsor documents. Keep evidence inspection close to each important answer.",
+      "evidence": [
+        "core/chat-kb-answer",
+        "core/chat-file-attached"
+      ]
+    },
+    {
+      "surface": "Agent approvals and recovery",
+      "ui": 8,
+      "ux": 7.5,
+      "ra": 8,
+      "works": "The approval names the action, previews the change and offers an explicit cancellation. Completion offers an Open workflow action.",
+      "critique": "Old approval messages remain in the transcript after the result. Clearer historical status and a compact final result would reduce the amount an RA must reread. No real tool execution was tested.",
+      "evidence": [
+        "core/chat-agent-confirmation",
+        "core/chat-agent-complete"
+      ]
+    },
+    {
+      "surface": "Files and document-to-tool work",
+      "ui": 8,
+      "ux": 8,
+      "ra": 8.5,
+      "works": "Opening a file, finding a Library workflow, retrying a failed run and returning to the document passed at five widths. The selected document UUID survived both run attempts.",
+      "critique": "File rows mainly communicate title and date. A richer document fixture is needed to judge scanned-PDF reading, tables and long-document navigation. Preserve the working split-pane interaction.",
+      "evidence": [
+        "file-journey/file-library-tool-1440",
+        "file-journey/file-library-run-complete-1440"
+      ]
+    },
+    {
+      "surface": "Projects and collaboration",
+      "ui": 7.5,
+      "ux": 6.5,
+      "ra": 7.5,
+      "works": "Project scope is prominent; Manage project exposes files, lifecycle state, pinned tools and members.",
+      "critique": "Opening a project lands on chat. Its contents and collaboration controls require a separate Manage action. A small persistent project overview could make this a better place to resume work without replacing the current panes.",
+      "evidence": [
+        "core/project-detail",
+        "verification/project-manage"
+      ]
+    },
+    {
+      "surface": "Library organization",
+      "ui": 7.5,
+      "ux": 7,
+      "ra": 8,
+      "works": "Mine, Team and Explore distinguish ownership and reuse. Search, type filters, saved views and folders support repeated work.",
+      "critique": "The user must distinguish workflows, extractions, prompts and formatters before deciding what to use. Add task-oriented entry points alongside the existing organization.",
+      "evidence": [
+        "core/library",
+        "core/library-mobile"
+      ]
+    },
+    {
+      "surface": "Explore and shared tool detail",
+      "ui": 8,
+      "ux": 7,
+      "ra": 7.5,
+      "works": "The detail panel exposes sample size, date, recorded quality and limits on what the score establishes.",
+      "critique": "The fixture with missing input/output descriptions is honest but leaves the RA unable to judge fit without opening the tool. Make an example input and expected deliverable part of publishing guidance. This is a missing-metadata scenario, not a finding about the live catalog.",
+      "evidence": [
+        "core/catalog-detail"
+      ]
+    },
+    {
+      "surface": "Workflow design, input and output",
+      "ui": 7,
+      "ux": 5.5,
+      "ra": 8,
+      "works": "The workflow stays beside its document, shows input scope and exposes an output with Download and Save to folder.",
+      "critique": "Step cards are pointer-only controls; the main editor tabs become icons at the ordinary split width. Nested step/task editing adds substantial conceptual load. Fix keyboard access first, then improve labels and starter-task guidance.",
+      "evidence": [
+        "file-journey/file-library-tool-1440",
+        "verification/workflow-step"
+      ]
+    },
+    {
+      "surface": "Extraction design, results and evidence",
+      "ui": 7.5,
+      "ux": 7,
+      "ra": 8.5,
+      "works": "A field result links to its source and keeps the document beside the extraction. Export is visible when results exist.",
+      "critique": "A single-field example is clear; bulk multi-document comparison and export fidelity still need real-data testing. Result inspection also copies the value, coupling two actions that users may not expect.",
+      "evidence": [
+        "source-check/extraction-result",
+        "source-check/extraction-source"
+      ]
+    },
+    {
+      "surface": "Automations: list, setup and history",
+      "ui": 7.5,
+      "ux": 7.5,
+      "ra": 8.5,
+      "works": "Trigger, input, action and output summaries make each automation understandable. The wizard supports saving disabled. Recorded output is available in history.",
+      "critique": "The editor title wraps to three lines while controls compete for the same row. Keep title and action groups on separate responsive rows. The list should remain the clear monitoring surface.",
+      "evidence": [
+        "core/automation-detail",
+        "core/wizard-5-activation",
+        "final-checks/automation-output"
+      ]
+    },
+    {
+      "surface": "Knowledge bases and source health",
+      "ui": 8,
+      "ux": 7.5,
+      "ra": 8.5,
+      "works": "Partial readiness, failed sources and the distinction between availability and validation are explicit. Chat and source management are close together.",
+      "critique": "Source cards can become tall and repetitive. With a large policy collection, compact health summaries and a clear \u201cneeds attention\u201d view would matter more than another badge. Large-collection behavior was not measured in this pass.",
+      "evidence": [
+        "core/knowledge-detail",
+        "core/knowledge-mobile"
+      ]
+    },
+    {
+      "surface": "Validation and quality improvement",
+      "ui": 7,
+      "ux": 6.5,
+      "ra": 7.5,
+      "works": "Test questions, expected answers, baseline comparisons and history provide a useful basis for evaluating reusable work.",
+      "critique": "Validation has several layers of tabs and substantial explanatory copy. \u201cImprove retrieval,\u201d model/grader choices and tuning budgets remain expert concepts. Make the default path a small representative test with an actionable summary; keep detailed controls available. Scores in this review are synthetic.",
+      "evidence": [
+        "core/knowledge-validation",
+        "core/validation-results",
+        "supplement/workflow-validate"
+      ]
+    },
+    {
+      "surface": "Activity and resuming work",
+      "ui": 7,
+      "ux": 5.5,
+      "ra": 7,
+      "works": "Recent work is accessible without leaving the workspace and links back to the corresponding tool.",
+      "critique": "The failed-run row makes deletion more visually prominent than failure status. Activity rows also use pointer-only divs. Add keyboard-operable row actions and persistent status text, with deletion separated from status.",
+      "evidence": [
+        "verification/activity-populated"
+      ]
+    },
+    {
+      "surface": "Human review queue and decision",
+      "ui": 7,
+      "ux": 6,
+      "ra": 8.5,
+      "works": "Instructions, source documents, the artifact, optional comments and Approve/Reject form a coherent handoff. Editing before approval is supported.",
+      "critique": "The status filter lacks an accessible name; the artifact-edit textarea is unnamed. Active-tab and action contrast also fail automated checks. This high-value RA surface needs the same care as the workspace. Decision submission was not exercised.",
+      "evidence": [
+        "supplement/reviews",
+        "supplement/review-detail",
+        "followup/review-edit"
+      ]
+    },
+    {
+      "surface": "Account and team management",
+      "ui": 7.5,
+      "ux": 7,
+      "ra": 7.5,
+      "works": "Profile, memory explanation, email preferences, member roles and invitation controls are understandable.",
+      "critique": "A global Member role and team Owner role appear on different pages without much distinction. Team management has a long sequence of equally styled cards; separate routine collaboration from ownership and deletion controls more clearly.",
+      "evidence": [
+        "supplement/account",
+        "supplement/teams"
+      ]
+    },
+    {
+      "surface": "Credentials and integrations",
+      "ui": 7,
+      "ux": 6,
+      "ra": 5.5,
+      "works": "The form has labeled fields, disabled incomplete actions and a clear description of secret handling.",
+      "critique": "API Node IDs, static headers and OAuth client credentials are integration-specialist concepts. The generic account-menu placement makes this appear equally relevant to ordinary RAs. Keep it available with clearer purpose and audience framing. No secrets were entered or tested.",
+      "evidence": [
+        "followup/credentials-form"
+      ]
+    },
+    {
+      "surface": "Support panel",
+      "ui": 7,
+      "ux": 6.5,
+      "ra": 7,
+      "works": "The workspace remains visible while the user describes a problem. Subject, priority and description are straightforward.",
+      "critique": "The close button is unnamed. The blue floating panel introduces a different visual treatment, and category/priority selection adds work before the user describes the issue. No ticket was sent.",
+      "evidence": [
+        "verification/support-form"
+      ]
+    },
+    {
+      "surface": "Certification and learning",
+      "ui": 7,
+      "ux": 6.5,
+      "ra": 7,
+      "works": "A dockable course lets users learn beside their work. Duration and progress are explicit.",
+      "critique": "XP, tiers, locked modules and several docking icons dominate the course overview. The 3.5-hour curriculum should complement a short task-based first success. Only the overview and first lesson were inspected; course completion was not tested.",
+      "evidence": [
+        "supplement/certification",
+        "final-checks/certification-lesson"
+      ]
+    },
+    {
+      "surface": "Docs and self-service help",
+      "ui": 6.5,
+      "ux": 5.5,
+      "ra": 5.5,
+      "works": "Documentation is extensive and includes distinct topics and audience presentation links.",
+      "critique": "Getting Started immediately presents git clone, Docker, backend and frontend commands. That is a poor default help path for an RA already using the app. The dark site also has multiple contrast and mobile control issues. Add a visible RA quickstart with task walkthroughs.",
+      "evidence": [
+        "followup/docs-top",
+        "followup/docs-top-mobile"
+      ]
+    },
+    {
+      "surface": "Team Admin overview",
+      "ui": 5.5,
+      "ux": 4.5,
+      "ra": 6.5,
+      "works": "Desktop usage cards, time ranges and export can help a team owner understand adoption.",
+      "critique": "At 390px, the fixed sidebar and multi-column cards create an 878px scrollable content area. The default viewport cuts off the metrics. Usage volume and tokens also say little about whether RA work was completed successfully. Only the overview was visually audited, not every administration tab.",
+      "evidence": [
+        "supplement/team-admin",
+        "followup/team-admin-mobile"
+      ]
+    },
+    {
+      "surface": "Tuning suggestions",
+      "ui": 7,
+      "ux": 6.5,
+      "ra": 6.5,
+      "works": "The empty state and explanation make clear that proposed changes require a person to apply them.",
+      "critique": "This is an advanced maintenance surface rather than an everyday RA destination. The populated recommendation/revert flow was not exercised here; the grade is limited to the overview. Contrast needs attention.",
+      "evidence": [
+        "supplement/tuning"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "RA-01",
+      "priority": "P1",
+      "title": "Workflow and activity navigation are not fully keyboard-operable",
+      "kind": "Confirmed",
+      "observed": "Workflow StepCard and ActivityRail rows are clickable divs without role, tabIndex or keyboard activation. DOM inspection of the workflow step confirmed tabIndex -1; pointer activation opened it.",
+      "impact": "Keyboard users cannot reliably reach the same editing and resume actions as pointer users.",
+      "recommendation": "Use a named keyboard-operable primary action for each row/card; preserve independent move and delete buttons.",
+      "acceptance": "Tab to a step and an activity item; Enter/Space opens the intended item; focus returns predictably after closing.",
+      "evidence": [
+        "file-journey/file-library-tool-1440",
+        "verification/workflow-step",
+        "verification/activity-populated"
+      ],
+      "source": [
+        "frontend/src/components/workspace/WorkflowEditorPanel.tsx:1779",
+        "frontend/src/components/workspace/ActivityRail.tsx:289"
+      ]
+    },
+    {
+      "id": "RA-02",
+      "priority": "P1",
+      "title": "Team Admin and examiner layouts fail on narrow screens",
+      "kind": "Confirmed",
+      "observed": "At a 390px viewport the scrollable PageLayout container measured 878px wide in content. The fixed 220px sidebar leaves the KPI grid clipped. The examiner Shared items page uses the same fixed-width sidebar pattern; at 390px its explanation becomes a column of short word fragments and its search control is clipped.",
+      "impact": "A team owner cannot read the overview in the initial phone viewport. A document-level overflow check missed this nested overflow.",
+      "recommendation": "Collapse the sidebar at narrow widths and stack the KPI/chart grids; measure nested scroll containers in QA.",
+      "acceptance": "At 390px and 320px all primary labels, values and export controls are visible without horizontal page/container scrolling.",
+      "evidence": [
+        "followup/team-admin-mobile",
+        "roles/examiner-mobile"
+      ],
+      "source": [
+        "frontend/src/pages/Admin.tsx:170",
+        "frontend/src/components/admin/UsageTab.tsx:100",
+        "frontend/src/pages/Verification.tsx:53"
+      ]
+    },
+    {
+      "id": "RA-03",
+      "priority": "P1",
+      "title": "Accessibility coverage stops short of the surrounding app",
+      "kind": "Confirmed",
+      "observed": "Axe found an unnamed Reviews status select, an unnamed artifact-edit textarea and an unnamed Support close button. Docs mobile also has an unnamed button. Contrast failures appear in Reviews, Teams, Docs, Certification, Tuning, Admin and empty tool histories.",
+      "impact": "Critical RA handoff and help actions are less accessible than the main workspace.",
+      "recommendation": "Add associated labels and control names, repair contrast, and add these routes and editing states to the regular accessibility checks.",
+      "acceptance": "Named controls appear in accessibility snapshots; each listed state passes the relevant axe checks and a manual keyboard pass.",
+      "evidence": [
+        "supplement/reviews",
+        "followup/review-edit",
+        "verification/support-form",
+        "followup/docs-top-mobile"
+      ],
+      "source": [
+        "frontend/src/pages/Reviews.tsx:128",
+        "frontend/src/pages/ReviewDetail.tsx:29",
+        "frontend/src/components/support/SupportChatPanel.tsx:1576"
+      ]
+    },
+    {
+      "id": "RA-04",
+      "priority": "P2",
+      "title": "Failed activity emphasizes deletion over recovery",
+      "kind": "Confirmed",
+      "observed": "In the expanded activity capture, the failed workflow displays a yellow title row and a trailing delete control; the status icon shares the trailing area and is not clearly visible. Failure detail is carried in hover text.",
+      "impact": "An RA scanning recent work can miss that something needs attention.",
+      "recommendation": "Show a persistent Failed label and concise reason/recovery action; keep deletion in a separate location.",
+      "acceptance": "A failed run is recognizable without hover, color recognition or opening the item, on desktop and touch screens.",
+      "evidence": [
+        "verification/activity-populated"
+      ],
+      "source": [
+        "frontend/src/components/workspace/ActivityRail.tsx:349"
+      ]
+    },
+    {
+      "id": "RA-05",
+      "priority": "P2",
+      "title": "The default workflow pane hides useful section labels",
+      "kind": "Confirmed",
+      "observed": "At the ordinary desktop split width, Design, Input, Validate, Advanced and History become five icons. The compact threshold is 520px. Left navigation also uses icons with hover titles rather than visible labels.",
+      "impact": "The RA must learn two icon systems before discovering input setup and past results.",
+      "recommendation": "Retain readable tab text through wrapping or compact labels and offer labeled navigation expansion. Keep the current document/tool split.",
+      "acceptance": "A first-time user can locate Input, History, Files and Knowledge without hovering or memorizing symbols; document context remains open.",
+      "evidence": [
+        "file-journey/file-library-tool-1440"
+      ],
+      "source": [
+        "frontend/src/components/workspace/WorkflowEditorPanel.tsx:279",
+        "frontend/src/components/workspace/WorkflowEditorPanel.tsx:969",
+        "frontend/src/components/workspace/UtilityBar.tsx:37"
+      ]
+    },
+    {
+      "id": "RA-06",
+      "priority": "P2",
+      "title": "Projects do not immediately show the work to resume",
+      "kind": "Design critique",
+      "observed": "Opening the sample project shows project-scoped chat. Files, members, status and pinned tools are primarily exposed through Manage project.",
+      "impact": "A project feels more like a chat scope than a place to check progress and continue a submission.",
+      "recommendation": "Expose a compact project overview or pinned-work summary inside the existing workspace; keep chat and tools available beside sources.",
+      "acceptance": "The user can identify project contents, current state and a next action without opening a settings-like dialog.",
+      "evidence": [
+        "core/project-detail",
+        "verification/project-manage"
+      ],
+      "source": [
+        "frontend/src/components/chat/ChatPanel.tsx:998"
+      ]
+    },
+    {
+      "id": "RA-07",
+      "priority": "P2",
+      "title": "Automation header layout spends space on controls before the title",
+      "kind": "Design critique",
+      "observed": "\u201cReview incoming proposals\u201d wraps into three lines beside Run now, Enabled, Private, delete and close in the desktop editor.",
+      "impact": "The primary identity of the open automation becomes harder to scan than its action controls.",
+      "recommendation": "Give the title its own flexible row and group actions beneath it when the pane narrows.",
+      "acceptance": "Ordinary three-to-six-word titles stay readable at the default split and laptop widths without hiding actions.",
+      "evidence": [
+        "core/automation-detail"
+      ],
+      "source": [
+        "frontend/src/components/workspace/AutomationEditorPanel.tsx"
+      ]
+    },
+    {
+      "id": "RA-08",
+      "priority": "P2",
+      "title": "Help starts with deployment, not RA work",
+      "kind": "Design critique",
+      "observed": "The Docs Getting Started screen shows repository cloning, Docker and server commands. The workspace task guidance uses knowledge-base and workflow concepts earlier than some newcomers will understand.",
+      "impact": "An RA seeking help with a proposal may conclude the product expects developer knowledge.",
+      "recommendation": "Add a direct RA quickstart: upload a proposal, identify requirements, verify a source, save or share the result. Retain deployment docs in their existing topic.",
+      "acceptance": "An RA reaches a relevant worked example from help without passing through installation instructions.",
+      "evidence": [
+        "followup/docs-top",
+        "core/chat-onboarding"
+      ],
+      "source": [
+        "frontend/src/pages/Docs.tsx:46",
+        "frontend/src/pages/Docs.tsx:92"
+      ]
+    },
+    {
+      "id": "RA-09",
+      "priority": "P2",
+      "title": "Validation and catalog setup still demand expert interpretation",
+      "kind": "Design critique / data-dependent scenario",
+      "observed": "Validation combines question authoring, quality checks, retrieval improvement and tuning controls. In the catalog missing-metadata fixture, input and expected output remain unspecified even while a quality score is visible.",
+      "impact": "Users can understand a score without understanding whether the tool fits their actual task.",
+      "recommendation": "Lead with a representative task and example deliverable; summarize what the test established and what needs review. Require or strongly prompt input/output examples for shared tools.",
+      "acceptance": "A colleague can choose a tool and explain its input, output and test scope before running it.",
+      "evidence": [
+        "core/knowledge-validation",
+        "core/catalog-detail"
+      ],
+      "source": []
+    },
+    {
+      "id": "RA-10",
+      "priority": "P3",
+      "title": "Visual language varies between tools and supporting pages",
+      "kind": "Design critique",
+      "observed": "The purple/checkerboard workflow canvas, blue support widget, yellow workspace and dark Docs site have different visual emphasis and control treatments.",
+      "impact": "Cross-surface transitions feel less cohesive, even when the functions work.",
+      "recommendation": "Align typography, action hierarchy, spacing and state treatments; retain distinctive diagrams only where they explain behavior.",
+      "acceptance": "The same class of action and status is recognizable across workspace, Reviews, Support and learning.",
+      "evidence": [
+        "verification/workflow-step",
+        "verification/support-form",
+        "followup/docs-top"
+      ],
+      "source": []
+    }
+  ],
+  "runs": [
+    {
+      "folder": "core",
+      "captures": 55,
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        {
+          "id": "wizard-description-enter",
+          "expected": "Advance to the next step without dismissing the wizard",
+          "actual": "New Automation\nStep 2 of 5 \u00b7 Trigger\nWhat will trigger this automation?\nFolder Watch\nTrigger when files are added to a folder\nAPI Endpoint\nTrigger via HTTP POST request\nSchedule\nRun daily, weekly or monthly at a set time\n\nEach trigger keeps its settings while you edit. Only the selected trigger is used when you create.\n\nBack\nNext"
+        },
+        {
+          "id": "upload-chat-scope",
+          "expected": [
+            "doc-upload"
+          ],
+          "actual": [
+            "doc-upload"
+          ],
+          "uploadPresentInFixture": true
+        },
+        {
+          "id": "agent-confirm",
+          "actual": "Yes, go ahead"
+        }
+      ]
+    },
+    {
+      "folder": "file-journey",
+      "captures": 30,
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "folder": "supplement",
+      "captures": 27,
+      "unmatched": [
+        "GET /api/admin/system/version"
+      ],
+      "errors": [],
+      "observations": [
+        {
+          "id": "credentials-form",
+          "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Credential/i })\u001b[22m\n"
+        },
+        {
+          "id": "support-form",
+          "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /New Ticket/i })\u001b[22m\n"
+        }
+      ]
+    },
+    {
+      "folder": "followup",
+      "captures": 9,
+      "unmatched": [
+        "GET /api/projects/project-1/members"
+      ],
+      "errors": [],
+      "observations": [
+        {
+          "id": "extraction-result",
+          "error": "locator.waitFor: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('200', { exact: true }).first() to be visible\u001b[22m\n"
+        },
+        {
+          "id": "workflow-step",
+          "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('Review evidence', { exact: true })\u001b[22m\n"
+        },
+        {
+          "id": "team-admin-overflow",
+          "containers": [
+            {
+              "tag": "DIV",
+              "class": "flex-1 overflow-auto bg-gray-50",
+              "width": 390,
+              "contentWidth": 878
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "folder": "verification",
+      "captures": 9,
+      "unmatched": [
+        "GET /api/certification/modules/ai_literacy/exercise"
+      ],
+      "errors": [],
+      "observations": [
+        {
+          "id": "workflow-step-keyboard",
+          "elements": [
+            {
+              "text": "Review evidenceDELIVERABLE",
+              "tag": "DIV",
+              "role": null,
+              "tabIndex": -1,
+              "parentRole": null,
+              "parentTabIndex": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "folder": "final-checks",
+      "captures": 5,
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "folder": "source-check",
+      "captures": 2,
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "folder": "roles",
+      "captures": 3,
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    }
+  ],
+  "canonicalCaptures": {
+    "chat-home": {
+      "path": "core/chat-home",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "files": {
+      "path": "core/files",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "projects": {
+      "path": "core/projects",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automations": {
+      "path": "core/automations",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge": {
+      "path": "core/knowledge",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "library": {
+      "path": "core/library",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "files-selected": {
+      "path": "core/files-selected",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "files-context-menu": {
+      "path": "core/files-context-menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "project-detail": {
+      "path": "core/project-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automation-detail": {
+      "path": "core/automation-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-1-name": {
+      "path": "core/wizard-1-name",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-2-trigger": {
+      "path": "core/wizard-2-trigger",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-3-folder": {
+      "path": "core/wizard-3-folder",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-4-action": {
+      "path": "core/wizard-4-action",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-action-picker": {
+      "path": "core/wizard-action-picker",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-5-activation": {
+      "path": "core/wizard-5-activation",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-description-before-enter": {
+      "path": "core/wizard-description-before-enter",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "wizard-description-enter": {
+      "path": "core/wizard-description-enter",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-detail": {
+      "path": "core/knowledge-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-validation": {
+      "path": "core/knowledge-validation",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-queries": {
+      "path": "core/knowledge-queries",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-run": {
+      "path": "core/knowledge-run",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-history": {
+      "path": "core/knowledge-history",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-wizard-questions": {
+      "path": "core/validation-wizard-questions",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-wizard-preview": {
+      "path": "core/validation-wizard-preview",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-wizard-baseline": {
+      "path": "core/validation-wizard-baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-wizard-budget": {
+      "path": "core/validation-wizard-budget",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-results": {
+      "path": "core/validation-results",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "validation-history-populated": {
+      "path": "core/validation-history-populated",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "catalog": {
+      "path": "core/catalog",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "catalog-detail": {
+      "path": "core/catalog-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-catalog": {
+      "path": "core/knowledge-catalog",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-add-menu": {
+      "path": "core/chat-add-menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-file-attached": {
+      "path": "core/chat-file-attached",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-file-request": {
+      "path": "core/chat-file-request",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-upload-error": {
+      "path": "core/chat-upload-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-upload-retried": {
+      "path": "core/chat-upload-retried",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-kb-attached": {
+      "path": "core/chat-kb-attached",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-kb-answer": {
+      "path": "core/chat-kb-answer",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-agent-confirmation": {
+      "path": "core/chat-agent-confirmation",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-agent-complete": {
+      "path": "core/chat-agent-complete",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-agent-error": {
+      "path": "core/chat-agent-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "chat-onboarding": {
+      "path": "core/chat-onboarding",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "files-empty": {
+      "path": "core/files-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "projects-empty": {
+      "path": "core/projects-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automations-empty": {
+      "path": "core/automations-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "knowledge-empty": {
+      "path": "core/knowledge-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "library-empty": {
+      "path": "core/library-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automation-editor-mobile": {
+      "path": "core/automation-editor-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "chat-mobile": {
+      "path": "core/chat-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "files-mobile": {
+      "path": "core/files-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "projects-mobile": {
+      "path": "core/projects-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "automations-mobile": {
+      "path": "core/automations-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "knowledge-mobile": {
+      "path": "core/knowledge-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "library-mobile": {
+      "path": "core/library-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-open-file-1440": {
+      "path": "file-journey/file-library-open-file-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-browse-1440": {
+      "path": "file-journey/file-library-browse-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-tool-1440": {
+      "path": "file-journey/file-library-tool-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-run-error-1440": {
+      "path": "file-journey/file-library-run-error-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-run-complete-1440": {
+      "path": "file-journey/file-library-run-complete-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-return-1440": {
+      "path": "file-journey/file-library-return-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "axe": []
+    },
+    "file-library-open-file-1024": {
+      "path": "file-journey/file-library-open-file-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-browse-1024": {
+      "path": "file-journey/file-library-browse-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-tool-1024": {
+      "path": "file-journey/file-library-tool-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-run-error-1024": {
+      "path": "file-journey/file-library-run-error-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-run-complete-1024": {
+      "path": "file-journey/file-library-run-complete-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-return-1024": {
+      "path": "file-journey/file-library-return-1024",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "axe": []
+    },
+    "file-library-open-file-768": {
+      "path": "file-journey/file-library-open-file-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-browse-768": {
+      "path": "file-journey/file-library-browse-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-tool-768": {
+      "path": "file-journey/file-library-tool-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-run-error-768": {
+      "path": "file-journey/file-library-run-error-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-run-complete-768": {
+      "path": "file-journey/file-library-run-complete-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-return-768": {
+      "path": "file-journey/file-library-return-768",
+      "viewport": {
+        "width": 768,
+        "height": 700
+      },
+      "axe": []
+    },
+    "file-library-open-file-390": {
+      "path": "file-journey/file-library-open-file-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-browse-390": {
+      "path": "file-journey/file-library-browse-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-tool-390": {
+      "path": "file-journey/file-library-tool-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-run-error-390": {
+      "path": "file-journey/file-library-run-error-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-run-complete-390": {
+      "path": "file-journey/file-library-run-complete-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-return-390": {
+      "path": "file-journey/file-library-return-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "file-library-open-file-320": {
+      "path": "file-journey/file-library-open-file-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "file-library-browse-320": {
+      "path": "file-journey/file-library-browse-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "file-library-tool-320": {
+      "path": "file-journey/file-library-tool-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "file-library-run-error-320": {
+      "path": "file-journey/file-library-run-error-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "file-library-run-complete-320": {
+      "path": "file-journey/file-library-run-complete-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "file-library-return-320": {
+      "path": "file-journey/file-library-return-320",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "axe": []
+    },
+    "account": {
+      "path": "supplement/account",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "teams": {
+      "path": "supplement/teams",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                ".text-green-600"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.21 (foreground color: #00a63e, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "credentials": {
+      "path": "supplement/credentials",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "reviews": {
+      "path": "supplement/reviews",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#main-content > div > div:nth-child(3) > button:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 1.83 (foreground color: #eab308, background color: #f9fafb, font size: 9.8pt (13px), font weight: bold). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "select-name",
+          "impact": "critical",
+          "description": "Ensure select element has an accessible name",
+          "nodes": [
+            {
+              "target": [
+                "select"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        }
+      ]
+    },
+    "review-detail": {
+      "path": "supplement/review-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(6) > div:nth-child(1) > button"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.65 (foreground color: #0ea5e9, background color: #f9fafb, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(8) > button:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.29 (foreground color: #ffffff, background color: #16a34a, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "support": {
+      "path": "supplement/support",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "docs": {
+      "path": "supplement/docs",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(11) > div > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#administration > .space-y-6 > .font-mono.overflow-x-auto.p-4 > div:nth-child(1) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4 > div:nth-child(2) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-classification\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-extraction\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-chat\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-workflow\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-validation\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".mt-1\\.5.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-\\[\\#f1b300\\]\\/30.p-6.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-6.border-white\\/15.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(1) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(2) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(3) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(4) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(5) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-5.border-white\\/15.bg-\\[\\#262626\\] > .mt-3.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(1) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(2) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(3) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(4) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "link-in-text-block",
+          "impact": "serious",
+          "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
+          "nodes": [
+            {
+              "target": [
+                "#contributing > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            },
+            {
+              "target": [
+                "#about > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            }
+          ]
+        }
+      ]
+    },
+    "certification": {
+      "path": "supplement/certification",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                ".uppercase"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: bold). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "tuning": {
+      "path": "supplement/tuning",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.42 (foreground color: #9ca3af, background color: #f9fafb, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div > p"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.42 (foreground color: #9ca3af, background color: #f9fafb, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "team-admin": {
+      "path": "supplement/team-admin",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(1) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(2) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(2) > div:nth-child(4) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(5) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(6) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(1) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#main-content > div > div > div > div:nth-child(4) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "workflow-design": {
+      "path": "supplement/workflow-design",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "workflow-input": {
+      "path": "supplement/workflow-input",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "workflow-validate": {
+      "path": "supplement/workflow-validate",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "workflow-history": {
+      "path": "supplement/workflow-history",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#wf-tabpanel > div"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "extraction-design": {
+      "path": "supplement/extraction-design",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "extraction-validate": {
+      "path": "supplement/extraction-validate",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "extraction-history": {
+      "path": "supplement/extraction-history",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#extraction-tabpanel-history > div"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "activity": {
+      "path": "supplement/activity",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "account-menu": {
+      "path": "supplement/account-menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "teams-mobile": {
+      "path": "supplement/teams-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                ".text-green-600"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.21 (foreground color: #00a63e, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "review-detail-mobile": {
+      "path": "supplement/review-detail-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(6) > div:nth-child(1) > button"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.65 (foreground color: #0ea5e9, background color: #f9fafb, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(8) > button:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.29 (foreground color: #ffffff, background color: #16a34a, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "support-mobile": {
+      "path": "supplement/support-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    },
+    "docs-mobile": {
+      "path": "supplement/docs-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "description": "Ensure buttons have discernible text",
+          "nodes": [
+            {
+              "target": [
+                ".lg\\:hidden"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(11) > div > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#administration > .space-y-6 > .font-mono.overflow-x-auto.p-4 > div:nth-child(1) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4 > div:nth-child(2) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-classification\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-extraction\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-chat\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-workflow\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-validation\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".mt-1\\.5.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-\\[\\#f1b300\\]\\/30.p-6.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-6.border-white\\/15.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(1) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(2) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(3) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(4) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(5) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-5.border-white\\/15.bg-\\[\\#262626\\] > .mt-3.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(1) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(2) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(3) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(4) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "link-in-text-block",
+          "impact": "serious",
+          "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
+          "nodes": [
+            {
+              "target": [
+                "#contributing > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            },
+            {
+              "target": [
+                "#about > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+          "nodes": [
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .overflow-x-auto.bg-\\[\\#262626\\].rounded-lg:nth-child(11)"
+              ],
+              "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            },
+            {
+              "target": [
+                ".sm\\:text-sm"
+              ],
+              "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    },
+    "certification-mobile": {
+      "path": "supplement/certification-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                ".uppercase"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: bold). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "team-admin-mobile": {
+      "path": "followup/team-admin-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(1) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(2) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(2) > div:nth-child(4) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(5) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(6) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(1) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#main-content > div > div > div > div:nth-child(4) > div:nth-child(2) > div:nth-child(2) > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "credentials-form": {
+      "path": "followup/credentials-form",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "support-widget": {
+      "path": "verification/support-widget",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "description": "Ensure buttons have discernible text",
+          "nodes": [
+            {
+              "target": [
+                ".p-0\\.5"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        }
+      ]
+    },
+    "project-manage": {
+      "path": "verification/project-manage",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "review-edit": {
+      "path": "followup/review-edit",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(8) > button:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.29 (foreground color: #ffffff, background color: #16a34a, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "label",
+          "impact": "critical",
+          "description": "Ensure every form element has a label",
+          "nodes": [
+            {
+              "target": [
+                "textarea[rows=\"9\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element has no placeholder attribute\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        }
+      ]
+    },
+    "docs-top": {
+      "path": "followup/docs-top",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(11) > div > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#administration > .space-y-6 > .font-mono.overflow-x-auto.p-4 > div:nth-child(1) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4 > div:nth-child(2) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-classification\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-extraction\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-chat\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-workflow\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-validation\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".mt-1\\.5.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-\\[\\#f1b300\\]\\/30.p-6.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-6.border-white\\/15.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(1) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(2) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(3) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(4) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(5) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-5.border-white\\/15.bg-\\[\\#262626\\] > .mt-3.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(1) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(2) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(3) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(4) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "link-in-text-block",
+          "impact": "serious",
+          "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
+          "nodes": [
+            {
+              "target": [
+                "#contributing > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            },
+            {
+              "target": [
+                "#about > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            }
+          ]
+        }
+      ]
+    },
+    "docs-top-mobile": {
+      "path": "followup/docs-top-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "description": "Ensure buttons have discernible text",
+          "nodes": [
+            {
+              "target": [
+                ".lg\\:hidden"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#getting-started > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(8) > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4:nth-child(11) > div > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#administration > .space-y-6 > .font-mono.overflow-x-auto.p-4 > div:nth-child(1) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".font-mono.overflow-x-auto.p-4 > div:nth-child(2) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "div:nth-child(3) > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-classification\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-extraction\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-chat\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-workflow\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "label[for=\"count-validation\"] > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".mt-1\\.5.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".border-\\[\\#f1b300\\]\\/30.p-6.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-6.border-white\\/15.bg-\\[\\#262626\\] > .mt-2.text-gray-500.text-xs"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(1) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(2) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(3) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(4) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "tr:nth-child(5) > .p-3:nth-child(1) > .mt-0\\.5.max-w-md.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".p-5.border-white\\/15.bg-\\[\\#262626\\] > .mt-3.text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(1) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(2) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(3) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                ".bg-\\[\\#262626\\].border-white\\/5.border:nth-child(4) > .mb-1.justify-between.items-center > .text-gray-500"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .text-gray-500:nth-child(1)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(5)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            },
+            {
+              "target": [
+                "#contributing > .space-y-6 > .font-mono.overflow-x-auto.p-4 > .mt-3.text-gray-500:nth-child(7)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.12 (foreground color: #6a7282, background color: #262626, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        },
+        {
+          "id": "link-in-text-block",
+          "impact": "serious",
+          "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
+          "nodes": [
+            {
+              "target": [
+                "#contributing > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            },
+            {
+              "target": [
+                "#about > .space-y-6 > .text-lg > .hover\\:underline[target=\"_blank\"][rel=\"noopener noreferrer\"]"
+              ],
+              "summary": "Fix any of the following:\n  The link has insufficient color contrast of 1.27:1 with the surrounding text. (Minimum contrast is 3:1, link text: #f1b300, surrounding text: #d1d5dc)\n  The link has no styling (such as underline) to distinguish it from the surrounding text"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "description": "Ensure elements that have scrollable content are accessible by keyboard in Safari",
+          "nodes": [
+            {
+              "target": [
+                "#cost-estimator > .space-y-6 > .overflow-x-auto.bg-\\[\\#262626\\].rounded-lg:nth-child(11)"
+              ],
+              "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            },
+            {
+              "target": [
+                ".sm\\:text-sm"
+              ],
+              "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    },
+    "support-form": {
+      "path": "verification/support-form",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "description": "Ensure buttons have discernible text",
+          "nodes": [
+            {
+              "target": [
+                ".p-0\\.5"
+              ],
+              "summary": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element does not have an implicit (wrapped) <label>\n  Element does not have an explicit <label>\n  Element's default semantics were not overridden with role=\"none\" or role=\"presentation\""
+            }
+          ]
+        }
+      ]
+    },
+    "extraction-result": {
+      "path": "source-check/extraction-result",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "workflow-step": {
+      "path": "verification/workflow-step",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "#step-tab-basic"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 1.91 (foreground color: #eab308, background color: #ffffff, font size: 9.0pt (12px), font weight: bold). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "certification-lesson": {
+      "path": "final-checks/certification-lesson",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "activity-populated": {
+      "path": "verification/activity-populated",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "sign-in": {
+      "path": "verification/sign-in",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "landing": {
+      "path": "verification/landing",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "extraction-source": {
+      "path": "source-check/extraction-source",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automation-history": {
+      "path": "final-checks/automation-history",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "automation-output": {
+      "path": "final-checks/automation-output",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "examiner-queue": {
+      "path": "roles/examiner-queue",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": []
+    },
+    "support-staff": {
+      "path": "roles/support-staff",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+          "nodes": [
+            {
+              "target": [
+                "div:nth-child(3) > div:nth-child(2) > div"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ]
+        }
+      ]
+    },
+    "examiner-mobile": {
+      "path": "roles/examiner-mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "axe": []
+    }
+  },
+  "limits": [
+    "Every major RA-facing area was sampled, including account/team, support, reviews, learning and the Team Admin overview. Examiner and support-staff overviews were sampled separately. This is not an exhaustive audit of every configuration/admin tab.",
+    "No live authentication submission, model quality, permissions enforcement, delivery/email, real collaborator handoff, long/scanned PDF behavior, extraction export fidelity or production latency was validated.",
+    "Returning-user fixture has sparse activity and a small catalog. Empty-state and short-result quality cannot establish dense production usability.",
+    "Initial missing fixtures, wrong test selectors, expected role denial on /support and the first inconsistent extraction-source fixture were harness limitations, excluded from product findings. Corrected captures are used where available.",
+    "The previous split-icon removal is included in this build. No application code was changed for this assessment. No GitHub issues were reopened or created."
+  ],
+  "nextAcceptance": [
+    "Fix P1 keyboard, mobile-layout and named-control failures before spending another pass on decoration.",
+    "Keep the passing file \u2192 Library \u2192 run \u2192 recover \u2192 return journey intact at 1440, 1024, 768, 390 and 320px.",
+    "Then improve labels, project resumption, failure visibility and RA help. Re-review affected states rather than rebuilding a giant screenshot matrix.",
+    "Validate usefulness with real RAs on five tasks: identify a proposal deadline, compare a budget requirement, verify an extracted value, run a reusable checklist, and hand the result to a colleague. Record unaided completion, time, errors, evidence verification and whether the handoff is usable."
+  ],
+  "roleOverviews": [
+    {
+      "surface": "Examiner / Shared items",
+      "ui": 5.5,
+      "ux": 4.5,
+      "ra": 6.5,
+      "works": "Requests, catalog, coverage and collections have a clear desktop sidebar.",
+      "critique": "The 220px sidebar persists at 390px, crushing explanatory text into a narrow column and clipping controls. Only the empty queue and navigation were assessed; submission decisions were not exercised.",
+      "evidence": [
+        "roles/examiner-queue",
+        "roles/examiner-mobile"
+      ]
+    },
+    {
+      "surface": "Support-staff queue",
+      "ui": 7,
+      "ux": 7,
+      "ra": 6.5,
+      "works": "Stats, status filters, search and priority/type filters give support staff a clear triage overview.",
+      "critique": "The empty queue was assessed on desktop only. Ticket conversations, assignment, populated queues and staff mobile behavior remain outside this pass. RA usefulness is indirect through support quality.",
+      "evidence": [
+        "roles/support-staff"
+      ]
+    }
+  ]
+}

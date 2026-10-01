@@ -8,6 +8,8 @@ import { useBranding } from '../../contexts/BrandingContext'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface Props {
+  initialDraft?: string
+  onDraftChange?: (draft: string) => void
   onSend: (message: string) => void | Promise<void>
   onAttachFile?: (files: File[]) => void
   onAttachLink?: (url: string) => void
@@ -25,6 +27,7 @@ interface Props {
   hasDocuments?: boolean
   contextMeter?: ReactNode
   memoryControl?: ReactNode
+  navigationControl?: ReactNode
   // Bumped by the workspace to pull focus into the composer (e.g. the file
   // browser's "Ask about folder" action).
   focusSignal?: number
@@ -36,11 +39,17 @@ export function ChatInput({
   onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onModelsLoaded, onExport, hasMessages, hasDocuments,
-  contextMeter, memoryControl, focusSignal,
+  contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange,
 }: Props) {
   const branding = useBranding()
   const uploadPolicy = useUploadPolicy()
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialDraft)
+  const messageRef = useRef(message)
+  const updateMessage = (value: string) => {
+    messageRef.current = value
+    setMessage(value)
+    onDraftChange?.(value)
+  }
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
@@ -118,7 +127,7 @@ export function ChatInput({
     try {
       await onSend(trimmed)
       // A new draft typed during submission belongs to the next message.
-      setMessage(current => current === message ? '' : current)
+      if (messageRef.current === message) updateMessage('')
     } catch (reason) {
       setSendError(reason instanceof Error ? reason.message : 'Could not send.')
     } finally {
@@ -157,7 +166,7 @@ export function ChatInput({
 
   return (
     <div
-      className="shrink-0 p-[15px] bg-white"
+      className="chat-composer shrink-0 p-[15px] bg-white"
       style={{ boxShadow: '0 0px 23px -8px rgb(211, 211, 211)', zIndex: 500 }}
     >
       {/* Link input row */}
@@ -204,7 +213,7 @@ export function ChatInput({
           <textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => updateMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
               hasDocuments
@@ -290,7 +299,7 @@ export function ChatInput({
 
           {/* Model selector */}
           {onModelChange && (
-            <div ref={modelMenuRef} className="relative">
+            <div ref={modelMenuRef} className="chat-model-control relative">
               <button
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 aria-expanded={showModelMenu}
@@ -299,7 +308,7 @@ export function ChatInput({
                 className="flex min-w-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
               >
                 <Cpu className="h-3 w-3 shrink-0" />
-                <span className="truncate max-w-[28vw] sm:max-w-[160px]">{displayModel || 'Model'}</span>
+                <span className="chat-model-name truncate max-w-[28vw] sm:max-w-[160px]">{displayModel || 'Model'}</span>
                 <ChevronDown className="h-3 w-3 shrink-0" />
               </button>
 
@@ -327,6 +336,7 @@ export function ChatInput({
 
           {/* Assistant memory */}
           {memoryControl}
+          {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
 
           {/* Export button */}
           {onExport && hasMessages && (

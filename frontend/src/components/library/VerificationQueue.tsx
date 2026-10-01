@@ -46,7 +46,7 @@ function DetailSection({ label, children }: { label: string; children: React.Rea
 }
 
 function ListDetail({ label, items }: { label: string; items?: string[] }) {
-  if (!items || items.length === 0) return null
+  if (!items || items.length === 0) return <DetailSection label={label}>None supplied.{label !== 'Dependencies' && ' Request a concrete example from the author.'}</DetailSection>
   return (
     <DetailSection label={label}>
       <ul className="list-disc list-inside space-y-0.5">
@@ -61,18 +61,26 @@ function ListDetail({ label, items }: { label: string; items?: string[] }) {
 export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: string } = {}) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [view, setView] = useState<QueueView>('pending')
+  const [queueView, setView] = useState<QueueView>('pending')
+  const view: QueueView = user?.is_examiner ? queueView : 'mine'
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
-  const [reviewNotes, setReviewNotes] = useState('')
+  const [notesByRequest, setNotesByRequest] = useState<Record<string, string>>({})
+  const [queueError, setQueueError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const actionPending = useRef(false)
+  const requestVersion = useRef(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const [drawerRequest, setDrawerRequest] = useState<VerificationRequest | null>(null)
 
   const refresh = useCallback(async () => {
+    const version = ++requestVersion.current
     setLoading(true)
+    setQueueError(null)
     try {
       // pending_admin_validation is a client-side filter on validation_origin, not a status
       const serverStatus = statusFilter === 'pending_admin_validation' ? undefined : statusFilter || undefined
@@ -80,16 +88,17 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
         view === 'pending'
           ? await listVerificationQueue(serverStatus)
           : await myVerificationRequests()
-      setRequests(data.requests)
-    } catch {
-      // silently fail
+      if (version === requestVersion.current) setRequests(data.requests)
+    } catch (error) {
+      if (version === requestVersion.current) setQueueError(error instanceof Error ? error.message : 'Could not load submissions')
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }, [view, statusFilter])
 
   useEffect(() => {
     refresh()
+    const requests = requestVersion; return () => { requests.current++ }
   }, [refresh])
 
   // A notification names one submission, so open it rather than dropping the
@@ -116,10 +125,24 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
     // Publishing is one decision. Organization visibility and collection
     // membership are curated afterwards on the Catalog tab, where that work
     // already lives, rather than bolted onto the button.
-    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined)
-    setReviewingId(null)
-    setReviewNotes('')
-    refresh()
+    if (actionPending.current || !user?.is_examiner) return
+    if ((action === 'returned' || action === 'rejected') && !notesByRequest[uuid]?.trim()) {
+      setActionError('Add review notes explaining what the author should change before sending back or declining.'); return
+    }
+    actionPending.current = true
+    setPendingAction(uuid)
+    setActionError(null)
+    try {
+      await updateVerificationStatus(uuid, action, notesByRequest[uuid]?.trim() || undefined)
+      setReviewingId(null)
+      setNotesByRequest(notes => { const next = { ...notes }; delete next[uuid]; return next })
+      await refresh()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not save the review. Your notes are still here; try again.')
+    } finally {
+      actionPending.current = false
+      setPendingAction(null)
+    }
   }
 
   const handleOpen = (req: VerificationRequest) => {
@@ -137,6 +160,8 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
           workflow_share_token: undefined,
         },
       })
+    } else if (req.item_kind === 'knowledge_base') {
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: req.item_id, project: undefined, workflow_share_token: undefined } })
     } else if (req.item_uuid) {
       navigate({
         to: '/',
@@ -190,7 +215,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
 
       {/* Search + view toggle + status filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 basis-48 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
@@ -202,7 +227,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
           />
         </div>
         <div role="group" aria-label="Shared items views" className="flex items-center gap-2">
-          <button
+          {user?.is_examiner && <button
             type="button"
             aria-pressed={view === 'pending'}
             onClick={() => setView('pending')}
@@ -213,7 +238,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
             }`}
           >
             Requests
-          </button>
+          </button>}
           <button
             type="button"
             aria-pressed={view === 'mine'}
@@ -241,6 +266,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
           ] as [StatusFilter, string][]).map(([val, label]) => (
             <button
               key={val}
+              aria-pressed={statusFilter === val}
               onClick={() => setStatusFilter(val)}
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                 statusFilter === val
@@ -254,11 +280,15 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
         </div>
       )}
 
+      {actionError && <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{actionError} Your review notes are preserved.</p>}
+      {pendingAction && <p role="status" className="mb-3 text-sm text-gray-600">Saving the review decision…</p>}
       {loading ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
+      ) : queueError ? (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">Submissions could not be loaded: {queueError}. <button type="button" onClick={() => void refresh()} className="underline">Retry submissions</button></div>
       ) : filtered.length === 0 ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-12 text-center">
-          {view === 'pending' ? 'No pending verification requests.' : 'You have no submissions yet.'}
+          {searchQuery || statusFilter ? 'No submissions match these filters. Try another search or choose All.' : view === 'pending' ? 'No pending sharing requests.' : 'You have no submissions yet.'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -274,9 +304,9 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                 className="border border-gray-200 rounded-lg bg-white"
               >
                 <div className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-56">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <button
                           type="button"
                           onClick={() => setExpandedId(isExpanded ? null : req.uuid)}
@@ -296,7 +326,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                           <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <ShieldCheck className="h-4 w-4 text-gray-400 shrink-0" />
-                        <span className="text-sm font-semibold text-gray-900 truncate">
+                        <span className="break-words text-sm font-semibold text-gray-900">
                           {req.item_name || req.summary || 'Untitled'}
                         </span>
                         <span
@@ -356,7 +386,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                     {/* Actions for pending queue */}
                     {view === 'pending' &&
                       (req.status === 'submitted' || req.status === 'in_review') && (
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-1 sm:w-auto">
                           {!isReviewing ? (
                             <>
                               <button
@@ -369,9 +399,10 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                               </button>
                               {req.status === 'submitted' && (
                                 <button
+                                  disabled={!!pendingAction}
                                   onClick={() => handleAction(req.uuid, 'in_review')}
                                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200"
-                                  title="Claim this submission and mark it as actively under review"
+                                  title="Mark this submission as actively under review"
                                 >
                                   Mark In Review
                                 </button>
@@ -384,13 +415,15 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                               </button>
                             </>
                           ) : (
-                            <div className="flex flex-col gap-2 w-64">
+                            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-64">
                               <textarea
-                                value={reviewNotes}
-                                onChange={(e) => setReviewNotes(e.target.value)}
-                                placeholder="What would get it there? Shown to the author. (optional)"
+                                disabled={!!pendingAction}
+                                aria-label={`Review notes for ${req.item_name || req.summary || 'submission'}`}
+                                value={notesByRequest[req.uuid] || ''}
+                                onChange={(e) => setNotesByRequest(notes => ({ ...notes, [req.uuid]: e.target.value }))}
+                                placeholder="What would get it there? Shown to the author. Required for Send back or Decline."
                                 rows={2}
-                                className="text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+                                className="w-full min-w-0 text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                               />
                               {/* Baseline note in reviewer language: what publishing does,
                                   not a warning about a subsystem. Absence is information, not
@@ -410,21 +443,23 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                                   Declining outright is rare enough to sit below the row. */}
                               <div className="flex gap-1">
                                 <button
+                                  disabled={!!pendingAction}
                                   onClick={() => handleAction(req.uuid, 'approved')}
-                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
+                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-green-700 text-white hover:bg-green-800"
                                 >
                                   Accept
                                 </button>
                                 <button
+                                  disabled={!!pendingAction}
                                   onClick={() => handleAction(req.uuid, 'returned')}
-                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-orange-500 text-white hover:bg-orange-600"
+                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-orange-700 text-white hover:bg-orange-800"
                                 >
                                   Send back
                                 </button>
                                 <button
+                                  disabled={!!pendingAction}
                                   onClick={() => {
                                     setReviewingId(null)
-                                    setReviewNotes('')
                                   }}
                                   className="px-2 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
                                 >
@@ -433,7 +468,8 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleAction(req.uuid, 'rejected')}
+                                disabled={!!pendingAction}
+                                  onClick={() => handleAction(req.uuid, 'rejected')}
                                 className="self-start text-xs text-red-700 hover:underline"
                                 title="Close this request without sharing it. Prefer Send back when a revision could get it there."
                               >
@@ -449,7 +485,13 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                 {/* Expandable detail section */}
                 {isExpanded && (
                   <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-9">
+                    <section aria-label="Submission readiness" className="mb-4 rounded border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                      <h3 className="mb-1 font-semibold text-gray-900">Review readiness</h3>
+                      <p>{req.example_inputs?.length || 0} example input(s) · {req.expected_outputs?.length || 0} expected output(s).</p>
+                      <p>{req.validation_origin === 'pending_admin_validation' ? 'The author requests help with validation.' : req.validation_snapshot ? 'A submitted validation result is available below.' : 'No validation result was supplied.'} {req.known_limitations ? 'Known limitations are documented below.' : 'No limitations were documented; ask about unsupported cases.'}</p>
+                      <p className="mt-1">Assess usefulness, review the measured evidence, then decide whether to share. A completed validation run or a high score does not establish correctness on other documents.</p>
+                    </section>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:ml-9">
                       {req.validation_snapshot && (() => {
                         const snapshot = req.validation_snapshot as Record<string, unknown>
                         const aggregateAccuracy =
@@ -492,11 +534,8 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                           <p className="whitespace-pre-wrap text-orange-700">{req.return_guidance}</p>
                         </DetailSection>
                       )}
-                      {req.description && (
-                        <DetailSection label="Description">
-                          <p className="whitespace-pre-wrap">{req.description}</p>
-                        </DetailSection>
-                      )}
+                      <DetailSection label="Task and intended use"><p className="whitespace-pre-wrap break-words">{req.description || 'No task description was supplied. Open the item and request a concrete use case before deciding whether it is useful to share.'}</p></DetailSection>
+                      <p className="text-xs leading-5 text-gray-600">Acceptance makes this item available for sharing. Recorded validation describes the submitted test cases; it does not guarantee correctness on another user’s documents.</p>
                       {req.run_instructions && (
                         <DetailSection label="Run Instructions">
                           <p className="whitespace-pre-wrap">{req.run_instructions}</p>
@@ -546,7 +585,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                       )}
                       {req.item_version_hash && (
                         <DetailSection label="Version Hash">
-                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">{req.item_version_hash}</code>
+                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono break-all">{req.item_version_hash}</code>
                         </DetailSection>
                       )}
                     </div>

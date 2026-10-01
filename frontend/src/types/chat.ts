@@ -16,6 +16,8 @@ export interface ChatMessage {
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
   source_documents?: SourceDocument[]
+  /** Snapshot of the outgoing request, recorded locally for live turns. */
+  request_scope?: { documents: string[]; folders: string[]; knowledgeBases: string[]; project?: string }
 }
 
 /** A document that was attached when a question was asked. The title is stored

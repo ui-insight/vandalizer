@@ -82,6 +82,11 @@ def _mock_find_chain(items):
 
 
 class TestListContents:
+    @pytest.fixture(autouse=True)
+    def no_project_scope(self):
+        with patch("app.services.access_control.find_folder_project", new=AsyncMock(return_value=None)):
+            yield
+
     @pytest.mark.asyncio
     async def test_returns_folders_and_documents(self):
         folders = [_make_folder(uuid="f1", title="My Folder")]

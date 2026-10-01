@@ -29,3 +29,19 @@ it('ignores an earlier team response that arrives after an account change', asyn
   expect(result.current.currentTeam?.uuid).toBe('t2')
   expect(result.current.loading).toBe(false)
 })
+
+it('keeps same-account team context on refresh failure but never reveals it to another account', async () => {
+  mocks.user = { user_id: 'u1' } as User
+  mocks.list.mockResolvedValueOnce([{ uuid: 't1' } as Team])
+  const { result, rerender } = renderHook(() => useTeams(), { wrapper: TeamProvider })
+  await waitFor(() => expect(result.current.currentTeam?.uuid).toBe('t1'))
+  mocks.list.mockRejectedValue(new Error('Unavailable'))
+  await act(async () => { await result.current.refreshTeams() })
+  expect(result.current.currentTeam?.uuid).toBe('t1')
+  expect(result.current.error).toBe('Unavailable')
+  mocks.user = { user_id: 'u2' } as User; rerender()
+  expect(result.current.teams).toEqual([])
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  expect(result.current.currentTeam).toBeNull()
+  expect(result.current.teams).toEqual([])
+})

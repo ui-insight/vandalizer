@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, X, Maximize2, Printer } from 'lucide-react'
 import type { Slide as SlideData } from '../content'
 import { Slide } from './Slide'
 import { usePresentNav } from '../usePresentNav'
+import { FocusTrap } from '../../../components/shared/PanelFocusTrap'
 import { cn } from '../../../lib/cn'
 
 export interface DeckProps {
@@ -31,6 +32,7 @@ export function Deck({
   onIndexChange,
   onPrint,
 }: DeckProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
   const count = slides.length
   const clampedInitial = Math.min(Math.max(initialIndex, 0), count - 1)
   const [index, setIndex] = useState(clampedInitial)
@@ -55,8 +57,8 @@ export function Deck({
 
   const requestFullscreen = () => {
     try {
-      if (document.fullscreenElement) document.exitFullscreen?.()
-      else document.documentElement.requestFullscreen?.()
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+      else document.documentElement.requestFullscreen?.().catch(() => {})
     } catch {
       /* fullscreen is best-effort; the CSS overlay already fills the screen */
     }
@@ -65,15 +67,16 @@ export function Deck({
   const slide = slides[index]
 
   return (
-    <div
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false, initialFocus: () => dialogRef.current!, fallbackFocus: () => dialogRef.current! }}>
+    <div ref={dialogRef} tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={title ? `${title}: presentation` : 'Presentation'}
       className="no-print fixed inset-0 z-[100] flex flex-col bg-[#0a0a0a] text-white"
     >
       {/* Top chrome */}
-      <div className="no-print flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10">
-        <div className="flex items-center gap-3 text-sm">
+      <div className="no-print flex flex-wrap gap-2 items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="font-bold text-white">Vandalizer</span>
           {title && <span className="text-[#f1b300]">{title}</span>}
         </div>
@@ -105,44 +108,45 @@ export function Deck({
       </div>
 
       {/* Slide stage */}
-      <div className="relative flex-1 min-h-0 flex items-center justify-center px-6 sm:px-16 py-8 overflow-y-auto">
+      <div role="region" aria-label="Presentation slide" tabIndex={0} className="relative flex-1 min-h-0 px-6 sm:px-16 py-8 overflow-y-auto">
         {/* Prev / next click zones (chevrons) */}
+
+        <Slide slide={slide} />
+
+      </div>
+
+      <div className="no-print flex justify-between px-4">
         <button
           onClick={() => goTo(index - 1)}
           disabled={index === 0}
           aria-label="Previous slide"
-          className="no-print absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-gray-500 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+          className="no-print p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-20"
         >
           <ChevronLeft className="w-7 h-7" />
         </button>
-        <Slide slide={slide} />
         <button
           onClick={() => goTo(index + 1)}
           disabled={index === count - 1}
           aria-label="Next slide"
-          className="no-print absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-gray-500 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+          className="no-print p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-20"
         >
           <ChevronRight className="w-7 h-7" />
         </button>
       </div>
-
       {/* Bottom chrome: dots + counter + hint */}
-      <div className="no-print flex items-center justify-between px-4 sm:px-6 py-3 border-t border-white/10">
-        <div className="flex items-center gap-1.5">
+      <div className="no-print flex flex-wrap gap-2 items-center justify-between px-4 sm:px-6 py-3 border-t border-white/10">
+        <div className="flex flex-wrap items-center gap-1.5">
           {slides.map((s, i) => (
             <button
               key={s.id}
               onClick={() => goTo(i)}
               aria-label={`Go to slide ${i + 1}`}
               aria-current={i === index}
-              className={cn(
-                'h-2 rounded-full transition-all',
-                i === index ? 'w-6 bg-[#f1b300]' : 'w-2 bg-white/20 hover:bg-white/40',
-              )}
-            />
+              className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white/10"
+            ><span className={cn('block h-2 rounded-full', i === index ? 'w-5 bg-[#f1b300]' : 'w-2 bg-white/40')} /></button>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4 text-xs text-gray-400">
           <span className="hidden sm:inline">← → to navigate · Esc to exit</span>
           <span className="tabular-nums text-gray-400">
             {index + 1} / {count}
@@ -150,5 +154,6 @@ export function Deck({
         </div>
       </div>
     </div>
+    </FocusTrap>
   )
 }

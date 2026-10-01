@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ShieldCheck, AlertTriangle, Pin, Wrench, CheckCircle2, Filter } from 'lucide-react'
 import { listCatalogCoverage } from '../../api/library'
 import type { CatalogCoverageItem } from '../../types/library'
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
+import { TableRegion } from '../admin/shared/TableRegion'
 import { RetroactiveBaselineDialog } from './RetroactiveBaselineDialog'
 
 type Coverage = '' | 'none' | 'snapshot_only' | 'pinned_baseline' | 'drift_checked'
@@ -34,31 +36,14 @@ function kindLabel(k: string) {
 }
 
 export function CatalogCoverageTab() {
-  const [items, setItems] = useState<CatalogCoverageItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [coverage, setCoverage] = useState<Coverage>('')
   const [kind, setKind] = useState<Kind>('')
   const [editing, setEditing] = useState<CatalogCoverageItem | null>(null)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await listCatalogCoverage({
-        kind: kind || undefined,
-        coverage: coverage || undefined,
-        limit: 200,
-      })
-      setItems(data.items)
-      setTotal(data.total)
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false)
-    }
-  }, [coverage, kind])
-
-  useEffect(() => { refresh() }, [refresh])
+  const request = useCallback(() => listCatalogCoverage({ kind: kind || undefined, coverage: coverage || undefined, limit: 200 }), [coverage, kind])
+  const { data, loading, error, load: refresh } = useAdminQuery(request)
+  const items = data?.items ?? []
+  const total = data?.total
 
   // Summary counts
   const counts = items.reduce<Record<string, number>>((acc, it) => {
@@ -69,15 +54,16 @@ export function CatalogCoverageTab() {
   return (
     <div>
       <div className="mb-4">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
           <h2 className="text-base font-semibold text-gray-900">Validation coverage</h2>
-          <span className="text-xs text-gray-500">({total} shared items)</span>
+          <span className="text-xs text-gray-500">({total ?? '…'} matching shared items)</span>
         </div>
         <p className="text-xs text-gray-500">
           Shared items by validation coverage. An item without a pinned baseline is not monitored for drift — <strong>Establish baseline</strong> pins one from its latest validation.
         </p>
       </div>
 
+      <p className="mb-3 text-xs text-gray-600">Counts describe the loaded matching items{total != null && total > items.length ? ` (${items.length} of ${total}; first 200 shown)` : ''}. Filter by kind or coverage to narrow the list.</p>
       {/* Summary tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         {(['none', 'snapshot_only', 'pinned_baseline', 'drift_checked'] as const).map(c => {
@@ -87,6 +73,7 @@ export function CatalogCoverageTab() {
           return (
             <button
               key={c}
+              aria-pressed={active}
               onClick={() => setCoverage(active ? '' : c)}
               className={`text-left p-3 rounded-lg border transition-all ${active ? 'ring-2 ring-gray-900' : ''} ${COVERAGE_STYLE[c]}`}
             >
@@ -94,18 +81,19 @@ export function CatalogCoverageTab() {
                 <Icon className="h-4 w-4" />
                 <div className="text-xs font-semibold">{COVERAGE_LABEL[c]}</div>
               </div>
-              <div className="text-2xl font-bold mt-1">{count}</div>
+              <div className="text-2xl font-bold mt-1">{loading || error ? '—' : count}</div>
             </button>
           )
         })}
       </div>
 
       {/* Kind filter */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <Filter className="h-3 w-3 text-gray-500" />
         {(['', 'workflow', 'search_set', 'knowledge_base'] as const).map(k => (
           <button
             key={k || 'all'}
+            aria-pressed={kind === k}
             onClick={() => setKind(k)}
             className={`px-2.5 py-1 rounded-full text-xs font-medium border ${kind === k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
           >
@@ -119,7 +107,7 @@ export function CatalogCoverageTab() {
         )}
       </div>
 
-      {loading ? (
+      {error ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error} <button onClick={refresh} className="underline">Retry coverage</button></p> : loading ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading…</div>
       ) : items.length === 0 ? (
         <div className="text-sm text-gray-500 py-12 text-center">
@@ -127,7 +115,7 @@ export function CatalogCoverageTab() {
         </div>
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+          <TableRegion label="Catalog validation coverage"><table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr className="text-left text-xs font-semibold text-gray-600">
                 <th scope="col" className="px-3 py-2">Item</th>
@@ -136,7 +124,7 @@ export function CatalogCoverageTab() {
                 <th scope="col" className="px-3 py-2">Current score</th>
                 <th scope="col" className="px-3 py-2">Pinned</th>
                 <th scope="col" className="px-3 py-2">Drift check</th>
-                <th scope="col" className="px-3 py-2"></th>
+                <th scope="col" className="px-3 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -148,7 +136,7 @@ export function CatalogCoverageTab() {
                     : null
                 return (
                   <tr key={`${it.item_kind}:${it.item_id}`} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2 font-medium text-gray-900 truncate max-w-xs">{it.name}</td>
+                    <td className="px-3 py-2 font-medium text-gray-900 break-words max-w-xs">{it.name}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{kindLabel(it.item_kind)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${COVERAGE_STYLE[it.coverage]}`}>
@@ -172,12 +160,12 @@ export function CatalogCoverageTab() {
                         <div>
                           <div>{new Date(it.last_drift_check_at).toLocaleDateString()}</div>
                           {driftDelta != null && (
-                            <div className={`text-xs ${driftDelta >= 10 ? 'text-red-600' : driftDelta >= 5 ? 'text-amber-600' : 'text-gray-500'}`}>
+                            <div className={`text-xs ${driftDelta >= 10 ? 'text-red-600' : driftDelta >= 5 ? 'text-amber-800' : 'text-gray-500'}`}>
                               {driftDelta > 0 ? `-${driftDelta.toFixed(1)} pts` : 'stable'}
                               {it.last_drift_basis !== 'baseline_reexecution' && (
                                 <span
                                   title="Compared against the item's latest validation score — the frozen baseline was not re-run. Enable monitoring.baseline_reexecution to re-execute extraction baselines."
-                                  className="ml-1 text-gray-400"
+                                  className="ml-1 text-gray-600"
                                 >
                                   (proxy)
                                 </span>
@@ -200,7 +188,7 @@ export function CatalogCoverageTab() {
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
 

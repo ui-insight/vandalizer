@@ -8,7 +8,8 @@ const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: 
 const { page, state } = review
 const viewports = [[320,568],[768,600],[1440,900]].filter(([width]) => !process.env.REVIEW_WIDTHS || process.env.REVIEW_WIDTHS.split(',').includes(String(width)))
 page.setDefaultTimeout(10000)
-let failPicker = false, failPreview = false
+let failPicker = false, failPreview = false, failFinalUpdate = false
+const creates = [], updates = []
 const actionName = 'Proposal readiness review — institutional requirements, award conditions, and submission evidence'
 await page.route('**/api/library/library-1/items?*', async route => {
   if (failPicker) return route.fulfill({ status: 503, json: { detail: 'Library temporarily unavailable.' } })
@@ -20,6 +21,38 @@ await page.route('**/api/automations/schedule/preview', async route => {
   if (failPreview) return route.fulfill({ status: 503, json: { detail: 'Schedule preview temporarily unavailable.' } })
   await route.fulfill({ json: { cron_expression: '0 9 * * 1', timezone: 'UTC', next_runs: ['2026-10-05T09:00:00Z', '2026-10-12T09:00:00Z'] } })
 })
+// Capture exact requests without running or delivering any automation.
+await page.route('**/api/automations', async route => {
+  if (route.request().method() !== 'POST') return route.fallback()
+  const draft = route.request().postDataJSON(); creates.push(draft)
+  state.savedAutomation = { ...automation, ...draft, id: 'auto-1', enabled: false }
+  return route.fulfill({ json: state.savedAutomation })
+})
+await page.route('**/api/automations/auto-1', async route => {
+  if (route.request().method() !== 'PATCH') return route.fallback()
+  const draft = route.request().postDataJSON(); updates.push(draft)
+  if (failFinalUpdate) return route.fulfill({ status: 503, json: { detail: 'Final update temporarily unavailable' } })
+  state.savedAutomation = { ...state.savedAutomation, ...draft }
+  return route.fulfill({ json: state.savedAutomation })
+})
+async function saveAndCheck(activate, width, expected) {
+  const createCount = creates.length, updateCount = updates.length
+  const button = page.getByRole('button', { name: activate ? 'Create & enable' : 'Save disabled', exact: true })
+  failFinalUpdate = true
+  await button.click()
+  await page.getByRole('alert').filter({ hasText: 'Retry to update the same automation.' }).waitFor()
+  assert.equal(creates.length, createCount + 1)
+  const submitted = creates.at(-1)
+  for (const [key, value] of Object.entries(expected)) assert.deepEqual(submitted[key], value, 'submitted ' + key)
+  await shot(`wizard-${activate ? 'enable' : 'disabled'}-save-recovery-${width}`)
+  failFinalUpdate = false
+  await button.click()
+  await page.getByRole('dialog', { name: 'New Automation', exact: true }).waitFor({ state: 'hidden' })
+  assert.equal(creates.length, createCount + 1, 'Retry must not create a second automation')
+  assert.equal(updates.length, updateCount + 2)
+  assert.deepEqual(updates.at(-1), { ...submitted, enabled: activate })
+  assert.equal(state.savedAutomation.enabled, activate)
+}
 async function shot(id) {
   await review.capture(id)
   console.log(`Captured ${id}`)
@@ -76,6 +109,9 @@ try {
     await page.getByLabel('Email recipients').fill('review@example.test')
     await reachable(page.getByRole('button', { name: 'Create & enable' }))
     await shot(`wizard-folder-review-${width}`)
+    await saveAndCheck(true, width, { name: 'Review proposal intake', trigger_type: 'folder_watch', action_type: 'workflow', action_id: 'workflow-1', output_config: { storage: { enabled: true, destination_folder: 'folder-1', format: 'text' }, notifications: [{ channel: 'email', recipients: ['review@example.test'], notify_owner: true }] } })
+    assert.equal(creates.at(-1).trigger_config.folder_id, 'folder-1')
+    assert.equal(creates.at(-1).trigger_config.exclude_patterns, 'draft*')
 
     await openWizard()
     await page.getByLabel('Name', { exact: false }).fill('API proposal review')
@@ -87,6 +123,7 @@ try {
     await next()
     await reachable(page.getByRole('button', { name: 'Save disabled' }))
     await shot(`wizard-api-review-${width}`)
+    await saveAndCheck(false, width, { name: 'API proposal review', trigger_type: 'api', action_type: 'workflow', action_id: 'workflow-1', output_config: {} })
 
     await openWizard()
     await page.getByLabel('Name', { exact: false }).fill('Scheduled proposal review')

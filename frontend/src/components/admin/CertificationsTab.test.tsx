@@ -50,24 +50,24 @@ describe('CertificationsTab — unlock toggle', () => {
     mockSetCertificationUnlock.mockResolvedValue({ user_id: 'user-1', unlocked: true })
     render(<CertificationsTab />)
     await waitFor(() => expect(screen.getByText('Target User')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock prerequisites for Target User' }))
     await waitFor(() => expect(mockSetCertificationUnlock).toHaveBeenCalledWith('user-1', true))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unlocked' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Re-lock prerequisites for Target User' })).toBeInTheDocument())
   })
 
   it('does not leave the row flipped and surfaces an error on a rejected unlock (regression for plan 004)', async () => {
     mockSetCertificationUnlock.mockRejectedValue(new Error('Server rejected the change'))
     render(<CertificationsTab />)
     await waitFor(() => expect(screen.getByText('Target User')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock prerequisites for Target User' }))
     await waitFor(() => expect(mockSetCertificationUnlock).toHaveBeenCalledWith('user-1', true))
     await waitFor(() => expect(mockToast).toHaveBeenCalledWith(
       expect.stringContaining('Failed to unlock certification for Target User'),
       'error',
     ))
     // Row must still read "Unlock" (not flipped to "Unlocked") since the write failed.
-    expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Unlocked' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unlock prerequisites for Target User' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Re-lock prerequisites for Target User' })).not.toBeInTheDocument()
   })
 })
 

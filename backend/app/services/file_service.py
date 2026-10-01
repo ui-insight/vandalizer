@@ -61,7 +61,7 @@ async def upload_document(
     team_id: str | None = None
 
     if target_folder and target_folder != "0":
-        parent_folder = await access_control.get_authorized_folder(target_folder, user)
+        parent_folder = await access_control.get_authorized_folder(target_folder, user, contribute=True)
         if not parent_folder:
             raise ValueError("Folder not found.")
         team_id = parent_folder.team_id
@@ -301,7 +301,7 @@ async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
 
     target_team_id: str | None = None
     if folder_id != "0":
-        folder = await access_control.get_authorized_folder(folder_id, user)
+        folder = await access_control.get_authorized_folder(folder_id, user, contribute=True)
         if not folder:
             return False
         target_team_id = folder.team_id

@@ -1,3 +1,4 @@
+import { TaskHelpLink } from '../shared/TaskHelpLink'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useRef, useEffect } from 'react'
@@ -281,39 +282,28 @@ export function LibraryTab() {
     if (!shareDialogItem || !targetTeamId) return
     const { id, name } = shareDialogItem
     const teamName = teams.find((t) => t.id === targetTeamId)?.name ?? 'the team'
-    setShareDialogItem(null)
     try {
       await shareToTeam(id, targetTeamId, comment || undefined)
-      toast(`Shared to ${teamName}'s library`, 'success')
-      refreshItems()
     } catch (err) {
-      // 409: this item was already shared to the team — re-sharing would
-      // create an independent duplicate, so ask before forcing it.
-      if (err instanceof ApiError && err.status === 409) {
-        const ok = await confirm({
-          title: 'Already shared to team',
-          message: (
-            <>
-              <strong>{name}</strong> is already in {teamName}'s library. Sharing again
-              creates a separate copy that can be edited independently of the first.
-            </>
-          ),
-          confirmLabel: 'Share a copy',
-        })
-        if (!ok) return
-        try {
-          await shareToTeam(id, targetTeamId, comment || undefined, true)
-          toast(`Shared a new copy to ${teamName}'s library`, 'success')
-          refreshItems()
-        } catch (err2) {
-          const msg = err2 instanceof ApiError ? err2.message : 'Failed to share to team'
-          toast(msg, 'error')
-        }
-        return
-      }
-      const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
-      toast(msg, 'error')
+      // Sharing again creates another independent copy, so retain the draft
+      // while asking whether that is intended. Failures reach the open dialog.
+      if (!(err instanceof ApiError) || err.status !== 409) throw err
+      const ok = await confirm({
+        title: 'Already shared to team',
+        message: (
+          <>
+            <strong>{name}</strong> is already in {teamName}'s library. Sharing again
+            creates a separate copy that can be edited independently of the first.
+          </>
+        ),
+        confirmLabel: 'Share a copy',
+      })
+      if (!ok) return
+      await shareToTeam(id, targetTeamId, comment || undefined, true)
     }
+    setShareDialogItem(null)
+    toast(`Shared to ${teamName}'s library`, 'success')
+    void refreshItems()
   }
   // Prompts/formatters are search_set items — label them by set_type.
   const itemKindLabel = (item: { kind: string; set_type: string | null }) =>
@@ -795,6 +785,14 @@ export function LibraryTab() {
         </div>
 
         <SavedScopeHint scope={scope} kind="tools" />
+        {scope !== 'explore' && <details className="text-sm text-gray-600">
+          <summary className="cursor-pointer py-1">Find a tool for an RA task</summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {([{ label: 'Review requirements', query: 'review', kind: 'workflow' }, { label: 'Extract budget details', query: 'budget', kind: 'extraction' }, { label: 'Summarize award conditions', query: 'award', kind: 'prompt' }] as const).map(task => <button type="button" key={task.label} className="rounded border border-gray-300 bg-white px-2 py-1 text-left" onClick={() => { setSearch(task.query); setKindFilter(task.kind) }}>{task.label}</button>)}
+          </div>
+          <p className="mt-2">These search your current library. Review the tool’s inputs and description; matching a task name does not establish quality.</p>
+          <TaskHelpLink topic="library-tools">Choosing and reusing a Library tool</TaskHelpLink>
+        </details>}
         {scope !== 'explore' && <div style={{ position: 'relative', minWidth: 0 }}>
               <Search
                 style={{
@@ -838,11 +836,11 @@ export function LibraryTab() {
               />
             </div>}
         {/* Row 3: Filter chips + sort (Explore has its own) */}
-        <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--workspace-space-12)', paddingBottom: 'var(--workspace-space-2)' }}>
+        <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--workspace-space-12)', paddingBottom: 'var(--workspace-space-2)' }}>
           <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
             {KIND_FILTERS.map(({ value, label }) => <option key={value} value={value}>{label} ({kindCounts[value]})</option>)}
           </select>
-          <div className="library-kind-chips" style={{ display: 'flex', gap: 'var(--workspace-space-12)', alignItems: 'center' }}>
+          <div className="library-kind-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', alignItems: 'center' }}>
             {KIND_FILTERS.map(({ value, label }) => {
               const active = kindFilter === value
               const count = kindCounts[value]
@@ -1929,6 +1927,7 @@ export function LibraryTab() {
 
       {shareDialogItem && (
         <ShareWithTeamDialog
+          createsIndependentCopy
           itemName={shareDialogItem.name}
           teams={teams.map((t) => ({ id: t.id, name: t.name }))}
           defaultTeamId={teamId}

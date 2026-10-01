@@ -1,11 +1,12 @@
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
 import { Link } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   AlertTriangle, CheckCircle2, Eye, Play, RefreshCw, Sparkles, XCircle,
 } from 'lucide-react'
 import {
   getOptimizerActivity,
-  type OptimizerActivityResponse,
   type OptimizerActivityRun,
 } from '../../api/admin'
 import { relativeTime } from '../../utils/time'
@@ -44,30 +45,13 @@ function triggerLabel(run: OptimizerActivityRun): string {
 }
 
 export function OptimizerTab() {
-  const [data, setData] = useState<OptimizerActivityResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(14)
   const [surface, setSurface] = useState('')
   const [status, setStatus] = useState('')
   const [trigger, setTrigger] = useState<'' | 'auto' | 'user'>('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    getOptimizerActivity({
-      days,
-      surface: surface || undefined,
-      status: status || undefined,
-      trigger: trigger || undefined,
-      limit: 200,
-    })
-      .then(setData)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load optimizer activity'))
-      .finally(() => setLoading(false))
-  }, [days, surface, status, trigger])
-
-  useEffect(() => { load() }, [load])
+  const request = useCallback(() => getOptimizerActivity({ days, surface: surface || undefined, status: status || undefined, trigger: trigger || undefined, limit: 200 }), [days, surface, status, trigger])
+  const { data, loading, error, load } = useAdminQuery(request)
 
   const summary = data?.summary
 
@@ -84,12 +68,12 @@ export function OptimizerTab() {
           <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>
             Every tuning run across workflows, extraction sets, and knowledge bases.
             Read-only — applying a config happens in{' '}
-            <Link to={'/tuning' as never} style={{ color: '#0ea5e9', textDecoration: 'none', fontWeight: 600 }}>
+            <Link to={'/tuning' as never} style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
               your tuning inbox
-            </Link>, which only lists items you own.
+            </Link>, which lists items you can access. Scores describe recorded test performance, not correctness on new documents.
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
           <select value={days} onChange={e => setDays(Number(e.target.value))} style={selectStyle} aria-label="Time window">
             {DAY_OPTIONS.map(d => <option key={d} value={d}>Last {d} days</option>)}
           </select>
@@ -131,7 +115,8 @@ export function OptimizerTab() {
           color: '#991b1b', fontSize: 13,
         }}>
           <AlertTriangle size={14} />
-          {error}
+          <span role="alert">{error}</span>
+          <button onClick={load} className="admin-open-record">Retry optimizer activity</button>
         </div>
       )}
 
@@ -139,7 +124,7 @@ export function OptimizerTab() {
         <>
           <div style={{
             display: 'grid', gap: 12, marginBottom: 16,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
           }}>
             <KpiCard label="Runs" value={summary.total} icon={Play} color="#0050d7" />
             <KpiCard label="Waiting on review" value={summary.pending_review} icon={Eye} color="#b45309" />
@@ -190,7 +175,7 @@ export function OptimizerTab() {
         background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
         overflow: 'hidden',
       }}>
-        <div style={{ overflowX: 'auto' }}>
+        <TableRegion label="Optimizer runs — scroll for more columns">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#f9fafb', textAlign: 'left' }}>
@@ -200,6 +185,7 @@ export function OptimizerTab() {
               </tr>
             </thead>
             <tbody>
+              {loading && <tr><td colSpan={8} style={{ padding: 24 }} role="status">Loading optimizer runs…</td></tr>}
               {(data?.runs || []).map(run => (
                 <tr key={`${run.surface}:${run.run_uuid}`} style={{ borderTop: '1px solid #f3f4f6' }}>
                   <td style={tdStyle}>
@@ -246,7 +232,7 @@ export function OptimizerTab() {
                   </td>
                 </tr>
               ))}
-              {!loading && (data?.runs.length || 0) === 0 && (
+              {!loading && !error && (data?.runs.length || 0) === 0 && (
                 <tr>
                   <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: '#6b7280', padding: 24 }}>
                     No optimizer runs in this window.
@@ -255,7 +241,7 @@ export function OptimizerTab() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableRegion>
       </div>
     </div>
   )

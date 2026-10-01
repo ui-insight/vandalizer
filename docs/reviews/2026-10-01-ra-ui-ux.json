@@ -1,0 +1,670 @@
+{
+  "title": "Vandalizer RA usability \u2014 implementation reassessment",
+  "date": "2026-10-01",
+  "status": "Heuristic reassessment complete; eight execution and observation checks remain",
+  "branch": "major/agentic-chat",
+  "startingCommit": "08100ba8",
+  "deployment": "Local uncommitted working tree; not deployed",
+  "rubric": {
+    "ui": "Hierarchy, readability, spacing, visual consistency and responsive layout.",
+    "ux": "Discoverability, keyboard access, scope retention, recovery and completion paths.",
+    "ra": "Observable fit for research-administration tasks, evidence inspection, reuse and handoff. Not measured AI accuracy or demonstrated time savings.",
+    "scale": "9 exceptional; 8 strong with small friction; 7 useful with noticeable friction; 6 substantial learning or accessibility cost; 5 a serious limitation on the tested surface. Half-point grades are reviewer judgments, not precision measurements."
+  },
+  "method": "Separate heuristic reassessment of every area and viewport using the original rubric, by the same implementation agent (not an independent human reviewer). Scores describe sampled interface/task fit, not model accuracy, accessibility certification, user-study success or measured time savings. No overall average is used.",
+  "surfaces": [
+    {
+      "surface": "Workspace navigation",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 6.5,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Persistent labels and pane controls preserve document-to-Library composition. Five-width navigation and scope-return checks pass.",
+      "remainingFriction": "The 320px rail consumes useful horizontal space, but actions remain named and reachable.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-files-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-files-320.png"
+      ]
+    },
+    {
+      "surface": "Public entry and sign-in",
+      "baseline": {
+        "ui": 8,
+        "ux": 7.5,
+        "ra": 7
+      },
+      "desktop": {
+        "ui": 8.5,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "The entry gives an RA task starting point; real password/reset/invitation failures retain input and offer recovery.",
+      "remainingFriction": "External SSO is not configured in the isolated environment.",
+      "evidence": [
+        "2026-10-01-ra8-isolated-learning/live-public-sign-in-1440.png",
+        "2026-10-01-ra8-isolated-learning/live-public-sign-in-320.png"
+      ]
+    },
+    {
+      "surface": "First-session guidance",
+      "baseline": {
+        "ui": 8,
+        "ux": 7.5,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Optional task actions, a labeled sample result and its linked evidence let a new RA begin before taking a course. Tour dismissal and return persist.",
+      "remainingFriction": "The compact layout needs scrolling to see the full example.",
+      "evidence": [
+        "2026-09-30-ra8-onboarding/onboarding-demo-evidence-1440.png",
+        "2026-09-30-ra8-onboarding/onboarding-demo-evidence-320.png"
+      ]
+    },
+    {
+      "surface": "Chat and document/KB scope",
+      "baseline": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Source identity, approximate page labels, missing-source recovery, bounded scope controls and retained draft/reading position support checking an answer.",
+      "remainingFriction": "Actual model grounding remains unverified; the grade covers the interaction and evidence-checking design.",
+      "evidence": [
+        "2026-10-01-ra8-chat-reading-final/chat-source-preview-1440.png",
+        "2026-10-01-ra8-chat-reading-final/chat-source-preview-320.png"
+      ]
+    },
+    {
+      "surface": "Agent approvals and recovery",
+      "baseline": {
+        "ui": 8,
+        "ux": 7.5,
+        "ra": 8
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "The proposed action, inputs and result are reviewable; pending, cancellation, failure and completion remain distinct. History does not imply an unrelated later action succeeded.",
+      "remainingFriction": "Actual model-driven approval/cancellation effects remain an execution gate.",
+      "evidence": [
+        "2026-09-30-ra8-agent-recovery/agent-approval-review-1440.png",
+        "2026-09-30-ra8-agent-recovery/agent-approval-review-320.png"
+      ]
+    },
+    {
+      "surface": "Files and document-to-tool work",
+      "baseline": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8.5
+      },
+      "desktop": {
+        "ui": 8.5,
+        "ux": 8,
+        "ra": 8.5
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "PDF, scan, DOCX and XLSX cases preserve viewing, search and recovery. File-to-Library selection survives tool runs and return. Actual project PDF read/download permissions pass.",
+      "remainingFriction": "An image-only scan needs readable extraction before grounded use; the interface explains that limit.",
+      "evidence": [
+        "2026-10-01-ra8-document-formats/format-pdf-search-1440.png",
+        "2026-10-01-ra8-document-formats/format-pdf-search-320.png"
+      ]
+    },
+    {
+      "surface": "Projects and collaboration",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 6.5,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8.5
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Project intent, pinned tools, role-aware management and independent drafts are explicit. Real owner/editor/viewer, invitation and removal checks pass.",
+      "remainingFriction": "Dense projects require filtering; the compact view exposes fewer records at once.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-projects-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-projects-320.png"
+      ]
+    },
+    {
+      "surface": "Library organization",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 7,
+        "ra": 8
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Task search, scope guidance, saved references versus copies, and failure recovery make reusable tools easier to find and maintain.",
+      "remainingFriction": "Type and scope filters still require familiarity with the tool catalog.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-library-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-library-320.png"
+      ]
+    },
+    {
+      "surface": "Explore and shared tool detail",
+      "baseline": {
+        "ui": 8,
+        "ux": 7,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Task/input/output descriptions and measured evidence precede adoption; the saved-reference/copy distinction is visible and failed adoption retains the selection.",
+      "remainingFriction": "Some shared tools have incomplete author-supplied examples; missing evidence is disclosed.",
+      "evidence": [
+        "2026-09-30-ra8-catalog-adoption/catalog-team-reference-1440.png",
+        "2026-09-30-ra8-catalog-adoption/catalog-team-reference-320.png"
+      ]
+    },
+    {
+      "surface": "Workflow design, input and output",
+      "baseline": {
+        "ui": 7,
+        "ux": 5.5,
+        "ra": 8
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8.5
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Named step/task controls, input readiness, visible step roles and a usable output/history/save path support repeatable RA reviews. The real approval-to-export task path passes.",
+      "remainingFriction": "The design surface remains an advanced task and takes more scrolling on a phone.",
+      "evidence": [
+        "2026-09-30-ra8-workflow-output-history/workflow-history-output-1440.png",
+        "2026-09-30-ra8-workflow-output-history/workflow-history-output-320.png"
+      ]
+    },
+    {
+      "surface": "Extraction design, results and evidence",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 7,
+        "ra": 8.5
+      },
+      "desktop": {
+        "ui": 8.5,
+        "ux": 8,
+        "ra": 8.5
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Results identify the current source; Inspect and Copy are separate. Missing/unconfirmed values, document switching and export limitations remain visible.",
+      "remainingFriction": "Actual extraction/model-answer correctness still needs a configured model.",
+      "evidence": [
+        "2026-09-30-ra8-extraction-evidence-export/extraction-second-document-1440.png",
+        "2026-09-30-ra8-extraction-evidence-export/extraction-second-document-320.png"
+      ]
+    },
+    {
+      "surface": "Automations: list, setup and history",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 7.5,
+        "ra": 8.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Setup summarizes trigger, source, action and destination; persisted outcomes distinguish queued, failed and completed runs. Actual manual/folder/schedule task paths deliver files and avoid repeated-event execution.",
+      "remainingFriction": "The execution exercise invokes task bodies locally; no distributed broker consumer or external receiver was tested.",
+      "evidence": [
+        "2026-09-30-ra8-automation-history/automation-history-list-1440.png",
+        "2026-09-30-ra8-automation-history/automation-history-list-320.png"
+      ]
+    },
+    {
+      "surface": "Knowledge bases and source health",
+      "baseline": {
+        "ui": 8,
+        "ux": 7.5,
+        "ra": 8.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Readability, indexed source status, provenance and failure recovery are distinct from answer quality. Retrying a source preserves previously usable content and scope.",
+      "remainingFriction": "Indexed text can be available without permission to download the original; this is now explained.",
+      "evidence": [
+        "2026-09-30-ra8-source-recovery/source-inspector-recovered-1440.png",
+        "2026-09-30-ra8-source-recovery/source-inspector-recovered-320.png"
+      ]
+    },
+    {
+      "surface": "Validation and quality improvement",
+      "baseline": {
+        "ui": 7,
+        "ux": 6.5,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Named expected answers, per-case failures, sample-size limits and separate advanced tuning make measured evidence interpretable.",
+      "remainingFriction": "Model-backed workflow/KB/extraction validation is still an open execution gate.",
+      "evidence": [
+        "2026-09-30-ra8-validation-results/validation-kb-failed-evidence-1440.png",
+        "2026-09-30-ra8-validation-results/validation-kb-failed-evidence-320.png"
+      ]
+    },
+    {
+      "surface": "Activity and resuming work",
+      "baseline": {
+        "ui": 7,
+        "ux": 5.5,
+        "ra": 7
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Keyboard-openable events show durable outcome/error text. Open/Delete are separate; completed and failed runs return to their actual result rather than an old approval.",
+      "remainingFriction": "A long activity feed remains dense, with filtering and scrolling necessary.",
+      "evidence": [
+        "2026-09-30-ra8-activity-keyboard/activity-dense-1440.png",
+        "2026-09-30-ra8-activity-keyboard/activity-dense-320.png"
+      ]
+    },
+    {
+      "surface": "Human review queue and decision",
+      "baseline": {
+        "ui": 7,
+        "ux": 6,
+        "ra": 8.5
+      },
+      "desktop": {
+        "ui": 8.5,
+        "ux": 8.5,
+        "ra": 8.5
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Instructions, original source, editable artifact and decision consequences are clear. Real concurrent decisions accept one winner and resume/export the exact reviewed artifact.",
+      "remainingFriction": "An approval records a decision; downstream completion is checked separately.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-review-detail-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-review-detail-320.png"
+      ]
+    },
+    {
+      "surface": "Account and team management",
+      "baseline": {
+        "ui": 7.5,
+        "ux": 7,
+        "ra": 7.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Account access and team roles are distinguished. Pending writes, invitation identity, ownership transfer, removal and password/session persistence are verified.",
+      "remainingFriction": "Institutional identity-provider administration remains outside this local test.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-teams-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-teams-320.png"
+      ]
+    },
+    {
+      "surface": "Credentials and integrations",
+      "baseline": {
+        "ui": 7,
+        "ux": 6,
+        "ra": 5.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Role guidance, masked secrets, connection-test recovery and deletion impact make maintenance understandable without asking ordinary RAs to manage secrets.",
+      "remainingFriction": "External service connectivity was simulated; the dependent-run failure was fixture-driven.",
+      "evidence": [
+        "2026-10-01-ra8-credential-lifecycle/credential-delete-impact-1440.png",
+        "2026-10-01-ra8-credential-lifecycle/credential-delete-impact-320.png"
+      ]
+    },
+    {
+      "surface": "Support panel",
+      "baseline": {
+        "ui": 7,
+        "ux": 6.5,
+        "ra": 7
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Subject/problem entry comes first. Failed messages and attachments survive close/reopen and can be retried without losing the draft.",
+      "remainingFriction": "Actual ticket delivery and staff handling were simulated, with no messages sent to real people.",
+      "evidence": [
+        "2026-10-01-ra8-support-final/support-form.png",
+        "2026-09-30-ra8-support-reply/support-reply-and-file-retained.png"
+      ]
+    },
+    {
+      "surface": "Certification and learning",
+      "baseline": {
+        "ui": 7,
+        "ux": 6.5,
+        "ra": 7
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "An optional short RA walkthrough precedes the course. Actual first-module progress, interruption/resumption, saved reflection, completion and Foundations unlock pass; completion has keyboard focus and readable status.",
+      "remainingFriction": "The full course and model-backed labs remain unverified. No learning outcome or time-saving claim is inferred.",
+      "evidence": [
+        "2026-10-01-ra8-isolated-learning/live-learning-foundations-unlocked-1440.png",
+        "2026-10-01-ra8-isolated-learning/live-learning-module-completion-320.png"
+      ]
+    },
+    {
+      "surface": "Docs and self-service help",
+      "baseline": {
+        "ui": 6.5,
+        "ux": 5.5,
+        "ra": 5.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "A proposal/source-checking quickstart, recovery examples and contextual links lead into the technical reference. Narrow layouts preserve text and keyboard-scrollable examples.",
+      "remainingFriction": "Long-form reference sections still require reading and navigation.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-docs-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-docs-320.png"
+      ]
+    },
+    {
+      "surface": "Team Admin overview",
+      "baseline": {
+        "ui": 5.5,
+        "ux": 4.5,
+        "ra": 6.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Responsive sections, bounded tables, readable comparisons and explicit metric limits support investigating usage and failed work without implying compliance.",
+      "remainingFriction": "Operational usefulness still needs observation by a real team owner.",
+      "evidence": [
+        "2026-10-01-ra8-final-review-layout/layout-admin-1440.png",
+        "2026-10-01-ra8-final-review-layout/layout-admin-320.png"
+      ]
+    },
+    {
+      "surface": "Tuning suggestions",
+      "baseline": {
+        "ui": 7,
+        "ux": 6.5,
+        "ra": 6.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Candidates expose regressions and uncertainty before Apply. Failed actions can recover; real repeated Apply and stale Revert tests preserve the correct configuration history.",
+      "remainingFriction": "Candidate scores were seeded; this does not establish optimization quality.",
+      "evidence": [
+        "2026-09-30-ra8-tuning/tuning-comparison-1440.png",
+        "2026-09-30-ra8-tuning/tuning-comparison-320.png"
+      ]
+    },
+    {
+      "surface": "Examiner / Shared items",
+      "baseline": {
+        "ui": 5.5,
+        "ux": 4.5,
+        "ra": 6.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Readiness evidence, claim ownership, retained workshop edits and required decision notes support review; authors can see feedback without examiner permissions.",
+      "remainingFriction": "A real examiner observation and model-backed evidence review remain open.",
+      "evidence": [
+        "2026-10-01-ra8-examiner-lifecycle/examiner-readiness-1440.png",
+        "2026-10-01-ra8-examiner-lifecycle/examiner-readiness-320.png"
+      ]
+    },
+    {
+      "surface": "Support-staff queue",
+      "baseline": {
+        "ui": 7,
+        "ux": 7,
+        "ra": 6.5
+      },
+      "desktop": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "mobile": {
+        "ui": 8,
+        "ux": 8,
+        "ra": 8
+      },
+      "scoreReason": "Responsive triage, keyboard entry, retained drafts/files, watcher recovery and explicit internal-note visibility support case handling. The mobile reply now uses the full row.",
+      "remainingFriction": "Long ticket threads need scrolling; actual staff observation remains open.",
+      "evidence": [
+        "2026-10-01-ra8-staff-final/staff-internal-note-recovery-1440.png",
+        "2026-10-01-ra8-staff-final/staff-internal-note-recovery-320.png"
+      ]
+    }
+  ],
+  "limits": [
+    "Actual screen-reader use, five-RA acceptance study and specialist observations have not occurred.",
+    "Real chat grounding, agent actions, model-backed validation and the full learning course need a configured development model connection.",
+    "Most browser evidence uses explicit synthetic API fixtures. Live local backend evidence is separately identified and uses synthetic accounts/data.",
+    "Actual local task bodies were exercised with isolated Mongo/Redis and file/SMTP sinks; no production data, broker consumer or external-service delivery was used."
+  ],
+  "verification": {
+    "Frontend": "1,267 tests / 198 files passed. Typecheck and production build passed. Full lint: zero errors, 14 warnings; final changed-component lint: zero errors, one existing hook-dependency warning.",
+    "Final browser checks": "30 five-width file-to-Library states; 33 chat/source states including delayed initial scope; 42 actual 200% Chrome zoom states; 14 staff recovery states; nine actual local public-entry/first-module learning states. Earlier five-width 105 and enlarged-text 42 scans are indexed separately.",
+    "Backend": "Actual isolated auth, team/project permissions, PDF storage/text extraction, atomic review/resume/export, workflow tuning persistence and manual/folder/schedule automation checks are separately recorded. Focused regression batches are listed in the implementation log; no model inference or external receiver success is inferred.",
+    "New findings closed": "Duplicate invitation misuse, project-file role gaps, duplicate review decisions, repeated Apply/stale Revert, repeated automation events, mobile source/reply space, learning modal contrast/focus, initial draft-scope loss and citation-return races.",
+    "Remaining sessions": "The acceptance guide and three fictional sources with 12 manually checked questions are ready. Actual screen-reader, model-backed labs/grounding and RA/specialist observations remain open."
+  },
+  "openItems": [
+    [
+      "R8-BASE-07 \u00b7 P1 \u00b7 Verify: Audit keyboard and assistive technology paths.",
+      "Exercise row opening, card editing, menus, tabs, source links and recovery with the keyboard, then spot-check names, order and announcements with a screen reader. Automated scans do not close this item by themselves."
+    ],
+    [
+      "R8-CHAT-02 \u00b7 P2 \u00b7 Verify: Check grounding and evidence navigation.",
+      "Use a manually checked set of sponsor/policy questions, including missing or conflicting information. Check deadline and budget claims against the cited passages; source inspection must preserve the conversation and reading position."
+    ],
+    [
+      "R8-AGENT-03 \u00b7 P2 \u00b7 Verify: Exercise actual tool lifecycle transitions.",
+      "In isolated test execution, cover approval, cancellation, permission denial, interrupted streaming and retry. Confirm one accepted action produces one intended effect, including when the user refreshes or resends."
+    ],
+    [
+      "R8-VALIDATE-04 \u00b7 P2 \u00b7 Verify: Cover all three validation domains.",
+      "Test KB, workflow and extraction validation with real-shaped cases, missing references, cancellation, refresh/resumption, history and apply/revert. Manually compare selected results with expected answers; fixture scores alone cannot close this item."
+    ],
+    [
+      "R8-LEARN-03 \u00b7 P2 \u00b7 Verify: Complete a representative learning path.",
+      "Exercise lesson progress, assessment feedback, interruption/resumption, module unlock and course completion states. Check keyboard, mobile, short viewports and saved progress using controlled test accounts."
+    ],
+    [
+      "R8-GATE-03 \u00b7 P2 \u00b7 Verify: Check real execution separately from fixtures.",
+      "Run representative flows against an isolated backend and controlled accounts, with non-delivering external-service stubs where needed. Record ingestion, persistence, worker/retry behavior, permission enforcement and model-answer spot checks separately from visual evidence."
+    ],
+    [
+      "R8-GATE-04 \u00b7 P2 \u00b7 Verify: Validate RA usefulness with representative users.",
+      "Use a proposed acceptance study of at least five representative RAs performing five tasks: find a deadline, check a budget requirement, verify an extracted value, run a reusable review, and hand off a result. At least four of five users should complete each task unaided, with no unnoticed wrong-source or unintended-approval error. Record time, errors, evidence checks and handoff usability; this is a formative gate, not a statistical guarantee."
+    ],
+    [
+      "R8-GATE-05 \u00b7 P2 \u00b7 Verify: Validate specialist task fit with the right roles.",
+      "Observe a team owner investigating a failed run, an integration maintainer repairing a connection, an examiner reviewing a submission and support staff responding to a ticket. Ordinary RAs must also be able to identify when they need these roles and where to request help."
+    ]
+  ],
+  "completedItems": 100,
+  "currentCommit": "08100ba89056784578e1aa05fb23c8ea40147cd6",
+  "implementationSha256": "714863e40585a74b79aae9b50247f731cef02202ec0d81a4c1ca7b24466dfba7",
+  "evidenceIndex": "2026-10-01-ra-ui-ux-evidence.json",
+  "selectedScreenshots": 50,
+  "studyGuide": "ra-acceptance-study.md"
+}

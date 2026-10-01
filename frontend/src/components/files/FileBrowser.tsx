@@ -1,3 +1,4 @@
+import { documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
@@ -62,6 +63,7 @@ interface FileBrowserProps {
   searchQuery?: string
   contentMatches?: ContentMatch[]
   onSelectionChange?: (docUuids: string[]) => void
+  onDocumentReadinessChange?: (docs: DocumentReadiness[]) => void
   onDocNamesChange?: (names: Record<string, string>) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
   onFolderNamesChange?: (names: Record<string, string>) => void
@@ -112,7 +114,7 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -121,7 +123,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
   const setCurrentFolder = onFolderNavigate ?? setInternalFolder
   const { documents, folders, loading, error: contentsError, refresh } = useDocuments(currentFolder, teamScopeUuid ?? currentTeam?.uuid)
-  const { breadcrumbs } = useBreadcrumbs(currentFolder)
+  const { breadcrumbs, error: breadcrumbError, refresh: refreshBreadcrumbs } = useBreadcrumbs(currentFolder)
 
   // When rooted at a project folder, trim the breadcrumb trail to start at that
   // folder so the project root acts as "Home" and ancestors above it are hidden.
@@ -205,6 +207,10 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
         .map(d => ({ uuid: d.uuid, title: d.title, status: d.task_status })),
     )
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
+
+  useEffect(() => {
+    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc) })))
+  }, [documents, contentMatches, onDocumentReadinessChange])
 
   // Sync selected folder UUIDs to parent
   useEffect(() => {
@@ -722,6 +728,8 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
         homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
         onDropFile={handleDropFile}
       />
+
+      {breadcrumbError && <p role="alert" className="mt-2 text-sm text-red-800">Folder path unavailable. {breadcrumbError} <button type="button" className="underline" onClick={() => void refreshBreadcrumbs()}>Retry folder path</button></p>}
 
       {/* Bulk action toolbar */}
       {selectedUuids.size > 0 && (

@@ -1,8 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   AlertCircle, ChevronRight, RefreshCw, MessageSquare, Download, ChevronDown,
   Mail, Send, Link, UserPlus, Award,
 } from 'lucide-react'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { TableRegion } from './shared/TableRegion'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import {
@@ -11,10 +13,9 @@ import {
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
   adminAddDemoUser,
 } from '../../api/demo'
-import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../../api/feedbackPrompt'
+import { getAdminPromptOverview, adminUpdatePrompt } from '../../api/feedbackPrompt'
 import * as supportApi from '../../api/support'
-import type { SupportTicket, SupportTicketSummary } from '../../types/support'
-import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../../types/demo'
+import type { SupportTicket } from '../../types/support'
 import { formatTokens } from '../../lib/formatTokens'
 import { POST_SURVEY_FIELDS } from '../survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from '../survey/preSurveyFields'
@@ -24,7 +25,7 @@ import { SearchInput } from './shared/primitives'
 
 function DemoResponseDetail({ responses }: { responses: Record<string, unknown> }) {
   if (!responses || Object.keys(responses).length === 0) {
-    return <div style={{ padding: '16px 0', color: '#9ca3af', fontSize: 13 }}>No onboarding responses recorded.</div>
+    return <div style={{ padding: '16px 0', color: '#6b7280', fontSize: 13 }}>No onboarding responses recorded.</div>
   }
 
   // Group fields by section using the PRE_SURVEY_FIELDS definitions
@@ -106,32 +107,16 @@ export function DemoTab() {
   const confirm = useConfirm()
   const { toast } = useToast()
   const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
-  const [stats, setStats] = useState<DemoAdminStats | null>(null)
-  const [apps, setApps] = useState<DemoApp[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const [s, a] = await Promise.all([
-        getDemoStats(),
-        getDemoApplications(statusFilter || undefined),
-      ])
-      setStats(s)
-      setApps(a)
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : 'Failed to load demo applications')
-    } finally {
-      setLoading(false)
-    }
+  const request = useCallback(async () => {
+    const [stats, apps] = await Promise.all([getDemoStats(), getDemoApplications(statusFilter || undefined)])
+    return { stats, apps }
   }, [statusFilter])
-
-  useEffect(() => { loadData() }, [loadData])
+  const { data, loading, error: loadError, load: loadData } = useAdminQuery(request)
+  const stats = data?.stats
+  const apps = useMemo(() => data?.apps ?? [], [data])
 
   // Client-side text search over the (status-filtered) applications.
   const filteredApps = useMemo(() => {
@@ -146,9 +131,15 @@ export function DemoTab() {
   }, [apps, search])
 
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const actionPending = useRef(false)
+  const beginAction = (action: string) => {
+    if (actionPending.current) return false
+    actionPending.current = true; setActionLoading(action); return true
+  }
+  const endAction = () => { actionPending.current = false; setActionLoading(null) }
 
   async function handleExport() {
-    setActionLoading('export')
+    if (!beginAction('export')) return
     try {
       // Fetch all applications (unfiltered) and post-survey responses
       const [allApps, postResponses] = await Promise.all([
@@ -221,7 +212,7 @@ export function DemoTab() {
     } catch {
       toast('Failed to export demo data', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -232,14 +223,14 @@ export function DemoTab() {
       confirmLabel: 'Activate',
     })
     if (!ok) return
-    setActionLoading(`activate-${uuid}`)
+    if (!beginAction(`activate-${uuid}`)) return
     try {
       await activateDemoUser(uuid)
       loadData()
     } catch {
       toast('Failed to activate application', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -250,32 +241,32 @@ export function DemoTab() {
       confirmLabel: 'Release',
     })
     if (!ok) return
-    setActionLoading(`release-${uuid}`)
+    if (!beginAction(`release-${uuid}`)) return
     try {
       await releaseDemoUser(uuid)
       loadData()
     } catch {
       toast('Failed to release application', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
   async function handleRestartTrial(uuid: string) {
     const ok = await confirm({
       title: 'Restart trial?',
-      message: 'Restart this user\'s trial? They will get a fresh 14-day trial period starting now.',
+      message: 'Restart this user\'s trial? Their account will receive a fresh token allowance with no time limit.',
       confirmLabel: 'Restart trial',
     })
     if (!ok) return
-    setActionLoading(`restart-${uuid}`)
+    if (!beginAction(`restart-${uuid}`)) return
     try {
       await restartDemoTrial(uuid)
       loadData()
     } catch {
       toast('Failed to restart trial', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -292,26 +283,26 @@ export function DemoTab() {
       confirmLabel: 'Promote',
     })
     if (!ok) return
-    setActionLoading(`promote-${uuid}`)
+    if (!beginAction(`promote-${uuid}`)) return
     try {
       await promoteDemoUser(uuid)
       loadData()
     } catch {
       toast('Failed to promote user', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
   async function handleTestEmail(email: string) {
-    setActionLoading(`test-${email}`)
+    if (!beginAction(`test-${email}`)) return
     try {
       await sendTestEmail(email)
       toast(`Test email sent to ${email}`, 'success')
     } catch {
       toast('Failed to send test email. Check SMTP configuration.', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -320,26 +311,27 @@ export function DemoTab() {
       title: 'Resend credentials?',
       message: (
         <>
-          Resend credentials to <strong>{email}</strong>? This will reset their password.
+          Send a fresh sign-in link to <strong>{email}</strong>?
         </>
       ),
       confirmLabel: 'Resend',
       destructive: true,
     })
     if (!ok) return
-    setActionLoading(`resend-${uuid}`)
+    if (!beginAction(`resend-${uuid}`)) return
     try {
-      await adminResendCredentials(uuid)
-      toast(`Credentials resent to ${email}`, 'success')
+      const result = await adminResendCredentials(uuid)
+      if (!result.ok || result.status !== 'sent') { toast(result.message || 'The sign-in email was not sent.', 'error'); return }
+      toast(`Sign-in link sent to ${email}`, 'success')
     } catch {
       toast('Failed to resend credentials', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
   async function handleCopyMagicLink(uuid: string) {
-    setActionLoading(`magic-${uuid}`)
+    if (!beginAction(`magic-${uuid}`)) return
     try {
       const result = await adminGetMagicLink(uuid)
       await navigator.clipboard.writeText(result.url)
@@ -347,7 +339,7 @@ export function DemoTab() {
     } catch {
       toast('Failed to generate magic link', 'error')
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -359,7 +351,7 @@ export function DemoTab() {
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault()
     setAddUserError(null)
-    setActionLoading('add-user')
+    if (!beginAction('add-user')) return
     try {
       await adminAddDemoUser(addUserForm)
       setAddUserForm({ first_name: '', last_name: '', email: '' })
@@ -369,7 +361,7 @@ export function DemoTab() {
       const msg = err instanceof Error ? err.message : 'Failed to add user'
       setAddUserError(msg)
     } finally {
-      setActionLoading(null)
+      endAction()
     }
   }
 
@@ -383,17 +375,17 @@ export function DemoTab() {
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+    <fieldset disabled={actionLoading !== null} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
         {subTab === 'applications' && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button
               onClick={() => setShowAddUser(!showAddUser)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
-                background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
+                background: showAddUser ? '#f0fdf4' : '#fff', color: '#15803d',
                 cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
               }}
             >
@@ -466,12 +458,12 @@ export function DemoTab() {
           border: '1px solid #bbf7d0', background: '#f0fdf4',
         }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Add User to Trial</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12, alignItems: 'end' }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>First Name</label>
               <input
                 required
-                value={addUserForm.first_name}
+                aria-label="First Name" value={addUserForm.first_name}
                 onChange={(e) => setAddUserForm({ ...addUserForm, first_name: e.target.value })}
                 style={{
                   width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
@@ -483,7 +475,7 @@ export function DemoTab() {
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Last Name</label>
               <input
                 required
-                value={addUserForm.last_name}
+                aria-label="Last Name" value={addUserForm.last_name}
                 onChange={(e) => setAddUserForm({ ...addUserForm, last_name: e.target.value })}
                 style={{
                   width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
@@ -496,7 +488,7 @@ export function DemoTab() {
               <input
                 required
                 type="email"
-                value={addUserForm.email}
+                aria-label="Email" value={addUserForm.email}
                 onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
                 style={{
                   width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
@@ -509,7 +501,7 @@ export function DemoTab() {
               disabled={actionLoading === 'add-user'}
               style={{
                 padding: '8px 20px', borderRadius: 8, border: 'none',
-                background: '#16a34a', color: '#fff', fontSize: 14, fontWeight: 600,
+                background: '#15803d', color: '#fff', fontSize: 14, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
                 opacity: actionLoading === 'add-user' ? 0.5 : 1,
               }}
@@ -518,17 +510,17 @@ export function DemoTab() {
             </button>
           </div>
           {addUserError && (
-            <div style={{ marginTop: 8, color: '#dc2626', fontSize: 13 }}>{addUserError}</div>
+            <div role="alert" style={{ marginTop: 8, color: '#dc2626', fontSize: 13 }}>{addUserError}</div>
           )}
         </form>
       )}
 
       {/* Stats cards */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: 16, marginBottom: 24 }}>
           {[
             { label: 'Total', value: stats.total_applications, color: '#6b7280' },
-            { label: 'Active', value: stats.active_count, color: '#16a34a' },
+            { label: 'Active', value: stats.active_count, color: '#15803d' },
             { label: 'Waitlist', value: stats.waitlist_count, color: '#d97706' },
             { label: 'Out of tokens', value: stats.expired_count, color: '#dc2626' },
             { label: 'Completed', value: stats.completed_count, color: '#2563eb' },
@@ -561,7 +553,7 @@ export function DemoTab() {
       )}
 
       {/* Filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, alignItems: 'center' }}>
         {['', 'pending', 'active', 'exhausted', 'completed'].map((s) => (
           <button
             key={s}
@@ -583,11 +575,11 @@ export function DemoTab() {
 
       {/* Applications table */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading...</div>
       ) : loadError && apps.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
           <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
-          <div style={{ fontSize: 14, color: '#374151' }}>{loadError}</div>
+          <div role="alert" style={{ fontSize: 14, color: '#374151' }}>{loadError} <button type="button" onClick={loadData} className="underline">Retry demo applications</button></div>
         </div>
       ) : (
         <div style={{ borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', background: '#fff' }}>
@@ -600,7 +592,7 @@ export function DemoTab() {
               <AlertCircle size={14} /> {loadError}
             </div>
           )}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <TableRegion label="Demo applications"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Name</th>
@@ -617,7 +609,7 @@ export function DemoTab() {
             <tbody>
               {filteredApps.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
                     {search.trim() ? 'No applications match your search.' : 'No applications found.'}
                   </td>
                 </tr>
@@ -628,13 +620,12 @@ export function DemoTab() {
                 return (
                   <React.Fragment key={app.uuid}>
                     <tr
-                      onClick={() => setExpandedUuid(isExpanded ? null : app.uuid)}
                       style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', cursor: 'pointer' }}
                     >
                       <td style={{ padding: '12px 16px', fontWeight: 500 }}>
-                        <span style={{ marginRight: 6, color: '#9ca3af', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
-                        {app.name}
-                        {app.title && <span style={{ color: '#9ca3af', fontWeight: 400, marginLeft: 6, fontSize: 12 }}>{app.title}</span>}
+                        <span style={{ marginRight: 6, color: '#6b7280', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
+                        <button type="button" aria-expanded={isExpanded} onClick={() => setExpandedUuid(isExpanded ? null : app.uuid)} className="text-left underline">{app.name}</button>
+                        {app.title && <span style={{ color: '#6b7280', fontWeight: 400, marginLeft: 6, fontSize: 12 }}>{app.title}</span>}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.email}</td>
                       <td style={{ padding: '12px 16px', color: '#6b7280' }}>{app.organization}</td>
@@ -656,7 +647,7 @@ export function DemoTab() {
                         {app.last_login_at ? (
                           <span style={{ color: '#6b7280' }}>{formatDate(app.last_login_at)}</span>
                         ) : (
-                          <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Never</span>
+                          <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Never</span>
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
@@ -672,7 +663,7 @@ export function DemoTab() {
                               disabled={actionLoading === `activate-${app.uuid}`}
                               style={{
                                 padding: '4px 12px', borderRadius: 6, border: '1px solid #16a34a',
-                                background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 600,
+                                background: '#f0fdf4', color: '#15803d', fontSize: 12, fontWeight: 600,
                                 cursor: 'pointer', fontFamily: 'inherit',
                                 opacity: actionLoading === `activate-${app.uuid}` ? 0.5 : 1,
                               }}
@@ -777,7 +768,7 @@ export function DemoTab() {
                             </>
                           )}
                           {app.admin_released && (
-                            <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>Released</span>
+                            <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>Released</span>
                           )}
                           {app.post_questionnaire_completed && (
                             <span style={{ fontSize: 12, color: '#6b7280' }}>Feedback done</span>
@@ -795,15 +786,15 @@ export function DemoTab() {
                   </React.Fragment>
                 )
               })}
-              {apps.length === 0 && (
+              {filteredApps.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
                     No applications found
                   </td>
                 </tr>
               )}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
 
@@ -812,30 +803,16 @@ export function DemoTab() {
       <TrialCheckinsSection />
       </>
       )}
-    </div>
+    </fieldset>
   )
 }
 
 function CheckInConversationsSection() {
-  const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'closed'>('all')
   const [activeUuid, setActiveUuid] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const status = statusFilter === 'all' ? undefined : statusFilter
-      const res = await supportApi.listTickets(status, 200, 0, undefined, undefined, 'feedback_prompt')
-      setTickets(res.tickets)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter])
-
-  useEffect(() => { load() }, [load])
+  const request = useCallback(() => supportApi.listTickets(statusFilter === 'all' ? undefined : statusFilter, 200, 0, undefined, undefined, 'feedback_prompt'), [statusFilter])
+  const { data, loading, error, load } = useAdminQuery(request)
+  const tickets = data?.tickets ?? []
 
   const statusColors: Record<string, string> = {
     open: '#f59e0b',
@@ -861,7 +838,7 @@ function CheckInConversationsSection() {
             Conversations from trial check-in prompts. These do not appear in the Support Center.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {(['all', 'open', 'in_progress', 'closed'] as const).map(s => (
             <button
               key={s}
@@ -890,15 +867,15 @@ function CheckInConversationsSection() {
         </div>
       </div>
 
-      {loading ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+      {error ? <p role="alert" className="text-sm text-red-800">{error} <button onClick={load} className="underline">Retry check-in conversations</button></p> : loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
       ) : tickets.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+        <div style={{ padding: 24, textAlign: 'center', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 12 }}>
           No check-in conversations yet.
         </div>
       ) : (
         <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <TableRegion label="Trial check-in conversations"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
@@ -915,12 +892,11 @@ function CheckInConversationsSection() {
                 return (
                   <React.Fragment key={t.uuid}>
                     <tr
-                      onClick={() => setActiveUuid(isExpanded ? null : t.uuid)}
                       style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', cursor: 'pointer' }}
                     >
                       <td style={{ padding: '10px 16px', fontWeight: 500 }}>
-                        <span style={{ marginRight: 6, color: '#9ca3af', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
-                        {subject}
+                        <span style={{ marginRight: 6, color: '#6b7280', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
+                        <button type="button" aria-expanded={isExpanded} onClick={() => setActiveUuid(isExpanded ? null : t.uuid)} className="text-left underline">{subject}</button>
                       </td>
                       <td style={{ padding: '10px 16px', color: '#6b7280' }}>{t.user_name || t.user_id}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
@@ -950,7 +926,7 @@ function CheckInConversationsSection() {
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
     </div>
@@ -962,13 +938,16 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
+  const pending = useRef(false)
+  const [error, setError] = useState<string | null>(null)
 
   const loadTicket = useCallback(async () => {
+    setLoading(true); setError(null)
     try {
       const data = await supportApi.getTicket(ticketUuid)
       setTicket(data)
-    } catch {
-      // ignore
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not load the conversation.')
     } finally {
       setLoading(false)
     }
@@ -980,47 +959,53 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
   }, [loadTicket, ticketUuid])
 
   const handleSend = async () => {
-    if (!reply.trim() || sending) return
+    if (!reply.trim() || pending.current) return
+    pending.current = true; setError(null)
     setSending(true)
     try {
       const updated = await supportApi.addMessage(ticketUuid, reply.trim())
       setTicket(updated)
       setReply('')
       onUpdate()
-    } catch {
-      // ignore
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Reply could not be sent. Your draft is preserved.')
     } finally {
+      pending.current = false
       setSending(false)
     }
   }
 
   const handleStatusChange = async (next: string) => {
+    if (pending.current) return
+    pending.current = true; setSending(true); setError(null)
     try {
       const updated = await supportApi.updateTicket(ticketUuid, { status: next })
       setTicket(updated)
       onUpdate()
-    } catch {
-      // ignore
-    }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not update the conversation status.')
+    } finally { pending.current = false; setSending(false) }
   }
 
   if (loading) {
-    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Loading conversation...</div>
+    return <div style={{ padding: 16, color: '#6b7280', fontSize: 13 }}>Loading conversation...</div>
   }
 
   if (!ticket) {
-    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Failed to load ticket.</div>
+    return <div role="alert" className="p-4 text-sm text-red-800">{error || 'Conversation unavailable.'} <button onClick={loadTicket} className="underline">Retry conversation</button></div>
   }
 
   return (
     <div style={{ paddingTop: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      {error && <p role="alert" className="mb-2 text-sm text-red-800">{error}</p>}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#6b7280' }}>
           {ticket.user_email && <span>{ticket.user_email} · </span>}
           opened {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : ''}
         </div>
         {ticket.status !== 'closed' ? (
           <select
+            aria-label="Check-in status" disabled={sending}
             value={ticket.status}
             onChange={(e) => handleStatusChange(e.target.value)}
             style={{ fontSize: 12, padding: '4px 8px', borderRadius: 8, border: '1px solid #d1d5db', fontFamily: 'inherit' }}
@@ -1031,7 +1016,7 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
           </select>
         ) : (
           <button
-            onClick={() => handleStatusChange('open')}
+            disabled={sending} onClick={() => handleStatusChange('open')}
             style={{
               fontSize: 12, padding: '4px 10px', borderRadius: 8,
               border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
@@ -1042,7 +1027,7 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
         )}
       </div>
 
-      <div style={{
+      <div role="region" aria-label="Check-in messages" tabIndex={0} style={{
         background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
         padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto',
       }}>
@@ -1055,12 +1040,12 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
                 background: isSupport ? '#2563eb' : '#f3f4f6',
                 color: isSupport ? '#fff' : '#111827',
               }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: isSupport ? '#fff' : '#4b5563' }}>
                   {m.user_name || m.user_id}
                   {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Team</span>}
                 </div>
-                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                <div style={{ fontSize: 10, marginTop: 2, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
+                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.content}</div>
+                <div style={{ fontSize: 10, marginTop: 2, color: isSupport ? '#fff' : '#4b5563' }}>
                   {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
                 </div>
               </div>
@@ -1070,14 +1055,15 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
       </div>
 
       {ticket.status !== 'closed' ? (
-        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <input
+            aria-label="Check-in reply" disabled={sending}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
             placeholder="Reply to this check-in..."
             style={{
-              flex: 1, padding: '8px 12px', fontSize: 13,
+              flex: '1 1 180px', minWidth: 0, padding: '8px 12px', fontSize: 13,
               border: '1px solid #d1d5db', borderRadius: 8, outline: 'none', fontFamily: 'inherit',
             }}
           />
@@ -1106,30 +1092,20 @@ function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onU
 
 function TrialCheckinsSection() {
   const { toast } = useToast()
-  const [prompts, setPrompts] = useState<PromptOverview[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadPrompts = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await getAdminPromptOverview()
-      setPrompts(data)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { loadPrompts() }, [loadPrompts])
+  const { data, loading, error, load: loadPrompts } = useAdminQuery(getAdminPromptOverview)
+  const prompts = data ?? []
+  const pending = useRef(false)
+  const [saving, setSaving] = useState(false)
 
   async function toggleEnabled(slug: string, enabled: boolean) {
+    if (pending.current) return
+    pending.current = true; setSaving(true)
     try {
       await adminUpdatePrompt(slug, { enabled })
       loadPrompts()
     } catch (e) {
       toast(`Failed to ${enabled ? 'enable' : 'disable'} check-in prompt: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
-    }
+    } finally { pending.current = false; setSaving(false) }
   }
 
   const stageColors: Record<string, { bg: string; text: string }> = {
@@ -1140,7 +1116,7 @@ function TrialCheckinsSection() {
 
   return (
     <div style={{ marginTop: 32 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Trial Check-ins</h3>
         <button
           onClick={loadPrompts}
@@ -1158,15 +1134,15 @@ function TrialCheckinsSection() {
         Responses appear as support tickets.
       </p>
 
-      {loading ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+      {error ? <p role="alert" className="text-sm text-red-800">{error} <button onClick={loadPrompts} className="underline">Retry check-in prompts</button></p> : loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
       ) : prompts.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+        <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>
           No prompts configured. They will be seeded on next server restart.
         </div>
       ) : (
         <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <TableRegion label="Trial check-in prompts"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Stage</th>
@@ -1199,24 +1175,25 @@ function TrialCheckinsSection() {
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>{p.stats.shown}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#16a34a' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>
                       {p.stats.responded}
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center', color: '#9ca3af' }}>{p.stats.dismissed}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: '#6b7280' }}>{p.stats.dismissed}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       {p.stats.shown > 0 ? `${Math.round(p.stats.response_rate * 100)}%` : '-'}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       <button
+                        aria-label={`Enable check-in: ${p.subject}`} aria-pressed={p.enabled} disabled={saving}
                         onClick={() => toggleEnabled(p.slug, !p.enabled)}
                         style={{
-                          width: 36, height: 20, borderRadius: 10, border: 'none',
+                          width: 40, height: 24, borderRadius: 10, border: 'none',
                           background: p.enabled ? '#16a34a' : '#d1d5db',
                           cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
                         }}
                       >
                         <span style={{
-                          position: 'absolute', top: 2, left: p.enabled ? 18 : 2,
+                          position: 'absolute', top: 4, left: p.enabled ? 20 : 4,
                           width: 16, height: 16, borderRadius: '50%', background: '#fff',
                           transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
                         }} />
@@ -1226,7 +1203,7 @@ function TrialCheckinsSection() {
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
     </div>
@@ -1234,8 +1211,8 @@ function TrialCheckinsSection() {
 }
 
 function SurveyResponsesSection() {
-  const [responses, setResponses] = useState<PostExperienceResponseAdmin[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, load: loadData } = useAdminQuery(getPostExperienceResponses)
+  const responses = data ?? []
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, unknown>>({})
@@ -1253,20 +1230,6 @@ function SurveyResponsesSection() {
     return sections
   }, [])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await getPostExperienceResponses()
-      setResponses(data)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { loadData() }, [loadData])
-
   function renderValue(val: unknown): string {
     if (val === null || val === undefined) return '-'
     if (Array.isArray(val)) return val.join(', ')
@@ -1282,7 +1245,7 @@ function SurveyResponsesSection() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Survey Responses</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <button
             onClick={() => { setShowPreview(!showPreview); setPreviewAnswers({}) }}
             style={{
@@ -1319,7 +1282,7 @@ function SurveyResponsesSection() {
             <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
               Post-Survey Preview
             </h3>
-            <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
+            <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
               This is what participants see after their demo expires.
             </p>
           </div>
@@ -1357,15 +1320,15 @@ function SurveyResponsesSection() {
         </div>
       )}
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>Loading...</div>
+      {error ? <p role="alert" className="text-sm text-red-800">{error} <button onClick={loadData} className="underline">Retry survey responses</button></p> : loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading...</div>
       ) : responses.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
           No survey responses yet.
         </div>
       ) : (
         <div style={{ borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', background: '#fff' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <TableRegion label="Trial survey responses"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Name</th>
@@ -1378,13 +1341,12 @@ function SurveyResponsesSection() {
               {responses.map((resp) => (
                 <React.Fragment key={resp.uuid}>
                   <tr
-                    onClick={() => setExpandedUuid(expandedUuid === resp.uuid ? null : resp.uuid)}
                     style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
                   >
                     <td style={{ padding: '12px 16px', fontWeight: 500 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {expandedUuid === resp.uuid ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        {resp.name}
+                        <button type="button" aria-expanded={expandedUuid === resp.uuid} onClick={() => setExpandedUuid(expandedUuid === resp.uuid ? null : resp.uuid)} className="text-left underline">{resp.name}</button>
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#6b7280' }}>{resp.email}</td>
@@ -1459,7 +1421,7 @@ function SurveyResponsesSection() {
                 </React.Fragment>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
     </div>

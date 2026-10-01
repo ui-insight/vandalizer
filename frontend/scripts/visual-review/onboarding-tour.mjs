@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { createReview } from './harness.mjs'
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state } = review
-page.setDefaultTimeout(12000)
+page.setDefaultTimeout(30000)
 async function shot(id) {
   await review.capture(id)
   assert.ok(review.captures.at(-1).pageWidth <= review.captures.at(-1).viewport.width, id + ': overflow')

@@ -1,5 +1,5 @@
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from '../shared/panelPortal'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react'
@@ -38,16 +38,27 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
   const [workflowRows, setWorkflowRows] = useState<WorkflowInput[]>([])
   const [score, setScore] = useState<string>('')
   const [saving, setSaving] = useState(false)
+  const pending = useRef(false)
+  const accepted = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const feedbackRef = useRef<HTMLDivElement>(null)
+  const close = () => { if (!pending.current) { if (accepted.current) onSaved(); else onClose() } }
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (error || warning) { feedbackRef.current?.focus(); feedbackRef.current?.scrollIntoView?.({ block: 'nearest' }) }
+  }, [error, warning])
+
   usePanelEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pending.current) { if (accepted.current) onSaved(); else onClose() } }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [onClose, onSaved])
 
   const handleSave = async () => {
+    if (pending.current || accepted.current) return
+    pending.current = true
     setSaving(true)
     setError(null)
     setWarning(null)
@@ -61,6 +72,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
             if (r.expected_json.trim()) {
               try {
                 expected = JSON.parse(r.expected_json)
+                if (!expected || Array.isArray(expected) || typeof expected !== 'object') throw new Error('Expected values must be a JSON object')
               } catch {
                 throw new Error(`Invalid JSON in expected values`)
               }
@@ -91,7 +103,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
       baseline._examiner_curated = true
       baseline._retroactive = true
 
-      const scoreNum = score.trim() ? parseFloat(score) : undefined
+      const scoreNum = score.trim() ? Number(score) : undefined
       if (scoreNum !== undefined && (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100)) {
         throw new Error('Score must be a number between 0 and 100')
       }
@@ -100,6 +112,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
         baseline,
         score: scoreNum,
       })
+      accepted.current = true
       if (result.live_passes_baseline === false) {
         setWarning(
           `Pinned. Soft warning: live config currently scores ${result.live_score != null ? Math.round(result.live_score) + '%' : 'N/A'}, below the new baseline (${result.pinned_score != null ? Math.round(result.pinned_score) + '%' : 'N/A'}). The catalog entry may not currently pass its own baseline.`,
@@ -111,6 +124,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
+      pending.current = false
       setSaving(false)
     }
   }
@@ -122,20 +136,22 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.4)',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) close() }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={`${item.official_baseline_pinned_at ? 'Update' : 'Establish'} official baseline`}
         style={{
         background: '#fff', borderRadius: 'var(--workspace-radius-large)', width: '100%', maxWidth: 680,
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        minWidth: 0, maxHeight: '90dvh', display: 'flex', flexDirection: 'column',
         boxShadow: 'var(--workspace-shadow-dialog)', margin: "0 var(--workspace-space-16)",
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between',
           padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)",
         }}>
           <div>
@@ -146,12 +162,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
               Retroactively pin a validation baseline for this {kindLabel(item.item_kind)}: <strong>{item.name}</strong>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 'var(--workspace-space-4)' }}>
+          <button aria-label="Close baseline editor" disabled={saving} onClick={close} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 'var(--workspace-space-4)' }}>
             <X size={18} />
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-16) var(--workspace-space-20)", display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: "var(--workspace-space-16) var(--workspace-space-20)", display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
+          <fieldset disabled={saving || !!warning} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {item.official_baseline_pinned_at && (
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)" }}>
               This item already has a pinned baseline ({item.official_baseline_test_case_count} case(s), score {item.official_baseline_score != null ? Math.round(item.official_baseline_score) + '%' : 'unknown'}). Saving will archive the previous one.
@@ -169,13 +186,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                   <div key={i} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-12)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                     <div>
                       <label style={labelStyle}>Document UUID</label>
-                      <input value={row.document_uuid} onChange={e => {
+                      <input aria-label={`Document UUID ${i + 1}`} value={row.document_uuid} onChange={e => {
                         const copy = [...extractionRows]; copy[i] = { ...row, document_uuid: e.target.value }; setExtractionRows(copy)
                       }} style={inputStyle} placeholder="(optional) document UUID" />
                     </div>
                     <div>
                       <label style={labelStyle}>Expected values (JSON)</label>
-                      <textarea value={row.expected_json} onChange={e => {
+                      <textarea aria-label={`Expected values (JSON) ${i + 1}`} value={row.expected_json} onChange={e => {
                         const copy = [...extractionRows]; copy[i] = { ...row, expected_json: e.target.value }; setExtractionRows(copy)
                       }} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'ui-monospace, monospace' }} placeholder='{"field": "value"}' />
                     </div>
@@ -203,13 +220,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                   <div key={i} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-12)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                     <div>
                       <label style={labelStyle}>Query</label>
-                      <input value={row.query} onChange={e => {
+                      <input aria-label={`Query ${i + 1}`} value={row.query} onChange={e => {
                         const copy = [...kbRows]; copy[i] = { ...row, query: e.target.value }; setKbRows(copy)
                       }} style={inputStyle} placeholder="What should the KB be able to answer?" />
                     </div>
                     <div>
                       <label style={labelStyle}>Expected answer (optional)</label>
-                      <textarea value={row.expected_answer} onChange={e => {
+                      <textarea aria-label={`Expected answer ${i + 1}`} value={row.expected_answer} onChange={e => {
                         const copy = [...kbRows]; copy[i] = { ...row, expected_answer: e.target.value }; setKbRows(copy)
                       }} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
@@ -237,13 +254,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                   <div key={i} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-12)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                     <div>
                       <label style={labelStyle}>Input</label>
-                      <textarea value={row.input} onChange={e => {
+                      <textarea aria-label={`Input ${i + 1}`} value={row.input} onChange={e => {
                         const copy = [...workflowRows]; copy[i] = { ...row, input: e.target.value }; setWorkflowRows(copy)
                       }} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="A representative input" />
                     </div>
                     <div>
                       <label style={labelStyle}>Expected output (optional)</label>
-                      <textarea value={row.expected_output} onChange={e => {
+                      <textarea aria-label={`Expected output ${i + 1}`} value={row.expected_output} onChange={e => {
                         const copy = [...workflowRows]; copy[i] = { ...row, expected_output: e.target.value }; setWorkflowRows(copy)
                       }} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
@@ -263,14 +280,15 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
 
           <div>
             <label style={labelStyle}>Baseline reference score (optional, 0–100)</label>
-            <input value={score} onChange={e => setScore(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 85" style={{ ...inputStyle, maxWidth: 160 }} />
-            <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 'var(--workspace-space-4)' }}>
+            <input aria-label="Baseline reference score" value={score} onChange={e => setScore(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 85" style={{ ...inputStyle, maxWidth: 160 }} />
+            <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
               Drift monitoring compares the live config's score to this reference. Leave blank if unknown, set it after a real validation run.
             </p>
           </div>
 
+          </fieldset>
           {warning && (
-            <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)' }}>
+            <div ref={feedbackRef} tabIndex={-1} role="status" style={{ padding: "var(--workspace-space-12) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)' }}>
               <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
                 <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-4)' }}>Baseline pinned with caveat</div>
@@ -283,7 +301,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           )}
 
           {error && (
-            <div style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 'var(--workspace-font-meta)', color: '#991b1b' }}>
+            <div ref={feedbackRef} tabIndex={-1} role="alert" style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 'var(--workspace-font-meta)', color: '#991b1b' }}>
               {error}
             </div>
           )}
@@ -291,15 +309,15 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
 
         <div style={{
           padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: "1px solid var(--workspace-border)",
-          display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-12)',
+          display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 'var(--workspace-space-12)',
         }}>
-          <button onClick={onClose} style={{
+          <button disabled={saving} onClick={close} style={{
             padding: "7px var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
             background: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: 'pointer', color: '#374151',
           }}>
-            Cancel
+            {warning ? 'Close' : 'Cancel'}
           </button>
-          <button onClick={handleSave} disabled={saving} style={{
+          <button onClick={handleSave} disabled={saving || !!warning} style={{
             display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
             padding: "7px var(--workspace-space-20)", borderRadius: 'var(--workspace-radius-small)', border: 'none',
             background: '#111827', color: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600,

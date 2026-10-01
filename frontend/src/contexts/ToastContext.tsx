@@ -55,8 +55,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           aria-label="Notifications"
           className="workspace-portal"
           style={{
-            position: 'fixed', top: 16, right: 16, zIndex: 9999,
-            display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 'min(380px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto',
+            position: 'fixed', top: 80, right: 16, zIndex: 9999,
+            display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 'min(380px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 96px)', overflowY: 'auto',
           }}
         >
           {toasts.map(t => {
@@ -109,9 +109,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   onClick={(e) => { e.stopPropagation(); dismiss(t.id) }}
                   style={{
                     flexShrink: 0, marginLeft: 4, marginTop: -2,
-                    background: 'none', border: 'none', padding: '0 2px',
+                    background: 'none', border: 'none', padding: 0, width: 24, height: 24,
                     fontSize: 16, lineHeight: 1, color: 'inherit',
-                    opacity: 0.7, cursor: 'pointer',
+                    cursor: 'pointer',
                   }}
                 >
                   {'\u2715'}

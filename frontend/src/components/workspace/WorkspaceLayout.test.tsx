@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { WorkspaceLayout } from './WorkspaceLayout'
 const h = vi.hoisted(() => ({ compact: false, mode: 'files', editor: null as string | null, tab: 'assistant', focus: 0, setTab: vi.fn() }))
-vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ railDocked: true, panelSplit: 50, chatSplitOpen: false, workspaceMode: h.mode, viewDocument: vi.fn(), setWorkspaceMode: vi.fn(), activeProjectUuid: null, openWorkflowId: h.editor, openExtractionId: null, openAutomationId: null, focusChatSignal: h.focus, activeRightTab: h.tab, setActiveRightTab: h.setTab }) }))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ selectedDocUuids: [], documentReadiness: {}, railDocked: true, panelSplit: 50, chatSplitOpen: false, workspaceMode: h.mode, viewDocument: vi.fn(), setWorkspaceMode: vi.fn(), activeProjectUuid: null, openWorkflowId: h.editor, openExtractionId: null, openAutomationId: null, focusChatSignal: h.focus, activeRightTab: h.tab, setActiveRightTab: h.setTab }) }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('../../hooks/useAutomationActivity', () => ({ useAutomationActivity: () => ({ activeIds: [], hasActive: false }) }))
 vi.mock('../layout/Header', () => ({ Header: () => <div>Header</div> }))

@@ -53,13 +53,13 @@ try {
   await card.getByRole('button',{name:'Create workflow',exact:true}).focus();await page.keyboard.press('Enter')
   await page.getByText('Your request is being reviewed; no completion is claimed.',{exact:true}).waitFor()
   assert.equal(state.lastChat.message,'Yes, go ahead')
-  await shot('agent-approval-requested-'+width,card)
+  await shot('agent-approval-requested-'+width,page.getByRole('region',{name:'Earlier action decision'}))
   await fresh();await send(approval)
   state.chatChunks=[{kind:'text',content:'Your cancellation request was received.'}]
   await card.getByRole('button',{name:'Cancel action'}).focus();await page.keyboard.press('Enter')
   await page.getByText('Your cancellation request was received.',{exact:true}).waitFor()
   assert.equal(state.lastChat.message,'No, cancel that')
-  await shot('agent-cancellation-requested-'+width,card)
+  await shot('agent-cancellation-requested-'+width,page.getByRole('region',{name:'Earlier action decision'}))
 
   await fresh()
   await page.getByRole('button',{name:'Choose a knowledge base',exact:true}).click()

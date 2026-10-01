@@ -1,4 +1,4 @@
-import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban, Columns2 } from 'lucide-react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
@@ -9,7 +9,7 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject, chatSplitOpen, setChatSplitOpen } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
   const activeMode = workspaceMode === 'projects' && activeProjectUuid ? 'chat' : workspaceMode
@@ -21,7 +21,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
     <nav
       aria-label="Workspace navigation"
       style={{
-        width: 48,
+        width: 88,
         background: 'var(--color-panel-dark)',
         borderRight: '1px solid #333',
         display: 'flex',
@@ -40,11 +40,13 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         aria-label="Projects"
         aria-current={projectsActive ? 'page' : undefined}
         style={{
-          width: 40,
-          height: 40,
+          width: 80,
+          minHeight: 56,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 4,
           background: 'transparent',
           border: 'none',
           borderLeft: projectsActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
@@ -53,7 +55,8 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           padding: 0,
         }}
       >
-        <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#888' }} />
+        <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#b6bdc7' }} />
+        <span style={{ fontSize: 12, color: projectsActive ? '#fff' : '#b6bdc7' }}>Projects</span>
       </button>
       <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-2) 0 var(--workspace-space-4)" }} />
 
@@ -71,11 +74,13 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
             aria-current={active ? 'page' : undefined}
             style={{
               position: 'relative',
-              width: 40,
-              height: 40,
+              width: 80,
+              minHeight: 56,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 4,
               background: 'transparent',
               border: 'none',
               borderLeft: active ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
@@ -87,8 +92,9 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           >
             <Icon
               size={20}
-              style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#888' }}
+              style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#b6bdc7' }}
             />
+            <span style={{ fontSize: 12, color: active ? '#fff' : '#b6bdc7' }}>{label}</span>
             {showDot && (
               <span
                 style={{
@@ -106,36 +112,6 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           </button>
         )
       })}
-
-      {/* Split view — show the file browser beside the chat. Only meaningful
-          in chat mode (other modes already have a left panel). */}
-      {(workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)) && activeProjectRole !== 'viewer' && (
-        <>
-          <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-4) 0 var(--workspace-space-2)" }} />
-          <button
-            onClick={() => setChatSplitOpen(!chatSplitOpen)}
-            className="workspace-desktop-split-toggle"
-            title={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
-            aria-label={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
-            aria-pressed={chatSplitOpen}
-            style={{
-              width: 40,
-              height: 40,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              borderLeft: chatSplitOpen ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-              borderRadius: 'var(--workspace-radius-small)',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            <Columns2 size={20} style={{ color: chatSplitOpen ? '#fff' : '#888' }} />
-          </button>
-        </>
-      )}
 
       <style>{`
         @keyframes automationGlow {

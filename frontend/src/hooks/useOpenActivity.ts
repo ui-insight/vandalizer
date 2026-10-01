@@ -25,7 +25,7 @@ export function pendingReviewUuid(activity: ActivityEvent): string | null {
  * come through here rather than send the agent a message about it.
  */
 export function useOpenActivity() {
-  const { setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation } = useWorkspace()
+  const { focusChat, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation } = useWorkspace()
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -35,9 +35,9 @@ export function useOpenActivity() {
         closeWorkflow()
         closeExtraction()
         closeAutomation()
-        setActiveRightTab('assistant')
+        focusChat()
         setLoadConversationId(activity.conversation_id)
-      } else if (activity.type === 'workflow_run' && pendingReviewUuid(activity)) {
+      } else if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued') && pendingReviewUuid(activity)) {
         // The run is frozen at the gate — there is nothing to see in the editor
         // that the review does not show, and the review is the only thing that
         // moves it forward.
@@ -77,7 +77,7 @@ export function useOpenActivity() {
         )
       }
     },
-    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
+    [focusChat, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
   )
 
   /** Open by id, for surfaces that only carry the activity's id (the home). */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code, Brain, Mail } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -23,14 +23,13 @@ export default function Account() {
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
+  const profilePending = useRef(false)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    if (user) {
-      setName(user.name || '')
-      setEmail(user.email || '')
-    }
-  }, [user])
+    setName(user?.name || '')
+    setEmail(user?.email || '')
+  }, [user?.name, user?.email])
 
   // SSO-linked accounts get their email from the identity provider on every
   // sign-in, so a local edit would be silently overwritten — lock the field.
@@ -42,10 +41,12 @@ export default function Account() {
     email.trim().toLowerCase() !== (user?.email || '').toLowerCase()
 
   const handleSaveProfile = async () => {
+    if (profilePending.current) return
     if (emailChanged && !currentPassword) {
       setProfileMessage('Enter your current password to change your email.')
       return
     }
+    profilePending.current = true
     setProfileSaving(true)
     setProfileMessage(null)
     try {
@@ -57,38 +58,41 @@ export default function Account() {
       await refreshUser()
       setCurrentPassword('')
       setProfileMessage('Profile saved')
-      setTimeout(() => setProfileMessage(null), 3000)
     } catch (err) {
       setProfileMessage(err instanceof Error ? err.message : 'Failed to save')
     } finally {
+      profilePending.current = false
       setProfileSaving(false)
     }
   }
 
-  // Email preferences state
+  // Keep saved preferences authoritative; a failed read is not a default choice.
   const [emailPrefs, setEmailPrefs] = useState<EmailPreferences | null>(null)
   const [prefsSaving, setPrefsSaving] = useState<string | null>(null)
-
+  const prefsPending = useRef(false)
+  const [prefsError, setPrefsError] = useState<string | null>(null)
+  const [prefsAttempt, setPrefsAttempt] = useState(0)
   useEffect(() => {
-    getEmailPreferences()
-      .then(setEmailPrefs)
-      .catch(() => setEmailPrefs({ onboarding: true, nudges: true, announcements: true }))
-  }, [])
+    let current = true
+    setPrefsError(null)
+    getEmailPreferences().then(value => { if (current) setEmailPrefs(value) })
+      .catch(reason => { if (current) setPrefsError(reason instanceof Error ? reason.message : 'Could not load email preferences.') })
+    return () => { current = false }
+  }, [prefsAttempt])
 
   const togglePref = async (key: keyof EmailPreferences) => {
-    if (!emailPrefs) return
-    const next = { ...emailPrefs, [key]: !emailPrefs[key] }
-    setEmailPrefs(next)
-    setPrefsSaving(key)
+    if (!emailPrefs || prefsPending.current) return
+    prefsPending.current = true
+    const previous = emailPrefs
+    const next = { ...previous, [key]: !previous[key] }
+    setEmailPrefs(next); setPrefsSaving(key); setPrefsError(null)
     try {
       const saved = await updateEmailPreferences({ [key]: next[key] })
       setEmailPrefs(saved)
-    } catch {
-      // revert on failure
-      setEmailPrefs(emailPrefs)
-    } finally {
-      setPrefsSaving(null)
-    }
+    } catch (reason) {
+      setEmailPrefs(previous)
+      setPrefsError(`${reason instanceof Error ? reason.message : 'Could not save the preference.'} Your last saved preferences have been restored. Try the change again.`)
+    } finally { prefsPending.current = false; setPrefsSaving(null) }
   }
 
   // API Token state
@@ -100,107 +104,84 @@ export default function Account() {
   const [tokenLoading, setTokenLoading] = useState(true)
   const [tokenGenerating, setTokenGenerating] = useState(false)
   const [tokenRevoking, setTokenRevoking] = useState(false)
+  const tokenPending = useRef(false)
+  const [tokenStatusKnown, setTokenStatusKnown] = useState(false)
+  const [tokenAttempt, setTokenAttempt] = useState(0)
+  const [tokenCopyError, setTokenCopyError] = useState<string | null>(null)
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   useEffect(() => {
-    getApiTokenStatus()
-      .then(s => { setHasToken(s.has_token); setTokenCreatedAt(s.created_at) })
-      .catch(err => { 
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load token status'
-        setTokenError(`Failed to load API token status: ${errorMessage}`)
-        console.error('Error loading API token status:', err)
-      })
-      .finally(() => setTokenLoading(false))
-  }, [])
+    let current = true
+    setTokenLoading(true); setTokenError(null)
+    getApiTokenStatus().then(status => {
+      if (current) { setHasToken(status.has_token); setTokenCreatedAt(status.created_at); setTokenStatusKnown(true) }
+    }).catch(reason => { if (current) setTokenError(reason instanceof Error ? reason.message : 'Could not load token status.') })
+      .finally(() => { if (current) setTokenLoading(false) })
+    return () => { current = false }
+  }, [tokenAttempt])
 
   const handleGenerateToken = async () => {
-    if (hasToken) {
-      const ok = await confirm({
-        title: 'Replace existing token?',
-        message: 'Generating a new token will revoke your existing one. Any scripts or integrations using it will stop working immediately.',
-        confirmLabel: 'Generate new token',
-        destructive: true,
-      })
-      if (!ok) return
-    }
-    setTokenGenerating(true)
-    setTokenError(null)
+    if (tokenPending.current || !tokenStatusKnown) return
+    tokenPending.current = true
     try {
-      const res = await generateApiToken()
-      setNewToken(res.api_token)
-      setHasToken(true)
-      setTokenCreatedAt(res.created_at)
-      setTokenVisible(true)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate token'
-      setTokenError(`Failed to generate API token: ${errorMessage}`)
-      console.error('Error generating API token:', err)
-    } finally { setTokenGenerating(false) }
+      if (hasToken && !await confirm({ title: 'Replace existing token?', message: 'Generating a new token will revoke your existing one. Any scripts or integrations using it will stop working immediately.', confirmLabel: 'Generate new token', destructive: true })) return
+      setTokenGenerating(true); setTokenError(null); setTokenCopyError(null); setTokenCopied(false)
+      const result = await generateApiToken()
+      setNewToken(result.api_token); setHasToken(true); setTokenCreatedAt(result.created_at); setTokenVisible(true)
+    } catch (reason) { setTokenError(reason instanceof Error ? reason.message : 'Could not generate a token.') }
+    finally { tokenPending.current = false; setTokenGenerating(false) }
   }
 
   const handleRevokeToken = async () => {
-    const ok = await confirm({
-      title: 'Revoke API token?',
-      message: 'Are you sure you want to revoke this token? Any scripts or integrations using it will stop working immediately.',
-      confirmLabel: 'Revoke',
-      destructive: true,
-    })
-    if (!ok) return
-    setTokenRevoking(true)
-    setTokenError(null)
+    if (tokenPending.current) return
+    tokenPending.current = true
     try {
+      if (!await confirm({ title: 'Revoke API token?', message: 'Any scripts or integrations using this token will stop working immediately.', confirmLabel: 'Revoke', destructive: true })) return
+      setTokenRevoking(true); setTokenError(null)
       await revokeApiToken()
-      setHasToken(false)
-      setTokenCreatedAt(null)
-      setNewToken(null)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to revoke token'
-      setTokenError(`Failed to revoke API token: ${errorMessage}`)
-      console.error('Error revoking API token:', err)
-    } finally { setTokenRevoking(false) }
+      setHasToken(false); setTokenCreatedAt(null); setNewToken(null); setTokenCopied(false)
+    } catch (reason) { setTokenError(reason instanceof Error ? reason.message : 'Could not revoke the token.') }
+    finally { tokenPending.current = false; setTokenRevoking(false) }
   }
 
-  const handleCopyToken = () => {
+  const handleCopyToken = async () => {
     if (!newToken) return
-    navigator.clipboard.writeText(newToken)
-    setTokenCopied(true)
-    setTimeout(() => setTokenCopied(false), 2000)
+    setTokenCopied(false); setTokenCopyError(null)
+    try { await navigator.clipboard.writeText(newToken); setTokenCopied(true) }
+    catch { setTokenCopyError('Could not copy the token. Select the token text and copy it manually.') }
   }
 
   // Chat memory state
   const [memory, setMemory] = useState<UserMemoryResponse | null>(null)
   const [memoryLoading, setMemoryLoading] = useState(true)
   const [memoryClearing, setMemoryClearing] = useState(false)
+  const memoryPending = useRef(false)
+  const memoryScope = useRef(user?.current_team)
+  memoryScope.current = user?.current_team
+  const [memoryAttempt, setMemoryAttempt] = useState(0)
   const [memoryError, setMemoryError] = useState<string | null>(null)
 
   useEffect(() => {
-    getUserMemory()
-      .then(setMemory)
-      .catch(err => {
-        const msg = err instanceof Error ? err.message : 'Failed to load memory'
-        setMemoryError(msg)
-      })
-      .finally(() => setMemoryLoading(false))
-  }, [])
+    let current = true
+    setMemoryLoading(true); setMemoryError(null); setMemory(null)
+    getUserMemory().then(value => { if (current) setMemory(value) })
+      .catch(reason => { if (current) setMemoryError(reason instanceof Error ? reason.message : 'Could not load assistant memory.') })
+      .finally(() => { if (current) setMemoryLoading(false) })
+    return () => { current = false }
+  }, [memoryAttempt, user?.current_team])
 
   const handleClearMemory = async () => {
-    const ok = await confirm({
-      title: 'Clear assistant memory',
-      message: "Clear what the assistant remembers? This only affects suggestions, not your documents, templates, or workflows.",
-      confirmLabel: 'Clear memory',
-      destructive: true,
-    })
-    if (!ok) return
-    setMemoryClearing(true)
-    setMemoryError(null)
+    if (memoryPending.current) return
+    memoryPending.current = true
+    const scope = memoryScope.current
     try {
+      if (!await confirm({ title: 'Clear assistant memory', message: "Clear what the assistant remembers? This only affects suggestions, not your documents, templates, or workflows.", confirmLabel: 'Clear memory', destructive: true })) return
+      if (memoryScope.current !== scope) return
+      setMemoryClearing(true); setMemoryError(null)
       await clearUserMemory()
-      setMemory({ extractions: [], workflows: [], kbs: [] })
-    } catch (err) {
-      setMemoryError(err instanceof Error ? err.message : 'Failed to clear memory')
-    } finally {
-      setMemoryClearing(false)
-    }
+      if (memoryScope.current === scope) setMemory({ extractions: [], workflows: [], kbs: [] })
+    } catch (reason) { if (memoryScope.current === scope) setMemoryError(reason instanceof Error ? reason.message : 'Could not clear memory. Your saved memory is unchanged.') }
+    finally { memoryPending.current = false; setMemoryClearing(false) }
   }
 
   const hasMemoryItems =
@@ -271,27 +252,29 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         {/* Account Information — editable */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-            <User className="h-4 w-4 text-gray-400" />
+            <User className="h-4 w-4 text-gray-600" />
             <h3 className="font-medium text-gray-900">Account Information</h3>
           </div>
           <div className="p-4">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
               <div>
                 <label className="block text-xs font-medium uppercase text-gray-500 mb-1">User ID</label>
                 <p className="text-sm font-mono text-gray-900">{user?.user_id || '-'}</p>
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-500 mb-1">Role</label>
-                <p className="text-sm text-gray-900">{user?.is_admin ? 'Administrator' : 'Member'}</p>
+                <label className="block text-xs font-medium uppercase text-gray-500 mb-1">Account access</label>
+                <p className="text-sm text-gray-900">{user?.is_admin ? 'Administrator' : user?.is_staff ? 'Staff' : 'Member'}</p>
+                <p className="mt-1 text-xs text-gray-600">System access is separate from your role in each team.</p>
               </div>
               <div>
                 <label htmlFor="account-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Display Name</label>
                 <input
+                  disabled={profileSaving}
                   id="account-name"
                   type="text"
                   autoComplete="name"
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => { setName(e.target.value); setProfileMessage(null) }}
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
                   placeholder="Your name"
                 />
@@ -303,8 +286,8 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={emailManagedBySso}
+                  onChange={e => { setEmail(e.target.value); setProfileMessage(null) }}
+                  disabled={emailManagedBySso || profileSaving}
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight disabled:bg-gray-50 disabled:text-gray-500"
                   placeholder="you@example.com"
                 />
@@ -315,11 +298,12 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 )}
               </div>
               {emailChanged && (
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label htmlFor="account-current-password" className="block text-xs font-medium uppercase text-gray-500 mb-1">
                     Current Password
                   </label>
                   <input
+                    disabled={profileSaving}
                     id="account-current-password"
                     type="password"
                     autoComplete="current-password"
@@ -334,7 +318,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex flex-wrap items-center gap-3 mt-4">
               <button
                 onClick={handleSaveProfile}
                 disabled={profileSaving}
@@ -344,7 +328,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 {profileSaving ? 'Saving...' : 'Save Profile'}
               </button>
               {profileMessage && (
-                <span className={`text-sm ${profileMessage === 'Profile saved' ? 'text-green-600' : 'text-red-600'}`}>
+                <span role={profileMessage === 'Profile saved' ? 'status' : 'alert'} className={`text-sm ${profileMessage === 'Profile saved' ? 'text-green-700' : 'text-red-700'}`}>
                   {profileMessage}
                 </span>
               )}
@@ -355,7 +339,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         {/* Chat Memory */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-            <Brain className="h-4 w-4 text-gray-400" />
+            <Brain className="h-4 w-4 text-gray-600" />
             <h3 className="font-medium text-gray-900">What the assistant remembers</h3>
           </div>
           <div className="p-4 space-y-4">
@@ -367,13 +351,14 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
 
             {memoryError && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-700">{memoryError}</p>
+                <p role="alert" className="text-sm text-red-700">{memoryError}</p>
+                {!memory && <button type="button" onClick={() => setMemoryAttempt(value => value + 1)} className="mt-2 text-sm underline">Retry assistant memory</button>}
               </div>
             )}
 
             {memoryLoading ? (
-              <p className="text-sm text-gray-400">Loading...</p>
-            ) : hasMemoryItems ? (
+              <p className="text-sm text-gray-600">Loading...</p>
+            ) : memoryError && !memory ? null : hasMemoryItems ? (
               <>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   {([
@@ -382,15 +367,15 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                     { label: 'Knowledge bases', items: memory!.kbs },
                   ] as const).map(group => (
                     <div key={group.label}>
-                      <p className="text-xs font-medium uppercase text-gray-400 mb-2">{group.label}</p>
+                      <p className="text-xs font-medium uppercase text-gray-600 mb-2">{group.label}</p>
                       {group.items.length === 0 ? (
-                        <p className="text-sm text-gray-400">-</p>
+                        <p className="text-sm text-gray-600">-</p>
                       ) : (
                         <ul className="space-y-1">
                           {group.items.map(item => (
                             <li key={item.title} className="text-sm text-gray-900">
                               {item.title}
-                              <span className="ml-1 text-xs text-gray-400">
+                              <span className="ml-1 text-xs text-gray-600">
                                 ({item.count}×)
                               </span>
                             </li>
@@ -423,7 +408,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         {/* Email Preferences */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-            <Mail className="h-4 w-4 text-gray-400" />
+            <Mail className="h-4 w-4 text-gray-600" />
             <h3 className="font-medium text-gray-900">Email Preferences</h3>
           </div>
           <div className="p-4 space-y-4">
@@ -431,8 +416,9 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
               Choose which emails we send you. Failure alerts, review requests, and
               security emails are always delivered.
             </p>
+            {prefsError && <p role="alert" className="text-sm text-red-800">{prefsError}{!emailPrefs && <button type="button" onClick={() => setPrefsAttempt(value => value + 1)} className="ml-2 underline">Retry email preferences</button>}</p>}
             {!emailPrefs ? (
-              <p className="text-sm text-gray-400">Loading...</p>
+              prefsError ? null : <p role="status" className="text-sm text-gray-600">Loading...</p>
             ) : (
               <div className="space-y-3">
                 {([
@@ -456,7 +442,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                     <input
                       type="checkbox"
                       checked={emailPrefs[key]}
-                      disabled={prefsSaving === key}
+                      disabled={prefsSaving !== null}
                       onChange={() => togglePref(key)}
                       className="mt-1 h-4 w-4 rounded border-gray-300 text-highlight focus:ring-highlight"
                     />
@@ -465,7 +451,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                       <div className="text-xs text-gray-500">{hint}</div>
                     </div>
                     {prefsSaving === key && (
-                      <span className="text-xs text-gray-400">Saving...</span>
+                      <span className="text-xs text-gray-600">Saving...</span>
                     )}
                   </label>
                 ))}
@@ -477,7 +463,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         {/* API Token */}
         <div className="rounded-lg border border-gray-200 bg-white">
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-            <KeyRound className="h-4 w-4 text-gray-400" />
+            <KeyRound className="h-4 w-4 text-gray-600" />
             <h3 className="font-medium text-gray-900">API Token</h3>
           </div>
           <div className="p-4 space-y-4">
@@ -488,13 +474,13 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
 
             {tokenError && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-700">{tokenError}</p>
+                <p role="alert" className="text-sm text-red-700">{tokenError}</p>
               </div>
             )}
 
             {tokenLoading ? (
               <p className="text-sm text-gray-500">Loading token status...</p>
-            ) : hasToken ? (
+            ) : !tokenStatusKnown ? <button type="button" onClick={() => setTokenAttempt(value => value + 1)} className="text-sm underline">Retry token status</button> : hasToken ? (
               <>
                 {/* Active token status */}
                 <div className="flex items-center gap-2">
@@ -520,11 +506,12 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                         type={tokenVisible ? 'text' : 'password'}
                         value={newToken}
                         readOnly
-                        className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono focus:outline-none"
+                        className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono focus:outline-none"
                       />
                       <button
                         onClick={() => setTokenVisible(!tokenVisible)}
                         className="rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50"
+                        aria-label={tokenVisible ? 'Hide token' : 'Show token'}
                         title={tokenVisible ? 'Hide token' : 'Show token'}
                       >
                         {tokenVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -532,6 +519,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                       <button
                         onClick={handleCopyToken}
                         className="rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50"
+                        aria-label={tokenCopied ? 'Token copied' : 'Copy token'}
                         title="Copy to clipboard"
                       >
                         {tokenCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
@@ -540,11 +528,13 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                   </div>
                 )}
 
+                {tokenCopyError && <p role="alert" className="text-sm text-red-800">{tokenCopyError}</p>}
+
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleGenerateToken}
-                    disabled={tokenGenerating}
+                    disabled={tokenGenerating || tokenRevoking}
                     className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
@@ -552,7 +542,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                   </button>
                   <button
                     onClick={handleRevokeToken}
-                    disabled={tokenRevoking}
+                    disabled={tokenGenerating || tokenRevoking}
                     className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -569,7 +559,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 </div>
                 <button
                   onClick={handleGenerateToken}
-                  disabled={tokenGenerating}
+                  disabled={tokenGenerating || tokenRevoking}
                   className="flex items-center gap-1.5 rounded-md bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50"
                 >
                   <KeyRound className="h-4 w-4" />
@@ -585,14 +575,14 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         {hasToken && (
           <div className="rounded-lg border border-gray-200 bg-white">
             <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-              <Code className="h-4 w-4 text-gray-400" />
+              <Code className="h-4 w-4 text-gray-600" />
               <h3 className="font-medium text-gray-900">API Integration</h3>
             </div>
             <div className="p-4 space-y-4">
               <p className="text-sm text-gray-600">
                 Use these code samples to integrate Vandalizer into your applications.
                 Replace <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">YOUR_API_TOKEN</code> with your token above.
-                See <a href="/api/docs" className="text-blue-600 hover:underline" target="_blank">/api/docs</a> for the full Swagger reference.
+                See <a href="/api/docs" className="text-blue-700 underline" target="_blank">/api/docs</a> for the full Swagger reference.
               </p>
 
               {/* Tabs */}
@@ -600,6 +590,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 {(['python', 'bash'] as const).map(tab => (
                   <button
                     key={tab}
+                    aria-pressed={apiTab === tab}
                     onClick={() => setApiTab(tab)}
                     className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                       apiTab === tab
@@ -613,7 +604,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
               </div>
 
               {/* Code block */}
-              <pre className="overflow-x-auto rounded-md bg-gray-900 p-4 text-xs text-gray-100 leading-relaxed">
+              <pre tabIndex={0} role="region" aria-label="API integration example" className="overflow-x-auto rounded-md bg-gray-900 p-4 text-xs text-gray-100 leading-relaxed">
                 <code>{apiTab === 'python' ? pythonSample : bashSample}</code>
               </pre>
             </div>

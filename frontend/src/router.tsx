@@ -116,10 +116,10 @@ const landingRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     error: (search.error as string) || undefined,
     invite_token: (search.invite_token as string) || undefined,
-    admin: (search.admin as string) || undefined,
+    admin: search.admin === 1 ? '1' : (search.admin as string) || undefined,
     next: (search.next as string) || undefined,
     // `register=1` opens the auth block in register mode (trial CTA, /register).
-    register: search.register === '1' ? ('1' as const) : undefined,
+    register: search.register === '1' || search.register === 1 ? ('1' as const) : undefined,
   }),
   component: Landing,
 })
@@ -260,6 +260,7 @@ const libraryRoute = createRoute({
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin',
+  validateSearch: (search: Record<string, unknown>): { tab?: string } => ({ tab: typeof search.tab === 'string' ? search.tab : undefined }),
   component: () => (
     <ProtectedRoute>
       <Admin />

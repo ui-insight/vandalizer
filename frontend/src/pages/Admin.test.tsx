@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react'
+import { render as renderView, screen, within, waitFor, fireEvent } from '@testing-library/react'
 import Admin from './Admin'
+import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
+import type { ReactElement } from 'react'
+const render = (view: ReactElement) => {
+  const root = createRootRoute()
+  const route = createRoute({ getParentRoute: () => root, path: '/admin', validateSearch: (search: Record<string, unknown>) => ({ tab: typeof search.tab === 'string' ? search.tab : undefined }), component: () => view })
+  const router = createRouter({ routeTree: root.addChildren([route]) })
+  return renderView(<RouterProvider router={router} />)
+}
 
 // ---------------------------------------------------------------------------
 // This suite is the behavior-preservation proof for plan 008: it verifies the
@@ -196,12 +204,12 @@ describe('Admin — tab visibility truth table', () => {
     render(<Admin />)
     // Deep link is honored first…
     expect(await screen.findByText('CatalogTab Stub')).toBeInTheDocument()
-    // …and consumed: the param is gone so later visibility recomputes can't
-    // re-apply it.
-    expect(new URLSearchParams(window.location.search).get('tab')).toBeNull()
+    // The section remains in the URL so refresh can restore it.
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('catalog')
 
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Admin sections' })).getByRole('button', { name: 'Users' }))
     expect(await screen.findByText('UsersTab Stub')).toBeInTheDocument()
     expect(screen.queryByText('CatalogTab Stub')).not.toBeInTheDocument()
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('users')
   })
 })

@@ -45,9 +45,9 @@ export function TrendDelta({ current, previous, invert }: { current: number; pre
   const pct = previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100)
   const isUp = pct > 0
   const isGood = invert ? !isUp : isUp
-  if (pct === 0) return <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>0%</span>
+  if (pct === 0) return <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--ui-text-muted, #59616b)' }}>0%</span>
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: isGood ? '#16a34a' : '#dc2626' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: isGood ? '#15803d' : '#dc2626' }}>
       {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
       {isUp ? '+' : ''}{pct}%
     </span>
@@ -128,8 +128,8 @@ export function SortableHeader({ label, sortKey, currentSort, onSort, align = 'l
 
 export function SearchInput({ value, onChange, placeholder, ariaLabel }: { value: string; onChange: (v: string) => void; placeholder: string; ariaLabel?: string }) {
   return (
-    <div style={{ position: 'relative', maxWidth: 300 }}>
-      <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+    <div style={{ position: 'relative', maxWidth: 300, minWidth: 0, flex: '1 1 180px' }}>
+      <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ui-text-muted, #59616b)' }} />
       <input
         type="text"
         value={value}
@@ -145,11 +145,13 @@ export function SearchInput({ value, onChange, placeholder, ariaLabel }: { value
   )
 }
 
-export function ExportButton({ onClick }: { onClick: () => void }) {
+export function ExportButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
+        opacity: disabled ? 0.6 : 1,
         display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
         borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
         fontSize: 'var(--workspace-font-meta)', fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#374151',
@@ -188,6 +190,7 @@ export function TimeRangeSelector({
         return (
           <button
             key={String(d)}
+            aria-pressed={active}
             onClick={() => onChange(d)}
             style={{
               padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft, LogOut, Link2, Link2Off } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
@@ -47,8 +47,13 @@ function getJoinLinkExpiry(link: TeamJoinLink): { label: string; expired: boolea
 }
 
 export function TeamSettings() {
+  const { currentTeam } = useTeams()
+  return <TeamSettingsContent key={currentTeam?.uuid ?? 'no-team'} />
+}
+
+function TeamSettingsContent() {
   const { user } = useAuth()
-  const { teams, currentTeam, switchTeam, refreshTeams } = useTeams()
+  const { teams, currentTeam, switchTeam, refreshTeams, error: teamsError } = useTeams()
   const navigate = useNavigate()
   const confirm = useConfirm()
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -65,12 +70,26 @@ export function TeamSettings() {
   const [joinLinkRole, setJoinLinkRole] = useState('member')
   const [joinLinkExpiry, setJoinLinkExpiry] = useState(48)
   const [creatingJoinLink, setCreatingJoinLink] = useState(false)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const pendingActionRef = useRef(false)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  function beginAction(label: string) {
+    if (pendingActionRef.current) return false
+    pendingActionRef.current = true
+    setPendingAction(label)
+    setError('')
+    return true
+  }
+  function endAction() { pendingActionRef.current = false; setPendingAction(null) }
 
   const canEdit = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
   const isOwner = currentTeam?.role === 'owner'
 
   const refreshData = useCallback(async () => {
     if (!currentTeam) return
+    setLoading(true)
+    setLoadError('')
     try {
       const [m, i, l] = await Promise.all([
         getTeamMembers(currentTeam.uuid),
@@ -83,8 +102,8 @@ export function TeamSettings() {
       setInvites(i)
       setJoinLinks(l)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load team details')
-    }
+      setLoadError(err instanceof Error ? err.message : 'Failed to load team details')
+    } finally { setLoading(false) }
   }, [currentTeam, canEdit])
 
   useEffect(() => {
@@ -95,23 +114,25 @@ export function TeamSettings() {
     e.preventDefault()
     if (!currentTeam || !inviteEmail.trim()) return
     setError('')
+    if (!beginAction('Sending invitation…')) return
     try {
       await inviteMember(currentTeam.uuid, inviteEmail.trim(), inviteRole)
       setInviteEmail('')
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to invite')
-    }
+    } finally { endAction() }
   }
 
   async function handleRoleChange(userId: string, role: string) {
     if (!currentTeam) return
+    if (!beginAction('Saving role…')) return
     try {
       await changeMemberRole(currentTeam.uuid, userId, role)
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to change role')
-    }
+    } finally { endAction() }
   }
 
   async function handleRemove(userId: string) {
@@ -128,31 +149,37 @@ export function TeamSettings() {
       destructive: true,
     })
     if (!ok) return
+    if (!beginAction('Removing member…')) return
     try {
       await removeMember(currentTeam.uuid, userId)
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove member')
-    }
+    } finally { endAction() }
   }
 
   async function handleRename() {
     if (!currentTeam || !renameValue.trim()) return
+    if (!beginAction('Saving team name…')) return
     try {
       await updateTeamName(currentTeam.uuid, renameValue.trim())
       setEditingName(false)
       refreshTeams()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rename team')
-    }
+    } finally { endAction() }
   }
 
   async function handleCreateTeam(e: FormEvent) {
     e.preventDefault()
-    if (!newTeamName.trim()) return
-    await createTeam(newTeamName.trim())
-    setNewTeamName('')
-    refreshTeams()
+    if (!newTeamName.trim() || !beginAction('Creating team…')) return
+    try {
+      await createTeam(newTeamName.trim())
+      setNewTeamName('')
+      await refreshTeams()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not create team. Your name is kept; try again.')
+    } finally { endAction() }
   }
 
   async function handleTransferOwnership() {
@@ -170,6 +197,7 @@ export function TeamSettings() {
     })
     if (!confirmed) return
     setError('')
+    if (!beginAction('Transferring ownership…')) return
     try {
       await transferOwnership(currentTeam.uuid, transferTarget)
       setTransferTarget('')
@@ -177,7 +205,7 @@ export function TeamSettings() {
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transfer ownership')
-    }
+    } finally { endAction() }
   }
 
   async function handleLeaveTeam() {
@@ -194,13 +222,14 @@ export function TeamSettings() {
     })
     if (!confirmed) return
     setError('')
+    if (!beginAction('Leaving team…')) return
     try {
       await removeMember(currentTeam.uuid, user.user_id)
       await refreshTeams()
       navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to leave team')
-    }
+    } finally { endAction() }
   }
 
   async function handleDeleteTeam() {
@@ -217,13 +246,14 @@ export function TeamSettings() {
     })
     if (!confirmed) return
     setError('')
+    if (!beginAction('Deleting team…')) return
     try {
       await deleteTeam(currentTeam.uuid)
       await refreshTeams()
       navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete team')
-    }
+    } finally { endAction() }
   }
 
   function handleCopyInviteLink(token: string) {
@@ -231,7 +261,7 @@ export function TeamSettings() {
     navigator.clipboard.writeText(link).then(() => {
       setCopiedToken(token)
       setTimeout(() => setCopiedToken(null), 2000)
-    })
+    }).catch(() => setError('Could not copy the link. Try again or allow clipboard access.'))
   }
 
   function handleCopyJoinLink(token: string) {
@@ -239,11 +269,11 @@ export function TeamSettings() {
     navigator.clipboard.writeText(link).then(() => {
       setCopiedToken(token)
       setTimeout(() => setCopiedToken(null), 2000)
-    })
+    }).catch(() => setError('Could not copy the link. Try again or allow clipboard access.'))
   }
 
   async function handleCreateJoinLink() {
-    if (!currentTeam) return
+    if (!currentTeam || !beginAction('Creating join link…')) return
     setError('')
     setCreatingJoinLink(true)
     try {
@@ -256,6 +286,7 @@ export function TeamSettings() {
       setError(err instanceof Error ? err.message : 'Failed to create join link')
     } finally {
       setCreatingJoinLink(false)
+      endAction()
     }
   }
 
@@ -268,12 +299,13 @@ export function TeamSettings() {
     })
     if (!confirmed) return
     setError('')
+    if (!beginAction('Revoking join link…')) return
     try {
       await revokeJoinLink(token)
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke join link')
-    }
+    } finally { endAction() }
   }
 
   // Members eligible for ownership transfer (non-owner members)
@@ -283,11 +315,15 @@ export function TeamSettings() {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <fieldset disabled={!!pendingAction} aria-label="Team settings" className="mx-auto min-w-0 max-w-3xl space-y-6 border-0 p-0">
         <h1 className="text-xl font-semibold text-gray-900">Teams</h1>
 
+        {teamsError && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">{teamsError} <button type="button" className="underline" onClick={() => void refreshTeams()}>Retry teams</button></div>}
+        {pendingAction && <p role="status" className="text-sm text-gray-700">{pendingAction}</p>}
+        {loading && <p role="status" className="text-sm text-gray-700">Loading team details…</p>}
+        {loadError && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">{loadError} <button type="button" className="underline" onClick={() => void refreshData()}>Retry team details</button></div>}
         {error && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
 
         {/* Current team members */}
@@ -313,7 +349,7 @@ export function TeamSettings() {
                       type="button"
                       aria-label="Save team name"
                       onClick={handleRename}
-                      className="rounded p-1 text-green-600 hover:bg-green-50"
+                      className="rounded p-1 text-green-700 hover:bg-green-50"
                     >
                       <Check className="h-4 w-4" />
                     </button>
@@ -321,7 +357,7 @@ export function TeamSettings() {
                       type="button"
                       aria-label="Cancel rename"
                       onClick={() => setEditingName(false)}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-100"
+                      className="rounded p-1 text-gray-600 hover:bg-gray-100"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -337,7 +373,7 @@ export function TeamSettings() {
                           setRenameValue(currentTeam.name)
                           setEditingName(true)
                         }}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-600"
                         title="Rename team"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -346,9 +382,10 @@ export function TeamSettings() {
                   </>
                 )}
               </div>
-              <p className="text-xs text-gray-500">Your role: {currentTeam.role}</p>
+              <p className="text-xs text-gray-500">Your role in this team: {currentTeam.role}</p>
+              <p className="mt-1 text-xs text-gray-600">Team roles control this team’s members and shared work. They are separate from account-level access.</p>
             </div>
-            <table className="w-full">
+            <table className="team-members-table w-full">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
                   <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Member</th>
@@ -368,7 +405,7 @@ export function TeamSettings() {
                     <td className="px-4 py-3">
                       {canEdit && m.user_id !== user?.user_id && m.role !== 'owner' ? (
                         <select
-                          aria-label="Member role"
+                          aria-label={`Role for ${nameWithoutEmail(m.name, m.email) || m.email || m.user_id}`}
                           value={m.role}
                           onChange={(e) => handleRoleChange(m.user_id, e.target.value)}
                           className="rounded border border-gray-300 px-2 py-1 text-sm"
@@ -385,9 +422,9 @@ export function TeamSettings() {
                         {m.user_id !== user?.user_id && m.role !== 'owner' && (
                           <button
                             type="button"
-                            aria-label="Remove member"
+                            aria-label={`Remove ${nameWithoutEmail(m.name, m.email) || m.email || m.user_id}`}
                             onClick={() => handleRemove(m.user_id)}
-                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            className="rounded p-1 text-gray-600 hover:bg-red-50 hover:text-red-700"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -405,8 +442,8 @@ export function TeamSettings() {
         {canEdit && (
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h3 className="mb-3 font-medium text-gray-900">Invite Member</h3>
-            <form onSubmit={handleInvite} className="flex items-end gap-3">
-              <div className="flex-1">
+            <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-[1_1_200px]">
                 <label htmlFor="invite-email" className="block text-xs font-medium text-gray-500">Email</label>
                 <input
                   id="invite-email"
@@ -455,7 +492,7 @@ export function TeamSettings() {
                           <span className="text-xs text-gray-500">{inv.role}</span>
                           {expiry.label && (
                             <span
-                              className={`text-xs ${expiry.expired ? 'font-medium text-red-600' : 'text-gray-400'}`}
+                              className={`text-xs ${expiry.expired ? 'font-medium text-red-700' : 'text-gray-600'}`}
                             >
                               {expiry.label}
                             </span>
@@ -489,7 +526,7 @@ export function TeamSettings() {
               Create a public link anyone can use to join this team. Links
               expire after a set time and can be revoked anytime.
             </p>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label htmlFor="joinlink-role" className="block text-xs font-medium text-gray-500">Role</label>
                 <select
@@ -545,7 +582,7 @@ export function TeamSettings() {
                           </span>
                           {expiry.label && (
                             <span
-                              className={`text-xs ${expiry.expired ? 'font-medium text-red-600' : 'text-gray-400'}`}
+                              className={`text-xs ${expiry.expired ? 'font-medium text-red-700' : 'text-gray-600'}`}
                             >
                               {expiry.label}
                             </span>
@@ -562,7 +599,7 @@ export function TeamSettings() {
                           </button>
                           <button
                             onClick={() => handleRevokeJoinLink(link.token)}
-                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-red-50 hover:text-red-600"
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-red-50 hover:text-red-700"
                             title="Revoke link"
                           >
                             <Link2Off className="h-3.5 w-3.5" />
@@ -588,8 +625,8 @@ export function TeamSettings() {
             <p className="mb-3 text-xs text-gray-500">
               Transfer team ownership to another member. You will be demoted to admin.
             </p>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-[1_1_200px]">
                 <label htmlFor="transfer-target" className="block text-xs font-medium text-gray-500">New Owner</label>
                 <select
                   id="transfer-target"
@@ -628,7 +665,7 @@ export function TeamSettings() {
             </p>
             <button
               onClick={handleLeaveTeam}
-              className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-100"
+              className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
             >
               <LogOut className="h-4 w-4" />
               Leave Team
@@ -659,8 +696,8 @@ export function TeamSettings() {
         {/* Create new team */}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h3 className="mb-3 font-medium text-gray-900">Create New Team</h3>
-          <form onSubmit={handleCreateTeam} className="flex items-end gap-3">
-            <div className="flex-1">
+          <form onSubmit={handleCreateTeam} className="flex flex-wrap items-end gap-3">
+            <div className="min-w-0 flex-[1_1_200px]">
               <input
                 aria-label="New team name"
                 type="text"
@@ -694,20 +731,20 @@ export function TeamSettings() {
                 </div>
                 {t.uuid !== currentTeam?.uuid && (
                   <button
-                    onClick={() => switchTeam(t.uuid)}
-                    className="text-xs text-highlight hover:brightness-75"
+                    onClick={() => void switchTeam(t.uuid).catch(reason => setError(reason instanceof Error ? reason.message : 'Could not switch teams. Try again.'))}
+                    className="text-xs text-highlight-on-light hover:brightness-75"
                   >
                     Switch
                   </button>
                 )}
                 {t.uuid === currentTeam?.uuid && (
-                  <span className="text-xs text-green-600">Current</span>
+                  <span className="text-xs text-green-700">Current</span>
                 )}
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </fieldset>
     </PageLayout>
   )
 }

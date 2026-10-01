@@ -433,10 +433,6 @@ async def apply_workflow_optimization(
     _require_applyable(run)
     _require_not_tied(run, force, "workflow")
 
-    # Snapshot the previous override so revert is exact.
-    run.previous_override = wf.config_override
-    await run.save()
-
     winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
     if step_ids is not None:
         # Validate: every requested step_id must exist in the winning config.
@@ -457,11 +453,19 @@ async def apply_workflow_optimization(
     else:
         applied_overrides = dict(winning_overrides)
 
-    wf.config_override = {
+    next_override = {
         "step_overrides": applied_overrides,
         "from_run_uuid": run.uuid,
         "partial": step_ids is not None,
     }
+    if wf.config_override == next_override:
+        return {"ok": True, "applied_config": next_override, "applied_step_ids": list(applied_overrides), "partial": step_ids is not None}
+    # A retry or additional subset from the same run must retain the original
+    # baseline. Validate the selection before touching that revert snapshot.
+    if (wf.config_override or {}).get("from_run_uuid") != run.uuid:
+        run.previous_override = wf.config_override
+        await run.save()
+    wf.config_override = next_override
     wf.config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()
 

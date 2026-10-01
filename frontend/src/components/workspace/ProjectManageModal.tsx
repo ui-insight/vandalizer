@@ -321,6 +321,11 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               <button onClick={() => { setWorkspaceMode('chat'); onClose() }} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm">Open project chat</button>
             </div>
           </section>
+          <section aria-label="Project access" className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600">
+            <h3 className="font-semibold text-gray-900">Your access: {project.role}</h3>
+            <p className="mt-1">{canManage ? 'You can update this project’s files and tools. Viewers can ask questions about shared content without changing it.' : 'You can view this project and ask questions about its shared content. An owner or editor changes its files and tools.'}</p>
+            {project.team_id ? <p className="mt-2">Members of the shared team have editor access to this project.</p> : isOwner && currentTeam ? <p className="mt-2">Share with team gives members of {currentTeam.name} editor access. A PI invite link gives read-only access instead.</p> : null}
+          </section>
           {/* Description */}
           <div>
             {editingDesc ? (

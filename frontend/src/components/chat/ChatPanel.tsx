@@ -1,3 +1,7 @@
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
+import { conversationEvidence } from './conversationEvidence'
+import { approvalHistoryFor } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
@@ -81,12 +85,14 @@ function StreamingLabel() {
 }
 
 interface ChatPanelProps {
+  initialDraft?: string
+  onDraftChange?: (draft: string) => void
   conversationToLoad?: string | null
   pendingMessage?: PendingChatMessage | null
   onPendingMessageConsumed?: () => void
 }
 
-export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
+export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange }: ChatPanelProps) {
   const branding = useBranding()
   const brandIcon = branding.iconUrl
   const {
@@ -721,6 +727,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             if (body) parts.push(`[${seg.result.tool_name}]\n${body}`)
           }
         }
+        parts.push(conversationEvidence(m))
         return `${role}:\n${parts.join('\n\n')}`
       }
       // Fallback: content + tool results
@@ -731,6 +738,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           if (body) parts.push(`[${r.tool_name}]\n${body}`)
         }
       }
+      parts.push(conversationEvidence(m))
       return `${role}:\n${parts.join('\n\n')}`
     }
 
@@ -763,7 +771,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             .filter(Boolean)
           if (extras.length) content += '\n' + extras.join('\n')
         }
-        rows.push([m.role, content])
+        rows.push([m.role, [content, conversationEvidence(m)].filter(Boolean).join('\n\n')])
       })
       const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
@@ -771,29 +779,31 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     } else if (format === 'pdf') {
       const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
       const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
-      .msg{margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
+      table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px;text-align:left;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere}h1,h2,h3{break-after:avoid}.evidence{margin-top:12px;border-top:1px solid #ccc;padding-top:8px;font-size:12px;overflow-wrap:anywhere}.msg{overflow-wrap:anywhere;margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
       .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}
       .tool-data{background:#f0f4f8;padding:8px 12px;border-radius:4px;font-size:12px;margin:8px 0;white-space:pre-wrap;font-family:monospace}</style></head>
       <body>${messages.map(m => {
-        const parts = [escHtml(m.content)]
+        const parts = [DOMPurify.sanitize(marked.parse(m.content, { async: false }))]
         const segs = m.segments
         if (segs) {
           for (const seg of segs) {
             if (seg.kind === 'tool_result') {
               const body = toolResultToText(seg.result.tool_name, seg.result.content)
-              if (body) parts.push(`<div class="tool-data"><strong>${seg.result.tool_name}</strong><br>${escHtml(body)}</div>`)
+              if (body) parts.push(`<div class="tool-data"><strong>${escHtml(seg.result.tool_name)}</strong><br>${escHtml(body)}</div>`)
             }
           }
         } else if (m.tool_results) {
           for (const r of m.tool_results) {
             const body = toolResultToText(r.tool_name, r.content)
-            if (body) parts.push(`<div class="tool-data"><strong>${r.tool_name}</strong><br>${escHtml(body)}</div>`)
+            if (body) parts.push(`<div class="tool-data"><strong>${escHtml(r.tool_name)}</strong><br>${escHtml(body)}</div>`)
           }
         }
+        parts.push(`<div class="evidence">${escHtml(conversationEvidence(m))}</div>`)
         return `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${parts.join('')}</div></div>`
       }).join('')}</body></html>`
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close(); win.print() }
+      else toast('The print window could not open. Allow pop-ups for this site or export Text or CSV.', 'error')
     }
   }
 
@@ -819,7 +829,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col"
+      className="chat-pane flex h-full min-h-0 flex-col"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -908,7 +918,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {effectiveFirstSession && hasDocContext && (
         <div className="first-task-progress" role="status">
           <strong>{messages.some(message => message.role === 'assistant') ? '3. Check the evidence' : '2. Ask a question'}</strong>
-          <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
+          <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document. Then use Export conversation for handoff, or ask the assistant to turn this task into a reusable workflow.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
         </div>
       )}
       {isLoadingHistory && <div role="status" className="px-4 py-3 text-sm text-gray-600">Loading conversation…</div>}
@@ -919,6 +929,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         aria-label="Conversation"
         tabIndex={0}
         onScroll={handleScroll}
+        // Focus can scroll a citation just before it opens another pane,
+        // before the browser has delivered its scroll event. Save that final
+        // visible position before the action changes the workspace.
+        onClickCapture={handleScroll}
+        onKeyDownCapture={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
       >
@@ -1212,6 +1227,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <ChatMessage
                     message={msg}
                     messageIndex={i}
+                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1))}
                     conversationUuid={conversationUuid || undefined}
                     onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
                   />
@@ -1508,45 +1524,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
       </div>
 
-      {/* Scroll to bottom button */}
-      {showScrollDown && (
-        <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-          <button
-            onClick={scrollToBottom}
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              border: "1px solid var(--workspace-border)",
-              backgroundColor: '#fff',
-              color: '#374151',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-              zIndex: 10,
-              transition: 'background-color 0.15s, box-shadow 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6'
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.18)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = '#fff'
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'
-            }}
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDown size={18} />
-          </button>
-        </div>
-      )}
-
-
-
       {/* Project active badge — entering a project clears the KB, so normally
           only one of these shows; render project-first for deterministic order. */}
       {activeProjectUuid && (
@@ -1582,6 +1559,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
       {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
       <ChatInput
+        initialDraft={initialDraft}
+        onDraftChange={onDraftChange}
         onSend={async (msg) => {
           if (isStreaming) await queueMessage(msg)
           else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
@@ -1600,6 +1579,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
         memoryControl={<MemoryPanel />}
+        navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
         focusSignal={focusChatSignal}
         contextMeter={
           messages.length > 0 && (contextMeter || contextTokens > 0) ? (

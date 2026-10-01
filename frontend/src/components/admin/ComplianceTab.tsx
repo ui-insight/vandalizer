@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useCallback } from 'react'
 import {
   AlertTriangle, FileText, Layers, Lock, Pause, RefreshCw, ShieldCheck, Tag, Trash2,
 } from 'lucide-react'
@@ -6,9 +8,7 @@ import {
 import {
   getClassificationDashboard,
   getRetentionDashboard,
-  type ClassificationDashboard,
   type ClassificationLevel,
-  type RetentionDashboard,
   type RetentionPolicy,
 } from '../../api/admin'
 import { formatDateTime } from './shared/format'
@@ -31,7 +31,7 @@ function ClassificationChip({ name, levels }: { name: string; levels: Classifica
       display: 'inline-flex', alignItems: 'center', gap: 6,
       padding: '2px 10px', borderRadius: 9999,
       fontSize: 12, fontWeight: 600,
-      backgroundColor: `${color}1a`, color,
+      backgroundColor: `${color}1a`, color: '#374151',
       border: `1px solid ${color}66`,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: color }} />
@@ -63,26 +63,13 @@ function StatCard({ icon: Icon, label, value, color }: {
 }
 
 export function ComplianceTab() {
-  const [classification, setClassification] = useState<ClassificationDashboard | null>(null)
-  const [retention, setRetention] = useState<RetentionDashboard | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [c, r] = await Promise.all([getClassificationDashboard(), getRetentionDashboard()])
-      setClassification(c)
-      setRetention(r)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load compliance data')
-    } finally {
-      setLoading(false)
-    }
+  const request = useCallback(async () => {
+    const [classification, retention] = await Promise.all([getClassificationDashboard(), getRetentionDashboard()])
+    return { classification, retention }
   }, [])
-
-  useEffect(() => { void reload() }, [reload])
+  const { data, loading, error, load: reload } = useAdminQuery(request)
+  const classification = data?.classification
+  const retention = data?.retention
 
   if (loading && !classification && !retention) {
     return <div style={{ padding: 24, color: '#6b7280' }}>Loading…</div>
@@ -91,7 +78,8 @@ export function ComplianceTab() {
     return (
       <div style={{ padding: 16, backgroundColor: '#fef2f2', border: '1px solid #fecaca',
                     borderRadius: 8, color: '#991b1b' }}>
-        {error}
+        <p role="alert">{error}</p>
+        <button onClick={reload} className="admin-open-record">Retry compliance records</button>
       </div>
     )
   }
@@ -103,13 +91,13 @@ export function ComplianceTab() {
   return (
     <div>
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
         marginBottom: 24,
       }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Compliance</h2>
           <p style={{ fontSize: 14, color: '#6b7280' }}>
-            Document classification (FERPA / CUI / ITAR) and retention policy enforcement.
+            Recorded document classifications and configured retention policy. Classification and model confidence are review signals; they do not certify legal compliance.
           </p>
         </div>
         <button
@@ -136,7 +124,7 @@ export function ComplianceTab() {
 
       {/* Classification section */}
       <section style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           <Tag size={18} color="#3b82f6" />
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Classification</h3>
           <span style={{
@@ -171,7 +159,7 @@ export function ComplianceTab() {
                   backgroundColor: `${level.color}0d`,
                   borderLeft: `3px solid ${level.color}`,
                 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: level.color, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
                     {level.label}
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 700 }}>{count.toLocaleString()}</div>
@@ -213,7 +201,7 @@ export function ComplianceTab() {
               No documents have been classified yet.
             </div>
           ) : (
-            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <TableRegion label="Recent document classifications — scroll for more columns"><table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
                   <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Title</th>
@@ -226,8 +214,7 @@ export function ComplianceTab() {
               <tbody>
                 {classification.recent_classifications.map(row => (
                   <tr key={row.uuid} style={{ borderTop: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px 16px', maxWidth: 320, overflow: 'hidden',
-                                 textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '10px 16px', maxWidth: 320, overflowWrap: 'anywhere' }}>
                       {row.title || <span style={{ color: '#6b7280' }}>Untitled</span>}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
@@ -247,14 +234,14 @@ export function ComplianceTab() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></TableRegion>
           )}
         </div>
       </section>
 
       {/* Retention section */}
       <section>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           <ShieldCheck size={18} color="#22c55e" />
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Retention</h3>
           <span style={{
@@ -276,7 +263,7 @@ export function ComplianceTab() {
             <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
               Retention enforcement is currently off. Documents will not be auto-scheduled for
-              deletion. Turn it on under <strong>Config → System Config → Document Retention
+              deletion. A platform admin can change this under <strong>Config → System Config → Document Retention
               Policy</strong>.
             </div>
           </div>
@@ -292,7 +279,7 @@ export function ComplianceTab() {
           }}>
             Per-classification retention policies
           </div>
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+          <TableRegion label="Retention policies — scroll for more columns"><table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
                 <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Tier</th>
@@ -324,7 +311,7 @@ export function ComplianceTab() {
                 )
               })}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
 
         <div style={{

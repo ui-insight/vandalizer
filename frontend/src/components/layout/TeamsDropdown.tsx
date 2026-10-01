@@ -9,11 +9,14 @@ import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import { VersionMenuFooter } from './VersionMenuFooter'
 
 export function TeamsDropdown() {
-  const { teams, currentTeam, switchTeam } = useTeams()
+  const { teams, currentTeam, switchTeam, refreshTeams, error: teamsError } = useTeams()
   const { user, logout } = useAuth()
   const certPanel = useCertificationPanel()
   const { count: pendingReviews } = useMyReviewCount()
   const [open, setOpen] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
+  const [switching, setSwitching] = useState(false)
+  const switchPending = useRef(false)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -117,6 +120,8 @@ export function TeamsDropdown() {
           }}
           onKeyDown={handleMenuKeyDown}
         >
+          {(teamsError || switchError) && <div role="none" className="max-w-[240px] p-2 text-xs text-red-800"><p role="alert">{switchError || teamsError}</p>{teamsError && <button type="button" role="menuitem" tabIndex={-1} className="underline" onClick={() => void refreshTeams()}>Retry teams</button>}</div>}
+          {switching && <p role="status" className="p-2 text-xs text-gray-700">Switching team…</p>}
           {/* Team list */}
           {teams.map((team) => {
             const isActive = team.uuid === currentTeam?.uuid
@@ -125,9 +130,15 @@ export function TeamsDropdown() {
                 key={team.uuid}
                 role="menuitem"
                 tabIndex={-1}
-                onClick={() => {
-                  switchTeam(team.uuid)
-                  closeMenu()
+                disabled={switching}
+                onClick={async () => {
+                  if (switchPending.current) return
+                  switchPending.current = true
+                  setSwitching(true)
+                  setSwitchError(null)
+                  try { await switchTeam(team.uuid); closeMenu() }
+                  catch (reason) { setSwitchError(reason instanceof Error ? reason.message : 'Could not switch teams. Try again.') }
+                  finally { switchPending.current = false; setSwitching(false) }
                 }}
                 className="menu-item flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
               >
@@ -254,7 +265,7 @@ export function TeamsDropdown() {
           )}
 
           {/* Examiner: sharing requests + what is shared. "Reviews" is taken by the document-review page. */}
-          {user?.is_examiner && (
+          {user && (
             <>
               {!user?.is_admin && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link
@@ -265,7 +276,7 @@ export function TeamsDropdown() {
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <ClipboardCheck className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                <span>Shared items</span>
+                <span>{user.is_examiner ? 'Shared items' : 'My sharing requests'}</span>
               </Link>
             </>
           )}

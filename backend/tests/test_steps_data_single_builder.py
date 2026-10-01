@@ -112,7 +112,7 @@ class TestScheduledRunUsesTheSharedBuilder:
         own_output = smart_docs[2]
         db.workflow_trigger_event.find_one.return_value = {
             "_id": ObjectId(), "workflow": workflow["_id"],
-            "documents": [trigger_doc["_id"], own_output["_id"]],
+            "status": "queued", "documents": [trigger_doc["_id"], own_output["_id"]],
             "trigger_type": "folder_watch",
         }
         db.system_config.find_one.return_value = {
@@ -139,7 +139,7 @@ class TestScheduledRunUsesTheSharedBuilder:
         db = _db_for(workflow, step_docs=[], task_docs=[])
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": ObjectId(), "workflow": workflow["_id"], "documents": [], "trigger_type": "scheduled",
+            "_id": ObjectId(), "workflow": workflow["_id"], "status": "queued", "documents": [], "trigger_type": "scheduled",
         }
         db.system_config.find_one.return_value = {
             "available_models": [

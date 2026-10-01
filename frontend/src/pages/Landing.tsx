@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
+import { FocusTrap } from '../components/shared/PanelFocusTrap'
 import { Footer } from '../components/layout/Footer'
 import { useBranding } from '../contexts/BrandingContext'
 import {
@@ -37,6 +38,7 @@ function LandingLoginForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
@@ -108,6 +110,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
@@ -298,6 +301,7 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
   }, [onClose])
 
   return (
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false }}>
     <div className="launch-access-overlay" role="presentation" onMouseDown={onClose}>
       <section
         role="dialog"
@@ -315,6 +319,7 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
         <div className="mt-8"><AuthBlock config={config} /></div>
       </section>
     </div>
+    </FocusTrap>
   )
 }
 
@@ -330,6 +335,7 @@ function DemoRequestForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
@@ -458,7 +464,7 @@ function AgentStage({ orgName }: { orgName: string }) {
                     <p className="text-sm font-semibold text-white">Proposal review is ready.</p>
                     <p className="mt-1 text-xs text-zinc-400">PI, budget, deadline, and policy checks are prepared.</p>
                   </div>
-                  <span className="launch-verified-badge"><BadgeCheck className="h-3.5 w-3.5" /> Verified · 94%</span>
+                  <span className="launch-verified-badge"><BadgeCheck className="h-3.5 w-3.5" /> Example score · 94%</span>
                 </div>
                 <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20 text-center">
                   <div className="border-r border-white/[0.08] p-2.5"><div className="text-sm font-semibold text-white">3</div><div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-zinc-500">Fields</div></div>
@@ -535,7 +541,7 @@ function ConfirmationVisual() {
           <p className="mt-1 text-sm leading-6 text-zinc-600">Run the NIH compliance check on NIH_R01_Proposal.pdf?</p>
         </div>
       </div>
-      <div className="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-3 text-sm text-zinc-600">8 verified steps · policy review, extraction, and report delivery</div>
+      <div className="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-3 text-sm text-zinc-600">8 configured steps · policy review, extraction, and report delivery</div>
       <div className="mt-4 flex gap-3">
         <button type="button" className="launch-secondary-button flex-1 justify-center">Not now</button>
         <button type="button" className="launch-brand-button flex-1 justify-center">Review &amp; run</button>
@@ -554,8 +560,8 @@ export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
   const branding = useBranding()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
-  const [accessOpen, setAccessOpen] = useState(false)
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
+  const [accessOpen, setAccessOpen] = useState(() => !!(search?.register === '1' || search?.admin === '1' || search?.error || search?.invite_token || search?.next))
   const inviteToken = search?.invite_token
   const nextPath = safeNextPath(search?.next)
 
@@ -599,8 +605,8 @@ export default function Landing() {
             <Link to="/docs" className="launch-nav-link">Docs</Link>
           </nav>
           <div className="flex shrink-0 items-center gap-3">
-            <button type="button" onClick={() => setAccessOpen(true)} className="hidden text-sm font-medium text-zinc-300 transition-colors hover:text-white sm:block">Sign in</button>
-            <a href="#demo" className="launch-nav-cta">Get started <span aria-hidden="true">→</span></a>
+            <button type="button" onClick={() => setAccessOpen(true)} className="text-sm font-medium text-zinc-300 transition-colors hover:text-white">Sign in</button>
+            <a href="#demo" className="launch-nav-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
           </div>
         </div>
       </header>
@@ -612,7 +618,7 @@ export default function Landing() {
           <div className="launch-content-wide relative z-10 flex flex-col items-center pt-32 text-center sm:pt-40">
             <p className="launch-eyebrow"><Sparkles className="h-4 w-4" /> Platform update · 5.0</p>
             <h1 className="launch-display mt-7 max-w-5xl">Everything {branding.orgName} can do. <span>Now, you just ask.</span></h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400 sm:text-xl">Search documents. Build knowledge. Extract what matters. Launch verified workflows. See every source, score, and approval along the way.</p>
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400 sm:text-xl">Find proposal requirements, extract budget details and run reusable reviews. Inspect the source passages and recorded checks before relying on a result.</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {primaryCta}
               <a href="#agent" className="launch-ghost-button">See how it works <ArrowDown className="h-4 w-4" /></a>
@@ -620,7 +626,9 @@ export default function Landing() {
             <p className="mt-5 text-sm text-zinc-500">A trusted agentic workspace for research administration.</p>
           </div>
           <div className="launch-content-wide relative z-10 mt-16 pb-8 sm:mt-20 sm:pb-12">
+            <p className="mb-4 text-center text-sm text-zinc-300">Illustrative proposal-review example. Documents, scores and outputs below are sample data; this is not a live run.</p>
             <AgentStage orgName={branding.orgName} />
+            <p className="mt-4 text-center text-sm text-zinc-300">In the workspace, open an answer’s source reference to compare it with the document. A completed run or shared tool does not certify compliance.</p>
           </div>
         </section>
 
@@ -635,7 +643,7 @@ export default function Landing() {
               <article className="launch-capability-card"><span className="launch-card-number">01</span><ScanLine className="h-7 w-7" /><h3>Find</h3><p>Search a workspace, folder, document, or policy library in your own words.</p></article>
               <article className="launch-capability-card"><span className="launch-card-number">02</span><Database className="h-7 w-7" /><h3>Know</h3><p>Ask institutional knowledge bases questions and follow the cited source.</p></article>
               <article className="launch-capability-card"><span className="launch-card-number">03</span><PenTool className="h-7 w-7" /><h3>Extract</h3><p>Turn unstructured proposals into review-ready data with quality in view.</p></article>
-              <article className="launch-capability-card"><span className="launch-card-number">04</span><GitMerge className="h-7 w-7" /><h3>Run</h3><p>Start the verified workflow your office already trusts—right from chat.</p></article>
+              <article className="launch-capability-card"><span className="launch-card-number">04</span><GitMerge className="h-7 w-7" /><h3>Run</h3><p>Start a shared workflow from chat, confirm its inputs and inspect the result against your sources.</p></article>
               <article className="launch-capability-card"><span className="launch-card-number">05</span><BadgeCheck className="h-7 w-7" /><h3>Verify</h3><p>Build test cases, validate results, and make trust visible over time.</p></article>
             </div>
           </div>

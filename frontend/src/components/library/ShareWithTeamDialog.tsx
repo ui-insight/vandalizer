@@ -1,5 +1,5 @@
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 
@@ -18,12 +18,14 @@ interface Props {
    */
   teams?: ShareTeamOption[]
   defaultTeamId?: string
+  createsIndependentCopy?: boolean
   busy?: boolean
   onCancel: () => void
   onConfirm: (comment: string, teamId?: string) => void | Promise<void>
 }
 
-export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, busy, onCancel, onConfirm }: Props) {
+export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, createsIndependentCopy = false, busy, onCancel, onConfirm }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const inFlight = useRef(false)
@@ -49,7 +51,9 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
     }
   }
 
+  const errorRef = useRef<HTMLParagraphElement>(null)
   const isBusy = busy || submitting
+  useEffect(() => { if (error && !isBusy) errorRef.current?.focus() }, [error, isBusy])
 
   usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isBusy && !inFlight.current) onCancel() }
@@ -59,8 +63,10 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Share with team"
@@ -107,6 +113,7 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
           </p>
         )}
 
+        {createsIndependentCopy && <p className="mb-4 text-sm text-gray-600">This creates an independent team copy. Later edits to your original or this copy do not update the other.</p>}
         <div>
           <label htmlFor="share-team-note" className="block text-sm font-medium text-gray-700 mb-1">
             Add a note (optional)
@@ -125,7 +132,7 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
           <div className="text-xs text-gray-500 text-right mt-1">{comment.length}/1000</div>
         </div>
 
-        {error && <p role="alert" className="text-sm text-red-800 mt-3">{error}</p>}
+        {error && <p ref={errorRef} tabIndex={-1} role="alert" className="text-sm text-red-800 mt-3">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2 mt-4">
           <button
             onClick={onCancel}

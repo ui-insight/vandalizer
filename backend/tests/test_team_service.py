@@ -415,6 +415,50 @@ class TestInviteMember:
 
 class TestAcceptInvite:
     @pytest.mark.asyncio
+    async def test_rejects_different_or_missing_email_without_mutation(self):
+        from app.services.team_service import accept_invite
+
+        for email in ("other@example.com", "", None):
+            invite = _make_invite()
+            user = _make_user(email=email)
+            with patch("app.services.team_service.TeamInvite") as invites:
+                invites.find_one = AsyncMock(return_value=invite)
+                with pytest.raises(ValueError, match="Sign in with the email"):
+                    await accept_invite("tok123", user)
+            invite.save.assert_not_awaited()
+            user.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("still_member", [False, True])
+    async def test_consumed_invite_cannot_restore_membership_or_old_role(self, still_member):
+        from app.services.team_service import accept_invite
+
+        invite = _make_invite(accepted=True, role="admin")
+        user = _make_user(email=" BOB@EXAMPLE.COM ")
+        membership = _make_membership(role="member") if still_member else None
+        with (
+            patch("app.services.team_service.TeamInvite") as invites,
+            patch("app.services.team_service.Team") as teams,
+            patch("app.services.team_service.TeamMembership") as memberships,
+            patch("app.services.team_service._notify_invite_accepted", new=AsyncMock()) as notify,
+        ):
+            invites.find_one = AsyncMock(return_value=invite)
+            teams.get = AsyncMock(return_value=_make_team())
+            memberships.find_one = AsyncMock(return_value=membership)
+            if still_member:
+                await accept_invite("tok123", user)
+                assert membership.role == "member"
+                membership.save.assert_not_awaited()
+                user.save.assert_awaited_once()
+            else:
+                with pytest.raises(ValueError, match="Invitation already used"):
+                    await accept_invite("tok123", user)
+                user.save.assert_not_awaited()
+            memberships.assert_not_called()
+            invite.save.assert_not_awaited()
+            notify.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_raises_on_invalid_token(self):
         with (
             patch("app.services.team_service.TeamInvite") as MockInvite,
@@ -446,7 +490,7 @@ class TestAcceptInvite:
     async def test_creates_membership_and_sets_current_team(self):
         team = _make_team()
         invite = _make_invite(role="member")
-        user = _make_user(user_id="bob")
+        user = _make_user(user_id="bob", email="bob@example.com")
 
         with (
             patch("app.services.team_service.TeamInvite") as MockInvite,
@@ -477,7 +521,7 @@ class TestAcceptInvite:
     async def test_updates_existing_membership_role(self):
         team = _make_team()
         invite = _make_invite(role="admin")
-        user = _make_user(user_id="bob")
+        user = _make_user(user_id="bob", email="bob@example.com")
         existing_m = _make_membership(user_id="bob", role="member")
 
         with (
@@ -502,7 +546,7 @@ class TestAcceptInvite:
     async def test_does_not_demote_existing_higher_role(self):
         """An owner/admin accepting a lower-role invite keeps their role."""
         team = _make_team()
-        invite = _make_invite(role="member")
+        invite = _make_invite(role="member", email="alice@example.com")
         user = _make_user(user_id="alice")
         existing_m = _make_membership(user_id="alice", role="owner")
 

@@ -61,11 +61,13 @@ def _make_workflow(
 class TestProcessPendingTriggers:
     @patch("app.tasks.passive_tasks.execute_workflow_passive")
     @patch("app.tasks.passive_tasks.get_sync_db")
-    def test_queues_valid_trigger_event(self, mock_get_db, mock_execute):
+    @pytest.mark.parametrize("claim_won", [True, False])
+    def test_queues_valid_trigger_event(self, mock_get_db, mock_execute, claim_won):
         from app.tasks.passive_tasks import process_pending_triggers
 
         db = MagicMock()
         mock_get_db.return_value = db
+        db.workflow_trigger_event.update_one.return_value.modified_count = int(claim_won)
 
         wf = _make_workflow()
         event = _make_event(workflow_oid=wf["_id"], trigger_type="folder_watch", documents=[ObjectId()])
@@ -83,8 +85,12 @@ class TestProcessPendingTriggers:
         ):
             result = process_pending_triggers()
 
-        assert result["processed"] == 1
-        mock_execute.delay.assert_called_once_with(str(event["_id"]))
+        assert result["processed"] == int(claim_won)
+        if claim_won:
+            mock_execute.delay.assert_called_once_with(str(event["_id"]))
+        else:
+            mock_execute.delay.assert_not_called()
+        assert db.workflow_trigger_event.update_one.call_args.args[0]["status"] == "pending"
 
     @patch("app.tasks.passive_tasks.execute_workflow_passive")
     @patch("app.tasks.passive_tasks.get_sync_db")
@@ -121,20 +127,22 @@ class TestProcessPendingTriggers:
 
     @patch("app.tasks.passive_tasks.execute_workflow_passive")
     @patch("app.tasks.passive_tasks.get_sync_db")
-    def test_skips_when_input_extraction_failed(self, mock_get_db, mock_execute):
+    @pytest.mark.parametrize("processing", [False, True])
+    def test_skips_when_input_extraction_failed_or_timed_out(self, mock_get_db, mock_execute, processing):
         from app.tasks.passive_tasks import process_pending_triggers
 
         db = MagicMock()
         mock_get_db.return_value = db
 
         wf = _make_workflow()
-        event = _make_event(workflow_oid=wf["_id"], trigger_type="folder_watch", documents=[ObjectId()])
+        event = _make_event(workflow_oid=wf["_id"], trigger_type="folder_watch", documents=[ObjectId()],
+                            created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=6))
         cursor = MagicMock()
         cursor.limit.return_value = [event]
         db.workflow_trigger_event.find.return_value = cursor
         db.workflow.find_one.return_value = wf
         db.smart_document.find.return_value = [
-            {"_id": event["documents"][0], "raw_text": "", "processing": False},
+            {"_id": event["documents"][0], "raw_text": "", "processing": processing},
         ]
 
         with (
@@ -582,7 +590,7 @@ class TestExecuteWorkflowPassiveMissingFixedDocument:
         db = MagicMock()
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "folder_watch",
+            "_id": event_id, "workflow": wf_id, "status": "queued", "documents": [], "trigger_type": "folder_watch",
         }
         db.workflow.find_one.return_value = {
             "_id": wf_id, "user_id": "u1", "steps": [],
@@ -622,7 +630,7 @@ class TestExecuteWorkflowPassiveRecordsItsAutomation:
         db = MagicMock()
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "schedule",
+            "_id": event_id, "workflow": wf_id, "status": "queued", "documents": [], "trigger_type": "schedule",
             "trigger_context": {"automation_id": str(auto_id), "automation_name": "Nightly"},
         }
         db.workflow.find_one.return_value = {
@@ -652,7 +660,7 @@ class TestExecuteWorkflowPassiveRecordsItsAutomation:
         db = MagicMock()
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "folder_watch",
+            "_id": event_id, "workflow": wf_id, "status": "queued", "documents": [], "trigger_type": "folder_watch",
         }
         db.workflow.find_one.return_value = {
             "_id": wf_id, "user_id": "u1", "steps": [],
@@ -668,3 +676,31 @@ class TestExecuteWorkflowPassiveRecordsItsAutomation:
         inserted = db.workflow_result.insert_one.call_args[0][0]
         assert inserted["automation_id"] is None
         assert inserted["trigger_event_id"] == str(event_id)
+@pytest.mark.parametrize("status", ["running", "completed", "failed", "pending", "skipped"])
+@patch("app.tasks.passive_tasks.get_sync_db")
+def test_passive_redelivery_never_reexecutes_nonqueued_event(mock_get_db, status):
+    from app.tasks.passive_tasks import execute_workflow_passive
+    db = mock_get_db.return_value
+    event_id, result_id = ObjectId(), ObjectId()
+    db.workflow_trigger_event.find_one.return_value = {
+        "_id": event_id, "status": status, "workflow_result": result_id,
+    }
+    result = execute_workflow_passive(str(event_id))
+    assert result["status"] == status
+    assert result["workflow_result_id"] == str(result_id)
+    db.workflow_trigger_event.update_one.assert_not_called()
+    db.workflow_result.insert_one.assert_not_called()
+    db.workflow.find_one.assert_not_called()
+
+
+@patch("app.tasks.passive_tasks.get_sync_db")
+def test_passive_concurrent_claim_loser_performs_no_steps(mock_get_db):
+    from app.tasks.passive_tasks import execute_workflow_passive
+    db = mock_get_db.return_value
+    event_id = ObjectId()
+    db.workflow_trigger_event.find_one.return_value = {"_id": event_id, "status": "queued"}
+    db.workflow_trigger_event.update_one.return_value.modified_count = 0
+    assert execute_workflow_passive(str(event_id))["status"] == "already_claimed"
+    assert db.workflow_trigger_event.update_one.call_args.args[0] == {"_id": event_id, "status": "queued"}
+    db.workflow_result.insert_one.assert_not_called()
+    db.workflow.find_one.assert_not_called()

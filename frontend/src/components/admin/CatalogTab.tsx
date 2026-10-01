@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   PackageOpen, CheckCircle2, AlertTriangle, Loader2, ArrowUpCircle, Trash2,
 } from 'lucide-react'
 import {
   getCatalogPreview, getCatalogStatus, applyCatalogUpgrade,
-  type CatalogPreview, type CatalogJob,
+  type CatalogJob,
 } from '../../api/admin'
+
+import { useAdminQuery } from './shared/useAdminQuery'
 
 function VersionPill({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -19,64 +21,54 @@ function VersionPill({ label, value, accent }: { label: string; value: string; a
 }
 
 export function CatalogTab() {
-  const [preview, setPreview] = useState<CatalogPreview | null>(null)
+  const { data: preview, loading, error: previewError, load: loadPreview } = useAdminQuery(getCatalogPreview)
   const [job, setJob] = useState<CatalogJob | null>(null)
   const [prune, setPrune] = useState(true)
-  const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [pollAttempt, setPollAttempt] = useState(0)
+  const pending = useRef(false)
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => { if (preview) setJob(preview.job) }, [preview])
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-  }, [])
-
-  const loadPreview = useCallback(async () => {
-    try {
-      const p = await getCatalogPreview()
-      setPreview(p)
-      setJob(p.job)
-      return p
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load catalog status')
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const startPolling = useCallback(() => {
-    stopPolling()
-    pollRef.current = setInterval(async () => {
-      try {
-        const s = await getCatalogStatus()
-        setJob(s.job)
-        if (s.job && s.job.state !== 'running') {
-          stopPolling()
-          setApplying(false)
-          await loadPreview() // refresh counts/version after completion
-        }
-      } catch { /* keep polling */ }
-    }, 3000)
-  }, [stopPolling, loadPreview])
-
+  // Only one status request is in flight. A failed read never starts another upgrade.
   useEffect(() => {
-    loadPreview().then((p) => {
-      if (p?.job?.state === 'running') { setApplying(true); startPolling() }
-    })
-    return stopPolling
-  }, [loadPreview, startPolling, stopPolling])
+    if (job?.state !== 'running') return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      try {
+        const status = await getCatalogStatus()
+        if (cancelled) return
+        if (!status.job) throw new Error('The accepted upgrade has no recorded status yet. Retry its status before starting another upgrade.')
+        setStatusError(null)
+        setJob(status.job)
+        if (status.job.state === 'running') timer = setTimeout(poll, 3000)
+        else loadPreview()
+      } catch (reason) {
+        if (!cancelled) setStatusError(reason instanceof Error ? reason.message : 'Unable to refresh upgrade status.')
+      }
+    }
+    timer = setTimeout(poll, 1000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [job?.state, pollAttempt, loadPreview])
 
   const apply = async () => {
+    if (pending.current || job?.state === 'running') return
+    pending.current = true
     setError(null)
+    setStatusError(null)
     setApplying(true)
     try {
-      await applyCatalogUpgrade(prune)
-      setJob({ state: 'running', target_version: preview?.bundled_version || '', prune })
-      startPolling()
-    } catch (e) {
-      setApplying(false)
-      setError(e instanceof Error ? e.message : 'Failed to start upgrade')
+      const accepted = await applyCatalogUpgrade(prune)
+      if (mounted.current) setJob({ state: 'running', target_version: accepted.target_version, prune: accepted.prune })
+    } catch (reason) {
+      if (mounted.current) setError(reason instanceof Error ? reason.message : 'Failed to start upgrade')
+    } finally {
+      pending.current = false
+      if (mounted.current) setApplying(false)
     }
   }
 
@@ -84,7 +76,7 @@ export function CatalogTab() {
     return <div className="flex items-center gap-2 p-6 text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading catalog status…</div>
   }
   if (!preview) {
-    return <div className="p-6 text-red-600">{error || 'Catalog status unavailable.'}</div>
+    return <div role="alert" className="p-6 text-red-800">{previewError || 'Catalog status unavailable.'} <button onClick={loadPreview} className="underline">Retry catalog preview</button></div>
   }
 
   const running = job?.state === 'running' || applying
@@ -98,14 +90,15 @@ export function CatalogTab() {
       </div>
 
       {/* Version summary */}
-      <div className="flex items-center gap-10 rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-6 rounded-lg border border-gray-200 bg-white p-4">
         <VersionPill label="Applied" value={preview.applied_version || 'none'} />
         <ArrowUpCircle className="h-5 w-5 text-gray-400" />
         <VersionPill label="Bundled (available)" value={preview.bundled_version} accent={preview.update_available} />
       </div>
 
+      {statusError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Status refresh failed: {statusError} The accepted upgrade may still be running. <button onClick={() => { setStatusError(null); setPollAttempt(value => value + 1) }} className="underline">Retry upgrade status</button></div>}
       {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" /> {error}
         </div>
       )}
@@ -118,7 +111,7 @@ export function CatalogTab() {
         </div>
       )}
       {job?.state === 'failed' && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <span>{job.message || 'Catalog upgrade failed.'}</span>
         </div>
@@ -127,7 +120,7 @@ export function CatalogTab() {
       {running ? (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Applying catalog {job?.target_version || preview.bundled_version}… You can leave this page; you'll get a notification when it finishes.
+          {statusError ? 'Last known status: applying' : 'Applying'} catalog {job?.target_version || preview.bundled_version}… You can leave this page; you'll get a notification when it finishes.
         </div>
       ) : !preview.update_available ? (
         <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
@@ -139,7 +132,7 @@ export function CatalogTab() {
           <div className="text-sm font-medium text-gray-900">
             Applying {preview.bundled_version} will:
           </div>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap gap-4 text-sm">
             <span className="text-emerald-700">+ {counts.new} new</span>
             <span className="text-gray-600">~ {counts.refreshed} refreshed</span>
             <span className="text-red-600">- {counts.retiring} retiring</span>
@@ -184,7 +177,7 @@ export function CatalogTab() {
           <button
             onClick={apply}
             disabled={applying}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
           >
             <ArrowUpCircle className="h-4 w-4" />
             Apply catalog {preview.bundled_version}

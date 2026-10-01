@@ -1489,9 +1489,9 @@ def _reap_abandoned_extractions(db) -> int:
         try:
             # Flip to error; never fake completion. update_document_fields is
             # deliberately NOT used here: it forces task_status="complete" and
-            # re-runs _check_folder_watch_automations, which has no dedup, so
-            # a reaped document would be presented as read (with no text) and
-            # would re-fire every folder-watch automation on its folder.
+            # re-runs _check_folder_watch_automations, so a reaped document
+            # would be presented as read (with no text) and could trigger
+            # automations even though ingestion has failed.
             #
             # The filter repeats processing=True and the updated_at we
             # matched on so a worker that finished (or a retry that re-took

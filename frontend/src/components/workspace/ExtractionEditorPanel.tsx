@@ -1,3 +1,4 @@
+import { useTestCaseSave } from '../../hooks/useTestCaseSave'
 import { SHARE_LABEL } from '../../lib/catalogLabels'
 import React, { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -24,7 +25,6 @@ import {
   getExtractionImprovementSuggestions,
   listTestCases,
   createTestCase,
-  updateTestCase,
   deleteTestCase,
   uploadPdfTemplate,
   exportExtractionPdf,
@@ -121,6 +121,8 @@ export function ExtractionEditorPanel() {
   const [titleDraft, setTitleDraft] = useState('')
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
+  const runPending = useRef(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const [resultSets, setResultSets] = useState<Record<string, string>[]>([])
   // Per-field source info, index-aligned with resultSets.
   const [resultSourceSets, setResultSourceSets] = useState<ExtractionSourceMap[]>([])
@@ -273,19 +275,27 @@ export function ExtractionEditorPanel() {
 
   // --- Run ---
   const handleRun = async () => {
-    if (!openExtractionId) return
+    if (!openExtractionId || runPending.current) return
+    runPending.current = true
+    setRunning(true)
+    setRunError(null)
     // Default to the whole project when nothing is explicitly selected, so you
     // can run an extraction "on the project" without hand-picking files.
     let docUuids = selectedDocUuids
     if (docUuids.length === 0) {
-      if (!activeProjectUuid) return
+      if (!activeProjectUuid) { runPending.current = false; setRunning(false); return }
       try {
         docUuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
-      } catch {
-        docUuids = []
+      } catch (reason) {
+        setRunError(reason instanceof Error ? reason.message : 'Could not load project files. Try again.')
+        runPending.current = false
+        setRunning(false)
+        return
       }
       if (docUuids.length === 0) {
         toast('No files in this project to run on yet', 'info')
+        runPending.current = false
+        setRunning(false)
         return
       }
     }
@@ -364,23 +374,18 @@ export function ExtractionEditorPanel() {
           toast('This run is taking unusually long — it is still working, and results will appear in the History tab when it finishes', 'info')
         }
       } else {
-        toast(err instanceof Error ? err.message : 'Extraction failed', 'error')
+        setRunError(err instanceof Error ? err.message : 'Extraction failed. Your selection is kept; try again.')
       }
     } finally {
+      runPending.current = false
       setRunning(false)
       bumpActivitySignal()
     }
   }
 
-  // --- Click-to-source ---
-  // Clicking a value copies it and shows where in the document it came from.
-  // With source tracking, that means the verified verbatim passage on its
-  // page; without it (older runs), fall back to a plain text search.
+  // Inspect evidence independently of copying a value. Older runs fall back
+  // to a text search; a located passage is not a guarantee of correctness.
   const handleValueClick = (field: string, value: string) => {
-    navigator.clipboard.writeText(value)
-      .then(() => toast('Copied to clipboard', 'success'))
-      .catch(() => toast('Failed to copy to clipboard', 'error'))
-
     const src: ExtractionFieldSource | undefined = resultSources[field]
     const support = src ? fieldSupportState(src) : undefined
     if (support === 'quote_unsupported' && src?.quote) {
@@ -665,19 +670,21 @@ export function ExtractionEditorPanel() {
   const hasResults = Object.keys(results).length > 0
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+    <div className="extraction-editor flex h-full min-w-0 flex-col" style={{ backgroundColor: '#fff' }}>
       {/* Header */}
       <div
         style={{
           display: 'flex',
+          flexWrap: tabsCompact ? 'wrap' : undefined,
+          gap: tabsCompact ? 6 : 0,
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: "var(--workspace-space-16) var(--workspace-space-24) var(--workspace-space-8)",
+          padding: tabsCompact ? 12 : "var(--workspace-space-16) var(--workspace-space-24) var(--workspace-space-8)",
           backgroundColor: '#fff',
           flexShrink: 0,
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: tabsCompact ? '1 0 100%' : 1, minWidth: 0 }}>
           {editingTitle ? (
             <input
               autoFocus
@@ -688,7 +695,7 @@ export function ExtractionEditorPanel() {
               onBlur={saveTitle}
               onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
               style={{
-                fontSize: 'var(--workspace-font-section-title)',
+                fontSize: tabsCompact ? 16 : 'var(--workspace-font-section-title)',
                 fontWeight: 600,
                 color: '#202124',
                 border: "1px solid var(--workspace-border)",
@@ -703,7 +710,7 @@ export function ExtractionEditorPanel() {
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <span
                 style={{
-                  fontSize: 'var(--workspace-font-section-title)',
+                  fontSize: tabsCompact ? 16 : 'var(--workspace-font-section-title)',
                   fontWeight: 600,
                   color: '#202124',
                   letterSpacing: '-0.01em',
@@ -867,7 +874,7 @@ export function ExtractionEditorPanel() {
               title={label}
               aria-label={label}
               style={{
-                padding: tabsCompact ? '10px 12px' : '10px 16px',
+                padding: tabsCompact ? '8px 6px' : '10px 16px',
                 fontSize: 'var(--workspace-font-control)',
                 fontWeight: isActive ? 600 : 400,
                 fontFamily: 'inherit',
@@ -882,8 +889,8 @@ export function ExtractionEditorPanel() {
                 gap: 'var(--workspace-space-6)',
               }}
             >
-              <TabIcon style={{ width: 14, height: 14 }} aria-hidden="true" />
-              {!tabsCompact && label}
+              {!tabsCompact && <TabIcon style={{ width: 14, height: 14 }} aria-hidden="true" />}
+              {label}
               {tabDot && (
                 <span aria-hidden="true" style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -918,6 +925,7 @@ export function ExtractionEditorPanel() {
           crossField={crossFieldSets[activeResultIdx] ?? null}
           documentWarnings={documentWarnings}
           resultSets={resultSets}
+          resultDocNames={resultDocNames}
           activeResultIdx={activeResultIdx}
           onSetActiveResultIdx={setActiveResultIdx}
         />
@@ -1060,14 +1068,15 @@ export function ExtractionEditorPanel() {
           style={{
             flexShrink: 0,
             borderTop: "1px solid var(--workspace-border)",
-            padding: "var(--workspace-space-12) var(--workspace-space-24)",
+            padding: tabsCompact ? 12 : "var(--workspace-space-12) var(--workspace-space-24)",
             backgroundColor: '#fff',
             display: 'flex',
+            flexWrap: 'wrap',
             gap: 'var(--workspace-space-8)',
             alignItems: 'center',
           }}
         >
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: tabsCompact ? '1 0 100%' : 1, minWidth: 0, position: 'relative' }}>
             <input
               value={newTerm}
               aria-label="Add term to extract"
@@ -1132,6 +1141,7 @@ export function ExtractionEditorPanel() {
               Combine input
             </label>
           )}
+          {runError && <div role="alert" style={{ flexBasis: '100%', color: '#991b1b', fontSize: 'var(--workspace-font-control)' }}>{runError} Your selection is kept; use Run to retry.</div>}
           <button
             type="button"
             onClick={handleRun}
@@ -1410,6 +1420,7 @@ function DesignTab({
   crossField,
   documentWarnings,
   resultSets,
+  resultDocNames,
   activeResultIdx,
   onSetActiveResultIdx,
 }: {
@@ -1433,9 +1444,11 @@ function DesignTab({
   crossField: CrossFieldRunReport | null
   documentWarnings: DocumentWarning[]
   resultSets: Record<string, string>[]
+  resultDocNames: string[]
   activeResultIdx: number
   onSetActiveResultIdx: (idx: number) => void
 }) {
+  const { toast } = useToast()
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -1509,7 +1522,7 @@ function DesignTab({
   }
 
   return (
-    <div style={{ padding: 'var(--workspace-space-24)' }}>
+    <div className="extraction-design" style={{ padding: 'var(--workspace-space-24)' }}>
       {/* Section header */}
       <div
         style={{
@@ -1653,7 +1666,7 @@ function DesignTab({
       {/* Result set selector for multi-document extractions */}
       {resultSets.length > 1 && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)',
           padding: "var(--workspace-space-8) 0", borderBottom: "1px solid var(--workspace-border)",
         }}>
           <span id="result-set-selector-label" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
@@ -1662,7 +1675,7 @@ function DesignTab({
           <div
             role="radiogroup"
             aria-labelledby="result-set-selector-label"
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}
+            style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, alignItems: 'center', gap: 'var(--workspace-space-6)' }}
             onKeyDown={(e) => {
               let next = activeResultIdx
               if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (activeResultIdx + 1) % resultSets.length
@@ -1681,18 +1694,19 @@ function DesignTab({
                 type="button"
                 role="radio"
                 aria-checked={i === activeResultIdx}
-                aria-label={`Document ${i + 1}`}
+                aria-label={`Document ${i + 1}: ${resultDocNames[i] ?? `Result ${i + 1}`}`}
                 tabIndex={i === activeResultIdx ? 0 : -1}
                 onClick={() => onSetActiveResultIdx(i)}
                 style={{
                   padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+                  maxWidth: '100%', overflowWrap: 'anywhere', textAlign: 'left',
                   fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-large)', border: 'none',
                   cursor: 'pointer', transition: 'all 0.15s',
                   backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
                   color: i === activeResultIdx ? 'var(--highlight-text-color, #000)' : '#374151',
                 }}
               >
-                {i + 1}
+                {i + 1}. {resultDocNames[i] ?? `Result ${i + 1}`}
               </button>
             ))}
           </div>
@@ -1701,6 +1715,8 @@ function DesignTab({
           </span>
         </div>
       )}
+
+      {hasResults && <p style={{ fontSize: 12, color: '#4b5563', overflowWrap: 'anywhere' }}>Results for <strong>{resultDocNames[activeResultIdx] ?? `Result ${activeResultIdx + 1}`}</strong>. CSV, JSON and clipboard exports contain values only; source passages, page references and warnings are not included. Check evidence here before sharing.</p>}
 
       {itemsLoading ? (
         <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
@@ -1891,6 +1907,7 @@ function DesignTab({
                     <X style={{ width: 14, height: 14 }} aria-hidden="true" />
                   </button>
                 </div>
+                {hasResults && resultVal === undefined && <p style={{ margin: '4px 0 0 42px', fontSize: 12, color: '#92400e' }}>No value returned for this field. Check the source.</p>}
                 {resultVal !== undefined && (() => {
                   const src = sources[item.searchphrase]
                   const clickable = !!resultVal && resultVal !== 'N/A'
@@ -1898,7 +1915,7 @@ function DesignTab({
                   // proves the passage exists, not that it says what the value
                   // claims — certifying the weaker proposition is how a
                   // hallucinated figure earned a blue "traced" chip.
-                  const support = src ? fieldSupportState(src) : undefined
+                  const support = fieldSupportState(src)
                   const badge = support ? SUPPORT_BADGES[presentedSupport(support)] : undefined
                   const locator = formatPageLocator(src?.page, src?.page_approximate)
                   const clickTitle = !clickable
@@ -1907,43 +1924,24 @@ function DesignTab({
                       ? `${badge.title}${locator && support !== 'unverified' ? ` (${locator})` : ''}`
                       : 'Click to highlight in PDF'
                   return (
-                    <div
-                      onClick={() => {
-                        if (clickable) onValueClick(item.searchphrase, resultVal)
-                      }}
-                      style={{
-                        marginTop: 'var(--workspace-space-4)',
-                        marginLeft: 42,
-                        fontSize: 'var(--workspace-font-control)',
-                        fontWeight: 600,
-                        color: '#202124',
-                        cursor: clickable ? 'pointer' : 'default',
-                        borderRadius: 'var(--workspace-radius-small)',
-                        padding: "var(--workspace-space-2) var(--workspace-space-4)",
-                        transition: 'background-color 0.15s',
-                      }}
-                      onMouseEnter={e => {
-                        if (clickable)
-                          (e.currentTarget as HTMLElement).style.backgroundColor = '#fef9c3'
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
-                      }}
-                      title={clickTitle}
-                    >
-                      {resultVal}
-                      {clickable && badge && (
-                        <span
-                          title={badge.title}
-                          style={{
-                            marginLeft: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
-                            color: badge.color, background: badge.background,
-                            borderRadius: 3, padding: "1px var(--workspace-space-4)", whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {badge.label(locator)}
-                        </span>
-                      )}
+                    <div className="extraction-field-value" style={{ marginTop: 4, marginLeft: 42, fontSize: 'var(--workspace-font-control)', color: '#202124', overflowWrap: 'anywhere' }}>
+                      <div style={{ fontWeight: 600 }}>{resultVal || 'No value returned'}</div>
+                      {(!resultVal || resultVal === 'N/A') && <p style={{ margin: '4px 0', color: '#92400e' }}>No confirmed value. Check the source; this does not establish that the information is absent.</p>}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                        {clickable && <button type="button"
+                          aria-label={`Inspect source for ${item.searchphrase}`}
+                          title={clickTitle}
+                          onClick={() => onValueClick(item.searchphrase, resultVal)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', background: '#fff', color: '#334155', font: 'inherit' }}>
+                          <Eye size={14} aria-hidden="true" /> Inspect source
+                          {badge && <span style={{ color: badge.color, background: badge.background, padding: '1px 4px', borderRadius: 3 }}>{badge.label(locator)}</span>}
+                        </button>}
+                        <button type="button" aria-label={`Copy value for ${item.searchphrase}`}
+                          onClick={() => { void navigator.clipboard.writeText(resultVal).then(() => toast('Value copied', 'success')).catch(() => toast('Could not copy value. Select the text to copy it.', 'error')) }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', background: '#fff', color: '#334155', font: 'inherit' }}>
+                          <Copy size={14} aria-hidden="true" /> Copy value
+                        </button>
+                      </div>
                     </div>
                   )
                 })()}
@@ -2053,7 +2051,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
     }}>
       <Shield style={{
         width: 20, height: 20, flexShrink: 0,
-        color: status.config_changed ? '#d97706' : status.tier === 'excellent' ? '#16a34a' : status.tier === 'good' ? '#2563eb' : '#d97706',
+        color: status.config_changed ? '#92400e' : status.tier === 'excellent' ? '#16a34a' : status.tier === 'good' ? '#2563eb' : '#92400e',
       }} />
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
@@ -3178,12 +3176,18 @@ function ValidateTab({
   const { toast } = useToast()
   const [sources, setSources] = useState<SourceLocal[]>([])
   const [loadingSources, setLoadingSources] = useState(true)
+  const [sourceLoadError, setSourceLoadError] = useState<string | null>(null)
+  const [sourceLoadAttempt, setSourceLoadAttempt] = useState(0)
   const [numRuns, setNumRuns] = useState(3)
   const [validating, setValidating] = useState(false)
   const [results, setResults] = useState<ValidationV2Result | null>(null)
   const [showDocPicker, setShowDocPicker] = useState(false)
   const [pendingDocs, setPendingDocs] = useState<{ uuid: string; title: string }[] | null>(null)
   const [autoFilling, setAutoFilling] = useState(false)
+  const [creatingSources, setCreatingSources] = useState(false)
+  const [sourceCreateError, setSourceCreateError] = useState<string | null>(null)
+  const creatingSourcesRef = useRef(false)
+  const retrySourcesRef = useRef<(() => Promise<void>) | null>(null)
   const [expandedSource, setExpandedSource] = useState<string | null>(null)
   const [qualityHistory, setQualityHistory] = useState<QualityHistoryRun[]>([])
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
@@ -3211,14 +3215,18 @@ function ValidateTab({
   }
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
-  // Debounce timers keyed by source id
-  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const testCaseSave = useTestCaseSave()
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const validationPending = useRef(false)
 
-  // Load persisted test cases on mount
+  // Load persisted test cases; a failed request is not an empty test suite.
   useEffect(() => {
+    let current = true
     setLoadingSources(true)
+    setSourceLoadError(null)
     listTestCases(searchSetUuid)
       .then(cases => {
+        if (!current) return
         const mapped = cases.map(tc => ({
           id: tc.uuid,
           source_type: tc.source_type as 'document' | 'text',
@@ -3230,11 +3238,12 @@ function ValidateTab({
           expanded: false,
         }))
         setSources(mapped)
-        if (mapped.length > 0) setSourcesCollapsed(true)
+        setSourcesCollapsed(false)
       })
-      .catch(() => {})
-      .finally(() => setLoadingSources(false))
-  }, [searchSetUuid])
+      .catch(reason => { if (current) setSourceLoadError(reason instanceof Error ? reason.message : 'Could not load test cases.') })
+      .finally(() => { if (current) setLoadingSources(false) })
+    return () => { current = false }
+  }, [searchSetUuid, sourceLoadAttempt])
 
   const reloadQualityHistory = useCallback(() => {
     return getExtractionQualityHistory(searchSetUuid)
@@ -3243,12 +3252,6 @@ function ValidateTab({
   }, [searchSetUuid])
 
   useEffect(() => { void reloadQualityHistory() }, [reloadQualityHistory])
-
-  // Cleanup debounce timers on unmount
-  useEffect(() => {
-    const timers = debounceTimers.current
-    return () => { Object.values(timers).forEach(clearTimeout) }
-  }, [])
 
   const handleGetSuggestions = async () => {
     setLoadingSuggestions(true)
@@ -3264,66 +3267,67 @@ function ValidateTab({
   }
 
   const addDocuments = async (docs: { uuid: string; title: string }[], autoFill: boolean = false) => {
-    const created = await Promise.all(
-      docs.map(d =>
-        createTestCase({
-          search_set_uuid: searchSetUuid,
-          label: d.title,
-          source_type: 'document',
-          document_uuid: d.uuid,
-          expected_values: {},
-        })
-      )
-    )
-    const newSources: SourceLocal[] = created.map((tc, i) => ({
-      id: tc.uuid,
-      source_type: 'document' as const,
-      document_uuid: docs[i].uuid,
-      document_title: docs[i].title,
-      document_exists: tc.document_exists ?? true,
-      expected_values: {},
-      expanded: false,
-    }))
-    setSources(prev => [...prev, ...newSources])
-
-    // Auto-fill expected values by running extraction on each document
-    if (autoFill) {
-      setAutoFilling(true)
-      for (const src of newSources) {
-        await fillFromExtraction(src).catch(() => {})
+    if (creatingSourcesRef.current) return
+    creatingSourcesRef.current = true
+    setCreatingSources(true)
+    setSourceCreateError(null)
+    try {
+      const outcomes = await Promise.allSettled(docs.map(d => createTestCase({
+        search_set_uuid: searchSetUuid, label: d.title, source_type: 'document',
+        document_uuid: d.uuid, expected_values: {},
+      })))
+      const failed: typeof docs = []
+      const created: SourceLocal[] = []
+      outcomes.forEach((outcome, i) => {
+        if (outcome.status === 'rejected') { failed.push(docs[i]); return }
+        const tc = outcome.value
+        created.push({ id: tc.uuid, source_type: 'document', document_uuid: docs[i].uuid,
+          document_title: docs[i].title, document_exists: tc.document_exists ?? true,
+          expected_values: {}, expanded: false })
+      })
+      setSources(prev => [...prev, ...created])
+      if (failed.length) {
+        setSourceCreateError(`${failed.length} test document${failed.length === 1 ? '' : 's'} could not be added. Successfully added cases are kept; retry only the failed documents.`)
+        retrySourcesRef.current = () => addDocuments(failed, autoFill)
+      } else retrySourcesRef.current = null
+      if (autoFill && created.length) {
+        setAutoFilling(true)
+        for (const source of created) await fillFromExtraction(source)
       }
+    } finally {
+      creatingSourcesRef.current = false
+      setCreatingSources(false)
       setAutoFilling(false)
     }
   }
 
   const addTextSource = async () => {
-    const tc = await createTestCase({
-      search_set_uuid: searchSetUuid,
-      label: 'Text Chunk',
-      source_type: 'text',
-      source_text: '',
-      expected_values: {},
-    })
-    setSources(prev => [
-      ...prev,
-      {
-        id: tc.uuid,
-        source_type: 'text',
-        source_text: '',
-        expected_values: {},
-        expanded: true,
-      },
-    ])
+    if (creatingSourcesRef.current) return
+    creatingSourcesRef.current = true
+    setCreatingSources(true)
+    setSourceCreateError(null)
+    try {
+      const tc = await createTestCase({ search_set_uuid: searchSetUuid, label: 'Text Chunk',
+        source_type: 'text', source_text: '', expected_values: {} })
+      setSources(prev => [...prev, { id: tc.uuid, source_type: 'text', source_text: '', expected_values: {}, expanded: true }])
+      retrySourcesRef.current = null
+    } catch (reason) {
+      setSourceCreateError(reason instanceof Error ? reason.message : 'Could not add a text test case.')
+      retrySourcesRef.current = addTextSource
+    } finally {
+      creatingSourcesRef.current = false
+      setCreatingSources(false)
+    }
   }
 
   const removeSource = async (id: string) => {
-    setSources(prev => prev.filter(s => s.id !== id))
-    // Clear any pending debounce for this source
-    if (debounceTimers.current[id]) {
-      clearTimeout(debounceTimers.current[id])
-      delete debounceTimers.current[id]
+    if (!await testCaseSave.retry()) return
+    try {
+      await deleteTestCase(id)
+      setSources(prev => prev.filter(s => s.id !== id))
+    } catch (reason) {
+      toast(reason instanceof Error ? reason.message : 'Could not remove test case. Try again.', 'error')
     }
-    await deleteTestCase(id).catch(() => {})
   }
 
   const toggleExpanded = (id: string) => {
@@ -3332,27 +3336,15 @@ function ValidateTab({
 
   const updateSourceText = (id: string, text: string) => {
     setSources(prev => prev.map(s => s.id === id ? { ...s, source_text: text } : s))
-    // Debounced save
-    if (debounceTimers.current[`text_${id}`]) clearTimeout(debounceTimers.current[`text_${id}`])
-    debounceTimers.current[`text_${id}`] = setTimeout(() => {
-      updateTestCase(id, { source_text: text }).catch(() => {})
-    }, 800)
+    void testCaseSave.save(id, { source_text: text })
   }
 
   const updateExpectedValue = (sourceId: string, field: string, value: string) => {
-    let updatedValues: Record<string, string> = {}
-    setSources(prev => prev.map(s => {
-      if (s.id !== sourceId) return s
-      const next = { ...s, expected_values: { ...s.expected_values, [field]: value } }
-      updatedValues = next.expected_values
-      return next
-    }))
-    // Debounced save
-    const key = `ev_${sourceId}`
-    if (debounceTimers.current[key]) clearTimeout(debounceTimers.current[key])
-    debounceTimers.current[key] = setTimeout(() => {
-      updateTestCase(sourceId, { expected_values: updatedValues }).catch(() => {})
-    }, 800)
+    const source = sources.find(s => s.id === sourceId)
+    if (!source) return
+    const expected_values = { ...source.expected_values, [field]: value }
+    setSources(prev => prev.map(s => s.id === sourceId ? { ...s, expected_values } : s))
+    void testCaseSave.save(sourceId, { expected_values })
   }
 
   const fillFromExtraction = async (src: SourceLocal) => {
@@ -3384,7 +3376,7 @@ function ValidateTab({
           if (s.id !== src.id) return s
           return { ...s, expected_values: newValues, expanded: true }
         }))
-        updateTestCase(src.id, { expected_values: newValues }).catch(() => {})
+        await testCaseSave.save(src.id, { expected_values: newValues })
       }
     } catch (e) {
       if (abort.signal.aborted) {
@@ -3400,9 +3392,13 @@ function ValidateTab({
   }
 
   const handleRunValidation = async () => {
+    if (validationPending.current) return
+    validationPending.current = true
+    setValidationError(null)
     setValidating(true)
     setSuggestions(null)
     try {
+      if (!await testCaseSave.retry()) return
       const apiSources: ValidationSource[] = sources.map((s, i) => {
         // For document sources, only send label if it's a real title (not a UUID)
         const isUuidLike = s.document_title && /^[0-9a-f-]{20,}$/i.test(s.document_title)
@@ -3425,17 +3421,10 @@ function ValidateTab({
       getExtractionQualityHistory(searchSetUuid)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
-      // Auto-fetch LLM suggestions if accuracy or consistency < 95%
-      const acc = res.aggregate_accuracy ?? 1
-      const con = res.aggregate_consistency ?? 1
-      if (acc < 0.95 || con < 0.95) {
-        setLoadingSuggestions(true)
-        getExtractionImprovementSuggestions(searchSetUuid)
-          .then(r => setSuggestions(r.suggestions))
-          .catch(() => {})
-          .finally(() => setLoadingSuggestions(false))
-      }
+    } catch (reason) {
+      setValidationError(reason instanceof Error ? reason.message : 'Validation failed. Your test cases are kept; try again.')
     } finally {
+      validationPending.current = false
       setValidating(false)
       onValidationComplete?.()
     }
@@ -3457,7 +3446,7 @@ function ValidateTab({
             Validate & Improve
           </div>
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
-            One click scores this extraction against your test cases and tries better settings.
+            Choose representative sources and enter the expected values before checking the extraction.
           </div>
         </div>
         <ExtractionNeedsFieldsNotice
@@ -3476,18 +3465,17 @@ function ValidateTab({
           Validate & Improve
         </div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
-          One click scores this extraction against your test cases and tries better settings.
-          The sections below hold the test data and per-field diagnostics.
+          Choose representative sources and enter the expected values before checking the extraction.
+          Run detailed validation, compare each result with its source, then consider optional tuning.
         </div>
       </div>
 
-      {/* Validate & improve (autovalidate) — THE validation flow and the single
-          scoring surface. Apply writes the certified ValidationRun / quality tile. */}
-      <ExtractionAutovalidatePanel
-        searchSetUuid={searchSetUuid}
-        canManage={canManage}
-        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
-      />
+      {creatingSources && <p role="status">{autoFilling ? 'Adding expected values…' : 'Adding test cases…'}</p>}
+      {sourceCreateError && <div role="alert">{sourceCreateError} <button type="button" disabled={creatingSources} onClick={() => void retrySourcesRef.current?.()}>Retry adding test cases</button></div>}
+      {sourceLoadError && <div role="alert">{sourceLoadError} <button type="button" onClick={() => setSourceLoadAttempt(n => n + 1)}>Retry loading test cases</button></div>}
+      {testCaseSave.saving && <p role="status">Saving test-case changes…</p>}
+      {testCaseSave.error && <div role="alert">{testCaseSave.error} <button type="button" onClick={() => void testCaseSave.retry()}>Retry saving test cases</button></div>}
+      {validationError && <div role="alert">{validationError} <button type="button" disabled={validating} onClick={() => void handleRunValidation()}>Retry validation</button></div>}
 
       {/* Test cases — the shared input to tuning + detailed validation. */}
       <div>
@@ -3565,7 +3553,7 @@ function ValidateTab({
                 padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
                 backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
               }}>
-                <ShieldCheck style={{ width: 14, height: 14, color: '#059669', flexShrink: 0 }} />
+                <ShieldCheck style={{ width: 14, height: 14, color: '#15803d', flexShrink: 0 }} />
                 <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#065f46' }}>
                   Sample size requirements met. Run validation again to update your score.
                 </span>
@@ -3578,7 +3566,7 @@ function ValidateTab({
               padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
               backgroundColor: '#fffbeb', border: '1px solid #fde68a',
             }}>
-              <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+              <AlertTriangle style={{ width: 16, height: 16, color: '#92400e', flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
                 <strong>Quality score reduced due to low sample size.</strong>
                 {' '}
@@ -3599,7 +3587,7 @@ function ValidateTab({
           }}>
             <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading sources...
           </div>
-        ) : sources.length === 0 ? (
+        ) : sourceLoadError ? null : sources.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: "var(--workspace-space-32) var(--workspace-space-16)",
             border: "1px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
@@ -3627,6 +3615,7 @@ function ValidateTab({
               <button
                 type="button"
                 onClick={addTextSource}
+                disabled={creatingSources || loadingSources || !!sourceLoadError}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                   padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500,
@@ -3647,9 +3636,9 @@ function ValidateTab({
               const docMissing = src.source_type === 'document' && src.document_uuid && src.document_exists === false
               return (
                 <div key={src.id} style={{ padding: "var(--workspace-space-12) 0", borderBottom: '1px solid #f0f0f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                     <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                    <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
                       {label}
                     </span>
                     {docMissing && (
@@ -3704,7 +3693,7 @@ function ValidateTab({
                   </div>
 
                   {src.expanded && (
-                    <div id={`source-expected-${src.id}`} style={{ marginTop: 'var(--workspace-space-8)', marginLeft: 22 }}>
+                    <div id={`source-expected-${src.id}`} className="extraction-expected-values" style={{ marginTop: 'var(--workspace-space-8)', marginLeft: 22 }}>
                       {/* Text input for text sources */}
                       {src.source_type === 'text' && (
                         <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
@@ -3747,6 +3736,7 @@ function ValidateTab({
                           </button>
                         )}
                       </div>
+                      <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBottom: 8 }}>Check expected values against the original source. Blank expectations measure consistency, not correctness; auto-filled values still need human review.</p>
                       {fillError && !fillingSourceId && (
                         <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 'var(--workspace-space-6)' }}>
                           {fillError}
@@ -3755,7 +3745,7 @@ function ValidateTab({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                         {items.map(item => (
                           <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
+                            <div className="extraction-expected-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                               <span style={{
                                 fontSize: 'var(--workspace-font-meta)', color: '#374151', width: 120, flexShrink: 0,
                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -3772,7 +3762,7 @@ function ValidateTab({
                                 onChange={e => updateExpectedValue(src.id, item.searchphrase, e.target.value)}
                                 placeholder={item.is_optional ? 'Expected value (optional field)' : 'Expected value'}
                                 style={{
-                                  flex: 1, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+                                  flex: '1 1 120px', minWidth: 0, maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                                   border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)",
                                   outline: 'none',
                                   backgroundColor: item.is_optional && !src.expected_values[item.searchphrase] ? '#fafafa' : '#fff',
@@ -3808,7 +3798,7 @@ function ValidateTab({
         )}
 
         {/* Add buttons */}
-        {!sourcesCollapsed && (
+        {!sourcesCollapsed && !loadingSources && !sourceLoadError && sources.length > 0 && (
           <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)' }}>
             <button
               type="button"
@@ -3825,6 +3815,7 @@ function ValidateTab({
             <button
               type="button"
               onClick={addTextSource}
+                disabled={creatingSources || loadingSources || !!sourceLoadError}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                 padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
@@ -3867,18 +3858,16 @@ function ValidateTab({
         fieldNames={items.map(i => i.searchphrase)}
       />
 
-      {/* 2. Detailed validation (on demand) — optional per-source/per-field
-          deep-dive. The headline score lives in the tune panel above; this is
-          a diagnostic breakdown, not a competing score. */}
+      {/* Check current settings before considering optional tuning. */}
       <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-16)' }}>
         <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
           Detailed validation
         </div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
-          Run the test cases as-is and inspect expected vs. extracted values per source and field.
-          For the official score, use “Validate & improve” at the top.
+          Run the test cases as-is, record quality history, and inspect expected vs. extracted values per source and field.
+          Each replicate repeats every test case and uses additional model calls. The default is three runs to compare consistency.
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
           <label htmlFor="detailed-validation-replicates" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Replicates:</label>
           <input
             id="detailed-validation-replicates"
@@ -3895,7 +3884,7 @@ function ValidateTab({
           <button
             type="button"
             onClick={handleRunValidation}
-            disabled={validating || sources.length === 0}
+            disabled={validating || loadingSources || !!sourceLoadError || sources.length === 0}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
               padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
@@ -3976,7 +3965,7 @@ function ValidateTab({
               </thead>
               <tbody>
                 {qualityHistory.map((run) => {
-                  const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
+                  const scoreColor = run.score >= 90 ? '#15803d' : run.score >= 70 ? '#92400e' : '#dc2626'
                   const isExpanded = expandedRunId === run.uuid
                   return (
                     <Fragment key={run.uuid}>
@@ -4006,7 +3995,7 @@ function ValidateTab({
                           {Math.round(run.score)}
                           {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
                             <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
-                              style={{ color: '#d97706', fontSize: 'var(--workspace-font-meta)', marginLeft: 'var(--workspace-space-2)', verticalAlign: 'super' }}>*</span>
+                              style={{ color: '#92400e', fontSize: 'var(--workspace-font-meta)', marginLeft: 'var(--workspace-space-2)', verticalAlign: 'super' }}>*</span>
                           )}
                         </td>
                         <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
@@ -4036,7 +4025,7 @@ function ValidateTab({
                                 padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
                                 backgroundColor: '#fffbeb', border: '1px solid #fde68a',
                               }}>
-                                <AlertTriangle style={{ width: 14, height: 14, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                                <AlertTriangle style={{ width: 14, height: 14, color: '#92400e', flexShrink: 0, marginTop: 1 }} />
                                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
                                   <strong>Score reduced by sample size confidence penalty</strong>
                                   <br />
@@ -4078,12 +4067,12 @@ function ValidateTab({
             padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)',
             backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
           }}>
-            <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
+            <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#15803d', flexShrink: 0 }} />
             <div style={{ flex: 1, fontSize: 'var(--workspace-font-control)', color: '#065f46' }}>
               <strong>Great results!</strong> This extraction has a quality score of {Math.round(displayScore)}%. Consider sharing it with Explore so others can benefit.
             </div>
             {submitLibraryResult === 'success' ? (
-              <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#15803d', whiteSpace: 'nowrap' }}>Submitted!</span>
             ) : (
               <button
                 type="button"
@@ -4092,7 +4081,7 @@ function ValidateTab({
                   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                   padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 'var(--workspace-radius-small)', border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                  color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
+                  color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
               >
                 {SHARE_LABEL}
@@ -4117,7 +4106,7 @@ function ValidateTab({
       {/* 4. Results — Executive Summary */}
       {results && (
         <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-16)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <button
@@ -4153,14 +4142,19 @@ function ValidateTab({
             </div>
           </div>
 
-          {/* The official, certified score lives in the auto-tune panel above
-              (and the quality tile). This block is a per-source/per-field
-              diagnostic only — no headline score here, so there's never a
-              second number that can disagree with the certified one. */}
+          <section aria-label="Extraction validation review summary" style={{ padding: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
+            <strong>What to review</strong>
+            <p>{results.num_sources} test sources, {results.num_runs} runs per source; {results.challenging_fields.length} field/source pairs flagged for closer review.</p>
+            <p>Start with Challenging Fields and failed cross-field rules. Compare each extracted value with the saved expected value and source; repeated answers measure consistency, which can include a consistently wrong answer.</p>
+            {results.sources.some(source => source.fields.some(field => field.accuracy == null)) && <p>Some fields have no measured accuracy. Add or check their expected values before drawing a correctness conclusion.</p>}
+            <p>These results describe the saved test cases. Detailed validation records quality history without applying tuning settings.</p>
+          </section>
+
+          {/* Raw accuracy and consistency explain individual failures; the saved quality score may also include sample-size penalties. */}
 
           {/* Executive Summary Card */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--workspace-space-12)',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: 'var(--workspace-space-12)',
             padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#f9fafb',
             border: "1px solid var(--workspace-border)",
           }}>
@@ -4190,7 +4184,7 @@ function ValidateTab({
             </div>
             <div>
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Best Run</div>
-              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#059669' }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#15803d' }}>
                 Src {results.executive_summary.best_run.source_index + 1}, Run {results.executive_summary.best_run.run_index + 1} ({results.executive_summary.best_run.correct} correct)
               </div>
             </div>
@@ -4221,7 +4215,7 @@ function ValidateTab({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
-                  <Sparkles aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
+                  <Sparkles aria-hidden="true" style={{ width: 14, height: 14, color: '#92400e' }} />
                   <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
                 </div>
                 {!suggestions && !loadingSuggestions && (
@@ -4236,7 +4230,7 @@ function ValidateTab({
                       color: '#92400e', cursor: 'pointer',
                     }}
                   >
-                    Get AI Suggestions
+                    Get AI Suggestions (uses model calls)
                   </button>
                 )}
               </div>
@@ -4386,7 +4380,7 @@ function ValidateTab({
               backgroundColor: '#fffbeb',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
-                <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
+                <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#92400e' }} />
                 <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
@@ -4417,7 +4411,7 @@ function ValidateTab({
                   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                   padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)',
                   backgroundColor: type === 'missing' ? '#fef2f2' : type === 'wrong_value' ? '#fef2f2' : type === 'format_difference' ? '#fffbeb' : '#eff6ff',
-                  color: type === 'missing' ? '#dc2626' : type === 'wrong_value' ? '#dc2626' : type === 'format_difference' ? '#d97706' : '#1d4ed8',
+                  color: type === 'missing' ? '#dc2626' : type === 'wrong_value' ? '#dc2626' : type === 'format_difference' ? '#92400e' : '#1d4ed8',
                   fontWeight: 600,
                 }}>
                   {type.replace('_', ' ')}: {count}
@@ -4429,7 +4423,18 @@ function ValidateTab({
         </div>
       )}
 
-      {/* Document Picker Dialog */}
+      <section aria-label="Advanced: tune extraction">
+        <h3 style={{ fontWeight: 600 }}>Advanced: tune extraction</h3>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBlock: 8 }}>Optional: compare alternative settings using additional model calls. Review the wizard’s budget and application options before starting. Detailed validation above checks current settings and records quality history without changing extraction settings. Tuning can propose or apply different settings according to the options you choose.</p>
+      {/* Applying tuning writes the shared ValidationRun / quality tile. */}
+      <ExtractionAutovalidatePanel
+        searchSetUuid={searchSetUuid}
+        canManage={canManage}
+        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
+      />
+
+      </section>
+
       {showDocPicker && (
         <DocumentPickerDialog
           onSelect={(docs) => {
@@ -4514,7 +4519,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
   })
 
   const latestScore = data.length > 0 ? data[data.length - 1].score : 0
-  const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#d97706' : '#dc2626'
+  const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#92400e' : '#dc2626'
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -4653,8 +4658,8 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
 
 function _scoreColor(score: number | null): string {
   if (score === null) return '#9ca3af'
-  if (score >= 0.9) return '#059669'
-  if (score >= 0.7) return '#d97706'
+  if (score >= 0.9) return '#15803d'
+  if (score >= 0.7) return '#92400e'
   return '#dc2626'
 }
 

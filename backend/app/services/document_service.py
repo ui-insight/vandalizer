@@ -114,7 +114,13 @@ async def list_contents(
         if not current_folder:
             return {"folders": [], "documents": []}
 
-        if current_folder.team_id:
+        project = await access_control.find_folder_project(current_folder.uuid)
+        if project:
+            candidate_folders = await SmartFolder.find({"parent_id": current_folder.uuid}).to_list()
+            folders = [f for f in candidate_folders if await access_control.get_authorized_folder(f.uuid, user, team_access=team_access)]
+            candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}}).to_list()
+            documents = [d for d in candidate_documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
+        elif current_folder.team_id:
             folders = await SmartFolder.find(
                 SmartFolder.parent_id == current_folder.uuid,
                 SmartFolder.team_id == current_folder.team_id,
@@ -227,6 +233,24 @@ async def collect_folder_document_uuids(
     )
     if not root:
         return None
+
+    project = await access_control.find_folder_project(root.uuid)
+    if project:
+        # Project collaborators may contribute files under different user IDs;
+        # traverse the authorized subtree rather than the current user's files.
+        folder_uuids = [root.uuid]
+        frontier = [root.uuid] if include_subfolders else []
+        seen = {root.uuid}
+        while frontier:
+            children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+            frontier = []
+            for child in children:
+                if child.uuid not in seen and await access_control.get_authorized_folder(child.uuid, user, team_access=team_access):
+                    seen.add(child.uuid)
+                    folder_uuids.append(child.uuid)
+                    frontier.append(child.uuid)
+        documents = await SmartDocument.find({"folder": {"$in": folder_uuids}, "soft_deleted": {"$ne": True}}).to_list()
+        return [d.uuid for d in documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
 
     # Resolve the set of folder uuids to scan (root + descendants).
     folder_uuids = [root.uuid]
