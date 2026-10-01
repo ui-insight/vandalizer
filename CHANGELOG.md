@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Background tasks no longer open idle database connections they never use.** Each background task creates its own MongoDB connection pool, and every pool kept 10 connections open in the background whether the task needed them or not. That meant a burst of extra connections to MongoDB for every task. Whenever MongoDB briefly stalled, the half-open connections were cancelled and each one was reported to Sentry ("MongoClient background task encountered an error: operation cancelled", Sentry 7764120249). Task pools now open connections only when a query needs one. The web server, whose pool lasts as long as the process, still keeps 10 connections ready.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added

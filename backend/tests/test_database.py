@@ -54,3 +54,33 @@ async def test_explicit_skip_does_not_mark_ensured():
     skips = [c.kwargs["skip_indexes"] for c in mock_init.call_args_list]
     assert skips == [True, False]
     assert database._indexes_ensured is True
+
+
+# --- connection pool warmth ---------------------------------------------------
+# Sentry 7764120249: per-task clients pre-filled a 10-connection pool in the
+# background; a Mongo stutter cancelled those half-open connects and pymongo
+# logged each as an error. Only the long-lived web client keeps a warm pool.
+
+
+@pytest.mark.asyncio
+async def test_task_clients_open_connections_on_demand():
+    with patch("app.database.AsyncIOMotorClient") as client_cls, \
+         patch("app.database.init_beanie", new_callable=AsyncMock):
+        await database.init_db(_settings())
+    assert client_cls.call_args.kwargs["minPoolSize"] == 0
+
+
+@pytest.mark.asyncio
+async def test_the_web_app_keeps_a_warm_pool():
+    with patch("app.database.AsyncIOMotorClient") as client_cls, \
+         patch("app.database.init_beanie", new_callable=AsyncMock):
+        await database.init_db(_settings(), warm_pool=True)
+    assert client_cls.call_args.kwargs["minPoolSize"] == 10
+
+
+def test_the_web_app_asks_for_the_warm_pool():
+    import inspect
+
+    import app.main as main
+
+    assert "warm_pool=True" in inspect.getsource(main.lifespan)
