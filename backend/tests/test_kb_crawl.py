@@ -65,6 +65,7 @@ def test_crawlable_links_pdf_without_links_is_empty():
 def _make_parent(url: str):
     parent = SimpleNamespace(uuid="parent-1", url=url, crawled_urls=None)
     parent.save = AsyncMock()
+    parent.replace = AsyncMock()
     return parent
 
 
@@ -449,6 +450,7 @@ async def test_user_supplied_thin_url_is_still_ingested():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = _page(source.url, _NAV, [])
 
     dm = MagicMock()
@@ -472,6 +474,7 @@ async def test_gated_out_page_never_reaches_chromadb():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = _page(source.url, _NAV, [])
 
     with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=fetched)), \
@@ -496,6 +499,7 @@ async def test_ingest_url_source_errors_on_bot_challenge():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = WebFetchResult(
         url=source.url, title="Robot or human?",
         text="Robot or human? Activate and hold the button to confirm that you're human.",
@@ -512,3 +516,54 @@ async def test_ingest_url_source_errors_on_bot_challenge():
     assert "bot protection" in source.error_message
     # The junk text must never reach ChromaDB.
     mock_get_dm.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Deleted mid-crawl (review of #977): the crawl's final parent save upserted,
+# resurrecting a parent the user deleted during a many-page crawl or colliding
+# with a re-added row; a child deleted mid-ingest was still counted as added.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_parent_deleted_mid_crawl_is_not_resurrected():
+    from beanie.exceptions import DocumentNotFound
+
+    parent = _make_parent("https://www.usda.gov/x/terms.pdf")
+    parent.replace = AsyncMock(side_effect=DocumentNotFound())
+    fetched = _pdf_result(parent.url, ["https://www.usda.gov/a"])
+    cls, _children = _mock_source_cls()
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source", AsyncMock(return_value=None)):
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=5,
+            allowed_domains="", parent_fetched=fetched,
+        )
+
+    assert added == 1
+    parent.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_child_deleted_mid_ingest_is_not_counted():
+    parent = _make_parent("https://www.usda.gov/x/terms.pdf")
+    fetched = _pdf_result(parent.url, ["https://www.usda.gov/a", "https://www.usda.gov/b"])
+    cls, children = _mock_source_cls()
+
+    async def ingest(child, kb, content_gate=None):
+        if child.url.endswith("/a"):
+            child.status = "deleted"  # what _save_unless_deleted marks
+        else:
+            child.status = "ready"
+        return None
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source", AsyncMock(side_effect=ingest)):
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=5,
+            allowed_domains="", parent_fetched=fetched,
+        )
+
+    assert added == 1
+    assert parent.crawled_urls == ["https://www.usda.gov/b"]

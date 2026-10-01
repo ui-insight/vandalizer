@@ -472,6 +472,24 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
 # Node base classes
 # ---------------------------------------------------------------------------
 
+STEP_SIDE_EFFECTS_ATTR = "workflow_step_side_effects"
+
+
+def _process_tagged(node: "Node", inputs):
+    """``node.process(inputs)``, tagging an escaping exception when the step
+    may already have acted outside the run, so the Celery task does not retry
+    it (re-running would repeat a POST, a browser action, a code run)."""
+    try:
+        return node.process(inputs)
+    except Exception as exc:
+        if node.has_side_effects():
+            try:
+                setattr(exc, STEP_SIDE_EFFECTS_ATTR, True)
+            except Exception:  # an exception type that refuses attributes
+                pass
+        raise
+
+
 class Node:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -484,6 +502,12 @@ class Node:
 
     def process(self, inputs) -> NoReturn:
         raise NotImplementedError
+
+    def has_side_effects(self) -> bool:
+        """Whether running this node acts outside the run (sends a write
+        request, drives a browser, runs code). A failed step containing one is
+        not retried: its other effects may already have happened."""
+        return False
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
@@ -546,6 +570,11 @@ class MultiTaskNode(Node):
             existing = result.get("warning")
             result["warning"] = f"{existing} | {warning}" if existing else warning
         return result
+
+    def has_side_effects(self) -> bool:
+        # Tasks run concurrently, so one may have finished its effect before a
+        # sibling failed.
+        return any(task.has_side_effects() for task in self.tasks)
 
     def process(self, inputs):
         import contextvars
@@ -1091,6 +1120,9 @@ class CodeExecutionNode(Node):
         super().__init__("CodeNode")
         self.data = data
 
+    def has_side_effects(self) -> bool:
+        return True
+
     def process(self, inputs):
         code = self.data.get("code", "")
         if not code:
@@ -1430,6 +1462,9 @@ class APICallNode(Node):
         if request is not None:
             result["request"] = request
         return result
+
+    def has_side_effects(self) -> bool:
+        return self.data.get("method", "GET").upper() not in ("GET", "HEAD", "OPTIONS")
 
     def process(self, inputs):
         from app.utils import templating
@@ -2159,6 +2194,9 @@ class BrowserAutomationNode(Node):
         super().__init__("BrowserAutomation")
         self.data = data
 
+    def has_side_effects(self) -> bool:
+        return True
+
     def process(self, inputs):
         from app.services.browser_automation import BrowserAutomationService
 
@@ -2502,7 +2540,7 @@ class WorkflowEngine:
                 })
 
             if idx == 0 and latest_output is None:
-                output = node.process({})
+                output = _process_tagged(node, {})
             else:
                 if isinstance(node, MultiTaskNode):
                     for task in node.tasks:
@@ -2514,7 +2552,7 @@ class WorkflowEngine:
                                     "current_step_preview": preview,
                                 }) if workflow_result_updater else None
                         )
-                output = node.process(latest_output or {})
+                output = _process_tagged(node, latest_output or {})
 
             # Retry-on-empty / fallback-model. Optimizer-set hook: if the
             # node's first task has ``_fallback_model`` and the output looks
@@ -2699,7 +2737,7 @@ def _retry_node_with_fallback(node, prev_output: dict) -> dict:
         "Workflow engine: retrying node '%s' with fallback model %r (was %r)",
         getattr(node, "name", "?"), fallback, original_model,
     )
-    return node.process(prev_output)
+    return _process_tagged(node, prev_output)
 
 
 def _apply_step_override(

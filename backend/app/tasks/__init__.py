@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 # is transient but its subclass ``ModelHTTPError`` (an HTTP *status* error —
 # a 4xx won't improve on retry) is not, and an ``except autoretry_for``
 # clause cannot express that exclusion. Tasks that make LLM calls handle it
-# per-task with the catch/re-raise pattern in
-# ``kb_validation_tasks.generate_test_queries_task``.
+# per-task: the catch/re-raise pattern in
+# ``kb_validation_tasks.generate_test_queries_task``, or
+# ``is_transient_llm_error`` below when engines wrap the error.
 def _transient_exceptions() -> tuple[type[BaseException], ...]:
     excs: list[type[BaseException]] = [ConnectionError, TimeoutError, OSError]
     try:
@@ -58,6 +59,52 @@ def _transient_exceptions() -> tuple[type[BaseException], ...]:
 
 
 TRANSIENT_EXCEPTIONS = _transient_exceptions()
+
+# HTTP statuses from a model provider worth another attempt: rate limiting
+# and the gateway/overload family. Any other status (a 400 for a bad request,
+# a 401 for a revoked key, a 404 for a renamed model) fails the same way again.
+_RETRYABLE_LLM_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+
+
+def is_transient_llm_error(exc: BaseException) -> bool:
+    """True when ``exc`` — or anything it wraps — is a retryable LLM failure.
+
+    pydantic-ai raises ``ModelAPIError`` for a provider it could not reach
+    ("Connection error.", after the OpenAI client's own two quick retries) and
+    its subclass ``ModelHTTPError`` for a status response. The engines wrap
+    both (``ExtractionError("Extraction failed: Connection error.")``), so the
+    cause chain is walked rather than the outer type checked.
+    """
+    try:
+        from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+    except ImportError:  # pragma: no cover
+        return False
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ModelHTTPError):
+            return current.status_code in _RETRYABLE_LLM_STATUSES
+        if isinstance(current, ModelAPIError):
+            return True
+        # ``raise X from None`` sets __suppress_context__: the earlier error
+        # was explicitly disowned, so it must not make X look transient.
+        current = current.__cause__ or (
+            None if current.__suppress_context__ else current.__context__
+        )
+    return False
+
+
+def llm_retry_countdown(retries: int) -> int:
+    """Seconds before retry number ``retries + 1`` of an LLM-bound task.
+
+    ``retry_backoff=True`` waits a jittered 1, 2, 4 seconds — the same
+    window the provider client already retried inside, so an outage of more
+    than a few seconds used up every attempt. 30, 60, 120 seconds rides out
+    a gateway restart and still finishes well inside the stale-run reaper's
+    30 minutes.
+    """
+    return 30 * (2 ** max(retries, 0))
 
 
 def run_task_async(coro: "Coroutine[Any, Any, Any]") -> Any:
