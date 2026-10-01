@@ -586,7 +586,10 @@ async def get_latest_validations(pairs: list[tuple[str, str]]) -> dict[tuple[str
                 {"$or": [{"item_kind": k, "item_id": {"$in": ids}} for k, ids in by_kind.items()]},
             ],
         }},
-        {"$sort": {"created_at": -1}},
+        # Same prefix as the (item_kind, item_id, created_at desc) index, so
+        # the index serves the sort instead of an in-memory sort of every
+        # matching run's full document.
+        {"$sort": {"item_kind": 1, "item_id": 1, "created_at": -1}},
         {"$group": {"_id": {"k": "$item_kind", "i": "$item_id"}, "run": {"$first": "$$ROOT"}}},
     ]
     rows = await ValidationRun.get_motor_collection().aggregate(pipeline).to_list(length=None)
