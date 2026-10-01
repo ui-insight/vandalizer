@@ -608,6 +608,58 @@ def _evaluate_xlsx_formulas(xlsx_path: str) -> dict[tuple[str, str], object]:
     return result
 
 
+# A zip that openpyxl refuses is often a different file under an .xlsx name.
+# Matched against the content types of the package's main parts (its
+# ``Override`` entries — never ``Default`` extension entries, which a real
+# workbook carries for any embedded Word or PowerPoint object) or an
+# OpenDocument package's "mimetype" member; first match wins.
+_MISNAMED_PACKAGES = (
+    (("ms-excel.sheet.binary.macroenabled.main",), "an Excel Binary Workbook (.xlsb)",
+     "Open it in Excel, use Save As → Excel Workbook (.xlsx), and upload that."),
+    (("wordprocessingml.document.main", "wordprocessingml.template.main"), "a Word document",
+     "Rename it to .docx and upload it again."),
+    (("presentationml.presentation.main", "presentationml.slideshow.main",
+      "presentationml.template.main"), "a PowerPoint presentation",
+     "Rename it to .pptx and upload it again."),
+    (("application/vnd.oasis.opendocument.spreadsheet",), "an OpenDocument spreadsheet (.ods)",
+     "Open it in Excel or LibreOffice, save it as .xlsx, and upload that."),
+)
+
+_OVERRIDE_CONTENT_TYPE = re.compile(r"<Override\b[^>]*\bContentType=\"([^\"]+)\"", re.IGNORECASE)
+
+
+def _no_workbook_in_package(exc: BaseException) -> bool:
+    """openpyxl found no workbook at all — not a workbook it failed to parse."""
+    text = str(exc)
+    return "no valid workbook part" in text or "[Content_Types].xml" in text
+
+
+def _describe_misnamed_xlsx(xlsx_path: str) -> str | None:
+    """A user-facing message when an .xlsx is really another kind of package.
+
+    None when the file isn't a readable zip or declares nothing recognizable.
+    Only meaningful once openpyxl has reported there is no workbook in it.
+    """
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(xlsx_path) as zf:
+            names = set(zf.namelist())
+            declared: list[str] = []
+            if "[Content_Types].xml" in names:
+                manifest = zf.read("[Content_Types].xml").decode("utf-8", "replace")
+                declared += _OVERRIDE_CONTENT_TYPE.findall(manifest)
+            if "mimetype" in names:
+                declared.append(zf.read("mimetype").decode("utf-8", "replace").strip())
+    except (zipfile.BadZipFile, OSError, KeyError):
+        return None
+    declared = [d.lower() for d in declared]
+    for markers, what, remedy in _MISNAMED_PACKAGES:
+        if any(m in d for m in markers for d in declared):
+            return f"This file is {what} saved with an .xlsx extension, so it can't be read as an Excel workbook. {remedy}"
+    return None
+
+
 def extract_text_from_xlsx(xlsx_path: str) -> str:
     """Extract every visible and hidden sheet from an .xlsx workbook.
 
@@ -625,6 +677,22 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
         wb_values = openpyxl.load_workbook(xlsx_path, data_only=True)
         wb_formulas = openpyxl.load_workbook(xlsx_path, data_only=False)
     except Exception as e:
+        # MarkItDown reads .xlsx through openpyxl too, so for a file that is
+        # not an Excel workbook at all the fallback only fails again — with
+        # "File conversion failed after 1 attempts: - XlsxConverter threw
+        # OSError …" as the message the user saw (Sentry 7598762528). Say
+        # what the file is instead.
+        # Only when there is no workbook at all: a real workbook that openpyxl
+        # fails to parse for any other reason still falls back to MarkItDown.
+        misnamed = _describe_misnamed_xlsx(xlsx_path) if _no_workbook_in_package(e) else None
+        if misnamed:
+            raise DocumentReadError(misnamed) from e
+        if "no valid workbook part" in str(e):
+            raise DocumentReadError(
+                "This .xlsx file contains no Excel workbook. It may be damaged, "
+                "or a different kind of file renamed to .xlsx. Open it in Excel, "
+                "use Save As → Excel Workbook (.xlsx), and upload that."
+            ) from e
         logger.warning(
             "openpyxl failed on %s (%s) — falling back to MarkItDown", xlsx_path, e
         )
