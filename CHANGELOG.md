@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A model preference saved as a tag, or naming a model since renamed or removed, no longer sends knowledge-base baseline checks and workflow baselines to a server that isn't there.** The knowledge-base **baseline probe** (scoring the model's answers without the knowledge base) and the workflow "no workflow" baseline looked up the user's model preference and used it exactly as saved. A preference saved as a tag (such as "fast"), or naming a model renamed or removed in System Config, therefore matched no configured model. A short name like that was treated as a local Ollama model and sent to `localhost:11434`, where nothing is running, so every call failed with "Connection error." (Sentry 7703225327). These now resolve the preference the same way chat and extraction do: a tag becomes its model's name, and a preference that matches no configured model falls back to the default model.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added

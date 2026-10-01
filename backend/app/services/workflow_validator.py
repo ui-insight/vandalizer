@@ -16,8 +16,9 @@ extraction / workflow modules still depend on:
   workers and other sync code paths where the async ``get_user_model_name``
   isn't available.
 
-Both helpers are unchanged from the original Flask port so existing import
-sites continue to work without edits.
+``_extract_json`` is unchanged from the original Flask port;
+``_resolve_model_name`` now resolves tags and stale names the way the async
+resolver does.
 """
 
 from __future__ import annotations
@@ -37,18 +38,44 @@ def _get_db():
 def _resolve_model_name(user_id: str | None = None) -> str:
     """Resolve model name using user config, falling back to system default.
 
-    Synchronous (pymongo). Returns "" when no model can be resolved — callers
-    should treat that as "no LLM configured" and skip or raise as appropriate.
+    Synchronous (pymongo) twin of ``config_service.get_user_model_name`` and
+    resolves the same way: the user's stored value may be a model's name or
+    its tag, and only a value naming a *configured* model is used. It used to
+    return the stored value verbatim, so a tag ("fast") or a model since
+    renamed or removed in System Config reached the LLM layer as a bare name
+    with no config — which ``detect_api_protocol`` reads as a local Ollama
+    model and dials at the built-in ``http://localhost:11434/v1``. Inside the
+    container nothing listens there (Sentry 7703225327: KB baseline probe,
+    "Connection error." on every call).
+
+    Returns "" when no model can be resolved — callers should treat that as
+    "no LLM configured" and skip or raise as appropriate.
     """
     db = _get_db()
+    sys_cfg = db.system_config.find_one() or {}
+    models = [m for m in (sys_cfg.get("available_models") or []) if isinstance(m, dict)]
+
+    def _configured(value: str | None) -> str:
+        if not value:
+            return ""
+        for key in ("name", "tag"):
+            for m in models:
+                if m.get(key) == value and m.get("name"):
+                    return m["name"]
+        return ""
+
     if user_id:
         user_config = db.user_model_config.find_one({"user_id": user_id})
-        if user_config and user_config.get("name"):
-            return user_config["name"]
-    sys_cfg = db.system_config.find_one() or {}
-    models = sys_cfg.get("available_models", [])
-    if models and isinstance(models[0], dict):
-        return models[0].get("name", "")
+        resolved = _configured((user_config or {}).get("name"))
+        if resolved:
+            return resolved
+
+    default = (sys_cfg.get("default_model") or "").strip()
+    if default and any(m.get("name") == default for m in models):
+        return default
+    for m in models:
+        if m.get("name"):
+            return m["name"]
     return ""
 
 
