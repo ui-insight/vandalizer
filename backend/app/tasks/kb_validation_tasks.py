@@ -194,12 +194,21 @@ def _same_stamp(stored, queued_at: str | None) -> bool:
         return True  # a task queued before stamps were passed along
     import datetime as _dt
 
-    if stored.tzinfo is None:
-        stored = stored.replace(tzinfo=_dt.timezone.utc)
+    def _utc(value: _dt.datetime) -> _dt.datetime:
+        return value if value.tzinfo else value.replace(tzinfo=_dt.timezone.utc)
+
+    # Both sides can arrive naive. Mongo hands datetimes back naive (the client
+    # is not tz_aware), and the refresh route read its stamp off the source
+    # *after* save(), which merges that naive value back — so every
+    # per-source Refresh crashed here with "can't subtract offset-naive and
+    # offset-aware datetimes" (Sentry 7755236750), leaving the source pending
+    # and the KB "building". Stamps already sitting in the queue are naive, so
+    # the comparison has to tolerate them, not just the producer be fixed.
     try:
-        return abs((stored - _dt.datetime.fromisoformat(queued_at)).total_seconds()) < 1
+        parsed = _dt.datetime.fromisoformat(queued_at)
     except ValueError:
         return True
+    return abs((_utc(stored) - _utc(parsed)).total_seconds()) < 1
 
 
 async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: str | None = None):
