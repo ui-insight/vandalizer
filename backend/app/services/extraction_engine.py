@@ -130,6 +130,49 @@ def _resolve_prompt(variant: str | None, source_label: str) -> str:
     return fn(source_label) + INJECTION_CLAUSE
 
 
+_JSON_CLOSERS = {"{": "}", "[": "]"}
+
+
+def _close_json_tail(text: str) -> str | None:
+    """Repair JSON whose only defect is its closing brackets; None otherwise.
+
+    gpt-oss on the JSON-fallback path sometimes ends a nested payload one
+    closer short ({"entities": [...], "_sources": {...} with no final "}") or
+    with the wrong one ("]" where "}" belonged), failing a complete answer on
+    its last character (Sentry 7694407872: "Expecting ',' delimiter" at char
+    1013 of 1015). Only brackets after the last value are touched — missing
+    ones are appended, wrong ones replaced — so no value can change. Text that
+    ends inside a string, or goes wrong before its tail, is left to fail.
+    """
+    stack: list[str] = []
+    in_string = escaped = False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in _JSON_CLOSERS:
+            stack.append(_JSON_CLOSERS[ch])
+        elif ch in "}]":
+            if stack and ch == stack[-1]:
+                stack.pop()
+                continue
+            # A wrong closer: repairable only when nothing but closers
+            # follows it, i.e. the model finished its values and fumbled the
+            # brackets.
+            if not stack or text[i:].strip(" \t\r\n}]"):
+                return None
+            return text[:i].rstrip() + "".join(reversed(stack))
+    if in_string or not stack:
+        return None
+    return text.rstrip() + "".join(reversed(stack))
+
+
 class ExtractionError(RuntimeError):
     """An extraction attempt failed — LLM/provider error or unparseable output.
 
@@ -1297,7 +1340,20 @@ class ExtractionEngine:
                 # for-character, and a passage that spans lines comes back
                 # with real newlines, which strict JSON rejects at the first
                 # one — turning a fully usable answer into a failed run.
-                parsed = json.loads(output.strip(), strict=False)
+                try:
+                    parsed = json.loads(output.strip(), strict=False)
+                except json.JSONDecodeError as original:
+                    repaired = _close_json_tail(output.strip())
+                    if repaired is None:
+                        raise
+                    try:
+                        parsed = json.loads(repaired, strict=False)
+                    except json.JSONDecodeError:
+                        raise original from None
+                    logger.warning(
+                        "Fallback extraction JSON had unbalanced closing "
+                        "brackets; repaired the tail and parsed it"
+                    )
                 # The prompts ask for an {"entities": [...]} envelope, so
                 # unwrap it before deciding the model answered about something
                 # else. ``envelope`` keeps the sibling ``_sources`` block.

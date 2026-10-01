@@ -217,3 +217,44 @@ def test_remap_is_a_classmethod_not_an_accidental_instance_method(engine):
     )
     assert matched == 1
     assert entity == {"Award amount": "$1"}
+
+
+# ---------------------------------------------------------------------------
+# A complete answer whose closing brackets are short or wrong (Sentry
+# 7694407872: "Expecting ',' delimiter" on the last character of the output).
+# ---------------------------------------------------------------------------
+
+
+def test_a_missing_final_brace_is_closed(monkeypatch, engine):
+    payload = (
+        '{"entities": [{"Award amount": "$50,000", "PI Name": "Dr. Lee"}], '
+        '"_sources": {"Award amount": "Total award: $50,000"}'
+    )
+    out = _run(monkeypatch, engine, payload, KEYS, capture_sources=True)
+    assert out[0]["Award amount"] == "$50,000"
+    assert out[0]["PI Name"] == "Dr. Lee"
+
+
+def test_a_wrong_closer_at_the_tail_is_replaced(monkeypatch, engine):
+    payload = '{"entities": [{"Award amount": "$50,000", "PI Name": "Dr. Lee"}}\n'
+    out = _run(monkeypatch, engine, payload, KEYS)
+    assert out[0]["Award amount"] == "$50,000"
+
+
+def test_brackets_inside_strings_are_not_counted(monkeypatch, engine):
+    payload = '{"Award amount": "see [Table 2] {draft}", "PI Name": "Dr. Lee"'
+    out = _run(monkeypatch, engine, payload, KEYS)
+    assert out[0]["Award amount"] == "see [Table 2] {draft}"
+
+
+def test_output_cut_off_inside_a_string_still_fails(monkeypatch, engine):
+    """Closing a truncated string would invent the end of a value."""
+    payload = '{"Award amount": "$50,000", "PI Name": "Dr. L'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)
+
+
+def test_a_defect_before_the_tail_still_fails(monkeypatch, engine):
+    payload = '{"Award amount": "$50,000" "PI Name": "Dr. Lee"'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)

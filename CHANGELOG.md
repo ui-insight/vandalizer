@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **An extraction answer that ends one bracket short is no longer thrown away.** When structured output is off, extraction asks the model for plain JSON and parses it. gpt-oss sometimes finishes every value and then leaves off the final `}`, or closes with `]` where `}` belonged, so a complete answer failed on its last character as "Model returned unparseable output" (Sentry 7694407872). Such output is now repaired before it is parsed: missing closing brackets at the end are added and a wrong one there is replaced. Nothing else is changed, so no value can be altered. Output that stops partway through a value, or has an error before its last bracket, still fails as before.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
