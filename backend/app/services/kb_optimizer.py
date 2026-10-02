@@ -342,6 +342,128 @@ def _exclude_judge_family_models(
     return (kept, list(dict.fromkeys(excluded)))
 
 
+class ModelPlanError(ValueError):
+    """A requested judge or challenger can't be used. The message is user-facing."""
+
+
+async def resolve_model_plan(
+    kb_uuid: str,
+    user_id: str,
+    *,
+    judge_model: str | None = None,
+    challenger_models: list[str] | None = None,
+) -> dict:
+    """Decide who judges, who answers today, and who competes in a tuning run.
+
+    The tuning wizard shows this plan before the run and the run executes it,
+    so both go through here. Three roles that used to be one model (the
+    runner's chat model) are kept apart:
+
+    - ``judge_model``: the requested judge, else the admin's Validation grader.
+      Never the chat model, so a run's scores don't move with the chat picker.
+    - ``current_model``: the model that answers for this KB today — an applied
+      override's model, else the runner's model. The default-KB baseline and
+      trials that leave ``model`` unset answer with it.
+    - ``challenger_models``: the models the search sweeps. A model is
+      ineligible when it is the judge or shares the judge's family (an LLM
+      judge over-rates its own family). ``None`` means every eligible model;
+      a list narrows that, and naming an ineligible model is an error.
+
+    ``models`` lists every configured model with its eligibility and the
+    reason it is ineligible, for the wizard's multi-select.
+    """
+    from app.services.config_service import (
+        get_llm_model_by_name,
+        get_user_model_name,
+        get_validation_judge_model,
+    )
+    from app.services.extraction_optimizer import _model_family
+
+    sys_cfg = await SystemConfig.get_config()
+    enabled = _enabled_model_names(sys_cfg)
+
+    grader, grader_fallback = await get_validation_judge_model()
+    requested_judge = (judge_model or "").strip()
+    if requested_judge:
+        match = await get_llm_model_by_name(requested_judge)
+        if not match or not match.get("name"):
+            raise ModelPlanError(
+                f"Judge model {requested_judge!r} isn't configured in System Config."
+            )
+        judge = str(match["name"])
+        judge_source = "selected"
+        judge_fallback = None
+    else:
+        judge = grader
+        judge_source = "validation_grader"
+        judge_fallback = grader_fallback
+    if not judge:
+        raise ModelPlanError("No LLM model is configured, so nothing can judge the trials.")
+
+    answer_fallback = await get_user_model_name(user_id)
+    default_cfg = await kb_validation_service._resolve_rag_config(
+        kb_uuid, None, kb_validation_service.DEFAULT_K,
+    )
+    current = (default_cfg.model if default_cfg else None) or answer_fallback
+    if not current:
+        raise ModelPlanError("No LLM model is configured to answer for this knowledge base.")
+
+    # The current model can be outside available_models only when the
+    # stale-selection fallback produced it; list it so it can be swept.
+    if current not in enabled:
+        enabled = [current] + enabled
+
+    judge_family = _model_family(judge)
+    models: list[dict] = []
+    for name in enabled:
+        family = _model_family(name)
+        if name == judge:
+            reason = "It is the judge."
+        elif family == judge_family:
+            reason = (
+                f"Same family as the judge ({family}). A judge over-rates "
+                "answers from its own family."
+            )
+        else:
+            reason = None
+        models.append({
+            "name": name,
+            "family": family,
+            "is_current": name == current,
+            "eligible": reason is None,
+            "ineligible_reason": reason,
+        })
+    eligible = [m["name"] for m in models if m["eligible"]]
+
+    if challenger_models is None:
+        challengers = eligible
+    else:
+        wanted = list(dict.fromkeys(str(m).strip() for m in challenger_models if m))
+        by_name = {m["name"]: m for m in models}
+        bad = [m for m in wanted if not by_name.get(m, {}).get("eligible")]
+        if bad:
+            details = "; ".join(
+                f"{m}: {by_name[m]['ineligible_reason']}" if m in by_name
+                else f"{m}: not configured in System Config"
+                for m in bad
+            )
+            raise ModelPlanError(f"These challengers can't be used — {details}")
+        challengers = [m for m in eligible if m in wanted]
+
+    return {
+        "judge_model": judge,
+        "judge_source": judge_source,
+        "judge_model_fallback": judge_fallback,
+        "validation_grader": grader,
+        "current_model": current,
+        "challenger_models": challengers,
+        "models": models,
+        # The default-KB baseline is graded by the judge whatever the
+        # challengers are, so a same-family current model is worth a warning.
+        "current_shares_judge_family": _model_family(current) == judge_family,
+    }
+
+
 def _build_search_space(
     enabled_models: list[str] | None,
 ) -> list[dict[str, Any]]:
@@ -487,35 +609,40 @@ class KBOptimizer:
                 overfitting_warning=not holdout_queries,
             )
 
-            # ----- Resolve model -----
-            # get_user_model_name validates the stored selection against
-            # available_models and falls back to the system default when stale,
-            # so the judge never targets a removed model's unreachable endpoint.
-            from app.services.config_service import get_user_model_name
-            user_default_model = await get_user_model_name(user_id)
-            if not user_default_model:
-                raise KBOptimizerError(
-                    "judge_unavailable",
-                    "No LLM model is configured for this user — the optimizer "
-                    "needs a judge model to score trials.",
-                    {"user_id": user_id},
+            # ----- Resolve models -----
+            # Judge, current answerer and challengers are separate roles; see
+            # resolve_model_plan. The wizard previewed the same plan.
+            opts = run_doc.options or {}
+            try:
+                plan = await resolve_model_plan(
+                    kb_uuid, user_id,
+                    judge_model=opts.get("judge_model"),
+                    challenger_models=opts.get("challenger_models"),
                 )
-
-            sys_cfg = await SystemConfig.get_config()
-            enabled_models = _enabled_model_names(sys_cfg)
-            # Optimizer treats the user's resolved model as the safe fallback.
-            if user_default_model not in enabled_models:
-                enabled_models = [user_default_model] + enabled_models
-            # Same-family judge exclusion: the judge is pinned to
-            # user_default_model; dropping candidates in the judge's family
-            # removes self-preference bias on the model axis. The full
-            # enabled_models list is preserved for cross-judge (which uses a
-            # sibling judge that may be same-family as the dropped candidates).
-            candidate_models, excluded_models = _exclude_judge_family_models(
-                enabled_models, user_default_model,
+            except ModelPlanError as e:
+                raise KBOptimizerError(
+                    "judge_unavailable", str(e), {"user_id": user_id},
+                ) from e
+            judge_model = plan["judge_model"]
+            current_model = plan["current_model"]
+            candidate_models = plan["challenger_models"]
+            # Every configured model stays available to cross-judge, which
+            # wants a second opinion from anyone but the primary judge.
+            enabled_models = [m["name"] for m in plan["models"]]
+            excluded_models = [
+                m["name"] for m in plan["models"]
+                if not m["eligible"] and m["name"] != judge_model
+            ]
+            await self._update(
+                run_doc,
+                judge_model=judge_model,
+                judge_source=plan["judge_source"],
+                judge_model_fallback=plan["judge_model_fallback"],
+                current_model=current_model,
+                challenger_models=candidate_models,
+                judge_family_excluded_models=excluded_models,
+                current_shares_judge_family=plan["current_shares_judge_family"],
             )
-            if excluded_models:
-                run_doc.judge_family_excluded_models = excluded_models
 
             # ----- Establish baselines (no-KB first, then default-KB) -----
             # Measure no-KB first and persist it before the heavier default-KB
@@ -524,11 +651,11 @@ class KBOptimizer:
             # Baselines and trials run on the TRAIN slice so the holdout is
             # never seen until the post-loop re-evaluation.
             await self._update(run_doc, phase="running",
-                               judge_model=user_default_model,
                                progress_message="Measuring no-KB baseline (score to beat)…")
             try:
                 baselines = await self._establish_baselines(
-                    run_doc, kb_uuid, user_id, train_queries, user_default_model,
+                    run_doc, kb_uuid, user_id, train_queries, current_model,
+                    judge_model=judge_model,
                 )
             except KBOptimizerError:
                 raise
@@ -626,7 +753,8 @@ class KBOptimizer:
                     else None
                 )
                 trial_result = await self._run_trial(
-                    cfg_dict, kb_uuid, user_id, train_queries, user_default_model,
+                    cfg_dict, kb_uuid, user_id, train_queries, current_model,
+                    judge_model=judge_model,
                     baseline_default_score=baselines["default_kb"],
                     baseline_no_kb_score=baselines.get("no_kb"),
                     judge_variance=baselines.get("judge_variance"),
@@ -700,11 +828,21 @@ class KBOptimizer:
             )
             if winner_trial is not None:
                 best_trial = winner_trial
+            # The current settings win unless a trial beat them by more than
+            # the noise. tied_with_baseline covers "within the noise" only, so
+            # a top trial clearly *below* the current settings needs its own
+            # check — it must never be offered as the configuration to apply.
+            current_wins = (
+                best_trial is None
+                or tied_with_baseline
+                or float(best_trial["score"]) < float(baselines["default_kb"])
+            )
             await self._update(
                 run_doc,
                 tie_cluster_size=tie_cluster_size,
                 winner_selection_reason=winner_reason,
                 tied_with_baseline=tied_with_baseline,
+                winner="current" if current_wins else "challenger",
             )
 
             # ----- Holdout re-evaluation (T2.1) -----
@@ -728,7 +866,8 @@ class KBOptimizer:
                 )
                 try:
                     holdout_result = await self._score_config_on_queries(
-                        kb_uuid, holdout_queries, best_config, user_default_model,
+                        kb_uuid, holdout_queries, best_config, current_model,
+                        judge_model=judge_model,
                         retrieval_score=baselines.get("retrieval_score", 0.0),
                         health_score=baselines.get("health_score", 0.0),
                         coverage_score=baselines.get("coverage_score", 0.0),
@@ -741,7 +880,8 @@ class KBOptimizer:
 
                 try:
                     default_holdout = await self._score_config_on_queries(
-                        kb_uuid, holdout_queries, {}, user_default_model,
+                        kb_uuid, holdout_queries, {}, current_model,
+                        judge_model=judge_model,
                         retrieval_score=baselines.get("retrieval_score", 0.0),
                         health_score=baselines.get("health_score", 0.0),
                         coverage_score=baselines.get("coverage_score", 0.0),
@@ -833,7 +973,8 @@ class KBOptimizer:
                 run_doc, kb_uuid, best_trial,
                 holdout_queries if holdout_queries else train_queries,
                 enabled_models=enabled_models,
-                primary_judge=user_default_model,
+                primary_judge=judge_model,
+                current_model=current_model,
                 token_budget=token_budget,
             )
 
@@ -847,7 +988,7 @@ class KBOptimizer:
             if await _is_cancelled(run_doc):
                 return await self._finalize_cancelled(run_doc, kb)
 
-            if apply_on_finish and best_config and not tied_with_baseline:
+            if apply_on_finish and best_config and not current_wins:
                 await self._apply_to_kb(kb_uuid, best_config, run_uuid, run_doc=run_doc)
                 await self._update(
                     run_doc, progress_message="Applied optimized settings to KB.",
@@ -944,8 +1085,13 @@ class KBOptimizer:
         user_id: str,
         test_queries: list[KBTestQuery],
         model_name: str,
+        *,
+        judge_model: str | None = None,
     ) -> dict:
         """Establish no-KB and default-KB baselines in three visible phases.
+
+        ``model_name`` answers (no-KB, and default-KB when the KB has no
+        override model); ``judge_model`` grades, defaulting to ``model_name``.
 
         Phase 0 captures the **config-invariant** metrics (source health,
         chunk coverage, retrieval precision) that go into the blended quality
@@ -989,8 +1135,9 @@ class KBOptimizer:
         )
 
         # --- Phase 1: no-KB baseline (the score to beat) ---
+        judge = judge_model or model_name
         baseline_result = await kb_validation_service.judge_baselines_only(
-            test_queries, model_name,
+            test_queries, model_name, judge_model=judge,
         )
         no_kb = baseline_result.get("avg_baseline_score") or 0.0
         baseline_tokens = int(baseline_result.get("tokens_used", 0) or 0)
@@ -1010,7 +1157,7 @@ class KBOptimizer:
 
         # --- Phase 2: default-KB score + variance ---
         result = await kb_validation_service.judge_test_queries(
-            kb_uuid, test_queries, model_name, mode="judge",
+            kb_uuid, test_queries, model_name, mode="judge", judge_model=judge,
         )
         default_kb = result.get("avg_judge_score") or 0.0
         judge_tokens = int(result.get("tokens_used", 0) or 0)
@@ -1023,7 +1170,7 @@ class KBOptimizer:
         by_uuid = {q.uuid: q for q in test_queries}
         variance_result = (
             await kb_validation_service._sample_judge_variance_detailed(
-                kb_uuid, result.get("details", []), by_uuid, model_name,
+                kb_uuid, result.get("details", []), by_uuid, judge,
             )
         )
         variance = variance_result.sigma
@@ -1078,8 +1225,13 @@ class KBOptimizer:
         health_score: float = 0.0,
         coverage_score: float = 0.0,
         current_best_judge_score: float | None = None,
+        judge_model: str | None = None,
     ) -> dict:
         """Run judge_test_queries with a specific RAGConfig override per query.
+
+        ``fallback_model`` answers when the trial leaves ``model`` unset (the
+        KB's current model); ``judge_model`` grades, defaulting to
+        ``fallback_model`` for callers that predate the split.
 
         We monkey-patch ``_generate_kb_answer`` for the duration of this trial
         so the existing judge_test_queries helper (which doesn't know about
@@ -1155,13 +1307,12 @@ class KBOptimizer:
             early_stop_callback = _should_stop
 
         try:
-            # Pin the judge to fallback_model regardless of cfg.model. Letting
-            # each trial judge itself (self-confirmation) lets a model that
-            # shares blind spots with its own judge artificially win on the
-            # ``model`` axis.
+            # Pin the judge regardless of cfg.model. Letting each trial judge
+            # itself (self-confirmation) lets a model that shares blind spots
+            # with its own judge artificially win on the ``model`` axis.
             judge_result = await kb_validation_service.judge_test_queries(
                 kb_uuid, test_queries, effective_model, mode="judge",
-                judge_model=fallback_model,
+                judge_model=judge_model or fallback_model,
                 early_stop_callback=early_stop_callback,
             )
         except Exception as e:
@@ -1231,6 +1382,7 @@ class KBOptimizer:
         retrieval_score: float = 0.0,
         health_score: float = 0.0,
         coverage_score: float = 0.0,
+        judge_model: str | None = None,
     ) -> dict:
         """Run one config on a query slice — used for holdout re-evaluation.
 
@@ -1262,7 +1414,7 @@ class KBOptimizer:
         try:
             judge_result = await kb_validation_service.judge_test_queries(
                 kb_uuid, queries, effective_model, mode="judge",
-                judge_model=fallback_model,
+                judge_model=judge_model or fallback_model,
             )
         finally:
             if original_gen is not None:
@@ -1389,6 +1541,7 @@ class KBOptimizer:
         enabled_models: list[str],
         primary_judge: str,
         token_budget: int,
+        current_model: str | None = None,
     ) -> None:
         """Re-judge the winning trial with an alternate model (best-effort).
 
@@ -1432,7 +1585,9 @@ class KBOptimizer:
                 # the judge swaps. Otherwise we're comparing "trial X scored
                 # by model A" vs "trial Y scored by model B" which conflates
                 # generator and judge changes.
-                generator_model = best_trial["config"].get("model") or primary_judge
+                generator_model = (
+                    best_trial["config"].get("model") or current_model or primary_judge
+                )
                 alt_result = await kb_validation_service.judge_test_queries(
                     kb_uuid, test_queries, generator_model, mode="judge",
                     judge_model=alt_judge_model,

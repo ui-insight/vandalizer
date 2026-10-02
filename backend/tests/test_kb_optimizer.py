@@ -297,6 +297,7 @@ async def test_run_completes_with_no_test_queries_triggers_autogen():
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.kb_question_generator.KBQuestionGenerator", return_value=fake_gen), \
          patch("app.services.config_service.get_user_model_name", new=AsyncMock(return_value="m1")), \
+         patch("app.services.config_service.get_validation_judge_model", new=AsyncMock(return_value=("m1", None))), \
          patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
              "avg_baseline_score": 0.3, "num_baselines_judged": 1, "tokens_used": 0,
              "details": [{"query_uuid": "tq-gen", "baseline_judge": {"score": 0.3, "verdict": "FAIL"}}],
@@ -366,6 +367,7 @@ async def test_run_records_trials_and_picks_winner():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.config_service.get_user_model_name", new=AsyncMock(return_value="m1")), \
+         patch("app.services.config_service.get_validation_judge_model", new=AsyncMock(return_value=("m1", None))), \
          patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
              "avg_baseline_score": 0.2, "num_baselines_judged": 1, "tokens_used": 0,
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
@@ -443,6 +445,7 @@ async def test_run_honours_cancellation_between_trials():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.config_service.get_user_model_name", new=AsyncMock(return_value="m1")), \
+         patch("app.services.config_service.get_validation_judge_model", new=AsyncMock(return_value=("m1", None))), \
          patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
              "avg_baseline_score": 0.2, "num_baselines_judged": 1, "tokens_used": 0,
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
@@ -506,6 +509,7 @@ async def test_run_apply_on_finish_writes_kb_override():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.config_service.get_user_model_name", new=AsyncMock(return_value="m1")), \
+         patch("app.services.config_service.get_validation_judge_model", new=AsyncMock(return_value=("m1", None))), \
          patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
              "avg_baseline_score": 0.1, "num_baselines_judged": 1, "tokens_used": 0,
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.1, "verdict": "FAIL"}}],

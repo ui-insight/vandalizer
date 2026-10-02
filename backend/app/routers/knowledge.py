@@ -2066,6 +2066,7 @@ def _serialize_optimization_run(run) -> dict:
         "data_source_suggestions": run.data_source_suggestions,
         "options": run.options,
         "error_message": run.error_message,
+        "error_code": getattr(run, "error_code", None),
         "started_at": _iso_utc(run.started_at),
         "completed_at": _iso_utc(run.completed_at),
         "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
@@ -2075,6 +2076,14 @@ def _serialize_optimization_run(run) -> dict:
         "reverted_at": _iso_utc(getattr(run, "reverted_at", None)),
         "tied_with_baseline": getattr(run, "tied_with_baseline", False),
         "apply_preview": getattr(run, "apply_preview", None),
+        "default_config": getattr(run, "default_config", None),
+        "judge_source": getattr(run, "judge_source", None),
+        "judge_model_fallback": getattr(run, "judge_model_fallback", None),
+        "current_model": getattr(run, "current_model", None),
+        "challenger_models": getattr(run, "challenger_models", []) or [],
+        "judge_family_excluded_models": getattr(run, "judge_family_excluded_models", []) or [],
+        "current_shares_judge_family": getattr(run, "current_shares_judge_family", False),
+        "winner": getattr(run, "winner", None),
     }
 
 
@@ -2123,10 +2132,29 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         [str(u) for u in raw_uuids if u] if isinstance(raw_uuids, list) else []
     )
 
+    # Judge and challengers chosen under the wizard's Advanced toggle. Omitted
+    # means the defaults: the admin's Validation grader judges and every
+    # eligible model competes. Validate now so a bad pick is a 400 here, not a
+    # failed run later.
+    judge_model = (body.get("judge_model") or "").strip() or None
+    raw_challengers = body.get("challenger_models")
+    if raw_challengers is not None and not isinstance(raw_challengers, list):
+        raise HTTPException(status_code=400, detail="challenger_models must be a list")
+    challenger_models = (
+        [str(m) for m in raw_challengers if m] if raw_challengers is not None else None
+    )
+    from app.services import kb_optimizer as _kb_optimizer
+    try:
+        await _kb_optimizer.resolve_model_plan(
+            kb.uuid, user.user_id,
+            judge_model=judge_model, challenger_models=challenger_models,
+        )
+    except _kb_optimizer.ModelPlanError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Sweep orphaned runs first, the way the extraction and workflow start
     # paths do: a run whose worker died past the hard time limit would
     # otherwise hold this 409 until the hourly janitor fired (#835).
-    from app.services import kb_optimizer as _kb_optimizer
     await _kb_optimizer.reap_stale_runs(kb.uuid)
 
     # Reject if a non-terminal run already exists for this KB.
@@ -2163,6 +2191,8 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
             "autogen_coverage": autogen_coverage,
             "test_set_build_mode": test_set_build_mode,
             "test_query_uuids": test_query_uuids,
+            "judge_model": judge_model,
+            "challenger_models": challenger_models,
         },
     )
     await run.insert()
@@ -2173,6 +2203,28 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         include_indexing_track, apply_on_finish,
     )
     return {"run_uuid": run.uuid, "status": "queued"}
+
+
+@router.get("/{uuid}/optimize/models")
+async def get_kb_optimization_models(
+    uuid: str,
+    judge_model: str | None = None,
+    user: User = Depends(get_current_user),
+):
+    """The judge / current / challenger plan a tuning run would use.
+
+    Drives the wizard's model summary and its Advanced pickers. Pass
+    ``judge_model`` to preview a different judge: eligibility depends on it.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    from app.services import kb_optimizer as _kb_optimizer
+    try:
+        return await _kb_optimizer.resolve_model_plan(
+            kb.uuid, user.user_id, judge_model=judge_model,
+        )
+    except _kb_optimizer.ModelPlanError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{uuid}/optimize/active")
@@ -2351,6 +2403,17 @@ async def apply_kb_optimization(
                     "current settings (within judge noise), so the data doesn't "
                     "justify a config change. Re-submit with force=true to apply "
                     "anyway."
+                ),
+            },
+        )
+    if getattr(run, "winner", None) == "current" and not run.tied_with_baseline and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "current_settings_won",
+                "message": (
+                    "No trial beat the KB's current settings — the best one scored "
+                    "lower. Re-submit with force=true to apply it anyway."
                 ),
             },
         )
