@@ -805,6 +805,16 @@ export type KBOptimizationRun = {
   tied_with_baseline?: boolean
   // Apply-preview rollup (Phase 2 loop closure).
   apply_preview?: ApplyPreview | null
+  // Who judged, who answered today, who competed. Absent on older runs.
+  judge_source?: 'validation_grader' | 'selected' | null
+  judge_model_fallback?: { configured: string; used: string; reason: string } | null
+  current_model?: string | null
+  challenger_models?: string[]
+  judge_family_excluded_models?: string[]
+  current_shares_judge_family?: boolean
+  /** 'current' when no trial beat the current settings by more than the
+   * noise; 'challenger' when one did. Null on runs that predate the field. */
+  winner?: 'current' | 'challenger' | null
 }
 
 export type ApplyPreviewItem = {
@@ -842,6 +852,34 @@ export type StartOptimizationOptions = {
   /** The exact reviewed test-question UUIDs to grade against — authoritative
    * when present so "generate only" / "combine" scope the run precisely. */
   test_query_uuids?: string[]
+  /** Omit to judge with the admin's Validation grader. */
+  judge_model?: string
+  /** Omit to let every eligible model compete. */
+  challenger_models?: string[]
+}
+
+export type KBOptimizationModelPlan = {
+  judge_model: string
+  judge_source: 'validation_grader' | 'selected'
+  judge_model_fallback: { configured: string; used: string; reason: string } | null
+  validation_grader: string
+  current_model: string
+  challenger_models: string[]
+  current_shares_judge_family: boolean
+  models: {
+    name: string
+    family: string
+    is_current: boolean
+    eligible: boolean
+    ineligible_reason: string | null
+  }[]
+}
+
+/** The judge / current / challenger plan a tuning run would use. Eligibility
+ * depends on the judge, so pass ``judgeModel`` to preview another one. */
+export function getKBOptimizationModels(uuid: string, judgeModel?: string | null) {
+  const qs = judgeModel ? `?judge_model=${encodeURIComponent(judgeModel)}` : ''
+  return apiFetch<KBOptimizationModelPlan>(`/api/knowledge/${uuid}/optimize/models${qs}`)
 }
 
 export function startKBOptimization(uuid: string, opts: StartOptimizationOptions) {
