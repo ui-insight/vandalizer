@@ -91,6 +91,9 @@ async def chat(
             raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
         authorized_document_uuids.append(doc.uuid)
         source_documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
+    # The selection as the user made it, before folders expand into it — what
+    # reopening the conversation re-attaches.
+    selected_document_uuids = list(authorized_document_uuids)
     document_uuids = authorized_document_uuids
 
     # The KB scope passed to retrieval, as [(uuid, title)]. A project scope
@@ -131,6 +134,10 @@ async def chat(
                 # Usage tracking is best-effort — never block chat on it.
                 logger.warning("Failed to record KB usage", exc_info=True)
 
+    # Recorded before a project scope replaces them below: reopening restores
+    # what was attached, and the project chat applies its own KB again.
+    selected_kb_uuids = [u for u, _ in resolved_kbs]
+
     if body.project_uuid:
         from app.services import project_service
 
@@ -143,6 +150,7 @@ async def chat(
             resolved_kbs = [(project.kb_uuid, project.title or "")]
 
     # Resolve folder selections: find all documents inside selected folders
+    selected_folder_uuids: list[str] = []
     if body.folder_uuids:
         from app.models.document import SmartDocument
 
@@ -156,6 +164,7 @@ async def chat(
             )
             if not folder:
                 raise HTTPException(status_code=404, detail=f"Folder not found: {folder_uuid}")
+            selected_folder_uuids.append(folder.uuid)
             folder_docs = await SmartDocument.find(
                 SmartDocument.folder == folder_uuid,
             ).limit(500).to_list()
@@ -242,6 +251,10 @@ async def chat(
     # a saved conversation cannot say which documents produced which answer,
     # and continuing a conversation across a changed selection (which is
     # deliberate and useful) leaves no trace of the change.
+    # add_message saves the conversation, so this rides along on that write.
+    conversation.scope_document_uuids = selected_document_uuids
+    conversation.scope_folder_uuids = selected_folder_uuids
+    conversation.scope_knowledge_base_uuids = selected_kb_uuids
     await conversation.add_message(
         ChatRole.USER, message, source_documents=source_documents or None,
     )
@@ -635,6 +648,95 @@ async def _refresh_openable_citations(messages: list[dict], user_id: str) -> Non
         else:
             c.pop("document_uuid", None)
 
+# Bounds the per-item authorization lookups when a conversation is reopened.
+_MAX_RESTORED_SCOPE_ITEMS = 100
+
+
+async def _restore_scope(
+    conversation: ChatConversation, messages: list[dict], user: User,
+) -> dict:
+    """What to re-attach when a conversation is reopened (support ticket).
+
+    The documents, folders and knowledge bases in scope live only in the
+    browser, so reopening a conversation used to bring back the messages and
+    nothing they were asked against, and the next question went out with no
+    context. Each item is re-authorized here, at read time: one deleted or
+    unshared since is left out, never named, and ``unavailable`` counts them.
+
+    A list that is ``None`` was never recorded, and the caller leaves that
+    part of its selection alone. Conversations from before the scope was
+    stored fall back to the documents their last question recorded; their
+    knowledge bases are unknown.
+    """
+    doc_uuids = conversation.scope_document_uuids
+    folder_uuids = conversation.scope_folder_uuids
+    kb_uuids = conversation.scope_knowledge_base_uuids
+    if doc_uuids is None:
+        last_question = next(
+            (m for m in reversed(messages) if m.get("role") == ChatRole.USER.value),
+            None,
+        )
+        recorded = (last_question or {}).get("source_documents")
+        if recorded:
+            doc_uuids = [d["uuid"] for d in recorded if d.get("uuid")]
+
+    team_access = (
+        await access_control.get_team_access_context(user)
+        if doc_uuids or folder_uuids or kb_uuids else None
+    )
+    unavailable = 0
+
+    documents: Optional[list[dict]] = None
+    if doc_uuids is not None:
+        documents = []
+        for doc_uuid in list(dict.fromkeys(doc_uuids))[:_MAX_RESTORED_SCOPE_ITEMS]:
+            doc = await access_control.get_authorized_document(
+                doc_uuid, user, team_access=team_access, allow_admin=True,
+            )
+            if doc:
+                documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
+            else:
+                unavailable += 1
+
+    folders: Optional[list[dict]] = None
+    if folder_uuids is not None:
+        folders = []
+        for folder_uuid in list(dict.fromkeys(folder_uuids))[:_MAX_RESTORED_SCOPE_ITEMS]:
+            folder = await access_control.get_authorized_folder(
+                folder_uuid, user, team_access=team_access, allow_admin=True,
+            )
+            if folder:
+                folders.append({"uuid": folder.uuid, "title": folder.title})
+            else:
+                unavailable += 1
+
+    knowledge_bases: Optional[list[dict]] = None
+    if kb_uuids is not None:
+        knowledge_bases = []
+        user_org_ancestry = (
+            await organization_service.get_user_org_ancestry(user) if kb_uuids else None
+        )
+        for kb_uuid in list(dict.fromkeys(kb_uuids))[:MAX_CHAT_KNOWLEDGE_BASES]:
+            kb = await access_control.get_authorized_knowledge_base(
+                kb_uuid,
+                user,
+                user_org_ancestry=user_org_ancestry,
+                allow_admin=True,
+                team_access=team_access,
+            )
+            if kb:
+                knowledge_bases.append({"uuid": kb.uuid, "title": kb.title or ""})
+            else:
+                unavailable += 1
+
+    return {
+        "documents": documents,
+        "folders": folders,
+        "knowledge_bases": knowledge_bases,
+        "unavailable": unavailable,
+    }
+
+
 @router.get("/history/{conversation_uuid}")
 async def get_chat_history(
     conversation_uuid: str,
@@ -650,6 +752,14 @@ async def get_chat_history(
 
     messages = await conversation.get_messages()
     await _refresh_openable_citations(messages, user.user_id)
+    # The client continues a conversation by its activity, not its uuid.
+    # Without this a follow-up in a reopened conversation started a new one,
+    # with none of the earlier messages in context.
+    activity = await ActivityEvent.find_one({
+        "conversation_id": conversation.uuid,
+        "user_id": user.user_id,
+        "type": ActivityType.CONVERSATION.value,
+    })
     url_attachments = await conversation.get_url_attachments()
     file_attachments = await conversation.get_file_attachments()
 
@@ -675,6 +785,8 @@ async def get_chat_history(
         ],
         "context_mode": conversation.context_mode,
         "context_cutoff_index": conversation.context_cutoff_index,
+        "activity_id": str(activity.id) if activity else None,
+        "scope": await _restore_scope(conversation, messages, user),
     }
 
 

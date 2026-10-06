@@ -141,6 +141,15 @@ class ChatConversation(Document):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+    # What was attached when the latest turn was asked — the library
+    # documents and folders as selected (folders not expanded) and the
+    # knowledge bases — so reopening the conversation re-attaches them. None
+    # means not recorded (conversations from before this existed), which the
+    # history route tells apart from "nothing was attached".
+    scope_document_uuids: Optional[list[str]] = None
+    scope_folder_uuids: Optional[list[str]] = None
+    scope_knowledge_base_uuids: Optional[list[str]] = None
+
     # Context management
     context_mode: str = "full"  # "full" | "truncated" | "compacted"
     context_cutoff_index: int = 0

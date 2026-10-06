@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory } from '../api/chat'
+import { streamChat, getHistory, type ChatHistory } from '../api/chat'
 import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, SuggestedModel } from '../types/chat'
 
 export interface ContextNotice {
@@ -161,15 +161,21 @@ export function useChat() {
     [activityId],
   )
 
-  const loadHistory = useCallback(async (uuid: string) => {
+  // Resolves to the loaded history (null on failure) so the caller can
+  // restore what the conversation was attached to.
+  const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
     try {
       const data = await getHistory(uuid)
       setMessages(data.messages)
       setConversationUuid(uuid)
+      // Without it the next question would start a new conversation.
+      setActivityId(data.activity_id ?? null)
       if (data.context_mode) setContextMode(data.context_mode)
       if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      return data
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load history')
+      return null
     }
   }, [])
 
