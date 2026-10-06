@@ -111,6 +111,9 @@ interface ChatStateContextValue {
   // attached and past MAX_ATTACHED_KBS are dropped silently; the caller knows
   // the capacity (activeKBs.length) and warns before calling.
   attachKBs: (kbs: AttachedKB[]) => void
+  // Replace the attached KBs without starting a fresh chat — what reopening
+  // a conversation does to restore the KBs it was asked against.
+  replaceKBs: (kbs: AttachedKB[]) => void
   detachKB: (uuid: string) => void
   deactivateKB: () => void
   // Project scope — the whole workspace (files, chat, …) re-scoped to one project.
@@ -520,6 +523,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBs(prev => mergeAttachedKBs(prev, kbs))
   }, [])
 
+  const replaceKBs = useCallback((kbs: AttachedKB[]) => {
+    setActiveKBs(mergeAttachedKBs([], kbs))
+  }, [])
+
   const detachKB = useCallback((uuid: string) => {
     setActiveKBs(prev => prev.filter(kb => kb.uuid !== uuid))
   }, [])
@@ -832,7 +839,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     newChatSignal, triggerNewChat,
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
-    activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, deactivateKB,
+    activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
@@ -841,7 +848,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     newChatSignal, triggerNewChat,
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
-    activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, deactivateKB,
+    activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
