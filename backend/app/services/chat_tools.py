@@ -1026,6 +1026,7 @@ async def get_app_help(
         topic: A short phrase describing what the user wants to know about
             (e.g. "knowledge bases", "validation", "team folders").
     """
+    from app.services.access_control import _team_role
     from app.services.help_content import find_topics, list_topic_index
 
     matches = find_topics(topic, limit=3)
@@ -1050,12 +1051,24 @@ async def get_app_help(
         return text.replace("Vandalizer", org)
 
     primary = matches[0]
+    topic = {
+        "id": primary["id"],
+        "title": _brand(primary["title"]),
+        "body": _brand(primary["body"]),
+    }
+    if primary.get("requires"):
+        topic["requires"] = primary["requires"]
+    user = context.deps.user
+    team_role = _team_role(context.deps.team_id, context.deps.team_access)
     result = {
         "matched": True,
-        "topic": {
-            "id": primary["id"],
-            "title": _brand(primary["title"]),
-            "body": _brand(primary["body"]),
+        "topic": topic,
+        # The steps in a topic can be gated by role. This is who is asking, so
+        # the answer can say "ask your admin" instead of describing controls
+        # the user will never see.
+        "viewer_access": {
+            "is_system_admin": bool(user.is_admin),
+            "current_team_role": team_role or "none",
         },
     }
     if len(matches) > 1:

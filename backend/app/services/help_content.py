@@ -254,6 +254,30 @@ HELP_TOPICS: list[dict] = [
         ),
     },
     {
+        "id": "delete-knowledge-base",
+        "title": "Deleting a knowledge base",
+        "requires": "manage rights on that knowledge base",
+        "aliases": [
+            "delete knowledge base", "delete kb", "remove knowledge base",
+            "remove kb", "get rid of knowledge base", "trash knowledge base",
+        ],
+        "body": (
+            "The chat can't delete a knowledge base — do it in the UI.\n\n"
+            "**To delete one:**\n"
+            "1. Click **Knowledge** in the left sidebar\n"
+            "2. Find the knowledge base's card\n"
+            "3. Click the **trash icon** at the bottom-right of the card, then "
+            "confirm\n\n"
+            "**Who can:** the trash icon only appears on knowledge bases you "
+            "can manage — ones you created, or team-shared ones when you're an "
+            "owner or admin of that team. If the card says **Read only** or "
+            "has no trash icon, ask the person who created it or one of your "
+            "team's admins to delete it.\n\n"
+            "A knowledge base you added from the catalog or another team shows "
+            "**Remove** instead; that only takes it off your list."
+        ),
+    },
+    {
         "id": "files-and-folders",
         "title": "Uploading files and folders",
         "aliases": [
@@ -323,19 +347,53 @@ HELP_TOPICS: list[dict] = [
             "team roles", "owner admin member", "switch team", "manage teams",
             "current team",
         ],
+        "requires": "team owner or admin (to invite or change roles)",
         "body": (
             "Vandalizer is multi-tenant: documents, workflows, and folders "
-            "are scoped to a **team** (or your personal workspace).\n\n"
-            "**To invite:**\n"
+            "are scoped to a **team** (or your personal workspace). The chat "
+            "can't add members or change roles — do it in the UI.\n\n"
+            "**To invite someone (team owners and admins only):**\n"
             "1. Click your name in the **top-right dropdown**\n"
             "2. **Manage teams** (or go to /teams)\n"
-            "3. Pick a team (or create one) → **Invite** → enter email\n\n"
+            "3. Pick the team → in **Invite**, enter their email, choose the "
+            "role (member or admin), and send\n\n"
+            "To change an existing member's role, use the **Role** dropdown "
+            "next to their name on the same page (owners and admins only).\n\n"
+            "**Members** don't see the invite form or role dropdowns — ask "
+            "your team's owner or an admin to add the person.\n\n"
             "**Roles:**\n"
             "- **Owner** — full control, including deleting the team\n"
             "- **Admin** — manage members and team settings\n"
             "- **Member** — use shared spaces and resources\n\n"
             "Switch the active team in the same top-right dropdown — the "
             "interface re-scopes to that team's documents and workflows."
+        ),
+    },
+    {
+        "id": "system-config",
+        "title": "System configuration and the default model (admins only)",
+        "requires": "system admin",
+        "aliases": [
+            "system config", "system configuration", "default model",
+            "change default model", "default chat model", "change model",
+            "set default model", "add model", "llm settings", "model settings",
+            "ocr settings", "admin settings", "admin config",
+        ],
+        "body": (
+            "Deployment-wide settings — which LLMs are available, the default "
+            "model, OCR, authentication, branding — live in the admin "
+            "**Config** tab. Only system admins can open it, and the chat "
+            "can't change any of it.\n\n"
+            "**To change the default model (system admins):**\n"
+            "1. Click your name in the **top-right dropdown** → **Admin**\n"
+            "2. Open the **Config** tab\n"
+            "3. In **Available Models**, click the **star** next to the model "
+            "you want as the default\n\n"
+            "If you aren't a system admin you won't see the **Config** tab "
+            "(or **Admin** in the menu at all) — ask your Vandalizer "
+            "administrator to make the change.\n\n"
+            "To use a different model for just your own chats, pick it from "
+            "the model selector in the chat input instead."
         ),
     },
     {
@@ -665,7 +723,11 @@ def find_topics(query: str, limit: int = 3) -> list[dict]:
                 break
         overlap = len(q_tokens & bag)
         if overlap or phrase_boost:
-            scored.append((overlap + phrase_boost, topic))
+            # Overlap outranks the boost: "delete the QA knowledge base" must
+            # reach the delete topic (3 shared words) over the generic KB
+            # topic, whose "knowledge base" alias would otherwise win on the
+            # phrase boost. The boost still breaks ties.
+            scored.append((overlap * 10 + phrase_boost, topic))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return [{**t, "score": s} for s, t in scored[:limit]]
