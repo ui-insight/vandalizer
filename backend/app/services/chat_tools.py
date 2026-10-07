@@ -264,6 +264,40 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
     )
 
 
+# Approve-button labels on the chat approval card. Mirrors ``actionLabel`` in
+# frontend/src/components/chat/ToolCallDisplay.tsx so the assistant can name
+# the button the user actually sees.
+_APPROVE_BUTTON_LABELS = {
+    "create_workflow": "Create workflow",
+    "create_automation": "Create automation",
+    "create_extraction_from_document": "Create extraction",
+    "run_workflow": "Run workflow",
+    "run_validation": "Run validation",
+}
+
+
+def approve_button_label(tool_name: str) -> str:
+    """The approve button's label on the approval card for ``tool_name``."""
+    return _APPROVE_BUTTON_LABELS.get(tool_name, f"Approve {tool_name.replace('_', ' ')}")
+
+
+def _armed_stash(
+    context: "RunContext[AgenticChatDeps]", tool_name: str, key: dict
+) -> Optional[dict]:
+    """The ``stash`` a preview of this exact action saved with its arming, if any.
+
+    Lets a write tool execute exactly what its approval card showed instead of
+    recomputing a non-deterministic proposal after the user approved.
+    """
+    conv = getattr(context.deps, "conversation", None)
+    fp = _confirm_fingerprint(tool_name, key)
+    for entry in list(getattr(conv, "pending_confirmations", None) or []) if conv else []:
+        if isinstance(entry, dict) and entry.get("fp") == fp:
+            stash = entry.get("stash")
+            return stash if isinstance(stash, dict) else None
+    return None
+
+
 def _confirm_fingerprint(tool_name: str, key: dict) -> str:
     """Stable fingerprint of a write action, used to match preview→confirm."""
     raw = tool_name + "|" + json.dumps(key, sort_keys=True, default=str)
@@ -277,6 +311,7 @@ async def _confirm_gate(
     key: dict,
     confirmed: bool,
     preview: dict,
+    stash: Optional[dict] = None,
 ) -> Optional[dict]:
     """Server-side enforcement of the write-tool preview→confirm handshake.
 
@@ -296,6 +331,9 @@ async def _confirm_gate(
     ``turn_marker`` is ``len(conversation.messages)`` at turn start, which
     strictly increases each turn, so "armed on an earlier turn" is
     ``entry.turn < turn_marker``.
+
+    ``stash`` is saved with the arming entry; read it back on the confirm call
+    with ``_armed_stash`` to execute exactly what the preview showed.
     """
     deps = context.deps
     conv = getattr(deps, "conversation", None)
@@ -328,7 +366,10 @@ async def _confirm_gate(
             p for p in armed
             if not (isinstance(p, dict) and p.get("fp") == fp)
         ]
-        new_pending.append({"fp": fp, "turn": marker, "tool": tool_name})
+        entry = {"fp": fp, "turn": marker, "tool": tool_name}
+        if stash is not None:
+            entry["stash"] = stash
+        new_pending.append(entry)
         # Cap to bound growth on long conversations; keep the most recent.
         conv.pending_confirmations = new_pending[-25:]
         try:
@@ -343,13 +384,17 @@ async def _confirm_gate(
     # are now indexed") on the preview turn even though nothing was written,
     # leaving the user thinking the write happened when it did not.
     out["status"] = "awaiting_user_confirmation"
+    label = approve_button_label(tool_name)
     out["assistant_instruction"] = (
         f"This action has NOT been performed. '{tool_name}' is only staged and "
-        "is waiting for the user to approve it with the Confirm button. Do NOT "
-        "tell the user it is done, added, saved, created, indexed, or running. "
-        "A Confirm/Cancel control is shown to the user automatically, so do NOT "
-        "call this tool again this turn and do NOT ask a separate yes/no "
-        "question in your reply — just briefly state what you have prepared."
+        f'is waiting for the user to approve it with the "{label}" button on '
+        "the approval card (or by replying yes). Do NOT tell the user it is "
+        "done, added, saved, created, indexed, or running. The approval card "
+        f'with its "{label}" and "Cancel action" buttons is shown to the user '
+        "automatically, so do NOT call this tool again this turn and do NOT "
+        "ask a separate yes/no question in your reply — just briefly state "
+        f'what you have prepared. If you name the button, call it "{label}"; '
+        'there is no "Confirm" button.'
     )
     return out
 
@@ -2777,16 +2822,16 @@ async def create_extraction_from_document(
     ``propose_test_case`` using the same document — the user-verified values
     become the first test case and seed validation from day one.
 
-    Call first with confirmed=false to preview. Then call again with
-    confirmed=true after the user approves — field discovery uses an LLM
-    call and mutates workspace state.
+    Call first with confirmed=false to preview: the preview runs field
+    discovery and shows the exact name and fields that will be created. Then
+    call again with the SAME arguments and confirmed=true after the user
+    approves — that creates exactly what the preview showed.
 
     Args:
         context: The call context.
-        document_uuids: Document(s) to analyze. The first document's title
-            seeds the default extraction set title when no title is provided.
-            Max 5 documents per call.
-        title: Optional name for the new extraction set.
+        document_uuids: Document(s) to analyze. Max 5 documents per call.
+        title: Optional name for the new extraction set. When omitted, the
+            name is suggested from the documents' content during the preview.
         domain: Optional domain hint — one of 'nsf', 'nih', 'dod', 'doe'.
             Activates domain-specific extraction prompts.
         pin_to_active_project: When a project is open and the user can manage
@@ -2853,7 +2898,28 @@ async def create_extraction_from_document(
             f"{', '.join(parts)}. Tell the user which documents are excluded."
         )
 
-    default_title = title or f"Extraction from {docs[0].title or doc_uuids[0]}"
+    from app.services import search_set_service as svc
+
+    # Discover the fields and the content-aware name BEFORE the approval card,
+    # so the card shows the name and fields that will actually be created. The
+    # proposal is stashed with the arming and reused on approval — re-running
+    # discovery afterwards is non-deterministic and could create a set under a
+    # name the user never saw.
+    gate_key = {"docs": sorted(d.uuid for d in docs), "title": title}
+    proposal = _armed_stash(context, "create_extraction_from_document", gate_key)
+    if proposal is None:
+        try:
+            fields, suggested_title = await svc.suggest_fields_from_documents(
+                [d.uuid for d in docs], user_id, context.deps.model_name or None,
+            )
+        except RuntimeError as e:
+            return {"error": f"Field discovery failed: {e}"}
+        proposal = {
+            "title": title or suggested_title or f"Extraction from {docs[0].title or doc_uuids[0]}",
+            "fields": list(fields),
+        }
+    default_title = proposal["title"]
+    proposed_fields: list[str] = list(proposal.get("fields") or [])
 
     # If the user is inside a project they can manage, the new extraction is
     # auto-pinned there so it shows up alongside the project's other tools.
@@ -2868,10 +2934,14 @@ async def create_extraction_from_document(
     doc_names = ", ".join(f'"{d.title}"' for d in docs[:3])
     if len(docs) > 3:
         doc_names += f" + {len(docs) - 3} more"
-    preview_text = (
-        f'Create a new extraction set "{default_title}" by analyzing {doc_names}. '
-        "The LLM will propose field names worth extracting."
-    )
+    if proposed_fields:
+        shown = ", ".join(f'"{f}"' for f in proposed_fields[:5])
+        if len(proposed_fields) > 5:
+            shown += f" + {len(proposed_fields) - 5} more"
+        fields_text = f"with {len(proposed_fields)} proposed field(s): {shown}."
+    else:
+        fields_text = "with no fields — no clear fields were found; you can add them manually."
+    preview_text = f'Create a new extraction set "{default_title}" from {doc_names} {fields_text}'
     if active_project:
         preview_text += f' It will also be pinned to project "{active_project.title}".'
     if unreadable_note:
@@ -2882,20 +2952,21 @@ async def create_extraction_from_document(
         "needs_confirmation": True,
         "document_count": len(docs),
         "default_title": default_title,
+        "proposed_fields": proposed_fields,
+        "field_count": len(proposed_fields),
     }
     if unreadable_note:
         preview_payload["excluded_documents_note"] = unreadable_note
     gate = await _confirm_gate(
         context,
         tool_name="create_extraction_from_document",
-        key={"docs": sorted(d.uuid for d in docs), "title": default_title},
+        key=gate_key,
         preview=preview_payload,
         confirmed=confirmed,
+        stash=proposal,
     )
     if gate is not None:
         return gate
-
-    from app.services import search_set_service as svc
 
     ss = await svc.create_search_set(
         title=default_title,
@@ -2907,23 +2978,7 @@ async def create_extraction_from_document(
         ss.domain = domain
         await ss.save()
 
-    try:
-        discovered_fields, suggested_title = await svc.build_from_documents(
-            search_set_uuid=ss.uuid,
-            document_uuids=[d.uuid for d in docs],
-            user_id=user_id,
-            model=context.deps.model_name or None,
-        )
-    except RuntimeError as e:
-        # Tear down the empty set if field discovery fails
-        await ss.delete()
-        return {"error": f"Field discovery failed: {e}"}
-
-    # When the caller didn't pass an explicit title, prefer the LLM's
-    # content-aware suggestion over the generic "Extraction from <doc>" fallback.
-    if not title and suggested_title:
-        ss.title = suggested_title
-        await ss.save()
+    discovered_fields = await svc.add_fields(ss.uuid, proposed_fields, user_id)
 
     try:
         from app.services.library_service import add_item, get_or_create_personal_library

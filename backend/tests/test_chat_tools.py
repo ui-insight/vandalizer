@@ -1011,8 +1011,10 @@ class TestCreateExtractionAutoPin:
         chat_tools.SmartDocument.find_one = AsyncMock(return_value=doc)
         stack.enter_context(patch("app.services.search_set_service.create_search_set",
                                   new_callable=AsyncMock, return_value=ss))
-        stack.enter_context(patch("app.services.search_set_service.build_from_documents",
+        stack.enter_context(patch("app.services.search_set_service.suggest_fields_from_documents",
                                   new_callable=AsyncMock, return_value=(["PI name"], "Smart Title")))
+        stack.enter_context(patch("app.services.search_set_service.add_fields",
+                                  new_callable=AsyncMock, side_effect=lambda _uuid, names, _uid: list(names)))
         stack.enter_context(patch("app.services.library_service.get_or_create_personal_library",
                                   new_callable=AsyncMock, return_value=MagicMock(id="lib")))
         stack.enter_context(patch("app.services.library_service.add_item",
@@ -1062,6 +1064,49 @@ class TestCreateExtractionAutoPin:
                 )
         mock_add.assert_not_awaited()
         assert result["pinned_to_project"] is None
+
+    @pytest.mark.asyncio
+    async def test_approval_card_names_what_gets_created(self):
+        """The card's name is the one created — not a fallback the tool swaps
+        for the LLM's suggestion after the user approved."""
+        from app.services import search_set_service
+        from app.services.chat_tools import create_extraction_from_document
+
+        class _Conversation:
+            pending_confirmations: list = []
+
+            async def save(self):
+                pass
+
+        ctx = _make_context(team_id="team1", user_id="user1",
+                            conversation=_Conversation(), turn_marker=5)
+        ss = self._ss()
+        with self._patches(ss, project=None, can_manage=False):
+            preview = await create_extraction_from_document(ctx, ["d1"])
+            assert preview["needs_confirmation"] is True
+            assert preview["default_title"] == "Smart Title"
+            assert preview["proposed_fields"] == ["PI name"]
+            assert '"Smart Title"' in preview["preview"]
+
+            ctx.deps.turn_marker = 6  # the user approves on the next turn
+            done = await create_extraction_from_document(ctx, ["d1"], confirmed=True)
+
+            # Discovery ran once, for the card; approval reused its proposal.
+            search_set_service.suggest_fields_from_documents.assert_awaited_once()
+            assert search_set_service.create_search_set.await_args.kwargs["title"] == "Smart Title"
+            search_set_service.add_fields.assert_awaited_once_with("ss-new", ["PI name"], "user1")
+        assert done["field_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_approval_instruction_names_the_real_button(self):
+        from app.services.chat_tools import create_extraction_from_document
+
+        ctx = _make_context(team_id="team1", user_id="user1")
+        with self._patches(self._ss(), project=None, can_manage=False):
+            preview = await create_extraction_from_document(ctx, ["d1"])
+        instruction = preview["assistant_instruction"]
+        assert '"Create extraction" button' in instruction
+        assert "Confirm button" not in instruction
 
 
 # ---------------------------------------------------------------------------

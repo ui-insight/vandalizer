@@ -515,11 +515,16 @@ async def build_from_documents(
     Returns (added_field_names, suggested_title).
     """
     entities, suggested_title = await suggest_fields_from_documents(document_uuids, user_id, model)
+    return await add_fields(search_set_uuid, entities, user_id), suggested_title
+
+
+async def add_fields(search_set_uuid: str, names: list[str], user_id: str) -> list[str]:
+    """Persist extraction field names into a SearchSet. Returns the names added."""
     added = []
-    for name in entities:
+    for name in names:
         await add_item(search_set_uuid, name, searchtype="extraction", title=name, user_id=user_id)
         added.append(name)
-    return added, suggested_title
+    return added
 
 
 # ---------------------------------------------------------------------------
