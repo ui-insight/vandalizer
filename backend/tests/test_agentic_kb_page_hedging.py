@@ -31,7 +31,11 @@ def _result(content: str, **meta) -> dict:
     return {"content": content, "metadata": base, "chunk_id": "c-1", "score": 0.9}
 
 
-async def _search(results: list[dict], query: str = "what is the award amount"):
+async def _search(
+    results: list[dict],
+    query: str = "what is the award amount",
+    sources: list | None = None,
+):
     ctx = _make_context()
     ctx.tool_call_id = "call-1"
     rag_cfg = MagicMock(k=10)
@@ -49,7 +53,7 @@ async def _search(results: list[dict], query: str = "what is the award amount"):
         patch("app.services.user_memory_service.record_kb_query", new=AsyncMock()),
     ):
         kb_cls.find_one = AsyncMock(return_value=_kb())
-        source_cls.find.return_value.to_list = AsyncMock(return_value=[])
+        source_cls.find.return_value.to_list = AsyncMock(return_value=sources or [])
         from app.services.chat_tools import search_knowledge_base
 
         out = await search_knowledge_base(ctx, query, kb_uuid="kb-1")

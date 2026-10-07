@@ -573,6 +573,16 @@ async def search_knowledge_base(
         ).to_list()
         source_map = {s.uuid: s for s in sources}
 
+    # The openable SmartDocument behind each source, resolved for this reader.
+    # A source's raw document_uuid can name a soft-deleted file or another
+    # member's personal-space file; opening either 404s in the viewer as
+    # "Source unavailable" (support ticket). Both the passage cards and the
+    # citation chips link only through this map, so a source the reader can't
+    # open stays preview-only rather than offering a button that 404s.
+    from app.services.knowledge_service import resolve_openable_documents
+
+    openable = await resolve_openable_documents(source_ids, user_id=user_id)
+
     enriched: list[dict] = []
     citations: list[dict] = []
     any_approximate = False
@@ -626,8 +636,8 @@ async def search_knowledge_base(
         src = source_map.get(sid)
         if src:
             entry["source_type"] = src.source_type
-            if src.source_type == "document" and src.document_uuid:
-                entry["document_uuid"] = src.document_uuid
+            if src.source_type == "document" and openable.get(sid):
+                entry["document_uuid"] = openable[sid]
             elif src.source_type == "url" and src.url:
                 entry["url"] = src.url
             if src.source_reference:
@@ -650,18 +660,8 @@ async def search_knowledge_base(
             "url": src.url if src and src.source_type == "url" and src.url else None,
         })
 
-    # The openable SmartDocument behind each source, as the classic KB path
-    # attaches it. Without document_uuid the chip has no "Open at p. N", and
-    # the preview's "Open the source" had only the KB source id, which the
-    # file viewer 404s as "Source unavailable" (support ticket). Resolved per
-    # reader: a source pointing at a document this user can't view stays
-    # preview-only rather than offering a button that 404s.
-    from app.services.knowledge_service import resolve_openable_documents
-
-    openable = await resolve_openable_documents(
-        [c["document_id"] for c in citations if c.get("document_id")],
-        user_id=user_id,
-    )
+    # Without document_uuid the chip has no "Open at p. N", and the preview's
+    # "Open the source" would have only the KB source id, which is not a file.
     for c in citations:
         doc_uuid = openable.get(c.get("document_id") or "")
         if doc_uuid:
