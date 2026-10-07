@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
+import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, SuggestedModel } from '../types/chat'
 
 export interface ContextNotice {
@@ -74,7 +75,7 @@ export function useChat() {
               const display = streamingRef.current
                 .replace(THINK_BLOCK_RE, '')
                 .replace(THINK_TRAILING_RE, '')
-              setStreamingContent(display)
+              setStreamingContent(expandSnippetRefs(display, citationsRef.current))
             } else if (chunk.kind === 'thinking') {
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
@@ -96,6 +97,8 @@ export function useChat() {
               if (chunk.sources?.length) {
                 citationsRef.current = [...citationsRef.current, ...chunk.sources]
               }
+            } else if (chunk.kind === 'sources_used') {
+              citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
             } else if (chunk.kind === 'context_notice') {
@@ -129,7 +132,11 @@ export function useChat() {
         setActivityId(result.activityId)
 
         // Add assistant message from accumulated stream
-        const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
+        // Expanded the same way the server stores it, so a reload reads the same.
+        const finalContent = expandSnippetRefs(
+          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
+          citationsRef.current,
+        )
         if (finalContent) {
           const assistantMsg: ChatMessage = {
             role: 'assistant',
