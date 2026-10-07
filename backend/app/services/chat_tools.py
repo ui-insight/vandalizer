@@ -2388,10 +2388,12 @@ async def get_workflow_status(
             ),
         )
 
+    done, total = status["num_steps_completed"], status["num_steps_total"]
     result: dict = {
         "status": status["status"],
-        "steps_completed": status["num_steps_completed"],
-        "steps_total": status["num_steps_total"],
+        "steps_completed": done,
+        "steps_total": total,
+        "progress": f"{done} of {total} steps completed",
         "current_step": status.get("current_step_name"),
     }
 
@@ -2417,14 +2419,86 @@ async def get_workflow_status(
             result["output"] = final
     elif status["status"] == "failed":
         result["error_detail"] = status.get("current_step_detail")
-    elif status["status"] == "paused":
+    elif status["status"] in _AWAITING_APPROVAL_STATUSES:
+        step = status.get("current_step_name") or "approval"
+        result["awaiting_approval"] = True
         result["approval_request_id"] = status.get("approval_request_id")
-        result["message"] = "Workflow is paused waiting for approval."
+        result["message"] = (
+            f'The run is NOT running: it is stopped at the "{step}" step, '
+            "waiting for a person to approve or reject it, and will not "
+            "continue until someone does. Tell the user approval is needed. "
+            "If they ask you to approve or reject it, call approve_workflow_step "
+            f'or reject_workflow_step with session_id="{session_id}". Never ask '
+            "the user for an approval ID — they can't see one."
+        )
+    elif status["status"] not in ("completed", "canceled", "error"):
+        result["message"] = (
+            f"Still running ({done} of {total} steps completed). You can't "
+            "notify the user when it finishes — never promise to. Tell them "
+            "the run card in this chat updates live, or to ask again."
+        )
 
     if status.get("current_step_preview"):
         result["preview"] = status["current_step_preview"]
 
     return result
+
+
+# A run parked at an approval gate. The engine writes "pending_approval";
+# "paused" is kept for runs recorded before that name.
+_AWAITING_APPROVAL_STATUSES = ("pending_approval", "paused")
+
+
+async def _find_pending_approval(
+    context: RunContext[AgenticChatDeps], approval_request_id: str, session_id: str,
+):
+    """The ApprovalRequest to decide, by its id or by the waiting run's session.
+
+    Returns ``(approval, None)`` or ``(None, error_dict)``. The user never sees
+    an approval id in the app, so the run's session_id (from run_workflow) is
+    the usual way in.
+    """
+    from app.models.approval import ApprovalRequest
+
+    if not approval_request_id and session_id:
+        from app.services import workflow_service
+
+        status = await workflow_service.get_workflow_status(
+            session_id, user=context.deps.user,
+        )
+        if not status:
+            return None, _err(
+                f"Workflow session '{session_id}' not found.",
+                hint="Use the session_id from this conversation's run_workflow result.",
+            )
+        if status["status"] not in _AWAITING_APPROVAL_STATUSES or not status.get("approval_request_id"):
+            return None, {
+                "error": (
+                    f"This run isn't waiting for approval — its status is "
+                    f"'{status['status']}'."
+                )
+            }
+        approval_request_id = status["approval_request_id"]
+    if not approval_request_id:
+        return None, _err(
+            "Name the run to decide.",
+            hint=(
+                "Pass session_id from this conversation's run_workflow result. "
+                "Don't ask the user for an approval ID."
+            ),
+        )
+    approval = await ApprovalRequest.find_one(
+        ApprovalRequest.uuid == approval_request_id
+    )
+    if not approval:
+        return None, _err(
+            f"Approval request '{approval_request_id}' not found.",
+            hint=(
+                "Retry with session_id set to the run's session_id from "
+                "run_workflow instead of an approval id."
+            ),
+        )
+    return approval, None
 
 
 async def _can_decide_approval(approval, user) -> bool:
@@ -2445,40 +2519,34 @@ async def _can_decide_approval(approval, user) -> bool:
 
 async def approve_workflow_step(
     context: RunContext[AgenticChatDeps],
-    approval_request_id: str,
+    approval_request_id: str = "",
     comments: str = "",
     confirmed: bool = False,
+    session_id: str = "",
 ) -> dict:
-    """Approve a workflow that is paused awaiting human review, resuming it.
+    """Approve a workflow run that is waiting at an approval step, resuming it.
 
-    A workflow pauses at an approval gate; get_workflow_status returns an
-    ``approval_request_id`` for it. Pass that id here. Call first with
-    confirmed=false to preview, then confirmed=true after the user approves.
-    Only an assigned reviewer or a workflow manager can approve.
+    Use this when the user says "approve it" about a run waiting for approval.
+    Pass the run's ``session_id`` from run_workflow — the tool finds the
+    pending approval itself. (An ``approval_request_id`` from
+    get_workflow_status also works.) Never ask the user for an approval ID;
+    the app doesn't show one. Call first with confirmed=false to preview,
+    then confirmed=true after the user approves. Only an assigned reviewer or
+    a workflow manager can approve.
 
     Args:
         context: The call context.
-        approval_request_id: The approval request UUID from get_workflow_status.
+        approval_request_id: Optional approval request UUID from get_workflow_status.
         comments: Optional reviewer note recorded with the decision.
         confirmed: Must be true to actually approve. If false, returns a preview.
+        session_id: The waiting run's session_id from run_workflow.
     """
-    from app.models.approval import (
-        ApprovalRequest,
-        STATUS_APPROVED,
-        STATUS_PENDING,
-    )
+    from app.models.approval import STATUS_APPROVED, STATUS_PENDING
 
-    approval = await ApprovalRequest.find_one(
-        ApprovalRequest.uuid == approval_request_id
-    )
-    if not approval:
-        return _err(
-            f"Approval request '{approval_request_id}' not found.",
-            hint=(
-                "Call get_workflow_status for the session to list its pending "
-                "approvals, then retry with the id it shows."
-            ),
-        )
+    approval, error = await _find_pending_approval(context, approval_request_id, session_id)
+    if error:
+        return error
+    approval_request_id = approval.uuid
     if approval.status != STATUS_PENDING:
         return {
             "error": (
@@ -2545,40 +2613,33 @@ async def approve_workflow_step(
 
 async def reject_workflow_step(
     context: RunContext[AgenticChatDeps],
-    approval_request_id: str,
+    approval_request_id: str = "",
     comments: str = "",
     confirmed: bool = False,
+    session_id: str = "",
 ) -> dict:
-    """Reject a workflow that is paused awaiting human review, failing it.
+    """Reject a workflow run that is waiting at an approval step, failing it.
 
-    Get the ``approval_request_id`` from get_workflow_status. Call first with
+    Pass the run's ``session_id`` from run_workflow (or an
+    ``approval_request_id`` from get_workflow_status); never ask the user for
+    an approval ID. Call first with
     confirmed=false to preview, then confirmed=true after the user approves.
     Only an assigned reviewer or a workflow manager can reject. Rejecting marks
     the workflow run as failed — it does not resume.
 
     Args:
         context: The call context.
-        approval_request_id: The approval request UUID from get_workflow_status.
+        approval_request_id: Optional approval request UUID from get_workflow_status.
         comments: Optional reason recorded with the rejection.
         confirmed: Must be true to actually reject. If false, returns a preview.
+        session_id: The waiting run's session_id from run_workflow.
     """
-    from app.models.approval import (
-        ApprovalRequest,
-        STATUS_PENDING,
-        STATUS_REJECTED,
-    )
+    from app.models.approval import STATUS_PENDING, STATUS_REJECTED
 
-    approval = await ApprovalRequest.find_one(
-        ApprovalRequest.uuid == approval_request_id
-    )
-    if not approval:
-        return _err(
-            f"Approval request '{approval_request_id}' not found.",
-            hint=(
-                "Call get_workflow_status for the session to list its pending "
-                "approvals, then retry with the id it shows."
-            ),
-        )
+    approval, error = await _find_pending_approval(context, approval_request_id, session_id)
+    if error:
+        return error
+    approval_request_id = approval.uuid
     if approval.status != STATUS_PENDING:
         return {
             "error": (

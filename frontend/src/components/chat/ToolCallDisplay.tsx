@@ -1012,7 +1012,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
   const effective = status?.status || initialStatus || 'running'
   const done = status?.num_steps_completed ?? 0
   const total = status?.num_steps_total ?? 0
-  const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval' }
+  const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval', pending_approval: 'Awaiting workflow approval' }
   const failed = effective === 'failed' || effective === 'error'
   const active = ['running', 'queued', 'pending'].includes(effective)
   const partial = status?.steps_output && Object.keys(status.steps_output).length ? JSON.stringify(status.steps_output, null, 2) : null

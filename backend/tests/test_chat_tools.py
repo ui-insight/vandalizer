@@ -652,6 +652,51 @@ class TestGetWorkflowStatus:
         assert result["approval_request_id"] == "apr-1"
         assert "approval" in result["message"].lower()
 
+    @pytest.mark.asyncio
+    async def test_pending_approval_is_waiting_not_running(self):
+        """The engine parks a gated run at "pending_approval" — chat must
+        report it as waiting for approval, with the counts the run card shows."""
+        from app.services.chat_tools import get_workflow_status
+
+        status_data = {
+            "status": "pending_approval",
+            "num_steps_completed": 1,
+            "num_steps_total": 2,
+            "current_step_name": "Approval",
+            "current_step_detail": "Waiting for human review",
+            "current_step_preview": None,
+            "final_output": None,
+            "steps_output": {},
+            "approval_request_id": "apr-1",
+        }
+
+        ctx = _make_context()
+        with patch("app.services.workflow_service.get_workflow_status", new_callable=AsyncMock, return_value=status_data):
+            result = await get_workflow_status(ctx, "session-123")
+
+        assert result["awaiting_approval"] is True
+        assert result["approval_request_id"] == "apr-1"
+        assert result["progress"] == "1 of 2 steps completed"
+        assert "NOT running" in result["message"]
+        assert 'session_id="session-123"' in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_running_never_promises_a_notification(self):
+        from app.services.chat_tools import get_workflow_status
+
+        status_data = {
+            "status": "running", "num_steps_completed": 0, "num_steps_total": 2,
+            "current_step_name": "Extract", "current_step_detail": None,
+            "current_step_preview": None, "final_output": None, "steps_output": {},
+            "approval_request_id": None,
+        }
+        ctx = _make_context()
+        with patch("app.services.workflow_service.get_workflow_status", new_callable=AsyncMock, return_value=status_data):
+            result = await get_workflow_status(ctx, "session-123")
+
+        assert "awaiting_approval" not in result
+        assert "can't notify" in result["message"]
+
 
 # ---------------------------------------------------------------------------
 # list_folders
@@ -1442,6 +1487,51 @@ class TestApproveWorkflowStep:
         fake_celery.send_task.assert_called_once()
 
 
+    @pytest.mark.asyncio
+    async def test_approves_by_run_session_id(self):
+        """"Approve it" works from the run's session_id — the user never sees
+        an approval id."""
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        fake_celery = MagicMock()
+        run_status = {"status": "pending_approval", "approval_request_id": "appr-1"}
+        with patch("app.services.approval_service.ApprovalRequest") as ClaimModel, \
+             patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.workflow_service.get_workflow_status",
+                   new_callable=AsyncMock, return_value=run_status) as mock_status, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True), \
+             patch("app.celery_app.celery", fake_celery):
+            ClaimModel.get_motor_collection.return_value.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+            MockAR.find_one = AsyncMock(return_value=approval)
+            preview = await approve_workflow_step(ctx, session_id="session-123")
+            assert preview["needs_confirmation"] is True
+            result = await approve_workflow_step(ctx, session_id="session-123", confirmed=True)
+
+        assert result["status"] == "approved"
+        assert mock_status.await_args.args[0] == "session-123"
+        assert fake_celery.send_task.call_args.kwargs["kwargs"] == {"approval_uuid": "appr-1"}
+
+    @pytest.mark.asyncio
+    async def test_session_not_awaiting_approval(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        with patch("app.services.workflow_service.get_workflow_status",
+                   new_callable=AsyncMock, return_value={"status": "running", "approval_request_id": None}):
+            result = await approve_workflow_step(ctx, session_id="session-123", confirmed=True)
+
+        assert "isn't waiting for approval" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_neither_id_nor_session(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        result = await approve_workflow_step(_make_context(), confirmed=True)
+        assert "session_id" in result["hint"]
+
+
 class TestRejectWorkflowStep:
     @pytest.mark.asyncio
     async def test_rejects_when_confirmed(self):
@@ -1477,6 +1567,22 @@ class TestRejectWorkflowStep:
             result = await reject_workflow_step(ctx, "appr-1", confirmed=False)
 
         assert result["needs_confirmation"] is True
+
+    @pytest.mark.asyncio
+    async def test_preview_by_run_session_id(self):
+        from app.services.chat_tools import reject_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.workflow_service.get_workflow_status", new_callable=AsyncMock,
+                   return_value={"status": "pending_approval", "approval_request_id": "appr-1"}), \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True):
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await reject_workflow_step(ctx, session_id="session-123")
+
+        assert result["needs_confirmation"] is True
+        assert "Manager sign-off" in result["preview"]
 
 
 # ---------------------------------------------------------------------------

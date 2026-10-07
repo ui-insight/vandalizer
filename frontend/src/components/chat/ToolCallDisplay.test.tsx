@@ -79,6 +79,11 @@ describe('workflow run recovery', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     } finally { vi.useRealTimers() }
   })
+  it('labels a run waiting at an approval gate instead of showing the raw status', async () => {
+    vi.mocked(getWorkflowStatus).mockResolvedValue(status({status:'pending_approval',num_steps_completed:1,num_steps_total:2,current_step_name:'Approval'}))
+    render(<WorkflowProgress sessionId="session-4" />)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Awaiting workflow approval · 1/2 steps completed'))
+  })
   it('announces clipboard failure instead of claiming the result was copied', async () => {
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn().mockRejectedValueOnce(new Error('denied')).mockResolvedValueOnce(undefined)}})
     vi.mocked(getWorkflowStatus).mockResolvedValue(status({status:'completed',final_output:'Saved result'}))
