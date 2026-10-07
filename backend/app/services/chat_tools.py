@@ -2905,7 +2905,25 @@ async def create_extraction_from_document(
     # proposal is stashed with the arming and reused on approval — re-running
     # discovery afterwards is non-deterministic and could create a set under a
     # name the user never saw.
-    gate_key = {"docs": sorted(d.uuid for d in docs), "title": title}
+    # If the user is inside a project they can manage, the new extraction is
+    # auto-pinned there so it shows up alongside the project's other tools.
+    # Resolved before the gate and part of its key: the project was otherwise
+    # looked up again on the approval turn, so a project opened after the card
+    # was shown got the pin though the card never named it (support ticket). A
+    # different project now re-arms with a card that names it.
+    from app.services import project_service
+
+    active_project = await _resolve_active_project(context) if pin_to_active_project else None
+    if active_project and not await project_service.can_manage_project(
+        active_project, context.deps.user
+    ):
+        active_project = None  # viewer — don't pin
+
+    gate_key = {
+        "docs": sorted(d.uuid for d in docs),
+        "title": title,
+        "project": active_project.uuid if active_project else None,
+    }
     proposal = _armed_stash(context, "create_extraction_from_document", gate_key)
     if proposal is None:
         try:
@@ -2920,16 +2938,6 @@ async def create_extraction_from_document(
         }
     default_title = proposal["title"]
     proposed_fields: list[str] = list(proposal.get("fields") or [])
-
-    # If the user is inside a project they can manage, the new extraction is
-    # auto-pinned there so it shows up alongside the project's other tools.
-    from app.services import project_service
-
-    active_project = await _resolve_active_project(context) if pin_to_active_project else None
-    if active_project and not await project_service.can_manage_project(
-        active_project, context.deps.user
-    ):
-        active_project = None  # viewer — don't pin
 
     doc_names = ", ".join(f'"{d.title}"' for d in docs[:3])
     if len(docs) > 3:
