@@ -32,7 +32,11 @@ from app.services.context_budget import (
     plan_and_compact_context,
     token_safety_margin,
 )
-from app.services.kb_answer_grounding import unsupported_figures
+from app.services.kb_answer_grounding import (
+    expand_snippet_refs,
+    unsupported_figures,
+    used_snippet_refs,
+)
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -1137,6 +1141,19 @@ async def chat_stream(
                 # Safety-net: strip any residual think tags the parser missed
                 assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 thinking_text = "".join(full_thinking) or None
+                # Only the snippets the answer cites are its sources; the rest
+                # were searched and not used. Stored with the numbers expanded,
+                # because they mean nothing outside this turn.
+                if kb_sources:
+                    used_refs = used_snippet_refs(assistant_message, kb_sources)
+                    for src in kb_sources:
+                        src["used"] = src.get("ref") in used_refs
+                    assistant_message = expand_snippet_refs(assistant_message, kb_sources)
+                    yield json.dumps({
+                        "kind": "sources_used",
+                        "content": "",
+                        "used_refs": used_refs,
+                    }) + "\n"
                 # A KB answer's dollar amounts and percentages must come from
                 # what the model was shown: the KB snippets, any attached
                 # document, or the question. One that doesn't came from the
@@ -2057,7 +2074,7 @@ async def _render_kb_segment(
     any_approximate = False
     any_spanning = False
     any_amendment = False
-    for r in kb_results:
+    for ref, r in enumerate(kb_results, start=1):
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
         src = meta.get("source_name", "Unknown")
@@ -2077,8 +2094,14 @@ async def _render_kb_segment(
         any_approximate = any_approximate or approximate
         annotated = annotate_chunk_pages(content, meta)
         any_spanning = any_spanning or annotated != content
-        snippet_blocks.append(f"\n**Source: {label}**\n{annotated}\n")
+        # Numbered so the answer can say which snippets it used: a filename
+        # can't, when one document contributes several.
+        snippet_blocks.append(f"\n**[S{ref}] Source: {label}**\n{annotated}\n")
         kb_sources.append({
+            "ref": ref,
+            # What [S{ref}] reads as in the answer the user sees and the one
+            # stored.
+            "cite_label": f"{src}, {locator}" if locator else src,
             "document_id": meta.get("source_id"),
             "document_title": src,
             "page": page,
@@ -2099,8 +2122,10 @@ async def _render_kb_segment(
         "\n\n## Retrieved Knowledge Base Snippets\n"
         "_The following are partial excerpts from a larger corpus, ranked "
         "by similarity to the user's question. They may be incomplete, "
-        "off-topic, or miss the best answer. Cite by filename only when a "
-        "snippet actually supports your claim._\n"
+        "off-topic, or miss the best answer. Each is numbered, e.g. `[S3]`. "
+        "Cite a snippet by its number right after the claim it supports — "
+        "`[S3]`, or `[S1, S3]` for several. Cite only snippets you actually "
+        "used. If none answers the question, say so and cite none._\n"
     )
     if any_approximate:
         # A tilde the model has not had explained to it does not survive: it

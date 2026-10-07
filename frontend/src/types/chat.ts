@@ -107,6 +107,14 @@ export interface Citation {
   chunk_id?: string | null
   score?: number | null
   content_preview?: string
+  /** The snippet's number in its turn's prompt; the answer cites it as [S#]. */
+  ref?: number
+  /** What [S#] reads as, e.g. "PAPPG.pdf, p. ~54". */
+  cite_label?: string
+  /** Whether the answer cited this snippet. false = retrieved and searched
+   *  but not used. Absent on answers saved before the distinction, which
+   *  show every snippet as a source. */
+  used?: boolean
 }
 
 export interface StreamChunk {
@@ -119,6 +127,7 @@ export interface StreamChunk {
     | 'context_budget'
     | 'context_notice'
     | 'sources'
+    | 'sources_used'
     | 'grounding_warning'
   content: string
   duration?: number
@@ -138,6 +147,8 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+  // sources_used only: the [S#] numbers the finished answer cited.
+  used_refs?: number[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
 }
