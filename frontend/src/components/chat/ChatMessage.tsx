@@ -7,7 +7,7 @@ import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { ToolCallDisplay, ToolStatusLine, toolResultToText, pickHighlightPhrase } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -150,7 +150,7 @@ export function ChatMessage({
   const contentRef = useRef<HTMLDivElement>(null)
   const citationsRef = useRef<HTMLDivElement>(null)
   const certPanel = useCertificationPanel()
-  const { setWorkspaceMode, viewDocument, setHighlightTerms, openDocumentUuid } = useWorkspace()
+  const { setWorkspaceMode, viewDocument, openDocumentUuid } = useWorkspace()
   const { toast } = useToast()
 
   const thinkingText = streamingThinking || message.thinking || ''
@@ -223,13 +223,6 @@ export function ChatMessage({
   }
 
   // Open the cited document in the viewer and highlight the cited passage.
-  const handleCitationClick = (c: Citation) => {
-    if (!c.document_id) return
-    setWorkspaceMode('files')
-    viewDocument(c.document_id, c.document_title, undefined, { preserveChatScope: true })
-    if (c.content_preview) setHighlightTerms([pickHighlightPhrase(c.content_preview)])
-  }
-
   // Close the citation chooser on an outside click or Escape, so it never
   // strands itself over the next message.
   usePanelEffect(() => {
@@ -680,16 +673,18 @@ export function ChatMessage({
                       })()}
                     </div>
                     {openPreview || 'No preview was saved for this source.'}
-                    {!open.document_uuid && !open.document_id && <p style={{ marginTop: 'var(--workspace-space-8)' }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
+                    {!open.document_uuid && !open.url && <p style={{ marginTop: 'var(--workspace-space-8)' }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
                       <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
                         Source: {open.source_reference}
                       </div>
                     )}
-                    {open.document_id && (
+                    {/* document_id is the KB source id, not a file: opening it 404s
+                        as "Source unavailable". document_uuid is the readable file. */}
+                    {open.document_uuid && (
                       <button
                         type="button"
-                        onClick={() => handleCitationClick(open)}
+                        onClick={() => openCitedDocument(open)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                           marginTop: 'var(--workspace-space-8)', padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,

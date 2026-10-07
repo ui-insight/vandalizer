@@ -650,6 +650,23 @@ async def search_knowledge_base(
             "url": src.url if src and src.source_type == "url" and src.url else None,
         })
 
+    # The openable SmartDocument behind each source, as the classic KB path
+    # attaches it. Without document_uuid the chip has no "Open at p. N", and
+    # the preview's "Open the source" had only the KB source id, which the
+    # file viewer 404s as "Source unavailable" (support ticket). Resolved per
+    # reader: a source pointing at a document this user can't view stays
+    # preview-only rather than offering a button that 404s.
+    from app.services.knowledge_service import resolve_openable_documents
+
+    openable = await resolve_openable_documents(
+        [c["document_id"] for c in citations if c.get("document_id")],
+        user_id=user_id,
+    )
+    for c in citations:
+        doc_uuid = openable.get(c.get("document_id") or "")
+        if doc_uuid:
+            c["document_uuid"] = doc_uuid
+
     # Citation sidecar: the streaming layer pops this by tool_call_id, emits a
     # 'sources' chunk, and persists the citations on the assistant message.
     if citations and context.tool_call_id:
