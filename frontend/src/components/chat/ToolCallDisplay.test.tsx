@@ -98,3 +98,16 @@ it('renders a historical approval as a nonactionable record even when a callback
   expect(screen.queryByText('Your approval is needed')).toBeNull()
   expect(confirm).not.toHaveBeenCalled()
 })
+
+describe('document search with no exact match', () => {
+  const search = { tool_name: 'search_documents', tool_call_id: 'call-s', args: { query: 'nih-ro1-neuroscience.pdf' } }
+  const searched = (content: unknown) => ({ tool_name: 'search_documents', tool_call_id: 'call-s', content, quality: null })
+  it('names the closest title instead of a bare not-found', () => {
+    render(<ToolStatusLine call={search} result={searched({ documents: [], did_you_mean: [{ uuid: 'd1', title: 'nih-r01-neuroscience.pdf' }] })} />)
+    expect(screen.getByText('No exact match · did you mean "nih-r01-neuroscience.pdf"?')).toBeInTheDocument()
+  })
+  it('still says nothing was found when nothing is close', () => {
+    render(<ToolStatusLine call={search} result={searched({ documents: [], did_you_mean: [] })} />)
+    expect(screen.getByText('No documents found')).toBeInTheDocument()
+  })
+})

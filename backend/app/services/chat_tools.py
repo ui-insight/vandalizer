@@ -8,12 +8,14 @@ Tools are exported as the ``TOOLS`` list for bulk registration.
 
 import asyncio
 import datetime
+import difflib
 import hashlib
 import json
 import logging
 import re
 from typing import Optional
 
+from pydantic import BaseModel
 from pydantic_ai.tools import RunContext
 
 from app.models.document import SmartDocument
@@ -399,11 +401,53 @@ async def _confirm_gate(
     return out
 
 
+class _TitleRow(BaseModel):
+    uuid: str
+    title: Optional[str] = None
+
+
+# Titles scanned for "did you mean" when a search finds nothing. Newest first,
+# so a large workspace may miss an old file — a near miss is still far better
+# than the bare "not found" this replaces.
+_SUGGESTION_POOL = 1000
+_SUGGESTION_CUTOFF = 0.75
+
+
+def _closest_titles(query: str, rows: list[_TitleRow], limit: int = 3) -> list[dict]:
+    """Rank document titles by closeness to a query that matched nothing.
+
+    A title scores the better of (a) whole-string similarity of the
+    normalized names and (b) the share of query tokens that appear in, or
+    nearly match a word of, the title — so a typo in one word of a long
+    filename and a typo in a short query both surface.
+    """
+    tokens = _tokenize_query(query)
+    q_norm = " ".join(tokens)
+    if not q_norm:
+        return []
+    scored: list[tuple[float, _TitleRow]] = []
+    for row in rows:
+        title_tokens = _tokenize_query(row.title or "")
+        if not title_tokens:
+            continue
+        t_norm = " ".join(title_tokens)
+        whole = difflib.SequenceMatcher(None, q_norm, t_norm).ratio()
+        near = sum(
+            1 for t in tokens
+            if t in t_norm or difflib.get_close_matches(t, title_tokens, n=1, cutoff=0.75)
+        )
+        score = max(whole, near / len(tokens))
+        if score >= _SUGGESTION_CUTOFF:
+            scored.append((score, row))
+    scored.sort(key=lambda s: s[0], reverse=True)
+    return [{"uuid": r.uuid, "title": r.title} for _, r in scored[:limit]]
+
+
 async def search_documents(
     context: RunContext[AgenticChatDeps],
     query: str,
     search_content: bool = False,
-) -> list[dict]:
+) -> list[dict] | dict:
     """Search the user's documents by title (fast) or full content (slow).
 
     Args:
@@ -418,6 +462,10 @@ async def search_documents(
                collection scan (no text index) and can time out on large
                workspaces. Only set this when a title search returns nothing
                and the user is describing content rather than a filename.
+
+    Returns a list of matching documents. When a non-empty query matches
+    nothing, returns ``{"documents": [], "did_you_mean": [...]}`` with the
+    closest titles instead.
     """
     owner_filter = _build_owner_filter(context.deps)
     base_filters: dict = {"$and": [owner_filter, {"soft_deleted": {"$ne": True}}]}
@@ -442,18 +490,46 @@ async def search_documents(
         filters = base_filters
 
     docs = await SmartDocument.find(filters).sort("-created_at").limit(MAX_RESULTS).to_list()
-    return [
-        {
-            "uuid": d.uuid,
-            "title": d.title,
-            "extension": d.extension,
-            "pages": d.num_pages,
-            "classification": d.classification,
-            "folder": d.folder,
-            "created_at": d.created_at.isoformat() if d.created_at else None,
-        }
-        for d in docs
-    ]
+    if docs or not query:
+        return [
+            {
+                "uuid": d.uuid,
+                "title": d.title,
+                "extension": d.extension,
+                "pages": d.num_pages,
+                "classification": d.classification,
+                "folder": d.folder,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in docs
+        ]
+
+    # Every query token must appear in the title, so one mistyped character
+    # ("nih-ro1" for "nih-r01") finds nothing. A bare [] left the model
+    # telling the user the file didn't exist, and later turns trusted that
+    # verdict even after the user typed the name correctly.
+    rows = await SmartDocument.find(base_filters).sort("-created_at").limit(
+        _SUGGESTION_POOL,
+    ).project(_TitleRow).to_list()
+    suggestions = _closest_titles(query, rows)
+    if suggestions:
+        instruction = (
+            f"No document title matches '{query}' exactly. Ask the user whether "
+            "they meant one of did_you_mean (name it), and use its uuid once "
+            "they confirm. Do not say the file does not exist."
+        )
+    else:
+        instruction = (
+            f"No document title matches '{query}' and nothing is close. Say so "
+            "and ask the user to check the name or upload the file."
+        )
+    return {
+        "documents": [],
+        "did_you_mean": suggestions,
+        "assistant_instruction": instruction
+        + " This result covers only this query: if the user names a file "
+        "again, search for it again.",
+    }
 
 
 async def list_documents(

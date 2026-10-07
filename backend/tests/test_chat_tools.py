@@ -187,10 +187,13 @@ class TestSearchDocuments:
 
         ctx = _make_context()
         with patch("app.services.chat_tools.SmartDocument") as MockDoc:
-            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+            chain = MockDoc.find.return_value.sort.return_value.limit.return_value
+            chain.to_list = AsyncMock(return_value=[])
+            chain.project.return_value.to_list = AsyncMock(return_value=[])
             await search_documents(ctx, "composer agreement")
 
-        call_args = MockDoc.find.call_args[0][0]
+        # The first find is the title search; a second one gathers "did you mean" titles.
+        call_args = MockDoc.find.call_args_list[0][0][0]
         assert "$and" in call_args
         text_filter = call_args["$and"][2]
         assert "title" in text_filter
@@ -204,10 +207,13 @@ class TestSearchDocuments:
 
         ctx = _make_context()
         with patch("app.services.chat_tools.SmartDocument") as MockDoc:
-            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+            chain = MockDoc.find.return_value.sort.return_value.limit.return_value
+            chain.to_list = AsyncMock(return_value=[])
+            chain.project.return_value.to_list = AsyncMock(return_value=[])
             await search_documents(ctx, "composer agreement", search_content=True)
 
-        call_args = MockDoc.find.call_args[0][0]
+        # The first find is the title search; a second one gathers "did you mean" titles.
+        call_args = MockDoc.find.call_args_list[0][0][0]
         text_filter = call_args["$and"][2]
         assert "$or" in text_filter
         fields = {list(c.keys())[0] for c in text_filter["$or"]}
@@ -223,6 +229,59 @@ class TestSearchDocuments:
             result = await search_documents(ctx, "")
 
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_typo_suggests_close_titles(self):
+        """A one-character typo matched nothing and the model told the user
+        the file didn't exist. The miss now carries the closest titles."""
+        from app.services.chat_tools import _TitleRow, search_documents
+
+        ctx = _make_context()
+        rows = [
+            _TitleRow(uuid="d1", title="nih-r01-neuroscience.pdf"),
+            _TitleRow(uuid="d2", title="NSF CAREER budget.xlsx"),
+        ]
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            chain = MockDoc.find.return_value.sort.return_value.limit.return_value
+            chain.to_list = AsyncMock(return_value=[])
+            chain.project.return_value.to_list = AsyncMock(return_value=rows)
+            result = await search_documents(ctx, "nih-ro1-neuroscience.pdf")
+
+        assert result["documents"] == []
+        assert result["did_you_mean"] == [{"uuid": "d1", "title": "nih-r01-neuroscience.pdf"}]
+        assert "search for it again" in result["assistant_instruction"]
+        # The suggestion pool keeps the owner scope.
+        assert MockDoc.find.call_args_list[1][0][0]["$and"][0] == MockDoc.find.call_args_list[0][0][0]["$and"][0]
+
+    @pytest.mark.asyncio
+    async def test_no_close_title_says_so(self):
+        from app.services.chat_tools import _TitleRow, search_documents
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            chain = MockDoc.find.return_value.sort.return_value.limit.return_value
+            chain.to_list = AsyncMock(return_value=[])
+            chain.project.return_value.to_list = AsyncMock(
+                return_value=[_TitleRow(uuid="d2", title="NSF CAREER budget.xlsx")],
+            )
+            result = await search_documents(ctx, "nih-ro1-neuroscience.pdf")
+
+        assert result["did_you_mean"] == []
+        assert "nothing is close" in result["assistant_instruction"]
+
+
+class TestClosestTitles:
+    def test_typo_in_one_word_of_a_short_query(self):
+        from app.services.chat_tools import _TitleRow, _closest_titles
+
+        rows = [_TitleRow(uuid="d1", title="FY25 Budget Justification.docx")]
+        assert [r["uuid"] for r in _closest_titles("budgte justification", rows)] == ["d1"]
+
+    def test_unrelated_titles_are_not_suggested(self):
+        from app.services.chat_tools import _TitleRow, _closest_titles
+
+        rows = [_TitleRow(uuid="d1", title="Composer-Performer Agreement.pdf")]
+        assert _closest_titles("nih-ro1-neuroscience", rows) == []
 
 
 # ---------------------------------------------------------------------------

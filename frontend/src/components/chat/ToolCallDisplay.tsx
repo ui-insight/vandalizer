@@ -171,7 +171,12 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     }
 
     case 'search_documents': {
-      if (!Array.isArray(content)) break
+      if (!Array.isArray(content)) {
+        // A query that matched nothing comes back with the closest titles.
+        const near = Array.isArray(obj.did_you_mean) ? obj.did_you_mean as Record<string, unknown>[] : []
+        if (near.length === 0) return { text: 'No documents found', qualityHint: '' }
+        return { text: `No exact match · did you mean "${String(near[0].title).slice(0, 40)}"?`, qualityHint: '' }
+      }
       if (content.length === 0) return { text: 'No documents found', qualityHint: '' }
       const first = content[0] as Record<string, unknown>
       const title = first.title ? `"${String(first.title).slice(0, 40)}"` : ''
