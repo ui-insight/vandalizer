@@ -1601,6 +1601,9 @@ async def chat_stream(
     kb_sources: list[dict] = []
     kb_manifest: list[dict] = []
     kb_retrieval_failed = False
+    # Titles of attached KBs that could not be searched this turn while
+    # others answered. Reported to the model and the user (#997).
+    kbs_not_searched: list[str] = []
     manifests: dict[str, list[dict]] = {}
     if active_kbs:
         from app.services.knowledge_service import get_kb_manifest
@@ -1628,6 +1631,7 @@ async def chat_stream(
             kb_segment, kb_sources = await _build_multi_kb_segment(
                 active_kbs, message, model_name, manifests=manifests,
                 history=previous_messages, user_id=user_id,
+                failed_kbs=kbs_not_searched,
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
@@ -1702,6 +1706,8 @@ async def chat_stream(
         # can distinguish "exists here but wasn't retrieved" from "not in this
         # project" on follow-ups too.
         reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
+        if kbs_not_searched:
+            reminder_blocks.append(_kbs_not_searched_reminder(kbs_not_searched))
     elif have_context:
         reminder_blocks.append(DOCUMENT_CHAT_RULES)
     elif active_kbs and kb_retrieval_failed:
@@ -1984,6 +1990,8 @@ async def chat_stream(
             "action": "kb_retrieval_failed",
             "tokens_dropped": 0,
         }) + "\n"
+    elif kbs_not_searched:
+        yield json.dumps(_kbs_not_searched_notice(kbs_not_searched, len(active_kbs))) + "\n"
 
     # Context meter (uplift plan Phase 2): estimate the request we're about
     # to send and place it on the warn/compact/block ladder. Prefer the
@@ -3153,6 +3161,36 @@ async def _build_kb_segment(
     return await _render_kb_segment(results, message, user_id=user_id)
 
 
+class KBRetrievalFailed(RuntimeError):
+    """Knowledge-base search failed in a way the turn must report, not treat as empty."""
+
+
+def _kbs_not_searched_reminder(titles: list[str]) -> str:
+    """Tell the model which attached KBs a partly failed turn never searched."""
+    return (
+        "Knowledge-base search FAILED this turn for: "
+        + "; ".join(f'"{t}"' for t in titles)
+        + ". Those knowledge bases were NOT searched; the passages above come "
+        "only from the others. Say in one line which knowledge bases weren't "
+        "searched, and do not say they lack the answer."
+    )
+
+
+def _kbs_not_searched_notice(titles: list[str], attached: int) -> dict:
+    """The context notice shown to the user when some attached KBs failed."""
+    return {
+        "kind": "context_notice",
+        "content": (
+            f"Couldn't search {len(titles)} of {attached} knowledge bases: "
+            + ", ".join(titles)
+            + ". This answer uses only the others. Retry in a moment to "
+            "include them."
+        ),
+        "action": "kb_partially_searched",
+        "tokens_dropped": 0,
+    }
+
+
 # One KB contributes its own tuned ``k`` (typically 8) snippets. Three at full
 # budget would triple the prompt for one question, so a multi-KB turn shares a
 # single ceiling: each KB is retrieved at its own settings, then the pools are
@@ -3168,6 +3206,7 @@ async def _build_multi_kb_segment(
     manifests: Optional[dict[str, list[dict]]] = None,
     history: Optional[list[ModelMessage]] = None,
     user_id: Optional[str] = None,
+    failed_kbs: Optional[list[str]] = None,
 ) -> tuple[Optional[DocumentSegment], list[dict]]:
     """Retrieve across several knowledge bases for one chat turn.
 
@@ -3178,8 +3217,13 @@ async def _build_multi_kb_segment(
     reaches the prompt, and every snippet carries the KB it came from.
 
     A KB whose retrieval fails is skipped rather than failing the turn: the
-    answer is then grounded in the ones that did respond, which is what the
-    model is told it has.
+    answer is then grounded in the ones that did respond. Its title is
+    appended to ``failed_kbs`` so the caller can tell the model and the user
+    which KBs were not searched. When every KB fails, or the ones that
+    responded found nothing while others failed, this raises
+    ``KBRetrievalFailed``: returning no segment would put the turn in
+    empty-KB mode, which allows general-knowledge answers, as if the
+    unsearched KBs had nothing on the question.
     """
     if not kbs:
         return None, []
@@ -3208,16 +3252,25 @@ async def _build_multi_kb_segment(
     ], return_exceptions=True)
 
     tagged: list[list[dict]] = []
+    failed: list[str] = []
     for (kb_uuid, kb_title), pool in zip(kbs, pools):
         if isinstance(pool, BaseException):
             logger.error("KB retrieval failed for kb_uuid=%s: %s", kb_uuid, pool)
+            failed.append(kb_title or kb_uuid)
             continue
         for r in pool:
             r["kb_title"] = kb_title
             r["kb_uuid"] = kb_uuid
         tagged.append(pool)
+    if failed_kbs is not None:
+        failed_kbs.extend(failed)
 
     merged = _round_robin_merge(tagged)[:MULTI_KB_SNIPPET_BUDGET]
+    if failed and not merged:
+        raise KBRetrievalFailed(
+            f"retrieval failed for {len(failed)} of {len(kbs)} knowledge bases "
+            "and the rest returned nothing"
+        )
     if not merged:
         logger.warning(
             "KB query returned no results across %d knowledge bases", len(kbs),

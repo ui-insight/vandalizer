@@ -146,11 +146,33 @@ interface ResultSummary {
   qualityHint: string
 }
 
+/**
+ * The error a list-returning tool sends as its only entry, such as
+ * search_knowledge_base's `[{"error": ...}]` for a missing, inaccessible,
+ * still-indexing or unreachable knowledge base. Checking `.error` on the array
+ * itself never finds it, so the failure read as "Found 1 relevant passage".
+ */
+export function listErrorEntry(content: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(content) || content.length !== 1) return null
+  const only = content[0] as Record<string, unknown> | null
+  return only && typeof only === 'object' && only.error ? only : null
+}
+
+/** Knowledge-base passages only: a search that matched nothing returns a lone `no_results` note. */
+function kbPassages(content: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(content)) return []
+  return (content as Array<Record<string, unknown> | null>).filter(
+    (c): c is Record<string, unknown> => !!c && typeof c === 'object' && typeof c.content === 'string',
+  )
+}
+
 function summarizeResult(toolName: string, content: unknown, quality: QualityMeta | null): ResultSummary {
   const empty: ResultSummary = { text: '', qualityHint: '' }
   if (content == null) return empty
   const obj = content as Record<string, unknown>
 
+  const listError = listErrorEntry(content)
+  if (listError) return { text: String(listError.error), qualityHint: '' }
   if (obj.error) return { text: String(obj.error), qualityHint: '' }
   if (obj.needs_confirmation) return { text: obj.preview ? String(obj.preview) : 'Awaiting confirmation', qualityHint: '' }
 
@@ -211,8 +233,9 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'search_knowledge_base': {
       if (!Array.isArray(content)) break
-      if (content.length === 0) return { text: 'No matching passages', qualityHint: '' }
-      return { text: `Found ${content.length} relevant passage${content.length !== 1 ? 's' : ''}`, qualityHint }
+      const passages = kbPassages(content)
+      if (passages.length === 0) return { text: 'No matching passages', qualityHint: '' }
+      return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
     }
 
     case 'get_document_text': {
@@ -526,7 +549,7 @@ function hasCopyableContent(toolName: string, content: unknown): boolean {
   const obj = content as Record<string, unknown>
   if (obj.error || obj.needs_confirmation) return false
   if (toolName === 'run_extraction') return Array.isArray(obj.entities) && obj.entities.length > 0
-  if (toolName === 'search_knowledge_base') return Array.isArray(content) && content.length > 0
+  if (toolName === 'search_knowledge_base') return kbPassages(content).length > 0
   if (toolName === 'get_workflow_status') return obj.status === 'completed' && obj.output != null
   if (toolName === 'get_document_text') return Boolean(obj.text)
   if (toolName === 'list_documents') return Array.isArray(obj.documents) && obj.documents.length > 0
@@ -862,8 +885,8 @@ interface KBSourceActions {
 }
 
 function KBPassages({ content, actions }: { content: unknown; actions?: KBSourceActions }) {
-  if (!Array.isArray(content) || content.length === 0) return null
-  const passages = content as Array<Record<string, unknown>>
+  const passages = kbPassages(content)
+  if (passages.length === 0) return null
   const copyText = toolResultToText('search_knowledge_base', content)
 
   return (
@@ -1123,7 +1146,7 @@ export function ToolStatusLine({
   const meta = getMeta(name)
   const accent = CATEGORY_ACCENT[meta.category]
   const args = call?.args || {}
-  const obj = result?.content as Record<string, unknown> | undefined
+  const obj = (listErrorEntry(result?.content) ?? result?.content) as Record<string, unknown> | undefined
   const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
   const isError = !canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error')
   const unconfirmed = !isActive && !!call && !result
@@ -1292,7 +1315,7 @@ export function ToolStatusLine({
       {result && name === 'run_extraction' && obj?.entities != null && (
         <ExtractionContent content={obj} actions={kbActions} />
       )}
-      {result && name === 'search_knowledge_base' && (
+      {result && name === 'search_knowledge_base' && !isError && (
         <KBPassages content={result.content} actions={kbActions} />
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
