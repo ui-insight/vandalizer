@@ -6,6 +6,8 @@ Use a separate development workspace with controlled accounts. The [three fictio
 
 ## Model execution checks
 
+**First run recorded:** [2026-10-08, `gpt-oss-120b`, chat paths a and b](2026-10-08-ra-expected-checks.md). 21 of 24 passed, 3 partial, 0 failed. Path (c) and the participant sessions below are still open.
+
 Use the configured development model to answer all 12 cases in `expected-checks.json`. Record model/configuration, exact source scope, answer, cited passage, missing/conflicting evidence, run ID and final outcome. Check dates, time zones, the $20,000 cap overrun and the difference between a promised and a signed letter manually. Mark each mismatch explicitly; a fluent answer or a high quality score is not a pass.
 
 Repeat representative cases through KB, workflow and extraction validation. Verify cancel, refresh/resume, persisted history and apply/revert without manufacturing successful scores. For agent actions, record the persisted before/after state and test approval, rejection/cancellation, denied access, interrupted streaming, refresh and retry. One accepted action must create one intended effect. Complete the model-backed learning labs and course using actual work, not seeded completion flags.
