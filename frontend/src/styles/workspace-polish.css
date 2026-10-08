@@ -440,3 +440,10 @@
 .admin-audit-details > div { margin: 8px 0; }
 .admin-audit-details dt { font-weight: 600; text-transform: capitalize; }
 .admin-audit-details dd { margin: 2px 0; overflow-wrap: anywhere; }
+
+/* Text-only browser enlargement must not split navigation labels into fragments. */
+@media (min-width: 900px) {
+  .section-page .section-page__nav { width: max-content; min-width: 220px; }
+  .section-page__links button { white-space: nowrap; }
+  .section-page__links button svg { flex-shrink: 0; }
+}
