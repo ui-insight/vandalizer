@@ -176,6 +176,11 @@ export interface Citation {
   chunk_id?: string | null
   score?: number | null
   content_preview?: string
+  /** Set on chips made from a page number the model wrote about an attached
+   *  document (#998): whether the sentence citing it was found on that page.
+   *  Only 'found' is shown as an ordinary source; absent on KB and web chips,
+   *  which come from retrieval rather than the model. */
+  grounding?: 'found' | 'not_found' | 'unchecked'
   // User-verifiable provenance for the KB source (origin URL / citation).
   source_reference?: string | null
   // Set when the KB source is a URL — citation chip links out to it.

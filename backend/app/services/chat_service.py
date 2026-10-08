@@ -42,6 +42,7 @@ from app.services.context_budget import (
     resolve_context_window,
     token_safety_margin,
 )
+from app.services.citation_grounding import ground_page_citation
 from app.services.kb_answer_grounding import unsupported_figures
 from app.services.model_routing import (
     RoutingDecision,
@@ -244,6 +245,12 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
 
     doc, raw, positions = candidates[0]
     by_page = {page: (offset, approx) for offset, page, approx in positions}
+    # Where each page's text ends: the next marker, or the end of the text.
+    page_end = {
+        page: (positions[i + 1][0] if i + 1 < len(positions) else len(raw))
+        for i, (_offset, page, _approx) in enumerate(positions)
+    }
+    order = [page for _offset, page, _approx in positions]
 
     citations: list[dict] = []
     seen: set[int] = set()
@@ -259,13 +266,28 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
         preview = " ".join(raw[offset:offset + 400].split())
         if not preview:
             continue
+        # The page as a reader would check it. An interpolated page's
+        # boundaries are estimates, so its neighbours are searched too.
+        start, end = offset, page_end[page]
+        if approximate:
+            i = order.index(page)
+            if i > 0:
+                start = by_page[order[i - 1]][0]
+            if i + 1 < len(order):
+                end = page_end[order[i + 1]]
+        grounding, passage = ground_page_citation(text, page, raw[start:end], _PAGE_REF_RE)
         citations.append({
             "document_uuid": doc.uuid,
             "document_title": doc.title,
             "page": page,
             "page_approximate": approximate,
-            "content_preview": preview[:240],
+            # The passage that supports the claim when one was found;
+            # otherwise the top of the page, which only says where to look.
+            "content_preview": (passage or preview)[:240],
             "source_reference": None,
+            # "found", "not_found" or "unchecked". Only "found" is shown as an
+            # ordinary source: the page number came from the model (#998).
+            "grounding": grounding,
         })
         if len(citations) >= _MAX_DERIVED_CITATIONS:
             break
@@ -2388,9 +2410,14 @@ async def chat_stream(
                 # agentic search_knowledge_base call retrieves passages beyond
                 # the pre-fetched snippets). One that doesn't came from the
                 # model's memory, which may predate the current regulation.
+                # The same holds for an answer about attached documents
+                # (#998), checked against their full text: the copy the
+                # model saw may have been trimmed, and a figure the
+                # document does state is not one to flag.
                 unsupported = (
                     unsupported_figures(assistant_message, "\n".join(
                         [s.text for s in (*doc_segments, *attachment_segments)]
+                        + [getattr(d, "raw_text", None) or "" for d in documents or []]
                         + [message]
                         + [
                             r["content"] if isinstance(r["content"], str)
@@ -2398,7 +2425,7 @@ async def chat_stream(
                             for r in streamed_tool_results
                         ]
                     ))
-                    if active_kbs else []
+                    if active_kbs or documents else []
                 )
                 await _finalize(
                     conversation, assistant_message, documents,

@@ -539,8 +539,8 @@ export function ChatMessage({
               <span>
                 Not in the retrieved sources: <strong>{message.unsupported_figures.join(', ')}</strong>.
                 {' '}It may come from the model's general knowledge, which can be out of date.
-                Check it against the source before relying on it — naming the section or document
-                in your question usually retrieves the passage that states it.
+                Check it against the source before relying on it. With a knowledge base, naming the
+                section or document in your question usually retrieves the passage that states it.
               </span>
             </div>
           )}
@@ -559,7 +559,13 @@ export function ChatMessage({
                     const base = locator ? `${c.document_title} · ${locator}` : c.document_title
                     // With several knowledge bases attached, the filename
                     // alone doesn't say which one a claim came from.
-                    const label = c.kb_title ? `${base} · ${c.kb_title}` : base
+                    const labelled = c.kb_title ? `${base} · ${c.kb_title}` : base
+                    // A page number the model wrote, not a retrieved passage:
+                    // never dress it as a source unless the cited sentence
+                    // was found on that page (#998).
+                    const unverified = c.grounding === 'not_found' || c.grounding === 'unchecked'
+                    const label = c.grounding === 'not_found' ? `${labelled} · passage not found`
+                      : c.grounding === 'unchecked' ? `${labelled} · not checked` : labelled
                     const preview = c.content_preview || ''
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
                     const chipBase = {
@@ -611,9 +617,11 @@ export function ChatMessage({
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                             padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
-                            backgroundColor: active ? '#e0e7ff' : '#f3f4f6',
-                            color: active ? '#3730a3' : '#374151',
-                            border: `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
+                            backgroundColor: unverified ? '#fffbeb' : active ? '#e0e7ff' : '#f3f4f6',
+                            color: unverified ? '#92400e' : active ? '#3730a3' : '#374151',
+                            border: unverified
+                              ? `1px dashed ${active ? '#b45309' : '#d97706'}`
+                              : `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
                             borderRadius: 'var(--workspace-radius-large)', overflowWrap: 'anywhere', textAlign: 'left',
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
@@ -672,6 +680,13 @@ export function ChatMessage({
                         return loc ? ` · ${loc}` : ''
                       })()}
                     </div>
+                    {(open.grounding === 'not_found' || open.grounding === 'unchecked') && (
+                      <p role="note" style={{ margin: '0 0 var(--workspace-space-6)', color: '#92400e', fontWeight: 500 }}>
+                        {open.grounding === 'not_found'
+                          ? 'The assistant cited this page, but what it said was not found there. Check the page before relying on it. Shown below is the top of the page, not a supporting passage.'
+                          : 'The assistant cited this page without a figure, date, quote or wording that could be checked against it. Shown below is the top of the page, not a supporting passage.'}
+                      </p>
+                    )}
                     {openPreview || 'No preview was saved for this source.'}
                     {!open.document_uuid && !open.url && <p style={{ marginTop: 'var(--workspace-space-8)' }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
