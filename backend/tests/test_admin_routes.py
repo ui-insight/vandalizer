@@ -423,7 +423,7 @@ class TestAdminListEndpointLimits:
         activity_find = MagicMock()
         activity_find.to_list = AsyncMock(return_value=events)
         users_find = MagicMock()
-        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+        users_find.to_list = AsyncMock(return_value=users)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -460,7 +460,7 @@ class TestAdminListEndpointLimits:
         activity_find = MagicMock()
         activity_find.to_list = AsyncMock(return_value=events)
         users_find = MagicMock()
-        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+        users_find.to_list = AsyncMock(return_value=users)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -976,6 +976,51 @@ class TestOcrProviderConfig:
 
         assert resp.status_code == 400
         assert cfg.ocr_timeout_seconds == 120
+
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("quality", [
+        {"quality_tiers": {"excellent": {"min_score": 150}}},
+        {"quality_tiers": {"excellent": {"min_score": -1}}},
+        {"quality_tiers": {"excellent": {"min_score": None}}},
+        {"quality_tiers": {"excellent": {"min_score": "90"}}},
+        {"quality_tiers": {"excellent": {"min_score": True}}},
+        {"quality_tiers": {"good": {"min_score": 95}}},
+        {"quality_tiers": {"good": {"min_score": 90}}},
+        {"quality_tiers": {"fair": {"min_score": 75}}},
+        {"quality_tiers": []},
+        {"verification_gates": {"min_extraction_accuracy": 1.01}},
+        {"verification_gates": {"min_extraction_consistency": -0.1}},
+        {"verification_gates": {"min_workflow_grade": "Z"}},
+    ])
+    async def test_invalid_quality_never_mutates_config(self, client, quality):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"quality_config": quality, "ocr_endpoint": "https://new.example.test"}, cfg)
+        assert resp.status_code == 422
+        assert cfg.quality_config == {}
+        assert cfg.ocr_endpoint == ""
+        cfg.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_valid_quality_preserves_extension_settings(self, client):
+        cfg = self._config_stub()
+        quality = {
+            "verification_gates": {"min_extraction_accuracy": 0, "min_extraction_consistency": 1},
+            "quality_tiers": {"excellent": {"min_score": 100}, "good": {"min_score": 50.5}, "fair": {"min_score": 0}},
+            "monitoring": {"stale_threshold_days": 42},
+        }
+        resp = await self._put(client, {"quality_config": quality}, cfg)
+        assert resp.status_code == 200
+        assert cfg.quality_config == quality
+        cfg.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("value", [0, 101, 1.5, True, None])
+    async def test_invalid_extraction_chunk_size_rejected(self, client, value):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"extraction_config": {"chunking": {"max_keys_per_chunk": value}}}, cfg)
+        assert resp.status_code == 422
+        cfg.save.assert_not_called()
 
 
 class TestUpdateAuthMethods:

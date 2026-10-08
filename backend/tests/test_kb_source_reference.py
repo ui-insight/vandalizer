@@ -56,6 +56,7 @@ class TestAdminListAllKnowledgeBases:
         limit_result = MagicMock()
         limit_result.to_list = AsyncMock(return_value=returns)
         sort_result = MagicMock()
+        sort_result.skip.return_value = sort_result
         sort_result.limit = MagicMock(return_value=limit_result)
         find_result = MagicMock()
         find_result.sort = MagicMock(return_value=sort_result)
@@ -69,7 +70,8 @@ class TestAdminListAllKnowledgeBases:
         out = await admin_list_all_knowledge_bases()
         assert out == ["kb1", "kb2"]
         mock_kb_cls.find.assert_called_once_with({})
-        find_result.sort.assert_called_once_with("-created_at")
+        find_result.sort.assert_called_once_with("-created_at", "_id")
+        sort_result.skip.assert_called_once_with(0)
         sort_result.limit.assert_called_once_with(1000)
 
     @patch("app.services.knowledge_service.KnowledgeBase")

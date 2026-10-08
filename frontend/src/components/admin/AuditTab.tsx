@@ -1,15 +1,16 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 
 import * as auditApi from '../../api/audit'
 
 export function AuditTab() {
-  const [page, setPage] = useState(0)
-  const [actionFilter, setActionFilter] = useState('')
-  const [debouncedActionFilter, setDebouncedActionFilter] = useState('')
-  const [resourceTypeFilter, setResourceTypeFilter] = useState('')
+  const [page, setPage] = useAdminViewState('AuditTab.page', 0)
+  const [actionFilter, setActionFilter] = useAdminViewState('AuditTab.actionFilter', '')
+  const [debouncedActionFilter, setDebouncedActionFilter] = useAdminViewState('AuditTab.debouncedActionFilter', '')
+  const [resourceTypeFilter, setResourceTypeFilter] = useAdminViewState('AuditTab.resourceTypeFilter', '')
   const actionDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const limit = 25
 
@@ -107,7 +108,7 @@ export function AuditTab() {
                   <span style={{ marginLeft: 6, fontSize: 11, color: '#59616b' }}>{entry.resource_type}</span>
                 </td>
                 <td style={{ padding: '10px 14px', color: '#59616b', fontSize: 12, minWidth: 180, maxWidth: 360 }}>
-                  {Object.keys(entry.detail).length > 0 ? <details><summary style={{ cursor: 'pointer' }}>View event details</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{JSON.stringify(entry.detail, null, 2)}</pre></details> : 'No details recorded'}
+                  {Object.keys(entry.detail).length > 0 ? <details><summary style={{ cursor: 'pointer' }}>View event details</summary><dl className="admin-audit-details">{Object.entries(entry.detail).filter(([, value]) => value === null || typeof value !== 'object').map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value === null ? 'Not recorded' : String(value)}</dd></div>)}</dl><details><summary>Raw event JSON</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{JSON.stringify(entry.detail, null, 2)}</pre></details></details> : 'No details recorded'}
                 </td>
               </tr>
             ))}

@@ -9,7 +9,9 @@ from typing import Literal, Optional
 
 from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.schemas.admin_config import validate_extraction_config, validate_quality_config, validate_retention_config, validate_compliance_config, validate_compliance_patch
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
@@ -287,6 +289,11 @@ class ConfigUpdateRequest(BaseModel):
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
     outbound_url_allowed_hosts: Optional[list[str]] = None
+
+    _validate_compliance = field_validator("compliance_config")(validate_compliance_patch)
+    _validate_retention = field_validator("retention_config")(validate_retention_config)
+    _validate_quality = field_validator("quality_config")(validate_quality_config)
+    _validate_extraction = field_validator("extraction_config")(validate_extraction_config)
 
 
 class AdminTeamItem(BaseModel):
@@ -636,6 +643,7 @@ async def usage_timeseries(
 async def user_leaderboard(
     days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -677,7 +685,7 @@ async def user_leaderboard(
         team_user_ids = [m.user_id for m in team_memberships]
         all_users = await User.find({"user_id": {"$in": team_user_ids}}).to_list()
     else:
-        all_users = await User.find().limit(10000).to_list()
+        all_users = await User.find().to_list()
     user_map = {u.user_id: u for u in all_users}
 
     # Build result list — include ALL users, not just those with activity
@@ -732,10 +740,10 @@ async def user_leaderboard(
             )
 
     # Sort by tokens desc
-    result.sort(key=lambda x: x.tokens_total, reverse=True)
+    result.sort(key=lambda x: (-x.tokens_total, x.user_id))
     total = len(result)
-    capped = total > limit
-    return UserLeaderboardResponse(items=result[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return UserLeaderboardResponse(items=result[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -746,6 +754,7 @@ async def user_leaderboard(
 async def team_leaderboard(
     days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -759,7 +768,7 @@ async def team_leaderboard(
         query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
-    all_teams = await Team.find().limit(10000).to_list()
+    all_teams = await Team.find().to_list()
     team_lookup: dict[str, Team] = {}
     for team in all_teams:
         team_lookup[str(team.id)] = team
@@ -794,7 +803,7 @@ async def team_leaderboard(
                 agg["latencies"].append(delta_ms)
 
     # Fetch member counts per team
-    all_memberships = await TeamMembership.find().limit(50000).to_list()
+    all_memberships = await TeamMembership.find().to_list()
     member_counts: dict[str, int] = {}
     for m in all_memberships:
         tid_str = str(m.team) if m.team else ""
@@ -819,10 +828,10 @@ async def team_leaderboard(
             )
         )
 
-    result.sort(key=lambda x: x.tokens_total, reverse=True)
+    result.sort(key=lambda x: (-x.tokens_total, x.team_id))
     total = len(result)
-    capped = total > limit
-    return TeamLeaderboardResponse(items=result[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return TeamLeaderboardResponse(items=result[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -2196,16 +2205,12 @@ async def update_compliance_config(
         current["check_on_upload"] = bool(body["check_on_upload"])
     if "rules" in body:
         current["rules"] = str(body["rules"] or "")
-    if "chunk_size" in body:
-        try:
-            current["chunk_size"] = max(500, int(body["chunk_size"]))
-        except (TypeError, ValueError):
-            pass
-    if "chunk_overlap" in body:
-        try:
-            current["chunk_overlap"] = max(0, int(body["chunk_overlap"]))
-        except (TypeError, ValueError):
-            pass
+    proposed = {**current, **{key: body[key] for key in ("chunk_size", "chunk_overlap") if key in body}}
+    try:
+        validate_compliance_config(proposed)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    current = proposed
 
     cfg.compliance_config = current
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -2702,18 +2707,23 @@ async def optimizer_activity(
 @router.get("/teams/all", response_model=AdminTeamListResponse)
 async def admin_list_all_teams(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
 ):
     await _require_admin(user)
 
     cfg = await SystemConfig.get_config()
-    all_teams = await Team.find().limit(10000).to_list()
-    all_memberships = await TeamMembership.find().limit(100000).to_list()
+    import re
+    query = {"name": {"$regex": re.escape(q.strip()), "$options": "i"}} if q.strip() else {}
+    total = await Team.find(query).count()
+    all_teams = await Team.find(query).sort("name", "_id").skip(offset).limit(limit).to_list()
+    counts = await TeamMembership.aggregate([
+        {"$match": {"team": {"$in": [t.id for t in all_teams]}}},
+        {"$group": {"_id": "$team", "count": {"$sum": 1}}},
+    ]).to_list()
 
-    member_counts: dict[str, int] = {}
-    for m in all_memberships:
-        key = str(m.team)
-        member_counts[key] = member_counts.get(key, 0) + 1
+    member_counts = {str(row["_id"]): row["count"] for row in counts}
 
     items = [
         AdminTeamItem(
@@ -2726,8 +2736,7 @@ async def admin_list_all_teams(
         )
         for t in all_teams
     ]
-    total = len(items)
-    capped = total > limit
+    capped = offset + len(items) < total
     return AdminTeamListResponse(items=items[:limit], total=total, capped=capped)
 
 
@@ -2835,11 +2844,12 @@ async def admin_remove_user_from_team(
 @router.get("/users/isolated", response_model=IsolatedUsersResponse)
 async def isolated_users(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     await _require_admin(user)
 
-    all_memberships = await TeamMembership.find().limit(100000).to_list()
+    all_memberships = await TeamMembership.find().to_list()
 
     # Count memberships per user and members per team
     user_team_ids: dict[str, set] = {}
@@ -2863,9 +2873,10 @@ async def isolated_users(
         IsolatedUserItem(user_id=u.user_id, name=u.name, email=u.email)
         for u in users
     ]
+    items.sort(key=lambda item: item.user_id)
     total = len(items)
-    capped = total > limit
-    return IsolatedUsersResponse(items=items[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return IsolatedUsersResponse(items=items[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -3578,6 +3589,8 @@ class CertificationProgressListResponse(BaseModel):
 @router.get("/certifications", response_model=CertificationProgressListResponse)
 async def list_certification_progress(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
 ):
     """List all users who have started the certification program with progress summary."""
@@ -3616,10 +3629,14 @@ async def list_certification_progress(
             )
         )
 
-    items.sort(key=lambda i: (i.modules_completed, i.total_xp), reverse=True)
+    if q.strip():
+        needle = q.strip().casefold()
+        items = [item for item in items if any(needle in (text or "").casefold()
+                 for text in (item.name, item.email, item.user_id))]
+    items.sort(key=lambda i: (-i.modules_completed, -i.total_xp, i.user_id))
     total = len(items)
-    capped = total > limit
-    return CertificationProgressListResponse(items=items[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return CertificationProgressListResponse(items=items[offset:offset + limit], total=total, capped=capped)
 
 
 @router.get("/certifications/{user_id}", response_model=CertificationProgressDetail)
@@ -3898,6 +3915,7 @@ class AdminKBListResponse(BaseModel):
 async def admin_list_knowledge_bases(
     search: Optional[str] = Query(None, description="Case-insensitive title substring"),
     limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
 ):
     """List every knowledge base across all users and teams (admin-only).
@@ -3909,7 +3927,7 @@ async def admin_list_knowledge_bases(
 
     from app.services import knowledge_service
 
-    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit)
+    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit, offset=offset)
 
     # Batch-resolve owner emails and team names so the table is readable
     # without an N+1 per row.
@@ -3944,4 +3962,4 @@ async def admin_list_knowledge_bases(
         )
         for kb in kbs
     ]
-    return AdminKBListResponse(total=len(summaries), knowledge_bases=summaries)
+    return AdminKBListResponse(total=await knowledge_service.admin_count_knowledge_bases(search), knowledge_bases=summaries)

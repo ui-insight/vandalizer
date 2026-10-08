@@ -47,7 +47,7 @@ export function TrendDelta({ current, previous, invert }: { current: number; pre
   const isGood = invert ? !isUp : isUp
   if (pct === 0) return <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--ui-text-muted, #59616b)' }}>0%</span>
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: isGood ? '#15803d' : '#dc2626' }}>
+    <span style={{ display: 'inline-flex', whiteSpace: 'nowrap', alignItems: 'center', gap: 2, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: isGood ? '#15803d' : '#dc2626' }}>
       {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
       {isUp ? '+' : ''}{pct}%
     </span>
@@ -112,7 +112,7 @@ export function SortableHeader({ label, sortKey, currentSort, onSort, align = 'l
         type="button"
         onClick={() => onSort(sortKey)}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%',
+          display: 'inline-flex', whiteSpace: 'nowrap', alignItems: 'center', gap: 4, width: '100%',
           justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
           padding: '10px 16px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
           textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none',

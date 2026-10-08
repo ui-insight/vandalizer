@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MessageSquare, Search, Zap, CheckCircle2, XCircle, Users, AlertCircle,
@@ -18,7 +19,7 @@ const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#0
 export function UsageTab() {
   const [stats, setStats] = useState<UsageStats | null>(null)
   const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null)
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useAdminViewState('UsageTab.days', 30)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loadedDays, setLoadedDays] = useState<number | null>(null)
@@ -91,6 +92,7 @@ export function UsageTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <p style={{ margin: 0, fontSize: 13 }}>Selected window: last {days} days. Trends compare with the preceding {days} days. Chart dates use UTC; exported timestamps retain their recorded timezone.</p>
       {/* Time range selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />

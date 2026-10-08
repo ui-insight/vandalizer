@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,10 +9,10 @@ import { downloadCSV, formatDateTime, formatDuration, formatNumber } from './sha
 import { ExportButton, SearchInput, StatusBadge, UserAvatar } from './shared/primitives'
 
 export function WorkflowsTab() {
-  const [page, setPage] = useState(1)
-  const [status, setStatus] = useState<string>('')
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [page, setPage] = useAdminViewState('WorkflowsTab.page', 1)
+  const [status, setStatus] = useAdminViewState<string>('WorkflowsTab.status', '')
+  const [search, setSearch] = useAdminViewState('WorkflowsTab.search', '')
+  const [searchInput, setSearchInput] = useAdminViewState('WorkflowsTab.searchInput', '')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -112,10 +113,10 @@ export function WorkflowsTab() {
                 <AlertCircle size={14} /> {error}
               </div>
             )}
-            <TableRegion label="Workflow events — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <TableRegion label="Workflow events — scroll for more columns"><table style={{ width: '100%', minWidth: 1080, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '10px 8px', width: 28 }} />
+                  <th className="admin-icon-column"><span className="sr-only">Details</span></th>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflow</th>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
@@ -130,11 +131,11 @@ export function WorkflowsTab() {
                   const isExpanded = expandedId === ev.id
                   return (
                     <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                      <td className="admin-icon-column" style={{ textAlign: 'center' }}>
                         <button type="button" className="admin-open-record" aria-expanded={isExpanded} aria-controls="workflow-event-detail" aria-label={`Details for ${ev.title || 'Untitled workflow'} · ${formatDateTime(ev.started_at)} · ${ev.status}`} onClick={() => setExpandedId(isExpanded ? null : ev.id)}>{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</button>
                       </td>
                       <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
-                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>{ev.title || 'Untitled'}</td>
+                      <td style={{ padding: '10px 16px', minWidth: 220, fontSize: 14, fontWeight: 500 }}>{ev.title || 'Untitled'}</td>
                       <td style={{ padding: '10px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <UserAvatar name={ev.user_name || ev.user_email} />

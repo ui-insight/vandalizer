@@ -1,5 +1,6 @@
+import { createRootRoute, createRoute, createRouter, createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { ConfigTab } from './ConfigTab'
 import type { SystemConfigData } from '../../api/admin'
 
@@ -216,7 +217,7 @@ describe('ConfigTab — panel inventory', () => {
       'Document Compliance Checks',
       'Document Retention Policy',
     ]) {
-      expect(await screen.findByText(heading)).toBeInTheDocument()
+      expect(await screen.findByText(heading, { selector: 'div' })).toBeInTheDocument()
     }
   })
 
@@ -258,7 +259,7 @@ describe('ConfigTab — OCR provider', () => {
     })
     fireEvent.change(screen.getByLabelText('Request Timeout (seconds)'), { target: { value: '600' } })
     fireEvent.click(screen.getByLabelText('Use async conversion API'))
-    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
 
     await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
     const payload = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
@@ -275,7 +276,7 @@ describe('ConfigTab — OCR provider', () => {
     fireEvent.change(screen.getByLabelText('Conversion Options (JSON)'), {
       target: { value: '{"do_ocr": tru' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
 
     await screen.findByText(/^OCR options:/)
     expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
@@ -379,7 +380,7 @@ describe('ConfigTab — allowed private hosts', () => {
     fireEvent.change(screen.getByLabelText('Allowed private hosts'), {
       target: { value: ' mindrouter.example.edu \n\ndata-api.example.edu, third.example.edu\n' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
 
     await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
     const payload = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
@@ -408,7 +409,7 @@ describe('ConfigTab — load-failure guard (plan 003)', () => {
     expect(screen.queryByText('Available Models')).not.toBeInTheDocument()
     expect(screen.queryByText('Authentication')).not.toBeInTheDocument()
     expect(screen.queryByText('UI Theme & Branding')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Save Configuration/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Save Processing Settings/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Save Theme/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Update Methods/i })).not.toBeInTheDocument()
     // Retry is the only control offered.
@@ -424,7 +425,7 @@ describe('ConfigTab — "***" API-key sentinel (plans 003 / 011)', () => {
   it('never sends an empty OCR key for an untouched field, and sends an edited one', async () => {
     await renderConfigTab()
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
     await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
 
     const untouched = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
@@ -437,7 +438,7 @@ describe('ConfigTab — "***" API-key sentinel (plans 003 / 011)', () => {
 
     // Once the admin actually types a key, it is sent verbatim.
     fireEvent.change(screen.getByPlaceholderText('Bearer token...'), { target: { value: 'new-ocr-secret' } })
-    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
     await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(2))
 
     const edited = mockUpdateSystemConfig.mock.calls[1][0] as Record<string, unknown>
@@ -586,4 +587,108 @@ it('retries only the list after an accepted provider edit fails to refresh', asy
   fireEvent.click(retry)
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry provider list' })).not.toBeInTheDocument())
   expect(mockUpdateOAuthProvider).toHaveBeenCalledTimes(1)
+})
+
+
+describe('ConfigTab — save scope and draft protection (#1010)', () => {
+  it('keeps compliance dirty after saving processing settings, then clears only its own successful save', async () => {
+    await renderConfigTab()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Activate compliance checks' }))
+    await screen.findByText(/Unsaved changes: Compliance/)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    await screen.findAllByText('Processing settings saved.')
+    expect(mockUpdateCompliancePolicyConfig).not.toHaveBeenCalled()
+    expect(mockUpdateSystemConfig.mock.calls[0][0]).not.toHaveProperty('compliance_config')
+    expect(screen.getByText(/Unsaved changes: Compliance/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save Compliance Settings' }))
+    await waitFor(() => expect(screen.queryByText(/Unsaved changes:/)).not.toBeInTheDocument())
+    expect(mockUpdateCompliancePolicyConfig).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }))
+  })
+
+  it.each(['150', '-1', ''])('blocks invalid excellent threshold %s and focuses its field', async value => {
+    await renderConfigTab()
+    const field = screen.getByRole('spinbutton', { name: 'Excellent score threshold' })
+    fireEvent.change(field, { target: { value } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
+    expect(field).toHaveFocus()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    expect(field).toHaveAccessibleDescription('Excellent threshold must be a number between 0 and 100.')
+  })
+
+  it('rejects inverted tier ordering and allows a corrected save', async () => {
+    await renderConfigTab()
+    const good = screen.getByRole('spinbutton', { name: 'Good score threshold' })
+    fireEvent.change(good, { target: { value: '95' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
+    expect(good).toHaveFocus()
+    fireEvent.change(good, { target: { value: '75' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
+    expect(mockUpdateSystemConfig.mock.calls[0][0].quality_config.quality_tiers.good.min_score).toBe(75)
+    expect(good).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('retains unsaved edits made while a save request is pending', async () => {
+    let finish!: (value: unknown) => void
+    mockUpdateSystemConfig.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    await renderConfigTab()
+    const endpoint = screen.getByRole('textbox', { name: 'OCR endpoint' })
+    fireEvent.change(endpoint, { target: { value: 'https://first.example.test' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    fireEvent.change(endpoint, { target: { value: 'https://newer.example.test' } })
+    await act(async () => finish({ status: 'ok' }))
+    expect(screen.getByText(/Unsaved changes: Processing settings/)).toBeInTheDocument()
+    expect(screen.queryByText('Processing settings saved.')).not.toBeInTheDocument()
+    expect(endpoint).toHaveValue('https://newer.example.test')
+  })
+
+  it('warns on page unload only while a draft differs from its saved values', async () => {
+    await renderConfigTab()
+    const initial = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(initial)
+    expect(initial.defaultPrevented).toBe(false)
+    const endpoint = screen.getByRole('textbox', { name: 'OCR endpoint' })
+    fireEvent.change(endpoint, { target: { value: 'https://draft.example.test' } })
+    const dirty = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dirty)
+    expect(dirty.defaultPrevented).toBe(true)
+    fireEvent.change(endpoint, { target: { value: 'https://ocr.example.edu' } })
+    const restored = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(restored)
+    expect(restored.defaultPrevented).toBe(false)
+  })
+
+  it('keeps edits when leaving is canceled and navigates only after explicit discard', async () => {
+    const root = createRootRoute()
+    const config = createRoute({ getParentRoute: () => root, path: '/config', component: ConfigTab })
+    const other = createRoute({ getParentRoute: () => root, path: '/other', component: () => <p>Other section</p> })
+    const router = createRouter({ routeTree: root.addChildren([config, other]), history: createMemoryHistory({ initialEntries: ['/config'] }) })
+    render(<RouterProvider router={router} />)
+    const endpoint = await screen.findByRole('textbox', { name: 'OCR endpoint' })
+    fireEvent.change(endpoint, { target: { value: 'https://draft.example.test' } })
+    await screen.findByText(/Unsaved changes: Processing settings/)
+    mockConfirm.mockResolvedValueOnce(false)
+    await act(async () => { router.history.push('/other') })
+    expect(endpoint).toHaveValue('https://draft.example.test')
+    expect(screen.queryByText('Other section')).not.toBeInTheDocument()
+    expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Discard and leave', cancelLabel: 'Keep editing' }))
+    mockConfirm.mockResolvedValueOnce(true)
+    await act(async () => { router.history.push('/other') })
+    await screen.findByText('Other section')
+  })
+})
+
+
+it('rejects compliance overlap that is larger than its chunk', async () => {
+  await renderConfigTab()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Activate compliance checks' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Compliance chunk size' }), { target: { value: '500' } })
+  const overlap = screen.getByRole('spinbutton', { name: 'Compliance chunk overlap' })
+  fireEvent.change(overlap, { target: { value: '600' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save Compliance Settings' }))
+  expect(mockUpdateCompliancePolicyConfig).not.toHaveBeenCalled()
+  expect(overlap).toHaveFocus()
+  expect(overlap).toHaveAccessibleDescription('Compliance chunk overlap must be smaller than chunk size.')
 })

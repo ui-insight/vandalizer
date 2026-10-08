@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, BarChart3, CheckCircle2, Clock, Minus, Play, RefreshCw,
@@ -25,14 +26,14 @@ import { useAdminQuery } from './shared/useAdminQuery'
 
 export function QualityTab() {
   const { toast } = useToast()
-  const [days, setDays] = useState(90)
+  const [days, setDays] = useAdminViewState('QualityTab.days', 90)
   const [regressionStarting, setRegressionStarting] = useState(false)
   const starting = useRef(false)
-  const [regressionModel, setRegressionModel] = useState('')
+  const [regressionModel, setRegressionModel] = useAdminViewState('QualityTab.regressionModel', '')
   const [activeSuite, setActiveSuite] = useState<RegressionSuiteRunDetail | null>(null)
   const [compareSuite, setCompareSuite] = useState<RegressionSuiteRunDetail | null>(null)
-  const [selectedRun, setSelectedRun] = useState('')
-  const [comparisonRun, setComparisonRun] = useState('')
+  const [selectedRun, setSelectedRun] = useAdminViewState('QualityTab.selectedRun', '')
+  const [comparisonRun, setComparisonRun] = useAdminViewState('QualityTab.comparisonRun', '')
   const [suiteError, setSuiteError] = useState<string | null>(null)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
   const suiteVersion = useRef(0)
@@ -40,7 +41,7 @@ export function QualityTab() {
   const acknowledging = useRef(new Set<string>())
   const [pendingAlerts, setPendingAlerts] = useState<string[]>([])
   const [expandedItem, setExpandedItem] = useState<{ kind: string; id: string } | null>(null)
-  const [itemSort, setItemSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'score', dir: 'asc' })
+  const [itemSort, setItemSort] = useAdminViewState<{ key: string; dir: 'asc' | 'desc' }>('QualityTab.itemSort', { key: 'score', dir: 'asc' })
 
   const request = useCallback(() => Promise.all([
     getQualitySummary(), getQualityTimeline(days), getQualityAlerts(50, false), getQualityItems('score', 'asc', 100),
@@ -207,7 +208,7 @@ export function QualityTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0, overflowWrap: 'anywhere' }}>
-      <p style={{ fontSize: 13, color: '#59616b', margin: 0 }}>Recorded validation scores measure performance on test cases. Review the affected item and its evidence before relying on it for a new document.</p>
+      <p style={{ fontSize: 13, color: '#59616b', margin: 0 }}>Recorded validation scores use a 0–100 scale and measure performance on test cases. Compare runs with the same grader and test cases; stale results may predate changes to the item. Review the evidence before relying on it for a new document. This monitoring view shows up to 100 items ordered by lowest score, 50 recent unacknowledged alerts, and 20 recent regression runs.</p>
       {/* Alert Feed Panel */}
       {alerts.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>

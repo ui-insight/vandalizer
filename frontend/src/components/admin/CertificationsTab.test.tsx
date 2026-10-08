@@ -71,18 +71,31 @@ describe('CertificationsTab — unlock toggle', () => {
   })
 })
 
-describe('CertificationsTab — truncation notice (plan 012)', () => {
-  it('renders a truncation notice when the API reports capped: true', async () => {
+describe('CertificationsTab — server pagination', () => {
+  it('offers the next page when more records exist', async () => {
     mockGetCertificationProgressList.mockResolvedValue({ items: [item], total: 5000, capped: true })
     render(<CertificationsTab />)
     await waitFor(() => expect(screen.getByText('Target User')).toBeInTheDocument())
-    expect(screen.getByText(/this list is truncated/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    await waitFor(() => expect(mockGetCertificationProgressList).toHaveBeenCalledWith(100, 100, ''))
   })
 
-  it('does not render a truncation notice when the API reports capped: false', async () => {
+  it('disables the next page after the final record', async () => {
     mockGetCertificationProgressList.mockResolvedValue({ items: [item], total: 1, capped: false })
     render(<CertificationsTab />)
     await waitFor(() => expect(screen.getByText('Target User')).toBeInTheDocument())
-    expect(screen.queryByText(/this list is truncated/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
   })
+})
+
+ it('searches all server records and resets pagination', async () => {
+  mockGetCertificationProgressList.mockResolvedValue({ items: [item], total: 501, capped: true })
+  render(<CertificationsTab />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+  await waitFor(() => expect(mockGetCertificationProgressList).toHaveBeenCalledWith(100, 100, ''))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Search all records' })).toBeEnabled())
+  fireEvent.change(screen.getByPlaceholderText('Search users...'), { target: { value: 'Target User' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Search all records' }))
+  await waitFor(() => expect(mockGetCertificationProgressList).toHaveBeenCalledWith(100, 0, 'Target User'))
 })

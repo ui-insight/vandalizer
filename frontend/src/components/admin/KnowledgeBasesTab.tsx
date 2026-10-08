@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback, useMemo, useState, useRef, useLayoutEffect } from 'react'
@@ -22,10 +23,13 @@ type SortKey = 'title' | 'updated'
  * in place (e.g. adding a date/version to the title). Source provenance per KB
  * is verified in the KB detail view; this surface is the bulk-rename overview. */
 export function KnowledgeBasesTab({ canEdit }: Props) {
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<SortKey>('title')
+  const [search, setSearch] = useAdminViewState('KnowledgeBasesTab.search', '')
+  const [statusFilter, setStatusFilter] = useAdminViewState('KnowledgeBasesTab.status', '')
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState<string | null>(null)
+  const [sort, setSort] = useAdminViewState<SortKey>('KnowledgeBasesTab.sort', 'title')
 
-  const request = useCallback(() => getAdminKnowledgeBases({ limit: 5000 }), [])
+  const request = useCallback(() => getAdminKnowledgeBases({ limit: 500 }), [])
   const { data, setData, loading, error, load } = useAdminQuery(request)
   const kbs = useMemo(() => data?.knowledge_bases ?? [], [data])
 
@@ -38,14 +42,25 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
           || (kb.team_name ?? '').toLowerCase().includes(q)
           || kb.tags.some(t => t.toLowerCase().includes(q)))
       : kbs
-    const sorted = [...rows]
+    const sorted = statusFilter ? rows.filter(kb => kb.status === statusFilter) : [...rows]
     if (sort === 'title') {
       sorted.sort((a, b) => a.title.localeCompare(b.title))
     } else {
       sorted.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
     }
     return sorted
-  }, [kbs, search, sort])
+  }, [kbs, search, sort, statusFilter])
+
+  const loadMore = async () => {
+    if (loadingMore || loading) return
+    setLoadingMore(true)
+    setMoreError(null)
+    try {
+      const result = await getAdminKnowledgeBases({ limit: 500, offset: kbs.length })
+      setData(previous => previous ? { total: result.total, knowledge_bases: [...previous.knowledge_bases, ...result.knowledge_bases.filter(kb => !previous.knowledge_bases.some(old => old.uuid === kb.uuid))] } : result)
+    } catch (reason) { setMoreError(reason instanceof Error ? reason.message : 'Could not load more knowledge bases. Retry.') }
+    finally { setLoadingMore(false) }
+  }
 
   const applyRename = useCallback((uuid: string, title: string) => {
     setData(prev => prev ? { ...prev, knowledge_bases: prev.knowledge_bases.map(kb => (kb.uuid === uuid ? { ...kb, title } : kb)) } : prev)
@@ -76,7 +91,9 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
               }}
             />
           </div>
+          <label style={{ fontSize: 13 }}>Status <select aria-label="Knowledge base status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="">All statuses</option>{[...new Set(kbs.map(kb => kb.status))].map(status => <option key={status} value={status}>{status}</option>)}</select></label>
           <button
+            disabled={loadingMore}
             onClick={load}
             title="Refresh"
             style={{
@@ -91,6 +108,9 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
         </div>
       </div>
 
+      <p style={{ fontSize: 13, color: '#475569' }}>{filtered.length} matching loaded records · {kbs.length} of {data?.total ?? 0} loaded. Search and status filters apply to loaded records, including owner, team and tags.</p>
+      {data && kbs.length < data.total && <button type="button" className="admin-open-record" disabled={loadingMore || loading} onClick={() => void loadMore()}>{loadingMore ? 'Loading records…' : 'Load more knowledge bases'}</button>}
+      {moreError && <p role="alert">{moreError}</p>}
       {error && (
         <div role="alert" style={{ padding: 12, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13 }}>
           {error}
@@ -105,7 +125,7 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
             {error ? 'Use Refresh to retry loading the inventory.' : kbs.length === 0 ? 'No knowledge bases found.' : 'No matches.'}
           </div>
         ) : (
-          <TableRegion label="Knowledge base inventory — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Knowledge base inventory — scroll for more columns"><table style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <Th>#</Th>

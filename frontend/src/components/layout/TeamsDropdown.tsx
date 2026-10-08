@@ -1,3 +1,4 @@
+import { adminAccess } from '../../lib/adminAccess'
 import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Inbox } from 'lucide-react'
@@ -14,6 +15,9 @@ export function TeamsDropdown() {
   const certPanel = useCertificationPanel()
   const { count: pendingReviews } = useMyReviewCount()
   const [open, setOpen] = useState(false)
+  const [teamSearch, setTeamSearch] = useState('')
+  const access = adminAccess(user, currentTeam)
+  const visibleTeams = teams.filter(team => team.name.toLowerCase().includes(teamSearch.toLowerCase()))
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [switching, setSwitching] = useState(false)
   const switchPending = useRef(false)
@@ -23,7 +27,7 @@ export function TeamsDropdown() {
 
   // Collect the currently rendered menuitems (order = DOM order).
   const getMenuItems = () =>
-    Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+    Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? [])
 
   // Close the menu and (by default) return focus to the trigger button.
   const closeMenu = (restoreFocus = true) => {
@@ -53,18 +57,26 @@ export function TeamsDropdown() {
   // Move focus to the first menuitem when the menu opens.
   useEffect(() => {
     if (!open) return
-    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]')
-    items?.[0]?.focus()
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')
+    const search = ref.current?.querySelector<HTMLInputElement>('input[type=search]')
+    if (search) search.focus()
+    else items?.[0]?.focus()
   }, [open])
 
   // Roving keyboard navigation within the menu.
   const handleMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Tab') {
+      triggerRef.current?.focus()
+      closeMenu(false)
+      return
+    }
     if (e.key === 'Escape') {
       e.preventDefault()
       closeMenu()
       return
     }
 
+    if (e.target instanceof HTMLInputElement) return
     const items = getMenuItems()
     if (items.length === 0) return
 
@@ -93,11 +105,11 @@ export function TeamsDropdown() {
   }
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <div ref={ref} className="relative inline-block" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
       {/* Trigger button - matches Flask .btn .btn-secondary */}
       <button
         ref={triggerRef}
-        onClick={() => setOpen(!open)}
+        onClick={() => { setTeamSearch(''); setOpen(!open) }}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={`Account menu: ${currentTeam?.name || 'Account'}`}
@@ -111,19 +123,26 @@ export function TeamsDropdown() {
       {/* Menu - matches Flask menu.css */}
       {open && (
         <div
+          className="account-menu-popup"
+          onKeyDown={handleMenuKeyDown}
+        >
+          {teams.length > 6 && <label className="account-team-search">Find a team<input type="search" value={teamSearch} onChange={e => setTeamSearch(e.target.value)} placeholder="Search your teams" onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); getMenuItems()[0]?.focus(); e.stopPropagation() } }} /></label>}
+        <div
           ref={menuRef}
           role="menu"
-          className="absolute right-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
+          aria-label="Account and teams"
+          className="p-1.5"
           style={{
             borderColor: 'rgba(0,0,0,.15)',
             boxShadow: '0 8px 24px rgba(0,0,0,.12)',
           }}
-          onKeyDown={handleMenuKeyDown}
         >
           {(teamsError || switchError) && <div role="none" className="max-w-[240px] p-2 text-xs text-red-800"><p role="alert">{switchError || teamsError}</p>{teamsError && <button type="button" role="menuitem" tabIndex={-1} className="underline" onClick={() => void refreshTeams()}>Retry teams</button>}</div>}
           {switching && <p role="status" className="p-2 text-xs text-gray-700">Switching team…</p>}
           {/* Team list */}
-          {teams.map((team) => {
+          <div role="group" aria-label="Switch team" className="account-team-list" tabIndex={0}>
+          {visibleTeams.length === 0 && <p role="status" className="p-2 text-sm">No teams match your search.</p>}
+          {visibleTeams.map((team) => {
             const isActive = team.uuid === currentTeam?.uuid
             return (
               <button
@@ -143,13 +162,14 @@ export function TeamsDropdown() {
                 className="menu-item flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <Users className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                <span>{team.name}</span>
+                <span className="account-team-name">{team.name}</span>
                 {isActive && (
-                  <span className="text-xs text-[#36c] ml-2">(current)</span>
+                  <span className="text-xs text-[#36c] ml-auto shrink-0 whitespace-nowrap">(current)</span>
                 )}
               </button>
             )
           })}
+          </div>
 
           {/* Divider */}
           <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
@@ -248,7 +268,7 @@ export function TeamsDropdown() {
           )}
 
           {/* Admin / Analytics: full admins and staff (analytics-only) and examiners */}
-          {(user?.is_admin || user?.is_staff || user?.is_examiner) && (
+          {access.hasAccess && (
             <>
               {!user?.is_support_agent && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link
@@ -259,7 +279,7 @@ export function TeamsDropdown() {
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <Shield className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                <span>{user?.is_admin ? 'Admin' : 'Analytics'}</span>
+                <span>{access.label}</span>
               </Link>
             </>
           )}
@@ -300,6 +320,7 @@ export function TeamsDropdown() {
 
           {/* Deployment / build info */}
           <VersionMenuFooter />
+        </div>
         </div>
       )}
     </div>

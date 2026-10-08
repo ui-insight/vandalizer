@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { useEffect, useRef, useState } from 'react'
 import {
   PackageOpen, CheckCircle2, AlertTriangle, Loader2, ArrowUpCircle, Trash2,
@@ -22,7 +23,7 @@ function VersionPill({ label, value, accent }: { label: string; value: string; a
 
 export function CatalogTab() {
   const { data: preview, loading, error: previewError, load: loadPreview } = useAdminQuery(getCatalogPreview)
-  const [job, setJob] = useState<CatalogJob | null>(null)
+  const [job, setJob] = useAdminViewState<CatalogJob | null>('CatalogTab.job', null)
   const [prune, setPrune] = useState(true)
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export function CatalogTab() {
   const pending = useRef(false)
   const mounted = useRef(false)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  useEffect(() => { if (preview) setJob(preview.job) }, [preview])
+  useEffect(() => { if (preview) setJob(preview.job) }, [preview, setJob])
 
   // Only one status request is in flight. A failed read never starts another upgrade.
   useEffect(() => {
@@ -53,7 +54,7 @@ export function CatalogTab() {
     }
     timer = setTimeout(poll, 1000)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [job?.state, pollAttempt, loadPreview])
+  }, [job?.state, pollAttempt, loadPreview, setJob])
 
   const apply = async () => {
     if (pending.current || job?.state === 'running') return

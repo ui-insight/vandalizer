@@ -1,3 +1,4 @@
+import { TableRegion } from '../components/admin/shared/TableRegion'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft, LogOut, Link2, Link2Off } from 'lucide-react'
@@ -385,7 +386,7 @@ function TeamSettingsContent() {
               <p className="text-xs text-gray-500">Your role in this team: {currentTeam.role}</p>
               <p className="mt-1 text-xs text-gray-600">Team roles control this team’s members and shared work. They are separate from account-level access.</p>
             </div>
-            <table className="team-members-table w-full">
+            <TableRegion label="Team members — scroll for roles and actions"><table className="team-members-table w-full">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
                   <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Member</th>
@@ -434,7 +435,7 @@ function TeamSettingsContent() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></TableRegion>
           </div>
         )}
 
@@ -442,6 +443,7 @@ function TeamSettingsContent() {
         {canEdit && (
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h3 className="mb-3 font-medium text-gray-900">Invite Member</h3>
+            <p className="mb-3 text-sm text-gray-600">Members use shared work. Admins can manage membership and team settings. Only the owner can transfer ownership or delete the team.</p>
             <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3">
               <div className="min-w-0 flex-[1_1_200px]">
                 <label htmlFor="invite-email" className="block text-xs font-medium text-gray-500">Email</label>

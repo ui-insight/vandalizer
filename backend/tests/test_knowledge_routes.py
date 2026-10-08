@@ -2318,6 +2318,7 @@ class TestAdminKBInventory:
                 "app.services.knowledge_service.admin_list_all_knowledge_bases",
                 new_callable=AsyncMock,
             ) as mock_list,
+            patch("app.services.knowledge_service.admin_count_knowledge_bases", new_callable=AsyncMock, return_value=1),
             patch("app.routers.admin.User.find") as mock_user_find,
             patch("app.routers.admin.Team.find") as mock_team_find,
         ):

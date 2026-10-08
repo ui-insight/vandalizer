@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
-type Section<T extends string> = { key: T; label: string; icon: LucideIcon }
+type Section<T extends string> = { key: T; label: string; icon: LucideIcon; group?: string }
 
 /** Shared navigation for administration and examiner work. The same sections
  * become a labeled selector on small screens without replacing the task. */
@@ -25,10 +25,13 @@ export function SectionPage<T extends string>({ title, icon: Icon, label, sectio
           </select>
         </label>
         <div className="section-page__links">
-          {sections.map(({ key, label: sectionLabel, icon: SectionIcon }) => (
+          {sections.map(({ key, label: sectionLabel, icon: SectionIcon, group }, index) => (
+            <Fragment key={key}>
+            {group && group !== sections[index - 1]?.group && <p className="admin-nav-group">{group}</p>}
             <button type="button" key={key} aria-current={active === key ? 'page' : undefined} onClick={() => onSelect(key)}>
               <SectionIcon size={18} aria-hidden="true" />{sectionLabel}
             </button>
+            </Fragment>
           ))}
         </div>
       </nav>

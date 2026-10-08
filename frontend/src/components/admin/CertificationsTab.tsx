@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback, useMemo, useState, useRef } from 'react'
@@ -12,24 +13,19 @@ import { ExportButton, SearchInput, UserAvatar } from './shared/primitives'
 
 export function CertificationsTab() {
   const { toast } = useToast()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useAdminViewState('CertificationsTab.search', '')
+  const [query, setQuery] = useAdminViewState('CertificationsTab.query', '')
+  const [offset, setOffset] = useAdminViewState('CertificationsTab.offset', 0)
+  const pageSize = 100
   const [busyUser, setBusyUser] = useState<string | null>(null)
 
   const busyRef = useRef(false)
-  const request = useCallback(() => getCertificationProgressList(), [])
+  const request = useCallback(() => getCertificationProgressList(pageSize, offset, query), [offset, query])
   const { data, setData, loading, error, load: refresh } = useAdminQuery(request)
   const items = useMemo(() => data?.items ?? [], [data])
   const capped = data?.capped ?? false
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return items
-    const q = search.toLowerCase()
-    return items.filter(p =>
-      (p.name || '').toLowerCase().includes(q) ||
-      (p.email || '').toLowerCase().includes(q) ||
-      (p.user_id || '').toLowerCase().includes(q)
-    )
-  }, [items, search])
+  const filtered = items
 
   const toggleUnlock = async (item: CertificationProgressItem) => {
     if (busyRef.current) return
@@ -63,7 +59,7 @@ export function CertificationsTab() {
     )
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading certification progress...</div>
+  if (loading && !data && !query && offset === 0) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading certification progress...</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -75,7 +71,10 @@ export function CertificationsTab() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
+        <form onSubmit={event => { event.preventDefault(); setOffset(0); setQuery(search.trim()); }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
+          <button type="submit" className="admin-open-record" disabled={loading}>Search all records</button>
+        </form>
         <div style={{ flex: 1 }} />
         <button
           onClick={refresh}
@@ -89,13 +88,13 @@ export function CertificationsTab() {
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-          Certification Progress ({filtered.length})
+          Certification Progress ({data?.total ?? 0} matching records)
         </div>
-        {capped && (
-          <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={14} /> Showing the top {items.length} users by progress — this list is truncated. Search and export cover only these loaded rows, not every user.
-          </div>
-        )}
+        <div className="admin-pagination" aria-label="Certification pages">
+          <p role="status">{loading ? 'Loading records…' : `${filtered.length ? offset + 1 : 0}–${offset + filtered.length} of ${data?.total ?? 0} matching records. Export contains this page only.`}</p>
+          <button type="button" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - pageSize))}>Previous page</button>
+          <button type="button" disabled={loading || !capped} onClick={() => setOffset(value => value + pageSize)}>Next page</button>
+        </div>
         {error && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
@@ -106,9 +105,9 @@ export function CertificationsTab() {
           </div>
         )}
         {filtered.length === 0 ? (
-          !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>{search.trim() ? 'No users match this search.' : 'No users have started the certification yet.'}</div>
+          !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>{query ? 'No records match this search.' : 'No users have started the certification yet.'}</div>
         ) : (
-          <TableRegion label="Certification progress — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Certification progress — scroll for more columns"><table style={{ width: '100%', minWidth: 1080, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
@@ -125,7 +124,7 @@ export function CertificationsTab() {
                 const pct = p.modules_total > 0 ? (p.modules_completed / p.modules_total) * 100 : 0
                 return (
                   <tr key={p.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td style={{ padding: '12px 16px', minWidth: 280 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <UserAvatar name={p.name || p.email} />
                         <div>

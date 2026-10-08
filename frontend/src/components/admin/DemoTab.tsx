@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   AlertCircle, ChevronRight, RefreshCw, MessageSquare, Download, ChevronDown,
@@ -106,9 +107,9 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 export function DemoTab() {
   const confirm = useConfirm()
   const { toast } = useToast()
-  const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
-  const [statusFilter, setStatusFilter] = useState<string>('')
-  const [search, setSearch] = useState('')
+  const [subTab, setSubTab] = useAdminViewState<'applications' | 'surveys'>('DemoTab.subTab', 'applications')
+  const [statusFilter, setStatusFilter] = useAdminViewState<string>('DemoTab.statusFilter', '')
+  const [search, setSearch] = useAdminViewState('DemoTab.search', '')
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
   const request = useCallback(async () => {
     const [stats, apps] = await Promise.all([getDemoStats(), getDemoApplications(statusFilter || undefined)])

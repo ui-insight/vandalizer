@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useConfigDraft } from './configDrafts'
 import { Palette } from 'lucide-react'
 import { getThemeConfig, updateThemeConfig } from '../../../api/config'
 import type { ThemeConfig } from '../../../api/config'
@@ -64,6 +65,10 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
   }, [])
   useEffect(() => { const requestRef = themeRequest; loadTheme(); return () => { requestRef.current++ } }, [loadTheme])
 
+  const themeDraft = useConfigDraft('Branding', {
+    themeColor, themeRadius, themeOrgName, themeAppName, themeLogo, themeIcon, themeIconHideInNav,
+  }, !themeLoading && !themeLoadError)
+
   const handleSaveTheme = async () => {
     if (savePending.current || themeLoading || themeLoadError) return
     savePending.current = true
@@ -81,6 +86,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
         icon_data_url: themeIcon,
         icon_hide_in_nav: themeIconHideInNav,
       })
+      themeDraft.markSaved()
       applyThemeToDOM(updated)
       await branding.refresh()
       setThemeSaved(revision === themeRevision.current)
@@ -140,11 +146,13 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
   if (themeLoadError) return <div style={sectionStyle}><p role="alert" style={sectionBodyStyle}>{themeLoadError} Branding changes are unavailable until saved settings load. <button onClick={loadTheme} style={{ textDecoration: 'underline' }}>Retry branding settings</button></p></div>
 
   return (
-    <div onChangeCapture={() => { themeRevision.current++; setThemeSaved(false) }} style={sectionStyle}>
+    <div id="cfg-branding" onChangeCapture={() => { themeRevision.current++; setThemeSaved(false) }} style={sectionStyle}>
       <div style={sectionHeaderStyle}>
         <Palette size={18} color="#6b7280" /> UI Theme &amp; Branding
       </div>
       <div style={sectionBodyStyle}>
+        <p style={{ fontSize: 13, color: '#475569' }}>Images below preview this draft. Application branding changes after Save Theme succeeds.</p>
+        {themeDraft.dirty && <button type="button" disabled={themeSaving} onClick={loadTheme} style={{ textDecoration: 'underline', fontSize: 13, marginBottom: 12 }}>Discard branding edits and reload saved appearance</button>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 20 }}>
           <div>
             <label style={labelStyle}>Highlight Color</label>

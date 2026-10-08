@@ -1,3 +1,5 @@
+import { InventoryPages } from './shared/InventoryPages'
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useAuth } from '../../hooks/useAuth'
@@ -224,10 +226,14 @@ export function TeamsTab() {
   const mutationKeys = useRef(new Set<string>())
   const confirm = useConfirm()
   const { toast } = useToast()
-  const [subTab, setSubTab] = useState<'manage' | 'stats' | 'isolated'>('manage')
+  const [subTab, setSubTab] = useAdminViewState<'manage' | 'stats' | 'isolated'>('TeamsTab.subTab', 'manage')
 
   // ── Manage sub-tab state ──────────────────────────────────────────────────
   const [allTeams, setAllTeams] = useState<AdminTeamItem[]>([])
+  const [allTeamsTotal, setAllTeamsTotal] = useState(0)
+  const [loadingMoreTeams, setLoadingMoreTeams] = useState(false)
+  const [moreTeamsError, setMoreTeamsError] = useState<string | null>(null)
+  const teamRequest = useRef(0)
   const [allTeamsCapped, setAllTeamsCapped] = useState(false)
   const [loadingAll, setLoadingAll] = useState(true)
   const [allTeamsError, setAllTeamsError] = useState<string | null>(null)
@@ -240,15 +246,17 @@ export function TeamsTab() {
   const [defaultTeamUuid, setDefaultTeamUuid] = useState<string>('')
   const [settingDefault, setSettingDefault] = useState(false)
 
+  const [statsOffset, setStatsOffset] = useAdminViewState('TeamsTab.statsOffset', 0)
+  const [isolatedOffset, setIsolatedOffset] = useAdminViewState('TeamsTab.isolatedOffset', 0)
   // ── Stats sub-tab state ───────────────────────────────────────────────────
   const [statsTeams, setStatsTeams] = useState<TeamLeaderboardItem[]>([])
   const [statsCapped, setStatsCapped] = useState(false)
   const [loadingStats, setLoadingStats] = useState(false)
   const [statsError, setStatsError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
+  const [search, setSearch] = useAdminViewState('TeamsTab.search', '')
+  const [sort, setSort] = useAdminViewState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>('TeamsTab.sort', { key: 'tokens_total', dir: 'desc' })
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
-  const [statsDays, setStatsDays] = useState<DayOption>('all')
+  const [statsDays, setStatsDays] = useAdminViewState<DayOption>('TeamsTab.statsDays', 'all')
 
   // ── Isolated sub-tab state ───────────────────────────────────────────────
   const [isolated, setIsolated] = useState<IsolatedUserItem[]>([])
@@ -266,11 +274,15 @@ export function TeamsTab() {
   const [addUserErrors, setAddUserErrors] = useState<Record<string, string>>({})
 
   const refreshAllTeams = useCallback(() => {
+    const version = ++teamRequest.current
     let cancelled = false
+    setMoreTeamsError(null)
+    setLoadingMoreTeams(false)
     setLoadingAll(true)
     setAllTeamsError(null)
     adminListAllTeams().then(res => {
-      if (cancelled) return
+      if (cancelled || version !== teamRequest.current) return
+      setAllTeamsTotal(res.total)
       setAllTeams(res.items)
       setAllTeamsCapped(res.capped)
       const def = res.items.find(x => x.is_default)
@@ -280,11 +292,27 @@ export function TeamsTab() {
     return () => { cancelled = true }
   }, [])
 
+  const loadMoreTeams = async () => {
+    if (loadingMoreTeams || loadingAll) return
+    const version = ++teamRequest.current
+    setLoadingMoreTeams(true)
+    setMoreTeamsError(null)
+    try {
+      const result = await adminListAllTeams(500, allTeams.length)
+      if (version !== teamRequest.current) return
+      setAllTeams(previous => [...previous, ...result.items.filter(item => !previous.some(old => old.uuid === item.uuid))])
+      setAllTeamsCapped(result.capped)
+      setAllTeamsTotal(result.total)
+    } catch (reason) {
+      if (version === teamRequest.current) setMoreTeamsError(reason instanceof Error ? reason.message : 'Could not load more teams. Retry.')
+    } finally { if (version === teamRequest.current) setLoadingMoreTeams(false) }
+  }
+
   const refreshIsolated = useCallback(() => {
     let cancelled = false
     setLoadingIsolated(true)
     setIsolatedError(null)
-    getIsolatedUsers().then(res => {
+    getIsolatedUsers(500, isolatedOffset).then(res => {
       if (cancelled) return
       setIsolated(res.items)
       setIsolatedCapped(res.capped)
@@ -295,7 +323,7 @@ export function TeamsTab() {
       setIsolatedLoaded(true)
     }).finally(() => { if (!cancelled) setLoadingIsolated(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [isolatedOffset])
 
   useEffect(() => {
     const cancelAllTeams = refreshAllTeams()
@@ -308,12 +336,12 @@ export function TeamsTab() {
     setLoadingStats(true)
     setStatsError(null)
     const arg = typeof statsDays === 'number' ? statsDays : undefined
-    getTeamLeaderboard(arg)
+    getTeamLeaderboard(arg, 500, statsOffset)
       .then(res => { if (!cancelled) { setStatsTeams(res.items); setStatsCapped(res.capped) } })
       .catch(e => { if (!cancelled) setStatsError(e?.message || 'Failed to load team stats') })
       .finally(() => { if (!cancelled) setLoadingStats(false) })
     return () => { cancelled = true }
-  }, [statsDays])
+  }, [statsDays, statsOffset])
 
   useEffect(() => {
     if (subTab === 'stats') {
@@ -501,6 +529,11 @@ export function TeamsTab() {
         </button>
       </div>
 
+      {allTeamsCapped && subTab !== 'stats' && <div>
+        <button type="button" className="admin-open-record" disabled={loadingMoreTeams || loadingAll} onClick={() => void loadMoreTeams()}>{loadingMoreTeams ? 'Loading teams…' : 'Load more teams'}</button>
+        {moreTeamsError && <p role="alert">{moreTeamsError}</p>}
+        <p style={{ fontSize: 13 }}>Loaded {allTeams.length} of {allTeamsTotal} teams. Additional teams become available for management and assignment after loading.</p>
+      </div>}
       {/* ── Manage Teams ─────────────────────────────────────────── */}
       {subTab === 'manage' && (
         <div role="tabpanel" id="admin-teams-panel-manage" aria-labelledby="admin-teams-tab-manage" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -535,15 +568,15 @@ export function TeamsTab() {
 
           {/* Teams list */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-              All Teams ({allTeams.length})
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              All Teams ({allTeams.length} of {allTeamsTotal})
               <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
                 Open a team to manage its members. {canSetDefault ? 'Set Default chooses the team for new users.' : 'A platform admin can change the default team for new users.'}
               </span>
             </div>
             {allTeamsCapped && (
               <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertCircle size={14} /> Showing the first {allTeams.length} teams only — there are more teams than fit here, and this view has no way to reach them yet.
+                <AlertCircle size={14} /> Showing {allTeams.length} of {allTeamsTotal} teams. Load more to reach additional teams.
               </div>
             )}
             {allTeamsError && (
@@ -575,10 +608,10 @@ export function TeamsTab() {
                     <Building2 size={16} color={team.is_default ? '#b45309' : '#7c3aed'} />
                   </div>
                   <div style={{ flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                       <button type="button" className="admin-open-record" aria-expanded={expandedTeamUuid === team.uuid} onClick={() => handleExpandTeam(team.uuid)}>{team.name}</button>
                       {team.is_default && (
-                        <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                        <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
                           Default
                         </span>
                       )}
@@ -600,7 +633,7 @@ export function TeamsTab() {
                       borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
                     }}
                   >
-                    {team.is_default ? '★ Default' : '☆ Set Default'}
+                    {team.is_default ? 'Remove default' : 'Set default for new users'}
                   </button>}
                 </div>
 
@@ -702,11 +735,7 @@ export function TeamsTab() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
               Team Leaderboard ({filteredStats.length}) {statsDays !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {statsDays} days</span>}
             </div>
-            {statsCapped && (
-              <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertCircle size={14} /> Showing the top {statsTeams.length} teams by token usage — this list is truncated. Sorting and export cover only these loaded rows, not every team.
-              </div>
-            )}
+            <InventoryPages offset={statsOffset} count={statsTeams.length} hasMore={statsCapped} busy={loadingStats} onChange={setStatsOffset} />
             {statsError && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -770,11 +799,7 @@ export function TeamsTab() {
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
             Isolated Users (only on their personal team) ({isolated.length})
           </div>
-          {isolatedCapped && (
-            <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle size={14} /> Showing the first {isolated.length} isolated users only — there are more than fit here.
-            </div>
-          )}
+          <InventoryPages offset={isolatedOffset} count={isolated.length} hasMore={isolatedCapped} busy={loadingIsolated} onChange={setIsolatedOffset} />
           {isolatedError && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,

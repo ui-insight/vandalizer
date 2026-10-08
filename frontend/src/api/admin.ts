@@ -176,10 +176,11 @@ export interface UserLeaderboardResponse {
   capped: boolean
 }
 
-export function getUserLeaderboard(days?: number, limit: number = 500) {
+export function getUserLeaderboard(days?: number, limit: number = 500, offset = 0) {
   const params = new URLSearchParams()
   if (days) params.set('days', String(days))
   params.set('limit', String(limit))
+  params.set('offset', String(offset))
   return apiFetch<UserLeaderboardResponse>(`/api/admin/users?${params.toString()}`)
 }
 
@@ -202,10 +203,11 @@ export interface TeamLeaderboardResponse {
   capped: boolean
 }
 
-export function getTeamLeaderboard(days?: number, limit: number = 500) {
+export function getTeamLeaderboard(days?: number, limit: number = 500, offset = 0) {
   const params = new URLSearchParams()
   if (days) params.set('days', String(days))
   params.set('limit', String(limit))
+  params.set('offset', String(offset))
   return apiFetch<TeamLeaderboardResponse>(`/api/admin/teams?${params.toString()}`)
 }
 
@@ -432,8 +434,8 @@ export interface IsolatedUsersResponse {
   capped: boolean
 }
 
-export function adminListAllTeams(limit: number = 500) {
-  return apiFetch<AdminTeamListResponse>(`/api/admin/teams/all?limit=${limit}`)
+export function adminListAllTeams(limit: number = 500, offset = 0, q = '') {
+  return apiFetch<AdminTeamListResponse>(`/api/admin/teams/all?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`)
 }
 
 export function adminCreateTeam(name: string) {
@@ -451,8 +453,8 @@ export function adminRemoveUserFromTeam(teamUuid: string, userId: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/teams/${teamUuid}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
-export function getIsolatedUsers(limit: number = 500) {
-  return apiFetch<IsolatedUsersResponse>(`/api/admin/users/isolated?limit=${limit}`)
+export function getIsolatedUsers(limit: number = 500, offset = 0) {
+  return apiFetch<IsolatedUsersResponse>(`/api/admin/users/isolated?limit=${limit}&offset=${offset}`)
 }
 
 export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean }) {
@@ -968,8 +970,8 @@ export interface CertificationProgressListResponse {
   capped: boolean
 }
 
-export function getCertificationProgressList(limit: number = 500) {
-  return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}`)
+export function getCertificationProgressList(limit: number = 500, offset = 0, q = '') {
+  return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`)
 }
 
 export function getCertificationProgressDetail(userId: string) {
@@ -1148,10 +1150,11 @@ export interface AdminKBListResponse {
 
 /** Org-wide KB inventory for reviewing names/versions. Backend gates on
  * admin-or-staff; renaming a KB you don't own additionally requires full admin. */
-export function getAdminKnowledgeBases(params?: { search?: string; limit?: number }) {
+export function getAdminKnowledgeBases(params?: { search?: string; limit?: number; offset?: number }) {
   const qs = new URLSearchParams()
   if (params?.search) qs.set('search', params.search)
   if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.offset) qs.set('offset', String(params.offset))
   const q = qs.toString()
   return apiFetch<AdminKBListResponse>(`/api/admin/knowledge-bases${q ? `?${q}` : ''}`)
 }

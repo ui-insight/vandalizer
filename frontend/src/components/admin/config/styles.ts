@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react'
 // is inline-styled by design — do not convert these to Tailwind.
 
 export const sectionStyle: CSSProperties = {
-  background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden',
+  scrollMarginTop: 180, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden',
 }
 
 export const sectionHeaderStyle: CSSProperties = {

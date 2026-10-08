@@ -94,6 +94,8 @@ export async function installFixtures(context, state = {empty:false, first:false
     const chunks=state.chatChunks || [{kind:'text',content:'The proposal is due **October 15**. Include a budget justification and review the award conditions before submission.'}];
     return route.fulfill({status:200,contentType:'application/x-ndjson',headers:{'X-Conversation-UUID':'review-conversation','X-Activity-ID':'review-activity'},body:chunks.map(x=>JSON.stringify(x)).join('\n')+'\n'});
   }
+  else if(p==='/api/notifications/count') data={unread_count:0};
+  else if(p==='/api/notifications') data={notifications:[],unread_count:0};
   else if(p.includes('/organizations') || p.includes('/notifications') || p.includes('/search_sets') || p.includes('/searchsets')) data=[];
   else { unmatched.add(`${req.method()} ${p}`); return route.fulfill({status:501,json:{detail:`Unconfigured review fixture: ${p}`}}); }
   return route.fulfill({status:200,json:data});

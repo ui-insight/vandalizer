@@ -1,3 +1,5 @@
+import { InventoryPages } from './shared/InventoryPages'
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
@@ -406,12 +408,13 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
 }
 
 export function UsersTab() {
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
+  const [offset, setOffset] = useAdminViewState('UsersTab.offset', 0)
+  const [search, setSearch] = useAdminViewState('UsersTab.search', '')
+  const [sort, setSort] = useAdminViewState<{ key: UserSortKey; dir: 'asc' | 'desc' }>('UsersTab.sort', { key: 'tokens_total', dir: 'desc' })
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [days, setDays] = useState<DayOption>('all')
+  const [days, setDays] = useAdminViewState<DayOption>('UsersTab.days', 'all')
 
-  const request = useCallback(() => getUserLeaderboard(typeof days === 'number' ? days : undefined), [days])
+  const request = useCallback(() => getUserLeaderboard(typeof days === 'number' ? days : undefined, 500, offset), [days, offset])
   const { data, loading, error, load } = useAdminQuery(request)
   const users = useMemo(() => data?.items ?? [], [data])
   const capped = data?.capped ?? false
@@ -479,11 +482,7 @@ export function UsersTab() {
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
           User Leaderboard ({filtered.length}) {days !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {days} days</span>}
         </div>
-        {capped && (
-          <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={14} /> Showing the top {users.length} users by token usage — this list is truncated. Sorting and export cover only these loaded rows, not the full user base.
-          </div>
-        )}
+        <InventoryPages offset={offset} count={users.length} total={data?.total} hasMore={capped} busy={loading} onChange={setOffset} />
         {error && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,

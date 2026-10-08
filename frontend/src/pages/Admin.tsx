@@ -1,3 +1,5 @@
+import { AdminViewState } from '../components/admin/shared/AdminViewState'
+import { adminAccess } from '../lib/adminAccess'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { SectionPage } from '../components/layout/SectionPage'
 import { lazy, Suspense, useEffect, useState } from 'react'
@@ -53,28 +55,49 @@ interface TabDef {
   label: string
   icon: typeof BarChart3
   minRole: MinRole
+  group?: string
   requires?: 'trial' | 'telemetryCollector'
 }
 
 const TABS: TabDef[] = [
-  { key: 'usage', label: 'Usage', icon: BarChart3, minRole: 'teamAdmin' },
-  { key: 'users', label: 'Users', icon: Users, minRole: 'teamAdmin' },
-  { key: 'teams', label: 'Teams', icon: Building2, minRole: 'staff' },
-  { key: 'organizations', label: 'Organizations', icon: FolderTree, minRole: 'staff' },
-  { key: 'workflows', label: 'Workflows', icon: Workflow, minRole: 'teamAdmin' },
-  { key: 'quality', label: 'Quality', icon: ShieldCheck, minRole: 'staff' },
-  { key: 'optimizer', label: 'Optimizer', icon: Sparkles, minRole: 'staff' },
-  { key: 'knowledgebases', label: 'Knowledge Bases', icon: BookOpen, minRole: 'staff' },
-  { key: 'compliance', label: 'Compliance', icon: Lock, minRole: 'staff' },
-  { key: 'audit', label: 'Audit Log', icon: FileText, minRole: 'staff' },
-  { key: 'demo', label: 'Demo', icon: Zap, minRole: 'staff', requires: 'trial' },
-  { key: 'email', label: 'Email', icon: Mail, minRole: 'staff' },
-  { key: 'certifications', label: 'Certifications', icon: Award, minRole: 'staff' },
-  { key: 'apikeys', label: 'API Keys', icon: KeyRound, minRole: 'staff' },
-  { key: 'catalog', label: 'Catalog', icon: PackageOpen, minRole: 'admin' },
-  { key: 'telemetry', label: 'Telemetry', icon: Globe, minRole: 'staff', requires: 'telemetryCollector' },
-  { key: 'config', label: 'Config', icon: Settings, minRole: 'admin' },
+  { key: 'usage', group: 'Activity', label: 'Usage', icon: BarChart3, minRole: 'teamAdmin' },
+  { key: 'users', group: 'People', label: 'Users', icon: Users, minRole: 'teamAdmin' },
+  { key: 'teams', group: 'People', label: 'Teams', icon: Building2, minRole: 'staff' },
+  { key: 'organizations', group: 'People', label: 'Organizations', icon: FolderTree, minRole: 'staff' },
+  { key: 'workflows', group: 'Analysis', label: 'Workflows', icon: Workflow, minRole: 'teamAdmin' },
+  { key: 'quality', group: 'Analysis', label: 'Quality', icon: ShieldCheck, minRole: 'staff' },
+  { key: 'optimizer', group: 'Analysis', label: 'Optimizer', icon: Sparkles, minRole: 'staff' },
+  { key: 'knowledgebases', group: 'Governance', label: 'Knowledge Bases', icon: BookOpen, minRole: 'staff' },
+  { key: 'compliance', group: 'Governance', label: 'Compliance', icon: Lock, minRole: 'staff' },
+  { key: 'audit', group: 'Governance', label: 'Audit Log', icon: FileText, minRole: 'staff' },
+  { key: 'demo', group: 'Operations', label: 'Demo', icon: Zap, minRole: 'staff', requires: 'trial' },
+  { key: 'email', group: 'Operations', label: 'Email', icon: Mail, minRole: 'staff' },
+  { key: 'certifications', group: 'Operations', label: 'Certifications', icon: Award, minRole: 'staff' },
+  { key: 'apikeys', group: 'System', label: 'API Keys', icon: KeyRound, minRole: 'staff' },
+  { key: 'catalog', group: 'System', label: 'Catalog', icon: PackageOpen, minRole: 'admin' },
+  { key: 'telemetry', group: 'System', label: 'Telemetry', icon: Globe, minRole: 'staff', requires: 'telemetryCollector' },
+  { key: 'config', group: 'System', label: 'Config', icon: Settings, minRole: 'admin' },
 ]
+
+const ADMIN_PURPOSE: Record<Tab, string> = {
+  usage: 'Compare activity over the selected period. Counts cover recorded events; token totals combine input and output.',
+  users: 'Inspect user activity and access. Search and exports cover the records shown; open a user to review their history.',
+  teams: 'Manage teams across the installation, inspect usage, and assign users who have no shared workspace.',
+  organizations: 'Maintain the organization hierarchy and its memberships. Moving a node changes its parent and inherited context.',
+  workflows: 'Investigate running and failed workflows. Open an event for its failure details; exports contain the current result page.',
+  quality: 'Monitor quality trends and alerts, investigate individual results, or run a regression suite. Compare models using the same suite and inputs.',
+  optimizer: 'Review optimization outcomes by status and surface. Applied changes are recorded here; pending decisions belong in the tuning inbox.',
+  knowledgebases: 'Review knowledge base ownership, sharing status, and versions across the installation.',
+  compliance: 'Classification labels describe content; compliance checks evaluate policy. Retention enforcement is a separate configured policy.',
+  audit: 'Review who changed what and when. Times are displayed in your browser’s local timezone; expand an event for its recorded details.',
+  demo: 'Manage trial lifecycle and follow-up. Activating an account and successfully delivering its credentials are separate outcomes.',
+  email: 'Review delivery outcomes for the selected period. A provider accepting a message does not establish inbox delivery or readership.',
+  certifications: 'Inspect selected courses and preserved enrollment history. Access overrides and recovery do not grant assessed credit.',
+  apikeys: 'Manage API access by scope and expiry. Copy a newly created token before closing its one-time display.',
+  catalog: 'Review additions, updates, and retirements before applying starter examples. Retiring an example removes its managed starter entry.',
+  telemetry: 'Compare reporting deployments. Counts may be bucketed or approximate; anonymous deployments intentionally omit organization identity.',
+  config: 'Configure processing and supporting services. Each settings area saves independently; unsaved sections remain listed until saved.',
+}
 
 // ──────────────────────────────────────────
 // Main Admin Component
@@ -103,13 +126,8 @@ export default function Admin() {
     return () => { cancelled = true }
   }, [])
 
-  const isGlobalAdmin = !!user?.is_admin
-  const isStaff = !!user?.is_staff
-  const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  // Examiners are intentionally excluded: every admin-panel endpoint gates on
-  // admin/staff/team-admin (see _require_admin_or_team_admin), so examiners would
-  // only hit 403s here. Their workspace is the Verification queue (/verification).
-  const hasAccess = isGlobalAdmin || isStaff || isTeamAdmin
+  const { isGlobalAdmin, isStaff, isTeamAdmin, hasAccess } = adminAccess(user, currentTeam)
+  const viewScope = `${user?.user_id}:${isGlobalAdmin ? 'admin' : isStaff ? 'staff' : `${currentTeam?.uuid}:${currentTeam?.role}`}`
 
   // Single source of truth for tab visibility: role satisfies the tab's
   // minRole, and any feature-flag requirement is met. Used for both the
@@ -158,9 +176,15 @@ export default function Admin() {
   return (
     <PageLayout>
       <SectionPage title={isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'} icon={Shield} label="Admin sections" sections={visibleTabs} active={effectiveActiveTab} onSelect={setActiveTab}>
+          <div className="admin-section-intro">
+            <p className="admin-section-name">{tabByKey[effectiveActiveTab]?.label}</p>
+            <p>{ADMIN_PURPOSE[effectiveActiveTab]}</p>
+            <p className="admin-scope">{isGlobalAdmin || isStaff ? 'Installation-wide administration' : `Current team: ${currentTeam?.name || 'Selected team'}`}</p>
+          </div>
           <UpdateBanner />
           {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
           {isGlobalAdmin && <TelemetryOptInBanner />}
+          <AdminViewState key={viewScope} scope={viewScope}>
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div>}>
             {waitingForFeature && <p role="status">Loading section availability…</p>}
             {effectiveActiveTab === 'usage' && canSee(tabByKey.usage) && <UsageTab />}
@@ -181,6 +205,7 @@ export default function Admin() {
             {effectiveActiveTab === 'telemetry' && canSee(tabByKey.telemetry) && <TelemetryTab />}
             {effectiveActiveTab === 'config' && canSee(tabByKey.config) && <ConfigTab />}
           </Suspense>
+          </AdminViewState>
       </SectionPage>
     </PageLayout>
   )

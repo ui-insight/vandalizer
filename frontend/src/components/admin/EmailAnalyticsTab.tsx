@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useAdminViewState } from './shared/AdminViewState'
+import { useCallback } from 'react'
 import {
   Send, XCircle, CheckCircle2, AlertCircle,
 } from 'lucide-react'
@@ -15,7 +16,7 @@ import {
 } from './shared/primitives'
 
 export function EmailAnalyticsTab() {
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useAdminViewState('EmailAnalyticsTab.days', 30)
   const request = useCallback(() => getEmailAnalytics(days), [days])
   const { data, loading, error, load } = useAdminQuery(request)
 
@@ -87,6 +88,11 @@ export function EmailAnalyticsTab() {
         )}
       </div>
 
+      <p style={{ margin: 0, fontSize: 13, color: '#4b5563', lineHeight: 1.6 }}>
+        Last {days} days. Sent means the provider accepted the send request; it does not confirm inbox delivery or that a message was read.
+        {' '}Success rate is sent requests divided by sent plus failed requests. Daily buckets use UTC; failure timestamps use your local timezone.
+        {' '}Export includes this period’s summary, daily counts, types, and the loaded recent failures.
+      </p>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
         <KpiCard label="Sent" value={formatNumber(data.total_sent)} icon={Send} color="#15803d" />
@@ -174,7 +180,16 @@ export function EmailAnalyticsTab() {
                   <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDateTime(f.created_at)}</td>
                   <td style={{ padding: '10px 16px', fontSize: 13, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{f.recipient}</td>
                   <td style={{ padding: '10px 16px', fontSize: 13, color: '#374151' }}>{f.email_type}</td>
-                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#b91c1c', fontFamily: 'ui-monospace, monospace', maxWidth: 420, overflowWrap: 'anywhere' }} title={f.error || ''}>{f.error || '-'}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#b91c1c', maxWidth: 420, overflowWrap: 'anywhere' }}>
+                    <details>
+                      <summary style={{ cursor: 'pointer' }}>View failure details</summary>
+                      <dl>
+                        <dt>Provider</dt><dd>{f.provider || 'Not recorded'}</dd>
+                        <dt>Subject</dt><dd>{f.subject || 'Not recorded'}</dd>
+                        <dt>Error</dt><dd style={{ marginInlineStart: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, monospace' }}>{f.error || 'No error detail recorded'}</dd>
+                      </dl>
+                    </details>
+                  </td>
                 </tr>
               ))}
             </tbody>

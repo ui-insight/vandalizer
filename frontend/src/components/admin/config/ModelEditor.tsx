@@ -1,3 +1,4 @@
+import { useConfigDraft } from './configDrafts'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import {
   Cpu, Plus, Trash2, Pencil, RefreshCw,
@@ -246,6 +247,8 @@ export function ModelEditor({
   const [modelTest, setModelTest] = useState<ModelTestResult | null>(null)
   const [wizardTesting, setWizardTesting] = useState(false)
 
+  const modelDraft = useConfigDraft('Model editor', newModel, showModelForm)
+
   const handleProbeContextWindow = async () => {
     setProbingContext(true)
     setProbeResult(null)
@@ -358,6 +361,7 @@ export function ModelEditor({
       } else {
         res = await addModel(newModel)
       }
+      modelDraft.markSaved()
       const resDefault = (res as { default_model?: string }).default_model
       onConfigPatch({
         available_models: res.models,
@@ -533,6 +537,10 @@ export function ModelEditor({
         </button>
       </div>
       <div style={sectionBodyStyle}>
+        <p style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.6, margin: '0 0 16px' }}>
+          Default: <strong>{defaultModel || 'Not assigned'}</strong> · Long documents: <strong>{longDocumentModel || 'Off — trim oversized documents'}</strong> · Validation grader: <strong>{validationJudgeModel || 'Default model'}</strong>.
+          {' '}Assignments save immediately. Connection tests use the saved model; save edits before testing them.
+        </p>
         {models && models.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {models.map((m, i) => {

@@ -1,3 +1,4 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
@@ -54,7 +55,7 @@ function StatusBadge({ keyItem }: { keyItem: ApiKeyListItem }) {
 export function ApiKeysTab() {
   const { toast } = useToast()
   const confirm = useConfirm()
-  const [includeRevoked, setIncludeRevoked] = useState(false)
+  const [includeRevoked, setIncludeRevoked] = useAdminViewState('ApiKeysTab.includeRevoked', false)
   const [showCreate, setShowCreate] = useState(false)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
   const [showDocs, setShowDocs] = useState(false)
@@ -201,7 +202,7 @@ export function ApiKeysTab() {
                     <div style={{ fontSize: 12, fontFamily: 'monospace' }}>{k.last_used_ip}</div>
                   )}
                 </td>
-                <td style={{ padding: 8, color: '#6b7280' }}>{formatDateTime(k.expires_at)}</td>
+                <td style={{ padding: 8, color: '#6b7280' }}>{k.expires_at ? formatDateTime(k.expires_at) : 'No expiry'}</td>
                 <td style={{ padding: 8 }}>
                   {!k.revoked_at && (
                     <button

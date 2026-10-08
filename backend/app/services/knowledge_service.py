@@ -176,6 +176,7 @@ async def get_kb_usage_map(
 async def admin_list_all_knowledge_bases(
     search: str | None = None,
     limit: int = 1000,
+    offset: int = 0,
 ) -> list[KnowledgeBase]:
     """List EVERY knowledge base across all users/teams (admin-only).
 
@@ -188,10 +189,16 @@ async def admin_list_all_knowledge_bases(
         query["title"] = {"$regex": re.escape(search.strip()), "$options": "i"}
     return await (
         KnowledgeBase.find(query)
-        .sort("-created_at")
+        .sort("-created_at", "_id")
+        .skip(max(0, offset))
         .limit(max(1, min(limit, 5000)))
         .to_list()
     )
+
+async def admin_count_knowledge_bases(search: str | None = None) -> int:
+    query = {"title": {"$regex": re.escape(search.strip()), "$options": "i"}} if search and search.strip() else {}
+    return await KnowledgeBase.find(query).count()
+
 
 
 async def create_knowledge_base(

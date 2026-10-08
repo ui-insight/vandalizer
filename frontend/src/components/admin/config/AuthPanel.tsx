@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useConfigDraft } from './configDrafts'
 import { Lock, Plus, Globe, Pencil, Trash2 } from 'lucide-react'
 import { useConfirm } from '../../shared/useConfirm'
 import {
@@ -50,6 +51,10 @@ export function AuthPanel({
   const [samlMetaBusy, setSamlMetaBusy] = useState(false)
   const [samlMetaError, setSamlMetaError] = useState('')
   const [providerError, setProviderError] = useState('')
+
+  const authDraft = useConfigDraft('Authentication methods', authMethods)
+  useConfigDraft('New identity provider', { newProvider, samlMeta }, showAddProvider)
+  useConfigDraft('Identity provider changes', editingProvider, editingProviderId !== null)
 
   const providerPending = useRef(false)
   const [providerSaving, setProviderSaving] = useState(false)
@@ -109,6 +114,7 @@ export function AuthPanel({
     onError(null)
     try {
       await updateAuthMethods(authMethods)
+      authDraft.markSaved()
       onReadinessChange()
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Failed to update auth methods')
@@ -326,7 +332,9 @@ export function AuthPanel({
                             </div>
                             <div>
                               <label htmlFor={`admin-oauth-edit-${i}-client-secret`} style={labelStyle}>Client Secret</label>
-                              <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                              <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}><input type="checkbox" checked={editingProvider.client_secret !== '***'} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.checked ? '' : '***' })} /> Replace saved client secret</label>
+                              <p style={{ fontSize: 12, color: '#475569' }}>The existing secret is retained unless you choose a replacement.</p>
+                              <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} disabled={editingProvider.client_secret === '***'} style={inputStyle} placeholder="Enter replacement secret" />
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                               <label htmlFor={`admin-oauth-edit-${i}-redirect-uri`} style={labelStyle}>Redirect URI</label>

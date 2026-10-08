@@ -1,7 +1,8 @@
+import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { Link } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import {
   AlertTriangle, CheckCircle2, Eye, Play, RefreshCw, Sparkles, XCircle,
 } from 'lucide-react'
@@ -45,10 +46,10 @@ function triggerLabel(run: OptimizerActivityRun): string {
 }
 
 export function OptimizerTab() {
-  const [days, setDays] = useState(14)
-  const [surface, setSurface] = useState('')
-  const [status, setStatus] = useState('')
-  const [trigger, setTrigger] = useState<'' | 'auto' | 'user'>('')
+  const [days, setDays] = useAdminViewState('OptimizerTab.days', 14)
+  const [surface, setSurface] = useAdminViewState('OptimizerTab.surface', '')
+  const [status, setStatus] = useAdminViewState('OptimizerTab.status', '')
+  const [trigger, setTrigger] = useAdminViewState<'' | 'auto' | 'user'>('OptimizerTab.trigger', '')
 
   const request = useCallback(() => getOptimizerActivity({ days, surface: surface || undefined, status: status || undefined, trigger: trigger || undefined, limit: 200 }), [days, surface, status, trigger])
   const { data, loading, error, load } = useAdminQuery(request)

@@ -1,3 +1,5 @@
+import { Link } from '@tanstack/react-router'
+import { useAuth } from '../../hooks/useAuth'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback } from 'react'
@@ -63,6 +65,7 @@ function StatCard({ icon: Icon, label, value, color }: {
 }
 
 export function ComplianceTab() {
+  const { user } = useAuth()
   const request = useCallback(async () => {
     const [classification, retention] = await Promise.all([getClassificationDashboard(), getRetentionDashboard()])
     return { classification, retention }
@@ -356,7 +359,7 @@ export function ComplianceTab() {
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <Lock size={12} />
-          Edit retention windows under <strong style={{ marginLeft: 4 }}>Config → System Config → Document Retention Policy</strong>.
+          {user?.is_admin ? <Link to="/admin" search={{ tab: 'config' }} hash="cfg-retention" style={{ textDecoration: 'underline' }}>Edit retention policy in Configuration</Link> : 'A system administrator can change retention policy in Configuration.'}
         </div>
       </section>
     </div>

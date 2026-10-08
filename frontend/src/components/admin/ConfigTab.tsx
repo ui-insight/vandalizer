@@ -1,3 +1,4 @@
+import { useConfirm } from '../shared/useConfirm'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   ShieldCheck, Users, Settings,
@@ -19,6 +20,8 @@ import { AuthPanel } from './config/AuthPanel'
 import { ModelEditor } from './config/ModelEditor'
 import type { ModelEditorHandle } from './config/ModelEditor'
 import { ThemePanel } from './config/ThemePanel'
+import { ConfigDraftProvider, ConfigDraftStatus } from './config/ConfigDraftProvider'
+import { useConfigDraft } from './config/configDrafts'
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputStyle, checkStyle, hintStyle } from './config/styles'
 
 // Starting point for the Docling-Serve options blob — the options sites most
@@ -131,6 +134,11 @@ function ocrDiagFacts(result: OcrTestResult): DiagnosticFact[] {
 // ──────────────────────────────────────────
 
 export function ConfigTab() {
+  return <ConfigDraftProvider><ConfigEditor /></ConfigDraftProvider>
+}
+
+function ConfigEditor() {
+  const confirm = useConfirm()
   const [cfg, setCfg] = useState<SystemConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -139,11 +147,12 @@ export function ConfigTab() {
   const configRevision = useRef(0)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldError, setFieldError] = useState<{ id: string; message: string } | null>(null)
 
   // Extraction config
   const [extractionMode, setExtractionMode] = useState('one_pass')
   const [chunkingEnabled, setChunkingEnabled] = useState(false)
-  const [maxKeysPerChunk, setMaxKeysPerChunk] = useState(10)
+  const [maxKeysPerChunk, setMaxKeysPerChunk] = useState<number | ''>(10)
   const [repetitionEnabled, setRepetitionEnabled] = useState(false)
   const [onePassThinking, setOnePassThinking] = useState(true)
   const [onePassStructured, setOnePassStructured] = useState(true)
@@ -158,12 +167,12 @@ export function ConfigTab() {
 
   // Quality config
   const [requireValidation, setRequireValidation] = useState(false)
-  const [minAccuracy, setMinAccuracy] = useState(70)
-  const [minConsistency, setMinConsistency] = useState(80)
+  const [minAccuracy, setMinAccuracy] = useState<number | ''>(70)
+  const [minConsistency, setMinConsistency] = useState<number | ''>(80)
   const [minWorkflowGrade, setMinWorkflowGrade] = useState('C')
-  const [excellentThreshold, setExcellentThreshold] = useState(90)
-  const [goodThreshold, setGoodThreshold] = useState(70)
-  const [fairThreshold, setFairThreshold] = useState(50)
+  const [excellentThreshold, setExcellentThreshold] = useState<number | ''>(90)
+  const [goodThreshold, setGoodThreshold] = useState<number | ''>(70)
+  const [fairThreshold, setFairThreshold] = useState<number | ''>(50)
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
@@ -187,7 +196,7 @@ export function ConfigTab() {
   const [ocrOptionsText, setOcrOptionsText] = useState('')
   const [ocrOptionsError, setOcrOptionsError] = useState<string | null>(null)
   const [ocrAsync, setOcrAsync] = useState(false)
-  const [ocrTimeout, setOcrTimeout] = useState(120)
+  const [ocrTimeout, setOcrTimeout] = useState<number | ''>(120)
 
   // Web Search — powers the agentic chat web_search tool
   const [webSearchProvider, setWebSearchProvider] = useState('')
@@ -276,6 +285,23 @@ export function ConfigTab() {
   const [retentionSaving, setRetentionSaving] = useState(false)
   const [retentionSaved, setRetentionSaved] = useState(false)
 
+  const processingDraft = useConfigDraft('Processing settings', {
+    extractionMode, chunkingEnabled, maxKeysPerChunk, repetitionEnabled, onePassThinking,
+    onePassStructured, onePassModel, twoPassP1Thinking, twoPassP1Structured, twoPassP1Model,
+    twoPassP2Thinking, twoPassP2Structured, twoPassP2Model, useImages, requireValidation,
+    minAccuracy, minConsistency, minWorkflowGrade, excellentThreshold, goodThreshold,
+    fairThreshold, ocrEndpoint, allowedHosts, ocrApiKey, webSearchProvider,
+    webSearchEndpoint, webSearchApiKey, ocrProvider, ocrOptionsText, ocrAsync, ocrTimeout,
+  }, !!cfg)
+  const complianceDraft = useConfigDraft('Compliance', {
+    complianceEnabled, complianceCheckOnUpload, complianceRules, complianceChunkSize, complianceChunkOverlap,
+  }, !!cfg)
+  const retentionDraft = useConfigDraft('Retention', {
+    retentionEnabled, retentionPolicies, activityRetentionDays, chatRetentionDays,
+    workflowResultRetentionDays, staleActivityMinutes,
+  }, !!cfg)
+  useConfigDraft('New support contact', newContact, showAddContact)
+
   useEffect(() => { void refreshReadiness() }, [refreshReadiness])
   useEffect(() => { void refreshOcrReadiness() }, [refreshOcrReadiness])
 
@@ -363,8 +389,69 @@ export function ConfigTab() {
     void loadConfig()
   }, [loadConfig])
 
+  useEffect(() => {
+    if (loading) return
+    const id = window.location.hash.slice(1)
+    if (id.startsWith('cfg-')) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }))
+  }, [loading])
+
+  const numericFieldProps = (id: string) => ({
+    id, required: true,
+    'aria-invalid': fieldError?.id === id || undefined,
+    'aria-describedby': fieldError?.id === id ? `${id}-error` : undefined,
+  })
+  const numericFieldError = (id: string) => fieldError?.id === id
+    ? <p id={`${id}-error`} role="alert" style={{ color: '#991b1b', fontSize: 13, margin: '6px 0' }}>{fieldError.message}</p>
+    : null
+
+  const validatePolicyNumbers = (section: string) => {
+    const inputs = document.querySelectorAll<HTMLInputElement>(`#cfg-${section} input[type=number]`)
+    for (const input of inputs) {
+      if (!input.checkValidity() || (input.value !== '' && !Number.isInteger(input.valueAsNumber))) {
+        setFieldError({ id: input.id, message: `${input.getAttribute('aria-label') || 'Value'} must be a whole number of at least ${input.min || 0}.` })
+        input.focus()
+        return false
+      }
+    }
+    if (section === 'compliance' && complianceChunkOverlap >= complianceChunkSize) {
+      setFieldError({ id: 'compliance-overlap', message: 'Compliance chunk overlap must be smaller than chunk size.' })
+      document.getElementById('compliance-overlap')?.focus()
+      return false
+    }
+    setFieldError(null)
+    return true
+  }
+  const policyError = (prefix: string) => fieldError?.id.startsWith(prefix)
+    ? <p id={`${fieldError.id}-error`} role="alert" style={{ color: '#991b1b', padding: '8px 20px' }}>{fieldError.message}</p> : null
+
   const handleSaveConfig = async () => {
     if (savePending.current) return
+    const fields: [string, string, number | '', number, number, boolean][] = [
+      ['quality-accuracy', 'Minimum extraction accuracy', minAccuracy, 0, 100, false],
+      ['quality-consistency', 'Minimum extraction consistency', minConsistency, 0, 100, false],
+      ['quality-excellent', 'Excellent threshold', excellentThreshold, 0, 100, false],
+      ['quality-good', 'Good threshold', goodThreshold, 0, 100, false],
+      ['quality-fair', 'Fair threshold', fairThreshold, 0, 100, false],
+      ['extraction-max-fields', 'Maximum fields per chunk', maxKeysPerChunk, 1, 100, true],
+      ['ocr-timeout', 'OCR timeout', ocrTimeout, 10, 3600, true],
+    ]
+    let invalid: { id: string; message: string } | null = null
+    for (const [id, label, value, min, max, integer] of fields) {
+      if (value === '' || !Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value))) {
+        invalid = { id, message: `${label} must be ${integer ? 'a whole number' : 'a number'} between ${min} and ${max}.` }
+        break
+      }
+    }
+    if (!invalid && !(Number(excellentThreshold) > Number(goodThreshold) && Number(goodThreshold) > Number(fairThreshold))) {
+      invalid = { id: 'quality-good', message: 'Thresholds must decrease: Excellent > Good > Fair.' }
+    }
+    setFieldError(invalid)
+    if (invalid) {
+      setSaved(false)
+      setError(invalid.message)
+      document.getElementById(invalid.id)?.focus()
+      return
+    }
     // Parse before touching the saving state so a malformed options blob fails
     // loudly at the field rather than being silently dropped from the payload.
     let parsedOcrOptions: Record<string, unknown> = {}
@@ -397,21 +484,21 @@ export function ConfigTab() {
             pass_1: { thinking: twoPassP1Thinking, structured: twoPassP1Structured, model: twoPassP1Model || '' },
             pass_2: { thinking: twoPassP2Thinking, structured: twoPassP2Structured, model: twoPassP2Model || '' },
           },
-          chunking: { enabled: chunkingEnabled, max_keys_per_chunk: maxKeysPerChunk },
+          chunking: { enabled: chunkingEnabled, max_keys_per_chunk: Number(maxKeysPerChunk) },
           repetition: { enabled: repetitionEnabled },
           use_images: useImages,
         },
         quality_config: {
           verification_gates: {
             require_validation: requireValidation,
-            min_extraction_accuracy: minAccuracy / 100,
-            min_extraction_consistency: minConsistency / 100,
+            min_extraction_accuracy: Number(minAccuracy) / 100,
+            min_extraction_consistency: Number(minConsistency) / 100,
             min_workflow_grade: minWorkflowGrade,
           },
           quality_tiers: {
-            excellent: { min_score: excellentThreshold },
-            good: { min_score: goodThreshold },
-            fair: { min_score: fairThreshold },
+            excellent: { min_score: Number(excellentThreshold) },
+            good: { min_score: Number(goodThreshold) },
+            fair: { min_score: Number(fairThreshold) },
           },
         },
         ocr_endpoint: ocrEndpoint,
@@ -419,7 +506,7 @@ export function ConfigTab() {
         ocr_provider: ocrProvider,
         ocr_options: parsedOcrOptions,
         ocr_async: ocrAsync,
-        ocr_timeout_seconds: ocrTimeout,
+        ocr_timeout_seconds: Number(ocrTimeout),
         // Only send the key when the user actually touched the field. An
         // untouched field after a successful load holds the "***" sentinel,
         // which the backend already treats as "keep the stored key" — so
@@ -429,6 +516,7 @@ export function ConfigTab() {
         web_search_endpoint: webSearchEndpoint,
         ...(webSearchApiKeyDirty ? { web_search_api_key: webSearchApiKey } : {}),
       })
+      processingDraft.markSaved()
       setSaved(revision === configRevision.current)
       setTimeout(() => setSaved(false), 3000)
       void refreshReadiness()
@@ -550,7 +638,7 @@ export function ConfigTab() {
 
   return (
     <div onChangeCapture={() => { configRevision.current++; setSaved(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowWrap: 'anywhere' }}>
-      {/* Sticky save bar */}
+      {/* This action saves only the processing sections; other panels own their writes. */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 20,
         display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
@@ -561,8 +649,8 @@ export function ConfigTab() {
         <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Settings size={16} color="#6b7280" /> System Configuration
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Configuration saved!</span>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Processing settings saved.</span>}
           <button
             onClick={handleSaveConfig}
             disabled={saving}
@@ -572,11 +660,20 @@ export function ConfigTab() {
               opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? 'Saving...' : 'Save Configuration'}
+            {saving ? 'Saving...' : 'Save Processing Settings'}
           </button>
         </div>
+        <ConfigDraftStatus />
       </div>
 
+      <p style={{ fontSize: 13, color: '#4b5563', margin: 0 }}>
+        Save Processing Settings applies to OCR, web search, extraction, and quality gates.
+        Models, authentication, branding, contacts, compliance, and retention save in their own sections.
+      </p>
+
+      <nav aria-label="Configuration sections" className="config-section-links">
+        {Object.entries({ models: 'Models', playground: 'Prompt playground', auth: 'Authentication', ocr: 'OCR and search', branding: 'Branding', extraction: 'Extraction', quality: 'Quality gates', contacts: 'Support contacts', compliance: 'Compliance', retention: 'Retention' }).map(([id, label]) => <a key={id} href={`#cfg-${id}`}>{label}</a>)}
+      </nav>
       {error && (
         <div role="alert" style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
           {error}
@@ -616,7 +713,7 @@ export function ConfigTab() {
       />
 
       {/* Prompt Playground */}
-      <div style={sectionStyle}>
+      <div id="cfg-playground" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Play size={18} color="#6b7280" /> Prompt Playground
           <span style={{ fontSize: 12, fontWeight: 400, color: '#4b5563' }}>
@@ -828,11 +925,12 @@ ${playgroundResult.request.user_prompt}`}
                 <div>
                   <label style={labelStyle} htmlFor="ocr-timeout">Request Timeout (seconds)</label>
                   <input
-                    id="ocr-timeout" type="number" min={10} max={3600}
+                    {...numericFieldProps('ocr-timeout')} type="number" min={10} max={3600}
                     value={ocrTimeout}
-                    onChange={e => setOcrTimeout(parseInt(e.target.value) || 120)}
+                    onChange={e => setOcrTimeout(e.target.value === '' ? '' : Number(e.target.value))}
                     style={{ ...inputStyle, maxWidth: 160 }}
                   />
+                  {numericFieldError('ocr-timeout')}
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', alignSelf: 'flex-end', paddingBottom: 8 }}>
                   <input type="checkbox" checked={ocrAsync} onChange={e => setOcrAsync(e.target.checked)} />
@@ -875,6 +973,7 @@ ${playgroundResult.request.user_prompt}`}
               </span>
             )}
           </div>
+          {ocrTestResult && (ocrTestResult.endpoint !== ocrEndpoint || ocrTestResult.provider !== ocrProvider) && <p role="status" style={hintStyle}>These results describe {ocrTestResult.provider} at {ocrTestResult.endpoint}. Settings have changed since this test; test again to check the current draft.</p>}
           {ocrTestResult && ocrTestResult.checks.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <DiagnosticsPanel
@@ -968,7 +1067,7 @@ ${playgroundResult.request.user_prompt}`}
               )}
             </div>
             <div style={{ fontSize: 12, color: '#4b5563', marginTop: 10 }}>
-              Note: Test Search and chat use the saved configuration — click Save above before testing new values.
+              Note: Test Search and chat use the saved configuration — use Save Processing Settings before testing new values.
             </div>
           </div>
         </div>
@@ -980,7 +1079,7 @@ ${playgroundResult.request.user_prompt}`}
       />
 
       {/* Extraction Configuration */}
-      <div style={sectionStyle}>
+      <div id="cfg-extraction" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Cpu size={18} color="#6b7280" /> Extraction Configuration
         </div>
@@ -1087,10 +1186,11 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ marginTop: 12, paddingLeft: 24 }}>
                   <label style={labelStyle}>Max Keys Per Chunk</label>
                   <input
-                    type="number" min={1} max={100} aria-label="Maximum fields per chunk" value={maxKeysPerChunk}
-                    onChange={e => setMaxKeysPerChunk(Number(e.target.value))}
+                    type="number" min={1} max={100} {...numericFieldProps('extraction-max-fields')} aria-label="Maximum fields per chunk" value={maxKeysPerChunk}
+                    onChange={e => setMaxKeysPerChunk(e.target.value === '' ? '' : Number(e.target.value))}
                     style={{ ...inputStyle, maxWidth: 120 }}
                   />
+                  {numericFieldError('extraction-max-fields')}
                 </div>
               )}
             </div>
@@ -1118,7 +1218,7 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Quality & Verification Gates */}
-      <div style={sectionStyle}>
+      <div id="cfg-quality" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <ShieldCheck size={18} color="#6b7280" /> Quality &amp; Verification Gates
         </div>
@@ -1135,11 +1235,13 @@ ${playgroundResult.request.user_prompt}`}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Min Extraction Accuracy (%)</label>
-                <input type="number" min={0} max={100} aria-label="Minimum extraction accuracy percent" value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-accuracy')} aria-label="Minimum extraction accuracy percent" value={minAccuracy} onChange={e => setMinAccuracy(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-accuracy')}
               </div>
               <div>
                 <label style={labelStyle}>Min Extraction Consistency (%)</label>
-                <input type="number" min={0} max={100} aria-label="Minimum extraction consistency percent" value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-consistency')} aria-label="Minimum extraction consistency percent" value={minConsistency} onChange={e => setMinConsistency(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-consistency')}
               </div>
               <div>
                 <label style={labelStyle}>Min Workflow Grade</label>
@@ -1158,15 +1260,18 @@ ${playgroundResult.request.user_prompt}`}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Excellent threshold</label>
-                  <input type="number" min={0} max={100} aria-label="Excellent score threshold" value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-excellent')} aria-label="Excellent score threshold" value={excellentThreshold} onChange={e => setExcellentThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-excellent')}
                 </div>
                 <div>
                   <label style={labelStyle}>Good threshold</label>
-                  <input type="number" min={0} max={100} aria-label="Good score threshold" value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-good')} aria-label="Good score threshold" value={goodThreshold} onChange={e => setGoodThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-good')}
                 </div>
                 <div>
                   <label style={labelStyle}>Fair threshold</label>
-                  <input type="number" min={0} max={100} aria-label="Fair score threshold" value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-fair')} aria-label="Fair score threshold" value={fairThreshold} onChange={e => setFairThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-fair')}
                 </div>
               </div>
             </div>
@@ -1175,7 +1280,7 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Support Contacts */}
-      <div style={sectionStyle}>
+      <div id="cfg-contacts" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Users size={18} color="#6b7280" /> Support Contacts
           <div style={{ flex: 1 }} />
@@ -1209,7 +1314,8 @@ ${playgroundResult.request.user_prompt}`}
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#4b5563', fontWeight: 600 }}>{c.user_id}</span>
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      if (!await confirm({ title: `Remove ${c.name}?`, message: 'Remove this support contact from notifications and the configured Support Center access list?', confirmLabel: 'Remove contact', destructive: true })) return
                       const updated = supportContacts.filter((_, idx) => idx !== i)
                       saveSupportContacts(updated)
                     }}
@@ -1232,11 +1338,11 @@ ${playgroundResult.request.user_prompt}`}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Name</label>
-                  <input disabled={contactsSaving} aria-label="Support contact name" value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact name" required value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>User ID</label>
-                  <input disabled={contactsSaving} aria-label="Support contact user ID" value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact user ID" required value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Email</label>
@@ -1276,7 +1382,9 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Compliance Activation */}
-      <div style={sectionStyle}>
+      <div id="cfg-compliance" style={sectionStyle}>
+        {policyError('compliance-')}
+        {complianceEnabled && !complianceRules.trim() && <p role="status" style={{ padding: '0 20px', fontSize: 13 }}>Checks remain inactive until a non-empty policy is saved.</p>}
         <div style={sectionHeaderStyle}>
           <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
@@ -1319,8 +1427,8 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={500}
-                    aria-label="Compliance chunk size" value={complianceChunkSize}
-                    onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
+                    {...numericFieldProps('compliance-size')} max={2147483647} aria-label="Compliance chunk size" value={Number.isNaN(complianceChunkSize) ? '' : complianceChunkSize}
+                    onChange={e => setComplianceChunkSize(e.target.valueAsNumber)}
                     style={inputStyle}
                   />
                 </div>
@@ -1329,8 +1437,8 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={0}
-                    aria-label="Compliance chunk overlap" value={complianceChunkOverlap}
-                    onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
+                    {...numericFieldProps('compliance-overlap')} max={2147483647} aria-label="Compliance chunk overlap" value={Number.isNaN(complianceChunkOverlap) ? '' : complianceChunkOverlap}
+                    onChange={e => setComplianceChunkOverlap(e.target.valueAsNumber)}
                     style={inputStyle}
                   />
                 </div>
@@ -1340,6 +1448,7 @@ ${playgroundResult.request.user_prompt}`}
           <div>
             <button
               onClick={async () => {
+                if (!validatePolicyNumbers('compliance')) return
                 setComplianceSaving(true)
                 setComplianceSaved(false)
                 try {
@@ -1350,6 +1459,7 @@ ${playgroundResult.request.user_prompt}`}
                     chunk_size: complianceChunkSize,
                     chunk_overlap: complianceChunkOverlap,
                   })
+                  complianceDraft.markSaved()
                   setComplianceSaved(true)
                   setTimeout(() => setComplianceSaved(false), 3000)
                 } catch {
@@ -1367,13 +1477,15 @@ ${playgroundResult.request.user_prompt}`}
             >
               {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {complianceSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
+            {complianceDraft.dirty && <p style={hintStyle}>Unsaved compliance changes. Use Save Compliance Settings.</p>}
+            {complianceSaved && !complianceDraft.dirty && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
 
       {/* Retention Policy */}
-      <div style={sectionStyle}>
+      <div id="cfg-retention" style={sectionStyle}>
+        {policyError('retention-')}
         <div style={sectionHeaderStyle}>
           <ShieldCheck size={18} color="#6b7280" /> Document Retention Policy
         </div>
@@ -1440,8 +1552,8 @@ ${playgroundResult.request.user_prompt}`}
                             <input
                               type="number"
                               min={0}
-                              value={p.retention_days || 0}
-                              onChange={e => update({ retention_days: Number(e.target.value) || 0 })}
+                              {...numericFieldProps(`retention-${level.name}-retention_days`)} max={2147483647} aria-label={`${level.label} Retention days`} value={Number.isNaN(p.retention_days) ? '' : p.retention_days ?? 0}
+                              onChange={e => update({ retention_days: e.target.valueAsNumber })}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
                           </td>
@@ -1449,8 +1561,8 @@ ${playgroundResult.request.user_prompt}`}
                             <input
                               type="number"
                               min={0}
-                              value={p.soft_delete_grace_days || 0}
-                              onChange={e => update({ soft_delete_grace_days: Number(e.target.value) || 0 })}
+                              {...numericFieldProps(`retention-${level.name}-soft_delete_grace_days`)} max={2147483647} aria-label={`${level.label} Grace period days`} value={Number.isNaN(p.soft_delete_grace_days) ? '' : p.soft_delete_grace_days ?? 0}
+                              onChange={e => update({ soft_delete_grace_days: e.target.valueAsNumber })}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
                           </td>
@@ -1460,10 +1572,10 @@ ${playgroundResult.request.user_prompt}`}
                               min={0}
                               value={p.warning_days_before ?? ''}
                               placeholder="—"
-                              aria-label="Retention period (days)"
+                              {...numericFieldProps(`retention-${level.name}-warning`)} required={false} max={2147483647} aria-label={`${level.label} Warning days before deletion`}
                               onChange={e => {
                                 const v = e.target.value
-                                update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
+                                update({ warning_days_before: v === '' ? undefined : Number(v) })
                               }}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
@@ -1485,8 +1597,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      aria-label="Activity retention days" value={activityRetentionDays}
-                      onChange={e => setActivityRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-activity')} max={2147483647} aria-label="Activity retention days" value={Number.isNaN(activityRetentionDays) ? '' : activityRetentionDays}
+                      onChange={e => setActivityRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1495,8 +1607,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      aria-label="Chat retention days" value={chatRetentionDays}
-                      onChange={e => setChatRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-chat')} max={2147483647} aria-label="Chat retention days" value={Number.isNaN(chatRetentionDays) ? '' : chatRetentionDays}
+                      onChange={e => setChatRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1505,8 +1617,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      aria-label="Workflow result retention days" value={workflowResultRetentionDays}
-                      onChange={e => setWorkflowResultRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-workflows')} max={2147483647} aria-label="Workflow result retention days" value={Number.isNaN(workflowResultRetentionDays) ? '' : workflowResultRetentionDays}
+                      onChange={e => setWorkflowResultRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1515,8 +1627,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      aria-label="Stale activity threshold minutes" value={staleActivityMinutes}
-                      onChange={e => setStaleActivityMinutes(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-stale')} max={2147483647} aria-label="Stale activity threshold minutes" value={Number.isNaN(staleActivityMinutes) ? '' : staleActivityMinutes}
+                      onChange={e => setStaleActivityMinutes(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1527,6 +1639,7 @@ ${playgroundResult.request.user_prompt}`}
           <div>
             <button
               onClick={async () => {
+                if (!validatePolicyNumbers('retention')) return
                 setRetentionSaving(true)
                 setRetentionSaved(false)
                 try {
@@ -1540,6 +1653,7 @@ ${playgroundResult.request.user_prompt}`}
                       activity_stale_threshold_minutes: staleActivityMinutes,
                     },
                   })
+                  retentionDraft.markSaved()
                   setRetentionSaved(true)
                   setTimeout(() => setRetentionSaved(false), 3000)
                 } catch {
@@ -1557,7 +1671,8 @@ ${playgroundResult.request.user_prompt}`}
             >
               {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
             </button>
-            {retentionSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
+            {retentionDraft.dirty && <p style={hintStyle}>Unsaved retention changes. Use Save Retention Settings.</p>}
+            {retentionSaved && !retentionDraft.dirty && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -1573,9 +1688,9 @@ ${playgroundResult.request.user_prompt}`}
             opacity: saving ? 0.6 : 1,
           }}
         >
-          {saving ? 'Saving...' : 'Save Configuration'}
+          {saving ? 'Saving...' : 'Save Processing Settings'}
         </button>
-        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Configuration saved!</span>}
+        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Processing settings saved.</span>}
       </div>
     </div>
   )
