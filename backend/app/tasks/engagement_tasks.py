@@ -68,10 +68,11 @@ def process_v5_launch_announcement(self, batch_size: int = 200):
     """
     from app.services.engagement_service import process_v5_launch_announcement as _run
     from app.database import init_db
+    from app.config import Settings
 
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(init_db())
+        loop.run_until_complete(init_db(Settings()))
         count = loop.run_until_complete(_run(batch_size=batch_size))
         return {"sent": count}
     finally:
@@ -89,10 +90,11 @@ def process_agentic_chat_drip(self):
     """Send due agentic-chat tutorial drip emails (5-step sequence)."""
     from app.services.engagement_service import process_agentic_chat_drip as _run
     from app.database import init_db
+    from app.config import Settings
 
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(init_db())
+        loop.run_until_complete(init_db(Settings()))
         count = loop.run_until_complete(_run())
         return {"sent": count}
     finally:
@@ -110,10 +112,11 @@ def process_powerup_milestones(self):
     """Send the power-user upsell to users who've crossed the workflow threshold."""
     from app.services.engagement_service import process_powerup_milestones as _run
     from app.database import init_db
+    from app.config import Settings
 
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(init_db())
+        loop.run_until_complete(init_db(Settings()))
         count = loop.run_until_complete(_run())
         return {"sent": count}
     finally:
