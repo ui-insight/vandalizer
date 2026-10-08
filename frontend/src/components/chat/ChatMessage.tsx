@@ -545,6 +545,25 @@ export function ChatMessage({
             </div>
           )}
 
+          {message.silence_inferences && message.silence_inferences.length > 0 && (
+            <div
+              role="note"
+              aria-label="Conclusion the sources don't support"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                The sources don't say this either way:{' '}
+                {message.silence_inferences.map((s, i) => <span key={i}>{i > 0 ? ' ' : ''}<q style={{ fontStyle: 'italic' }}>{s}</q></span>)}.
+                {' '}A gap in the sources isn't a permission or a rule. Confirm with the sponsor or
+                the governing guide before relying on it.
+              </span>
+            </div>
+          )}
+
           {message.citations && message.citations.length > 0 && (() => {
             const open = openCitation !== null ? message.citations[openCitation] : null
             const openPreview = open?.content_preview?.trim() || ''

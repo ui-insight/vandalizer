@@ -69,3 +69,28 @@ describe('ChatMessage page citations on attached documents', () => {
     expect(screen.queryByText(/passage not found|not checked/)).not.toBeInTheDocument()
   })
 })
+
+// An answer that reads a gap in the sources as a rule ("may be any length")
+// says so under the answer (#1012). Both quoted sentences are from the
+// 2026-10-08 measured run on gpt-oss-120b.
+describe('ChatMessage conclusions drawn from silence', () => {
+  it('quotes each flagged sentence and tells the reader to confirm with the sponsor', () => {
+    render(<ChatMessage message={answer({
+      content: 'The notice sets no page limit, so it may be any length.',
+      silence_inferences: [
+        'The sponsor notice does not set a page-limit for the budget justification, so it may be any length.',
+        'The notice does not require the PI to be a U.S. citizen; citizenship eligibility is not specified.',
+      ],
+    })} />)
+    const note = screen.getByRole('note', { name: "Conclusion the sources don't support" })
+    expect(note).toHaveTextContent("The sources don't say this either way")
+    expect(note).toHaveTextContent('so it may be any length.')
+    expect(note).toHaveTextContent('does not require the PI to be a U.S. citizen')
+    expect(note).toHaveTextContent(/Confirm with the sponsor or the governing guide/)
+  })
+
+  it('shows nothing when no sentence was flagged', () => {
+    render(<ChatMessage message={answer({ content: 'The notice does not specify a page limit. Ask the sponsor.' })} />)
+    expect(screen.queryByRole('note', { name: "Conclusion the sources don't support" })).not.toBeInTheDocument()
+  })
+})

@@ -44,6 +44,7 @@ from app.services.context_budget import (
 )
 from app.services.citation_grounding import ground_page_citation
 from app.services.kb_answer_grounding import unsupported_figures
+from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -2427,6 +2428,12 @@ async def chat_stream(
                     ))
                     if active_kbs or documents else []
                 )
+                # A gap in the sources read as a rule ("may be any length")
+                # is flagged the same way (#1012).
+                silent = (
+                    inferences_from_silence(assistant_message)
+                    if active_kbs or documents else []
+                )
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -2441,12 +2448,14 @@ async def chat_stream(
                     ),
                     plan_state=deps.plan_state if deps is not None else None,
                     unsupported_figures=unsupported or None,
+                    silence_inferences=silent or None,
                 )
-                if unsupported:
+                if unsupported or silent:
                     yield json.dumps({
                         "kind": "grounding_warning",
                         "content": "",
                         "unsupported_figures": unsupported,
+                        "silence_inferences": silent,
                     }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
@@ -4001,6 +4010,7 @@ async def _finalize(
     context_anchor_tokens: int = 0,
     plan_state: Optional[list[dict]] = None,
     unsupported_figures: Optional[list[str]] = None,
+    silence_inferences: Optional[list[str]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -4013,6 +4023,7 @@ async def _finalize(
         segments=segments,
         citations=citations,
         unsupported_figures=unsupported_figures,
+        silence_inferences=silence_inferences,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

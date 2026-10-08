@@ -102,6 +102,7 @@ export function useChat() {
   const citationsRef = useRef<Citation[]>([])
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const silenceInferencesRef = useRef<string[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
@@ -132,6 +133,7 @@ export function useChat() {
       segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      silenceInferencesRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
@@ -174,6 +176,9 @@ export function useChat() {
         }
         if (unsupportedFiguresRef.current.length) {
           assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+        }
+        if (silenceInferencesRef.current.length) {
+          assistantMsg.silence_inferences = silenceInferencesRef.current
         }
         setMessages((prev) => [...prev, assistantMsg])
       }
@@ -288,6 +293,7 @@ export function useChat() {
               }
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              silenceInferencesRef.current = chunk.silence_inferences ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,

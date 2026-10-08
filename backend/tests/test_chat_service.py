@@ -484,6 +484,33 @@ class TestCitationPersistence:
         _, kwargs = conversation.add_message.await_args
         assert kwargs["unsupported_figures"] == ["$750,000"]
 
+    def test_chat_message_to_dict_carries_silence_inferences(self):
+        """#1012: a sentence that read a gap in the sources as a rule is kept
+        with the message so the note survives a reload."""
+        from app.models.chat import ChatMessage, ChatRole
+
+        sentence = "The notice does not set a page limit, so it may be any length."
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message=sentence, silence_inferences=[sentence],
+        )
+        assert msg.to_dict()["silence_inferences"] == [sentence]
+        bare = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer", silence_inferences=None,
+        )
+        assert "silence_inferences" not in bare.to_dict()
+
+    @pytest.mark.asyncio
+    async def test_finalize_passes_silence_inferences_to_add_message(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        await _finalize(
+            conversation, "It may be any length.", [], None, None, "user-1",
+            silence_inferences=["It may be any length."],
+        )
+        _, kwargs = conversation.add_message.await_args
+        assert kwargs["silence_inferences"] == ["It may be any length."]
+
     def _finalize_conversation(self):
         """MagicMock with concrete post-turn bookkeeping fields — _finalize
         reads resume/anchor state, and bare Mock attributes are truthy."""

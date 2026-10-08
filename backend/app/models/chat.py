@@ -71,6 +71,8 @@ class ChatMessage(Document):
     # states — likely recalled from the model's memory, which can predate the
     # current regulation. Chat shows them under the answer.
     unsupported_figures: Optional[list[str]] = None
+    # Sentences that conclude a rule from the sources' silence (#1012).
+    silence_inferences: Optional[list[str]] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -102,6 +104,8 @@ class ChatMessage(Document):
             d["citations"] = self.citations
         if self.unsupported_figures:
             d["unsupported_figures"] = self.unsupported_figures
+        if self.silence_inferences:
+            d["silence_inferences"] = self.silence_inferences
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -329,6 +333,7 @@ class ChatConversation(Document):
         citations: Optional[list[dict]] = None,
         source_documents: Optional[list[dict]] = None,
         unsupported_figures: Optional[list[str]] = None,
+        silence_inferences: Optional[list[str]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -340,6 +345,7 @@ class ChatConversation(Document):
             segments=segments or None,
             citations=citations or None,
             unsupported_figures=unsupported_figures or None,
+            silence_inferences=silence_inferences or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

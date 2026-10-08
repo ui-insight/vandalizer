@@ -9,9 +9,11 @@ export interface ChatMessage {
   tool_results?: ToolResultInfo[]
   segments?: StreamSegment[]
   citations?: Citation[]
-  /** KB answers only: dollar amounts / percentages in the answer that no
-   *  retrieved snippet states — likely recalled from the model's memory. */
+  /** KB and attached-document answers: dollar amounts / percentages in the
+   *  answer that no source states — likely recalled from the model's memory. */
   unsupported_figures?: string[]
+  /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
+  silence_inferences?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -241,6 +243,8 @@ export interface StreamChunk {
   sources?: Citation[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
+  /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
+  silence_inferences?: string[]
 }
 
 export interface SuggestedModel {
