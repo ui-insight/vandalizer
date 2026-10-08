@@ -1434,15 +1434,141 @@ async def web_search(
     return response
 
 
+_DOCUMENT_READ_MAX_CHARS = 30000
+
+
+def read_document_range(
+    raw: str,
+    markers: list[dict] | None,
+    *,
+    start_page: Optional[int] = None,
+    end_page: Optional[int] = None,
+    start_char: Optional[int] = None,
+    max_chars: int = _DOCUMENT_READ_MAX_CHARS,
+) -> dict:
+    """One bounded read of a document's text, by page where it has pages (#1007).
+
+    A read used to be the first 30,000 characters and nothing else, so a
+    100-page solicitation could not be read past roughly page 25 from chat.
+    Now a read covers the requested pages (all of them by default) and stops
+    at a page boundary when it hits the cap, and the result says exactly which
+    pages it holds and where to continue. Documents without page markers are
+    read by character offset with the same continuation fields.
+
+    Returns the read (``text``, ``pages_returned``, ``next_page`` or
+    ``next_start_char``, ``complete``) or ``{"error", "hint"}``.
+    """
+    from app.services.chat_service import _page_positions, annotate_pages
+
+    raw = raw or ""
+    positions = _page_positions(markers, len(raw))
+
+    if not positions:
+        if start_page is not None or end_page is not None:
+            return _err(
+                "This document has no page markers, so it can't be read by page.",
+                hint="Read it by position instead: start_char=0, then the next_start_char each read returns.",
+            )
+        begin = start_char or 0
+        if begin < 0 or (raw and begin >= len(raw)):
+            return _err(
+                f"start_char {begin} is outside this document ({len(raw)} characters).",
+                hint="Use start_char=0, or the next_start_char a previous read returned.",
+            )
+        stop = min(len(raw), begin + max_chars)
+        return {
+            "text": raw[begin:stop],
+            "start_char": begin,
+            "end_char": stop,
+            "next_start_char": stop if stop < len(raw) else None,
+            "total_chars": len(raw),
+            "complete": begin == 0 and stop == len(raw),
+        }
+
+    if start_char is not None:
+        return _err(
+            "This document has page markers; read it by page.",
+            hint="Use start_page and end_page (the pages to read).",
+        )
+    pages = [p for _offset, p, _approx in positions]
+    first, last = pages[0], pages[-1]
+    want_start = first if start_page is None else start_page
+    want_end = last if end_page is None else end_page
+    if not first <= want_start <= last:
+        return _err(
+            f"Page {want_start} is outside this document (pages {first}–{last}).",
+            hint=f"Ask for a page between {first} and {last}.",
+        )
+    if want_end < want_start:
+        return _err(
+            f"end_page {want_end} is before start_page {want_start}.",
+            hint="Give the first page to read as start_page and the last as end_page.",
+        )
+    want_end = min(want_end, last)
+
+    begin = next(o for o, p, _a in positions if p >= want_start)
+    stop = next((o for o, p, _a in positions if p > want_end), len(raw))
+    mid_page_stop = None
+    if stop - begin > max_chars:
+        # Whole pages when they fit; a single page longer than the cap is cut
+        # mid-page, and the read says where to pick up.
+        boundary = max((o for o, _p, _a in positions if begin < o <= begin + max_chars), default=None)
+        if boundary is not None:
+            stop = boundary
+        else:
+            stop = mid_page_stop = begin + max_chars
+
+    in_read = [(o, p, a) for o, p, a in positions if begin <= o < stop]
+    text = annotate_pages(
+        raw[begin:stop],
+        [{"kind": "page", "value": p, "char_offset": o - begin, "approximate": a} for o, p, a in in_read],
+    )
+    read_first, read_last = in_read[0][1], in_read[-1][1]
+    next_page = None
+    if mid_page_stop is None:
+        next_page = next((p for o, p, _a in positions if o >= stop), None)
+        if next_page is not None and next_page > want_end:
+            next_page = None if end_page is not None else next_page
+    result = {
+        "text": text,
+        "page_count": last,
+        "start_page": read_first,
+        "end_page": read_last,
+        "pages_returned": f"{read_first}–{read_last}" if read_first != read_last else str(read_first),
+        "next_page": next_page,
+        "total_chars": len(raw),
+        "complete": begin == 0 and stop == len(raw),
+    }
+    if mid_page_stop is not None:
+        result["page_cut_mid"] = True
+        result["next_start_char"] = mid_page_stop
+    return result
+
+
 async def get_document_text(
     context: RunContext[AgenticChatDeps],
     document_uuid: str,
+    start_page: Optional[int] = None,
+    end_page: Optional[int] = None,
+    start_char: Optional[int] = None,
 ) -> dict:
-    """Get the full text content of a document. Useful for reading before extracting.
+    """Read a document's text, a page range at a time. Useful for reading before extracting.
+
+    One call returns at most about 30,000 characters (roughly 20-25 pages),
+    ending at a page boundary. With no range it starts at page 1. The result
+    says which pages it holds (``pages_returned``) and, when there is more,
+    ``next_page``: call again with ``start_page=next_page`` to keep reading.
+    For a long solicitation or award, read the pages that matter (budget,
+    eligibility, required attachments, terms) before answering, and never
+    describe pages you have not read.
 
     Args:
         context: The call context.
         document_uuid: UUID of the document to read.
+        start_page: First page to read (1-based). Omit to start at page 1.
+        end_page: Last page to read. Omit to read as far as one call allows.
+        start_char: For documents without page numbers only: character offset
+            to start from (use ``next_start_char`` from the previous read).
     """
     doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
     if not doc:
@@ -1463,35 +1589,49 @@ async def get_document_text(
         if doc.user_id != context.deps.user_id:
             return {"error": "You do not have access to this document."}
 
-    # Same page treatment as the attach path: insert [p. N] boundaries from
-    # the stored markers so an answer built on this tool has a page-citable
-    # substrate, and tell the model how to cite (with the approximate-page
-    # hedge preserved). Local import — chat_service imports this module.
-    from app.services.chat_service import annotate_pages, page_note_for
+    # Same page treatment as the attach path: [p. N] boundaries from the
+    # stored markers so an answer built on this tool has a page-citable
+    # substrate, and a note on how to cite (with the approximate-page hedge
+    # preserved). Local import — chat_service imports this module.
+    from app.services.chat_service import page_note_for
 
     raw = doc.raw_text or ""
     markers = getattr(doc, "text_markers", None)
-    text = annotate_pages(raw, markers)
-    # Truncate to avoid overwhelming the LLM context
-    max_chars = 30000
-    truncated = len(text) > max_chars
+    read = read_document_range(
+        raw, markers, start_page=start_page, end_page=end_page, start_char=start_char,
+    )
+    if "error" in read:
+        return read
     result = {
         "uuid": doc.uuid,
         "title": doc.title,
         "extension": doc.extension,
         "pages": doc.num_pages,
-        "text": text[:max_chars],
-        "truncated": truncated,
-        "total_chars": len(text),
+        **read,
+        "truncated": not read["complete"],
     }
-    citation_note = page_note_for(markers, annotated=text is not raw)
+    citation_note = page_note_for(markers, annotated="page_count" in read)
     if citation_note:
         result["page_citation_note"] = citation_note.strip()
-    if truncated:
+    if not read["complete"]:
+        if "page_count" in read:
+            where = f"pp. {read['pages_returned']} of {read['page_count']}"
+            more = (
+                f" To keep reading, call get_document_text again with start_page={read['next_page']}."
+                if read.get("next_page") else
+                f" The rest of page {read['end_page']} starts at start_char={read['next_start_char']}."
+                if read.get("next_start_char") else ""
+            )
+        else:
+            where = f"characters {read['start_char']}–{read['end_char']} of {read['total_chars']}"
+            more = (
+                f" To keep reading, call again with start_char={read['next_start_char']}."
+                if read.get("next_start_char") else ""
+            )
         result["note"] = (
-            f"Only the first {max_chars} characters were returned — do not "
-            "present conclusions as covering the whole document; say the read "
-            "was partial."
+            f"This read covers {where}, not the whole document.{more} Say which "
+            "pages your answer is based on, and do not present conclusions as "
+            "covering pages you have not read."
         )
     return result
 

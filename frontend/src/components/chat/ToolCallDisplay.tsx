@@ -240,8 +240,12 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'get_document_text': {
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
-      const chars = obj.total_chars ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars` : ''
-      return { text: [title, chars].filter(Boolean).join(' - '), qualityHint }
+      // Say which pages a read covered, so a partial read of a long
+      // document never looks like the whole thing (#1007).
+      const extent = typeof obj.pages_returned === 'string' && typeof obj.page_count === 'number'
+        ? (obj.complete ? `all ${obj.page_count} pages` : `read pp. ${obj.pages_returned} of ${obj.page_count}`)
+        : obj.total_chars ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars${obj.complete === false ? ', partly read' : ''}` : ''
+      return { text: [title, extent].filter(Boolean).join(' - '), qualityHint }
     }
 
     case 'run_extraction': {
