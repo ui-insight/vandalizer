@@ -64,9 +64,10 @@ _PAPPG_SOURCES = [
             "Equipment is defined as tangible personal property (including information "
             "technology systems) having a useful life of more than one year and a per-unit "
             "acquisition cost which equals or exceeds the lesser of the capitalization level "
-            "established by the proposer for financial statement purposes, or $5,000. "
+            "established by the proposer for financial statement purposes, or $10,000. "
             "**Equipment is excluded from the Modified Total Direct Cost (MTDC) base for "
-            "indirect cost calculations.** Items under $5,000 are classified as supplies.\n\n"
+            "indirect cost calculations.** Items below that threshold are classified as "
+            "supplies.\n\n"
             "### E. Travel\n"
             "Travel and associated expenses for key project personnel who need to travel "
             "to fulfill the objectives of the project. Domestic and foreign travel must be "
@@ -80,14 +81,14 @@ _PAPPG_SOURCES = [
             "### G. Other Direct Costs\n"
             "Includes materials and supplies, publication/documentation/dissemination costs, "
             "consultant services, computer services, and subaward costs. "
-            "**The first $25,000 of each subaward is included in the MTDC base; amounts "
-            "above $25,000 are excluded.**\n\n"
+            "**The first $50,000 of each subaward is included in the MTDC base; amounts "
+            "above $50,000 are excluded.**\n\n"
             "### H. Total Direct Costs\n"
             "Sum of all direct cost categories A through G.\n\n"
             "### I. Indirect Costs (Facilities & Administrative)\n"
             "Indirect cost rates must be applied to the Modified Total Direct Cost (MTDC) "
             "base. MTDC excludes: equipment, participant support costs, the portion of each "
-            "subaward exceeding $25,000, and patient care costs. Institutions must use their "
+            "subaward exceeding $50,000, and patient care costs. Institutions must use their "
             "federally negotiated indirect cost rate.\n\n"
         ),
     },
@@ -128,17 +129,18 @@ _PAPPG_SOURCES = [
             "award. NSF does not negotiate indirect cost rates.\n\n"
             "### Modified Total Direct Cost (MTDC) Base\n"
             "The MTDC base includes all direct salaries and wages, applicable fringe "
-            "benefits, materials and supplies, services, travel, and the first $25,000 of "
+            "benefits, materials and supplies, services, travel, and the first $50,000 of "
             "each subaward (regardless of the period of performance).\n\n"
             "**Exclusions from MTDC:**\n"
-            "- Equipment (items costing $5,000 or more per unit with useful life > 1 year)\n"
+            "- Equipment (per-unit cost at or above the lesser of the capitalization level "
+            "or $10,000, with a useful life of more than one year)\n"
             "- Capital expenditures\n"
             "- Charges for patient care\n"
-            "- Rental costs of off-site facilities\n"
+            "- Rental costs\n"
             "- Tuition remission\n"
             "- Scholarships and fellowships\n"
             "- Participant support costs\n"
-            "- The portion of each subaward exceeding $25,000\n\n"
+            "- The portion of each subaward exceeding $50,000\n\n"
             "### Budget Adjustments\n"
             "Grantees must report deviations from the approved budget in accordance with "
             "2 CFR 200.308. Prior written approval from NSF is required for certain budget "
@@ -291,6 +293,8 @@ async def provision_onboarding_sample(user: User) -> Optional[OnboardingContext]
         # If no KB or ChromaDB is empty, self-provision from inline PAPPG content
         if not kb_available:
             kb, kb_available = await _provision_pappg_kb(kb)
+        elif kb:
+            await _refresh_stale_pappg_sources(kb)
 
         return OnboardingContext(
             sample_doc_uuid=sample_doc.uuid,
@@ -372,6 +376,47 @@ async def _provision_nsf_extraction_set() -> Optional[SearchSet]:
         return None
 
 
+
+async def _refresh_stale_pappg_sources(kb: KnowledgeBase) -> int:
+    """Re-index inline demo sources whose stored text is older than ``_PAPPG_SOURCES``.
+
+    The demo KB is provisioned once and its ready sources are never re-read,
+    so a correction to the inline text (such as the 2024 Uniform Guidance
+    thresholds) would otherwise never reach a deployment that already ran the
+    demo. Only sources this module created are touched, matched by title and
+    the inline URL. Best effort: a failure leaves the old chunks indexed and
+    never blocks the demo. Returns the number of sources replaced.
+    """
+    from app.services.document_manager import get_document_manager
+
+    replaced = 0
+    for src_data in _PAPPG_SOURCES:
+        try:
+            source = await KnowledgeBaseSource.find_one(
+                KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+                KnowledgeBaseSource.url_title == src_data["name"],
+            )
+            if (
+                not source
+                or source.status != "ready"
+                or not (source.url or "").startswith("https://new.nsf.gov/policies/pappg#")
+                or source.content == src_data["content"]
+            ):
+                continue
+            chunk_count = await asyncio.to_thread(
+                get_document_manager().replace_kb_source,
+                kb.uuid, source.uuid, src_data["name"], src_data["content"],
+            )
+            source.content = src_data["content"]
+            source.chunk_count = chunk_count
+            await source.save()
+            replaced += 1
+            logger.info("Re-indexed demo PAPPG source '%s' with updated text", src_data["name"])
+        except Exception as e:
+            logger.warning("Could not refresh demo PAPPG source '%s': %s", src_data["name"], e)
+    return replaced
+
+
 async def _provision_pappg_kb(
     existing_kb: Optional[KnowledgeBase],
 ) -> tuple[Optional[KnowledgeBase], bool]:
@@ -424,7 +469,9 @@ async def _provision_pappg_kb(
                 content=src_data["content"],
                 status="processing",
             )
-            if not existing_src:
+            if existing_src:
+                source.content = src_data["content"]
+            else:
                 await source.insert()
 
             try:

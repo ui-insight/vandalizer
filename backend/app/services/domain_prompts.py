@@ -22,7 +22,7 @@ DOMAIN_TEMPLATES = {
             "- GPG: Grant Proposal Guide\n\n"
             "Budget categories (NSF standard):\n"
             "- Senior Personnel, Other Personnel, Fringe Benefits\n"
-            "- Equipment (>$5,000 per item), Travel (domestic/foreign)\n"
+            "- Equipment (per-unit cost at or above the lesser of the institution's capitalization level or $10,000), Travel (domestic/foreign)\n"
             "- Participant Support Costs (stipends, travel, subsistence, other)\n"
             "- Other Direct Costs (materials, publication, consulting, subawards, other)\n"
             "- Indirect Costs (F&A rate applied to MTDC)\n"

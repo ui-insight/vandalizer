@@ -11,6 +11,9 @@
     "collections": [
       "pre-award",
       "financial"
+    ],
+    "superseded_prompt_sha256": [
+      "1d0780447f789a97fd9b9bc826497d32cef7a5fc222dbde5c0a0b76ed30ec717"
     ]
   },
   "items": [
@@ -39,7 +42,7 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are a grants budget specialist reviewing an extracted budget. Perform the following analysis:\n\n## Arithmetic Verification\n- Do the personnel + fringe + other categories sum to Total Direct Costs?\n- Is the indirect cost rate applied correctly to the appropriate base (MTDC)?\n- Does Total Direct + Indirect = Total Project Cost?\n\n## Compliance Flags\n- Are there any potentially unallowable costs (entertainment, alcohol, lobbying, first-class travel)?\n- Is equipment properly categorized (items >$5,000)?\n- Are participant support costs separated from other categories?\n- For subawards, is only the first $25K of each included in the indirect cost base?\n\n## Reasonableness Check\n- Is the fringe benefit rate within normal institutional ranges (20-35% typical)?\n- Is the indirect cost rate consistent with the stated rate?\n- Are travel costs reasonable for the scope of work?\n\nPresent findings as:\n1. **Summary Table** - Budget category, amount, status (OK/Warning/Error)\n2. **Issues Found** - Numbered list with severity\n3. **Recommendations** - Actions to resolve issues",
+                "prompt": "You are a grants budget specialist reviewing an extracted budget. Perform the following analysis:\n\n## Arithmetic Verification\n- Do the personnel + fringe + other categories sum to Total Direct Costs?\n- Is the indirect cost rate applied correctly to the appropriate base (MTDC)?\n- Does Total Direct + Indirect = Total Project Cost?\n\n## Compliance Flags\n- Are there any potentially unallowable costs (entertainment, alcohol, lobbying, first-class travel)?\n- Is equipment properly categorized (per-unit cost at or above the lesser of the institution's capitalization level or $10,000, per 2 CFR 200.1)?\n- Are participant support costs separated from other categories?\n- For subawards, is only the first $50,000 of each included in the indirect cost base? These are the thresholds in the 2024 revision of 2 CFR 200, which applies to awards and amendments made on or after October 1, 2024. An award made before then may still carry the earlier thresholds ($5,000 equipment; first $25,000 of each subaward) in its terms, so check the award date.\n\n## Reasonableness Check\n- Is the fringe benefit rate within normal institutional ranges (20-35% typical)?\n- Is the indirect cost rate consistent with the stated rate?\n- Are travel costs reasonable for the scope of work?\n\nPresent findings as:\n1. **Summary Table** - Budget category, amount, status (OK/Warning/Error)\n2. **Issues Found** - Numbered list with severity\n3. **Recommendations** - Actions to resolve issues",
                 "input_source": "workflow_documents"
               }
             }

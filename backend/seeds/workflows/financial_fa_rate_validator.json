@@ -10,6 +10,9 @@
     "quality_tier": "excellent",
     "collections": [
       "financial"
+    ],
+    "superseded_prompt_sha256": [
+      "86f7373d5bc332c6ad5100d865e2c96ac6599aa11277d7e33eb7db6f159acf02"
     ]
   },
   "items": [
@@ -38,7 +41,7 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are an indirect cost rate specialist. Validate the F&A rate application:\n\n## Rate Verification\n- Is the correct rate being applied per the institution's negotiated rate agreement?\n- Is the rate type correct (provisional, predetermined, fixed, final)?\n- Is the on-campus vs off-campus designation appropriate?\n\n## MTDC Base Calculation\nVerify the Modified Total Direct Cost base excludes:\n- Equipment (items >$5,000)\n- Patient care costs\n- Rental costs of off-site facilities\n- Tuition remission\n- Scholarships and fellowships\n- Participant support costs\n- Subaward amounts exceeding $25,000 per subaward\n\n## Sponsor Cap\n- Does the sponsor impose an F&A rate cap?\n- If capped, is the correct (lower) rate being applied?\n- What is the revenue impact of any cap (difference between negotiated and capped rate)?\n\n## Validation Results\nFor each element:\n- **Correct** - rate/base matches expected value\n- **Incorrect** - expected vs actual values shown\n- **Unable to Verify** - insufficient information\n\nInclude the financial impact of any errors found.",
+                "prompt": "You are an indirect cost rate specialist. Validate the F&A rate application:\n\n## Rate Verification\n- Is the correct rate being applied per the institution's negotiated rate agreement?\n- Is the rate type correct (provisional, predetermined, fixed, final)?\n- Is the on-campus vs off-campus designation appropriate?\n\n## MTDC Base Calculation\nVerify the Modified Total Direct Cost base (2 CFR 200.1) excludes:\n- Equipment (per-unit cost at or above the lesser of the institution's capitalization level or $10,000)\n- Capital expenditures\n- Patient care costs\n- Rental costs\n- Tuition remission\n- Scholarships and fellowships\n- Participant support costs\n- The portion of each subaward in excess of $50,000\n\nThese are the thresholds in the 2024 revision of 2 CFR 200, which applies to awards and amendments made on or after October 1, 2024. An award made before then may still carry the earlier thresholds ($5,000 equipment; first $25,000 of each subaward) in its terms, so check the award date.\n\n## Sponsor Cap\n- Does the sponsor impose an F&A rate cap?\n- If capped, is the correct (lower) rate being applied?\n- What is the revenue impact of any cap (difference between negotiated and capped rate)?\n\n## Validation Results\nFor each element:\n- **Correct** - rate/base matches expected value\n- **Incorrect** - expected vs actual values shown\n- **Unable to Verify** - insufficient information\n\nInclude the financial impact of any errors found.",
                 "input_source": "workflow_documents"
               }
             }

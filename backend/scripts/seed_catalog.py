@@ -37,6 +37,7 @@ Pair with --dry-run to preview the retirement list before applying it.
 import argparse
 import asyncio
 import datetime
+import hashlib
 import json
 import logging
 import pathlib
@@ -365,6 +366,46 @@ async def _patch_inline_extractions(wf: Workflow, seed_item: dict) -> int:
     return patched
 
 
+async def _patch_superseded_prompts(wf: Workflow, seed_item: dict, meta: dict) -> int:
+    """Replace Prompt tasks still carrying a prompt this catalog has since corrected.
+
+    Workflow upserts leave the step graph alone, so a fix to a seeded prompt
+    (such as an outdated regulatory threshold) would otherwise reach only new
+    installs. ``_seed_meta.superseded_prompt_sha256`` lists hashes of earlier
+    shipped prompts; a task whose text still hashes to one of them is replaced
+    with the seed's current prompt for the step of the same name. A prompt
+    anyone has edited no longer matches and is left alone, as is any workflow
+    not owned by the catalog (a user's copy keeps its ``seed_id``).
+    Returns the number of tasks replaced.
+    """
+    superseded = set(meta.get("superseded_prompt_sha256") or [])
+    if not superseded or wf.user_id != SYSTEM_USER:
+        return 0
+    current: dict[str, str] = {}
+    for step_data in seed_item.get("steps", []):
+        for task_data in step_data.get("tasks", []):
+            if task_data.get("name") == "Prompt":
+                current[step_data["name"]] = task_data.get("data", {}).get("prompt", "")
+    patched = 0
+    for step_id in wf.steps:
+        step = await WorkflowStep.get(step_id)
+        if not step or step.name not in current:
+            continue
+        for task_id in step.tasks:
+            task = await WorkflowStepTask.get(task_id)
+            if not task or task.name != "Prompt":
+                continue
+            prompt = task.data.get("prompt") or ""
+            if hashlib.sha256(prompt.encode()).hexdigest() not in superseded:
+                continue
+            if prompt == current[step.name]:
+                continue
+            task.data = {**task.data, "prompt": current[step.name]}
+            await task.save()
+            patched += 1
+    return patched
+
+
 async def seed_workflow(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
 ) -> SeedResult:
@@ -379,6 +420,9 @@ async def seed_workflow(
         patched = await _patch_inline_extractions(existing, item)
         if patched:
             print(f"    (patched {patched} extraction task(s))")
+        corrected = await _patch_superseded_prompts(existing, item, meta)
+        if corrected:
+            print(f"    (replaced {corrected} superseded prompt(s))")
 
         changed = _reinstate_verified(existing)
         new_name = item["name"]
