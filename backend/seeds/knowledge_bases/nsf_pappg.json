@@ -5,17 +5,115 @@
   "_seed_meta": {
     "seed_id": "kb-nsf-pappg",
     "display_name": "NSF PAPPG Reference",
-    "description": "NSF Proposal & Award Policies & Procedures Guide (PAPPG) - the primary reference for NSF proposal preparation and award management requirements.",
+    "description": "NSF Proposal & Award Policies & Procedures Guide (NSF 24-1 with Supplements 1–2), bundled in full: the primary reference for NSF proposal preparation and award management.",
     "quality_tier": "excellent",
-    "collections": ["federal-agency", "reference-knowledge", "pre-award"]
-  },
-  "items": [{
-    "title": "NSF PAPPG Reference",
-    "description": "Comprehensive knowledge base covering NSF proposal preparation, budget guidelines, merit review criteria, and award conditions from the PAPPG.",
-    "sources": [
-      {"source_type": "url", "url": "https://new.nsf.gov/policies/pappg", "url_title": "NSF Proposal & Award Policies & Procedures Guide (PAPPG) | NSF - U.S. National Science Foundation"},
-      {"source_type": "url", "url": "https://new.nsf.gov/funding/preparing-proposal", "url_title": "Preparing Your Proposal - Funding at NSF | NSF - U.S. National Science Foundation"},
-      {"source_type": "url", "url": "https://new.nsf.gov/funding/proposal-budget", "url_title": "Preparing Your Proposal Budget - Funding at NSF | NSF - U.S. National Science Foundation"}
+    "collections": [
+      "federal-agency",
+      "reference-knowledge",
+      "pre-award"
+    ],
+    "retired_source_urls": [
+      "https://new.nsf.gov/funding/preparing-proposal",
+      "https://new.nsf.gov/funding/proposal-budget",
+      "https://new.nsf.gov/policies/pappg"
     ]
-  }]
+  },
+  "items": [
+    {
+      "title": "NSF PAPPG Reference",
+      "description": "The full text of the NSF Proposal & Award Policies & Procedures Guide (NSF 24-1, for proposals due on or after May 20, 2024) with Supplements 1 and 2: proposal preparation, budget rules, merit review, award conditions, cost allowability and post-award requirements, one source per chapter.",
+      "sources": [
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/summary-changes",
+          "content_file": "content/nsf-pappg-24-1-summary-changes.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Summary of Changes"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-1-pre-submission",
+          "content_file": "content/nsf-pappg-24-1-ch-1-pre-submission.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter I: Pre-Submission Information"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-2-proposal-preparation",
+          "content_file": "content/nsf-pappg-24-1-ch-2-proposal-preparation.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter II: Proposal Preparation Instructions"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-3-proposal-processing-review",
+          "content_file": "content/nsf-pappg-24-1-ch-3-proposal-processing-review.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter III: NSF Proposal Processing and Review"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-4-non-award-decisions-transactions",
+          "content_file": "content/nsf-pappg-24-1-ch-4-non-award-decisions-transactions.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter IV: Non-Award Decisions and Transactions"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-5-renewal-proposals",
+          "content_file": "content/nsf-pappg-24-1-ch-5-renewal-proposals.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter V: Renewal Proposals"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-6-nsf-awards",
+          "content_file": "content/nsf-pappg-24-1-ch-6-nsf-awards.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter VI: NSF Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-7-award-administration",
+          "content_file": "content/nsf-pappg-24-1-ch-7-award-administration.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter VII: Award Administration"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-8-financial-requirements-payments",
+          "content_file": "content/nsf-pappg-24-1-ch-8-financial-requirements-payments.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter VIII: Financial Requirements and Payments"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-9-recipient-standards",
+          "content_file": "content/nsf-pappg-24-1-ch-9-recipient-standards.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter IX: Recipient Standards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-10-allowability-of-costs",
+          "content_file": "content/nsf-pappg-24-1-ch-10-allowability-of-costs.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter X: Allowability of Costs"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-11-other-post-award-requirements",
+          "content_file": "content/nsf-pappg-24-1-ch-11-other-post-award-requirements.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter XI: Other Post-Award Requirements and Considerations"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/pappg/24-1/ch-12-disputes-misconduct",
+          "content_file": "content/nsf-pappg-24-1-ch-12-disputes-misconduct.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Chapter XII: Recipient Disputes and Misconduct"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/document/pappg24-1-supplement-1",
+          "content_file": "content/nsf-pappg-24-1-supplement-1.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Supplement 1 (NSF 26-200)"
+        },
+        {
+          "source_type": "url",
+          "url": "https://www.nsf.gov/policies/document/pappg24-1-supplement-2",
+          "content_file": "content/nsf-pappg-24-1-supplement-2.txt",
+          "url_title": "NSF PAPPG (NSF 24-1) — Supplement 2 (NSF 26-202)"
+        }
+      ]
+    }
+  ]
 }

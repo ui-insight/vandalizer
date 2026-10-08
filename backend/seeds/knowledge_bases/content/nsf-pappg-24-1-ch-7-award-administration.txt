@@ -1,0 +1,342 @@
+NSF PAPPG (NSF 24-1) — Chapter VII: Award Administration
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-7-award-administration
+
+### A. Monitoring Project Performance
+
+#### 1. Recipient Responsibilities
+
+- The recipient has full responsibility for the conduct of the project or activity supported under an NSF award and for the results achieved. The recipient should monitor the performance of the project to assure adherence to performance goals, time schedules or other requirements as appropriate to the project or the terms and conditions of the award. In order to carry out these responsibilities, each recipient organization shall agree to comply with the applicable Federal requirements for awards and to the prudent management of all expenditures and actions affecting the award. Documentation for each expenditure or action affecting the award shall reflect appropriate organizational reviews or approvals, which should be made in advance of the action. Organizational reviews are intended to help assure that expenditures are allowable, necessary, and reasonable for the conduct of the project, and that the proposed action:
+
+-
+(i) is consistent with award terms and conditions;
+
+(ii) is consistent with NSF and recipient policies;
+
+(iii) represents effective utilization of resources; and
+
+(iv) does not constitute changes in objectives or scope.
+
+- Notwithstanding these responsibilities, NSF continues to encourage communication between NSF Program Officers and PIs on the progress of projects supported by NSF as well as on project changes.
+- NSF, through authorized representatives, has the right, at all reasonable times, to make site visits to review project accomplishments, recipient management control systems and administration and management of the award and to provide technical assistance as may be required. If any site visit is made by the Foundation on the premises of the recipient or a subrecipient under an award, the recipient shall provide and shall require its subrecipients to provide all reasonable facilities and assistance for the safety and convenience of the NSF representatives.
+
+#### 2. Recipient Notifications to NSF
+
+The following is a listing of recipient notifications to NSF, including a reference to where additional guidance is provided. Except where noted below, all notifications must be submitted via use of NSF’s electronic systems. With the exception of significant changes in methods or procedures and significant changes, delays or events of unusual interest, all notifications must be signed and submitted by the AOR.
+
+Certain actions require prior approval from NSF. Guidance regarding prior approval requirements is covered in Chapter X.A.3, and the NSF column of the Research Terms and Conditions, Appendix A.
+
+- Grantee-Approved No-Cost Extension – See Chapter VI.D.3.c(i).
+- Significant Changes in Methods or Procedures (Other than Changes in Objectives or Scope) – See Chapter VII.B.1.b.
+- Significant Changes, Delays or Events of Unusual Interest (Other than Changes in Objectives or Scope) – See Chapter VII.B.1.c.
+- Annual and Final Cost Share Notification by Recipient – See Chapter VII.C.3.
+- Conflicts of Interest that cannot be satisfactorily managed, reduced or eliminated and research that proceeds without the imposition of conditions or restrictions when a conflict of interest exists – See Chapter IX.A.
+- Finding/Determination that a PI or co-PI has been found to have violated awardee policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault - See Chapter XI.A.1. This notification must be submitted through use of NSF’s Office of Equity and Civil Rights website; or
+- Placement by the recipient of a PI or co-PI on administrative leave or the imposition of any administrative action on the PI or any co-PI by the awardee relating to any finding/determination or an investigation of an alleged violation of awardee policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault. See Chapter XI.A.1. This notification must be submitted through use of NSF’s Office of Equity and Civil Rights website.
+
+### B. Changes in Project Direction or Management
+
+#### 1. Changes in Objectives, Scope, or Methods/Procedures
+
+#### a. Changes in Objectives or Scope
+
+The objectives or scope of the project may not be changed without prior NSF approval. Such change requests must be signed and submitted by the AOR via use of NSF’s electronic systems. If approved by NSF, the Grants and Agreements Officer will amend the award. Prior written NSF approval also is required for changes to the Facilities, Equipment and Other Resources section of the approved proposal that would constitute changes in objectives or scope (see Chapter II.D.2.g for further information).
+
+#### b. Significant Changes in Methods or Procedures
+
+NSF believes that the PI and co-PI, operating within the established policies of the recipient organization, should feel free to pursue interesting and important leads that may arise during the conduct of a research (or other award-supported) project or to adopt an alternative approach which appears to be a more promising means of achieving the objectives of the project. Significant changes in methods or procedures should be reported to appropriate recipient official(s). The PI also must notify NSF via use of NSF’s electronic systems.
+
+#### c. Significant Changes, Delays, or Events of Unusual Interest
+
+In the event there are problems, delays, or adverse conditions that will materially impact the ability to attain the objectives of the project or to meet such time schedules as may have been proposed, the PI should notify the appropriate recipient official(s). The PI also must notify NSF via use of NSF’s electronic systems.
+
+NSF should be informed of any events of unusual interest that occur during the course of the project. Reports, communications, or photographs should be submitted via the interim report capability in Research.gov.
+
+#### 2. Changes in PI, co-PI, or Person-Months Devoted to the Project at the Initiation of the Recipient Organization
+
+The NSF decision to support a proposed project is based to a considerable extent upon its evaluation of the proposed PI and any identified co-PI’s knowledge of the field of study and their capabilities to conduct the project in an efficient and productive manner. This is reflected in the NSF merit review criteria (see Chapter III). The named PI (and co-PI) should be continuously responsible for the conduct of the project and be closely involved with the effort.
+
+If the recipient determines that there is a need for the addition of a new co-PI, or the current PI or co-PI plans to, or becomes aware that the current PI or co-PI will: (i) devote substantially less effort to the project than anticipated in the approved proposal; (ii) sever connection with the recipient organization; or (iii) otherwise relinquish active direction of the project, the individual must advise the appropriate official at the recipient organization, who shall initiate action appropriate to the situation under the guidelines that follow.
+
+#### a. Long-Term Disengagement of PI or co-PI
+
+-
+(i) In the event the PI or co-PI will be disengaged from the project for a period greater than three months (e.g., sabbatical leave) but intends to return, arrangements for oversight of the project must be signed and submitted by the AOR via use of NSF's electronic systems. This request must be submitted at least 30 days before departure or as soon as practicable after the prospective disengagement is known.[65] The cognizant NSF Program Officer will provide written approval to the recipient if the arrangements are satisfactory, but no formal amendment to the award will be made. If the arrangements are not satisfactory to NSF, the award may be terminated as prescribed in Chapter XII.A.
+
+(ii) In the event the PI or co-PI will temporarily be working for NSF as an IPA (Intergovernmental Personnel Act employee) or VSEE (Visiting Scientist, Engineer or Educator), the appropriate officials at the recipient organization must contact the cognizant NSF Program Officer for procedural guidance regarding any existing awards or pending proposals of the PI or co-PI.
+
+#### b. Changes in Person-Months Devoted to the Project
+
+If the PI or co-PI will devote substantially less time to the project than anticipated in the approved proposal, (defined in the applicable award terms and conditions as a reduction of 25% or more in time) that PI or co-PI should consult with the appropriate officials of the recipient organization. Requests for changes to the person-months devoted to the project must be signed and submitted by the AOR via use of NSF’s electronic systems. This request must be submitted at least 30 days before the proposed change, or as soon as practicable after the prospective change is known. If the recipient organization or NSF determines that the reduction of effort will substantially impair the successful execution of the project, the NSF Program Officer will consult the NSF Grants and Agreements Officer. The NSF Grants and Agreements Officer may:
+
+-
+(i) request the recipient to nominate a replacement PI or co-PI acceptable to the cognizant NSF Program Officer;
+
+(ii) initiate the termination procedures described in Chapter XII.A.; or
+
+(iii) negotiate an appropriate modification to the award.
+
+#### c. Addition of co-PI
+
+In the event the recipient desires to add a new co-PI to a project[66], the AOR must sign and submit the request via use of NSF’s electronic systems. The new co-PI’s name, biographical sketch, current and pending support from all ongoing projects and proposals, as well as a justification for the addition must also be included in the request. The contact information for the new co-PI also should be included. If approved by NSF, the Grants and Agreements Officer will amend the award.
+
+#### d. Withdrawal of PI or co-PI
+
+In the event the PI or co-PI severs connection with the recipient organization or otherwise relinquishes active direction of the project, the AOR must sign and submit a notification of the withdrawal of the PI or co-PI via Research.gov. This request must be submitted at least 30 days before the proposed change, or as soon as practicable after the prospective withdrawal is known. The recipient also must:
+
+-
+(i) initiate transfer of the award as described in Chapter VII.B.2.f. (This is generally reserved for the withdrawal of the PI);
+
+(ii) nominate a substitute as described in Chapter VII.B.2.e; or
+
+(iii) initiate award closeout procedures through submission of final reports as described in Chapter VII.D.2. (This is generally reserved for the withdrawal of the PI if no substitute is nominated).
+
+#### e. Substitute (Change) PI or co-PI
+
+In the event the recipient desires to continue the project with a substitute PI or co-PI, the AOR must sign and submit the request via use of NSF’s electronic systems. The substitute PI’s name or co-PI’s name, biographical sketch, current and pending support from all ongoing projects and proposals, as well as a justification for the substitution must also be included in the request. The contact information for the substitute PI or co-PI also should be included. If approved by NSF, the Grants and Agreements Officer will amend the award. If not approved, NSF may take steps, pursuant to Chapter XII.A to suspend or terminate the award.
+
+In cases where a former NSF employee or IPA is being reappointed as PI or co-PI to an award they were previously involved with, the recipient must submit a "Change of PI" request using the Research.gov Notifications and Requests module. The change in PI request should include documentation from the AOR designating a substitute negotiator for that award under the Associated Documents section. A co-PI request should designate the PI as the substitute negotiator.
+
+#### f. Disposition of an Award When a PI Transfers from One Organization to Another Organization
+
+-
+(i) Policy. When a PI plans to leave an organization during the course of a award, the organization has the prerogative to nominate a substitute PI or request that the award be terminated and closed out. In those cases where the PI’s original and new organizations agree, NSF will facilitate a transfer of the award and the assignment of remaining unobligated funds to the PI’s new organization. This should normally be done with a tripartite agreement (involving NSF, the PI’s original organization and new organization), or by a subaward arrangement between the PI’s original and new organizations, subject to NSF’s consent. (See Chapter VII.B.3)
+
+(ii) Procedures. When a PI plans to leave an organization during the course of an award, the PI or the SPO, shall notify the cognizant NSF Program Officer. If the project is to continue with the original organization, the cognizant NSF Program Officer should advise the recipient to nominate a substitute PI (see Chapter VII.B.2.e). If the project is to be continued at the PI’s new organization, and if NSF and both organizations agree, formal notification of the impending transfer can be electronically initiated by either the PI or the PI’s organization. The amount transferred has to be equal to or less than the unobligated balance. The request shall include a:
+
+-
+(a) brief summary of progress to date;
+
+(b) description of work yet to be accomplished;
+
+(c) completed on-line transfer request, including total disbursements and unpaid obligations to date (transfer amount will be automatically calculated, based on the amount entered in total disbursements). The original organization is responsible for including in the total estimated disbursements, any anticipated costs yet to be incurred against the original award;
+
+(d) detailed line item budget for the transfer amount and any outstanding award increments; and
+
+(e) If funding is requested to support a postdoctoral scholar or graduate student, then the request must include the requisite mentoring plan as described in Chapter II.D.2.i(i). The plan must be uploaded under “Mentoring Plan” in the Supplementary Documentation section of Research.gov. The PI must report on the mentoring activities provided to the individual(s) in annual and final annual project reports.
+
+The original organization concurs with the transfer of the award by electronically forwarding the request to the new organization.
+
+The new organization completes the request by providing a detailed budget for the transfer amount agreed to by both organizations. The AOR of the new organization must sign and submit the request via use of NSF’s electronic systems. Submission of the request constitutes agreement by the new organization to assume responsibility for completion of the project effort and to administer the award (as originally awarded) from the transfer date to completion in accordance with any special terms and conditions and the applicable general terms and conditions that normally govern NSF awards made to the new organization. Special terms and conditions, as appropriate, cited in the original award will convey to the new recipient organization.
+
+NSF will assign a proposal number at the time of submission. This proposal number will become the new award number when the transfer is approved by an NSF Grants and Agreements Officer.
+
+(iii) Fund Transfer. Upon receipt of the above material, NSF will review the request and, if approved, deduct the specified transfer amount from the original award and re-establish it under a new award number at the new organization. Award notification by the NSF Grants and Agreements Officer will constitute NSF approval of the award transfer. The award notification also will specify the applicable award terms and conditions that govern the award.
+
+(iv) Monetary Discrepancies. Upon transfer of the award to the new organization, any monetary discrepancies must be resolved between the original and the new recipient. NSF will not intervene in any disputes between the two organizations regarding the transferred amount.
+
+(v) Equipment Transfers. Equipment purchased with NSF funds for use in a specific project should remain available for use for the duration of the project. PIs who are in the midst of projects that included funding for equipment and who will continue the project at a new organization with NSF support, should arrange with their original organization to have the equipment transferred with them. Shipping costs for such equipment may be charged to the original or transferred award as an allowable cost. Budgets should not include funds to “buy” equipment that had been previously obtained with Federal funds.
+
+(vi) Possible Alternatives to the Transfer Process. When the amount of time and funds remaining in a project are modest, and if both the original and new organizations are in agreement, the original organization may issue a subaward to the new organization for completion of the project. This and other possible alternatives should be discussed with the NSF Grants and Agreements Officer. If the new organization is a foreign organization, a subaward also must follow the procedures outlined in Chapter I.E.2(c).
+
+#### 3. Changes in PI, co-PI, or Person-Months Devoted to the Project at the Initiation of NSF
+
+- Upon receipt of a notification specified in Chapter VII.A.2.f or g, NSF will consider, at a minimum, the following factors:
+
+-
+(i) The safety and security of personnel supported by the NSF award;
+
+(ii) The overall impact to the NSF-funded activity;
+
+(iii) The continued advancement of taxpayer-funded investments in science and scientists; and
+
+(iv) Whether the awardee has taken appropriate action(s) to ensure the continuity of science and that continued
+
+- Upon receipt and review of the information provided, NSF will consult with the AOR, or designee. Based on the results of this review and consultation, the Foundation may, if necessary, assert its programmatic stewardship responsibilities and oversight authority, to initiate the substitution or removal of the PI or any co-PI, reduce the award funding amount, or where neither of those previous options is available or adequate, to suspend or terminate the award.
+- When NSF invokes this authority, the recipient must nominate a substitute PI or co-PI via use of NSF’s electronic systems. The substitute PI’s name or co-PI’s name, biographical sketch, current and pending support from all ongoing projects and proposals, must also be included in the request. The contact information for the substitute PI or co-PI also should be included. If approved by NSF, the Grants and Agreements Officer will amend the award. If not approved, or a substitute PI or co-PI is not available, NSF may take steps, pursuant to Chapter XII.A to suspend or terminate the award.
+
+#### 4. Subawarding or Transferring Part of an NSF Award (Subaward)[67]
+
+Excluding the purchase of items such as commercially available materials and supplies, equipment, or general support services allowable under the award, no part of an NSF award may be subawarded or transferred to another organization without prior NSF authorization. The intent to enter into such arrangements should be disclosed in the proposal.
+
+If it becomes necessary to subaward or transfer part of an NSF award after an award has been made, the recipient shall submit, at a minimum:
+
+- a clear description of the work to be performed by each subrecipient;
+- a separate budget and budget justification for each subaward; and
+- If funding is requested to support a postdoctoral researcher, and the original proposal did not include a mentoring plan, then the request must include the requisite mentoring plan as described in Chapter II.C.2.j. The plan must be uploaded under “Mentoring Plan” in the Supplementary Documentation section of Research.gov.
+
+The request must be signed and submitted by the AOR via use of NSF’s electronic systems, and NSF authorization will be indicated by an amendment to the award signed by the Grants and Agreements Officer. The NSF award terms and conditions will identify which articles flow-down to subrecipients.
+
+Procurements under NSF awards are subject to Chapter X.C as well as 2 CFR § 200.317-327.
+
+#### 5. Postaward Additions of Postdoctoral Scholars or Graduate Students
+
+If a recipient rebudgets funds to support a postdoctoral scholar or graduate student and the original proposal included a mentoring plan, no further documentation is necessary. If the original proposal did not include a mentoring plan, then the recipient must send the cognizant NSF Program Officer the requisite mentoring plan, as described in Chapter II.D.2.i(i).
+
+If supplemental funding is requested to support a postdoctoral scholar or graduate student and the original proposal did not include a mentoring plan, then the supplemental funding request must include the requisite mentoring plan, as described in Chapter II.D.2.i(i). The plan should be uploaded to the "Other Supplementary Documents" section of the Research.gov Supplemental Funding Request module.
+
+In all cases, the PI must report on the mentoring activities provided to the individual in the annual and final project reports.
+
+#### 6. Postaward Additions of Off-Site or Off-Campus Research
+
+If a recipient rebudgets funds to support off-campus or off-site research and a Plan for Safe and Inclusive Working Environments was developed for the original proposal, no further documentation is necessary. If a Plan for Safe and Inclusive Working Environments was not developed for that proposal, then the recipient must develop and maintain the plan in the organization's records as described in Chapter II.E.9.
+
+If supplemental funding is requested to support off-site or off-campus research and the original proposal did not require a Plan for Safe and Inclusive Working Environments, then the recipient must develop and maintain the plan in the organization’s records as described in Chapter II.E.9.
+
+#### 7. Individual Development Plans for Postdoctoral Scholars and Graduate Students
+
+In accordance with Section 10313 (42 U.S.C. § 18993) of the CHIPS and Science Act of 2022, for each NSF award that provides substantial support to postdoctoral scholars and graduate students, each individual must have an Individual Development Plan, which is updated annually, that maps the educational goals, career exploration, and professional development of the individual. NSF defines “substantial support” as an individual that has received one person month or more during the annual reporting period under the NSF award. See also Chapter VII.D.1.b (iv) below for certification requirements.
+
+### C. Cost Sharing
+
+#### 1. General
+
+The National Science Board issued a report entitled “Investing in the Future: NSF Cost Sharing Policies for a Robust Federal Research Enterprise” (NSB 09-20), which contained eight recommendations for NSF regarding cost sharing. In implementation of the Board’s recommendations, NSF’s revised guidance[68] (see Chapter II.D.2.f(xii)) is as follows:
+
+- inclusion of voluntary committed cost sharing is prohibited. It should be noted that foregoing full indirect cost rate (F&A) recovery is considered voluntary committed cost sharing; and
+- when mandatory cost sharing is included on Line M and accepted by NSF, the commitment of funds becomes legally binding and is subject to audit. Failure to provide the level of cost sharing required by the NSF solicitation and reflected in the NSF award budget may result in termination of the NSF award, disallowance of award costs and/or refund of award funds to NSF by the recipient.
+
+#### 2. Mandatory Cost Sharing Commitments
+
+2 CFR § 200.306 prescribes criteria and procedures for the allowability of cash and in-kind contributions. Recipients should be aware that mandatory cost sharing commitments are subject to audit. Audit findings involving cost sharing have pertained to: a) failure to keep adequate source documentation for claimed cost sharing; b) unclear valuation of in-kind donated contributions; c) lack of support for cost sharing contributions by subrecipients; and d) failure to complete annual certifications for awards with mandatory cost sharing requirements. Additional guidance on cost sharing is available on the NSF website.
+
+#### 3. Mandatory Cost Sharing Records and Reports
+
+-
+Recipient Records
+
+Recipients shall maintain records of all project costs that are claimed by the recipient to meet mandatory cost sharing requirements specified in an NSF program solicitation. Records for cost share contributed to NSF awards must be compliant with the requirements of 2 CFR § 200.306 and are subject to audit.
+
+-
+Recipient Reports
+
+The amount of mandatory cost sharing must be documented (on an annual and final basis), certified by the AOR, and reported to the cognizant NSF Program Officer via use of NSF’s electronic systems. Such notifications must be submitted no later than 90 days prior to the end of the current budget period to meet the annual notification requirement, and no later than 120 days following the end date of the of the award to meet the final notification requirement. The cost share notification is considered due during the 90- or 120-day period respectively. The notification becomes overdue the day after the respective 90- or 120-day period ends.
+
+-
+Changes to the Cost Sharing Amount Specified on Line M of the NSF Award Budget
+
+Should the recipient become aware that it may be unable to provide the cost sharing of at least the amount identified on Line M of the NSF award budget, the AOR must immediately sign and submit a request to revise the agreed upon cost sharing amount and submit the request via use of the “Other” category” in the Notification and Request module of NSF’s electronic systems. The request must provide a description of why the cost sharing amount cannot be provided, and either indicate steps the recipient plans to take to secure replacement cost sharing; or indicate the plans that the recipient has to either continue or phase out the project in the absence of the approved level of cost sharing.
+
+Should NSF agree to the organization’s proposed plans, the NSF Grants and Agreements Officer will modify the award accordingly, including, if appropriate, reducing the amount of NSF support. Should the organization’s plans be unacceptable to NSF, the award may be subject to termination. NSF modifications to proposed cost sharing revisions are made on a case-by-case basis.
+
+Failure by the organization to notify NSF, in accordance with the paragraph above, may result in the disallowance of some or all of the costs charged to the award; the subsequent recovery by NSF of some or all of the NSF funds provided under the award; possible termination of the award; and may constitute a violation of the terms of the award so serious as to provide grounds for subsequent suspension or debarment.
+
+### D. Reporting Requirements[69]
+
+#### 1. Annual and Final Annual Project Reports
+
+NSF requires project reports for all assistance awards. Information from these reports is used in annual reports to Congress to demonstrate the Foundation’s performance as mandated by the Government Performance and Results Act (GPRA) of 1993. These reports also provide NSF program officers and administrative offices with information on the progress of supported projects and the way these funds are used. Information in these reports may be made available to the general public through the Freedom of Information Act (FOIA). These reports are fully consistent with the Research Performance Progress Report (RPPR), which is the government-wide standard for use with research and research-related activities. As implemented, the following components comprise NSF project reports:
+
+- Accomplishments;
+- Products;
+- Participants/Organizations
+- Impact;
+- Changes/Problems; and
+- Special Requirement (if applicable).
+
+Except where another format is approved by OMB for use by an NSF program, this means that the "where practicable" requirement specified in 2 CFR § 200.329 is not required as the RPPR does not relate financial information to performance data.
+
+#### a. Annual Project Reports
+
+Annual project reports should address progress in all activities of the project, including any activities intended to address the Broader Impacts criterion that are not intrinsic to the research. These reports are not cumulative and should be written specifically for the current budget period.
+
+Annual project reports must be submitted in Research.gov no later than 90-days prior to the end of the current budget period to provide sufficient time for review and approval by the cognizant NSF Program Officer. The report becomes overdue the day after the end of the current budget period if it has not been submitted by the PI and approved by the cognizant NSF Program Officer.
+
+The report becomes overdue the day after the 90-day period ends. Failure to submit timely reports will delay processing of additional funding and administrative actions, including, but not limited to, no cost extensions. In the case of continuing grants, failure to submit timely reports will delay processing of funding increments. See also Chapter VI.E.3.
+
+Annual project reports may not be required for fellowship awards. Specific reporting requirements for fellowships may be established in the applicable solicitation.
+
+For multi-year standard grants, PIs are required to submit annual reports as outlined above. In the case of cooperative agreements, the annual project report is required before NSF approves any future funding increments.
+
+Continuing grants also are subject to the same policies regarding report submission as outlined above. For continuing grants that have a duration of 18 months or more per increment, two annual reports are required. A report must be submitted for the first 12 months of the project, and then another report for the remaining months of the increment. Continuing grants which include an increment of 24 months will require an annual report for each 12-month period.
+
+#### b. Final Annual Project Report
+
+(i) The final annual project report is the last annual report of the project and should be written specifically for the most recently completed budget period. It should address progress in all activities of the project in its final year, including any activities intended to address the Broader Impacts criterion that are not intrinsic to the research. This report is not cumulative. By submitting the final annual project report, the PI is signifying that the scope of work for the project has been completed and that the PI does not anticipate that any further research activities (including a no-cost extension, supplemental funding, or transfer of the award) need to be completed on the project. Submission of the final annual project report, however, does not preclude the recipient from requesting any further payments for costs incurred during the period of performance.
+
+Unless otherwise specified in the award, the final annual project report must be submitted in Research.gov no later than 120-days following the end date of the award. As reflected in the Project Report System, the report is considered due during the 120-day period. If the report has not been submitted by the PI and approved by the cognizant NSF Program Officer within the 120-days period, the report becomes overdue. In addition, the recipient also shall provide to the cognizant NSF Program Officer, within 120-days following the end date of the award:
+
+- any unique reports or other end items specified in the award, including any reporting requirements set forth in any NSF brochure, guide, solicitation, etc., referenced in the award as being directly related to either the award or the administration of the award.
+- a final cost share notification documented and certified by the AOR for awards where there is mandatory cost sharing established for the program.
+
+(ii) PIs must submit final project reports within the time period specified. Failure to provide these reports on a timely basis will delay NSF review and processing of pending proposals for all identified PIs and co-PIs on a given award
+
+(iii) Final annual project reports may not be required for institutional graduate research fellowships. However, final reporting requirements for individual fellowships are established in the applicable program solicitation.
+
+(iv) Certification Requirements for Annual and Final Annual Reports
+
+In submission of each annual and final annual report, the PI or co-PI is certifying that:
+
+- the statements provided (excluding scientific hypotheses and scientific opinions) are true and complete, and the text and graphics in the report as well as any accompanying publications or other documents, unless otherwise indicated, are the original work of the signatories or individuals working under their supervision; and
+- that each postdoctoral scholar and graduate receiving substantial support from the award has an individual development plan that maps educational goals, career exploration, and professional development.
+
+Any misrepresentations and/or omissions may be subject to prosecution and liability pursuant to, but not limited to, 18 U.S.C. §§ 287, 1001, 1031 and 31 U.S.C. §§ 3729-3733 and 3802
+
+#### 2. Project Outcomes Report for the General Public (POR)
+
+This report serves as a brief summary, prepared specifically for the public, of the nature and outcomes of the project.
+
+#### Section Contents:
+
+- Describe the project outcomes or findings that address the intellectual merit and broader impacts of the work as defined in the NSF merit review criteria. This description should be a brief (generally, two to three paragraphs) summary of the project's results that is written for the lay reader. PIs are strongly encouraged to avoid use of jargon, terms of art, or acronyms.
+- NSF will automatically include all publications associated with the award that are reported in annual and final project reports. Other products that have resulted from the award may also be listed. Examples of other products include collections, data sets, software, as well as educational materials.
+- Information regarding anticipated publication of project results, as well as any other information that would be of interest to the public also may be included in this section.
+
+Recipients are to ensure that the report does not contain any confidential, proprietary business information; unpublished conclusions or data that might compromise the ability to publish results in the research literature; or invention disclosures that might adversely affect the patent rights or those of the organization, in a subject invention under the award. PORs are not to contain any personally identifiable information such as home contact information, individual demographic data or individually identifiable information collected from human research participants.
+
+This report will be posted electronically by NSF exactly as it is submitted and will be accompanied by the following disclaimer:
+
+"This Project Outcomes Report for the General Public is displayed verbatim as submitted by the Principal Investigator (PI) for this award. Any opinions, findings, and conclusions or recommendations expressed in this Report are those of the PI and do not necessarily reflect the views of the National Science Foundation; NSF has not approved or endorsed its content."
+
+The POR must be submitted in Research.gov no later than 120 days following the end date of the award. The report becomes overdue the day after the 120-day period ends if it has not been submitted by the PI. By submitting the POR, the PI is signifying that the scope of work for the project has been completed and that the PI does not anticipate that any further research activities (including a no-cost extension, supplemental funding, or transfer of the award) need to be completed on the project. Submission of the POR, however, does not preclude the recipient from requesting any further payments for costs incurred during the period of performance.
+
+#### 3. Foreign Financial Disclosure (CHIPS & Science Act of 2022)
+
+#### a. Applicability
+
+In accordance with Section 10339B, Foreign Financial Support, of the CHIPS and Science Act of 2022, (42 U.S.C. § 19040), each "recipient institution of higher education" must annually report all "current financial support, the value of which is $50,000 or more[70], including gifts and contracts, received directly or indirectly from a foreign source" which is “associated with a foreign country of concern,” as defined in the PAPPG Introduction, Section D.
+
+This requirement applies only to direct recipients of NSF funding. This does not include entities that receive subawards or individuals that are the beneficiaries of the award.
+
+Per section 10339B(a) (42 U.S.C. § 19040(a)), the report also must include covered financial support received by "a foundation of the institution, and related entities such as any educational, cultural, or language entity."[71] Also, covered financial support received from or contracts with an "agent" of a foreign source associated with a foreign country of concern are reportable. NSF is aware that the stated purpose and/or function of some legal entities (as articulated in articles of incorporation, for example) is to serve as an intermediary for foreign source gifts to or contracts with an institution. Allowing foreign sources and institutions to avoid disclosure by using intermediaries to transfer funds and benefit would be contrary to the plain statutory language, context, and purpose of 42 U.S.C. § 19040. Therefore, foreign source financial support comprised of gifts to or contracts with an intermediary that benefit an institution is reportable.
+
+Financial support is attributable to the country of citizenship, or if unknown, the principal residence for a foreign source who is a natural person, and the country of incorporation/establishment, or if unknown, the principal place of business, for a foreign source which is a legal entity.
+
+Tuition payments for a specific student(s) are excluded from the reporting requirement (e.g., parent payment for child/children or other relatives). However, if the payment of tuition is in the form of a grant, scholarship or other form of financial aid that is conditioned on a specific criterion (e.g., the student’s country of origin – all students from a particular country; students with a particular major; or students studying a particular language, etc.), but not for the benefit of a specific student, that payment is reportable when the aggregate threshold of $50,000 from a foreign source is met.
+
+#### b. Reporting Period and Record Retention Requirements
+
+The report must be submitted by July 31 of each calendar year. The first report will be due July 31, 2024, and will cover the reporting period from July 1, 2023, through June 30, 2024, to provide the institution with a 30-day period for finalization and submission of the requisite information. Subsequent years' reporting periods will run from July 1st of the previous year to June 30 of the reporting year. Negative reports are required to be submitted. The institution will maintain a copy of the relevant records subject to the disclosure requirement until the latest of --
+
+(1) the date that is four years after the end date of the award;
+
+(2) the date on which the agreement terminates; or
+
+(3) the last day of any period that applicable State public record law requires a copy of such agreement to be maintained.
+
+#### c. Copies of Contracts, Agreements, or Documentation
+
+Upon review of a submitted disclosure, NSF may request that copies be submitted of any contracts, agreements, or documentation of financial transactions associated with disclosures submitted under this section.
+
+#### d. Award Term
+
+Each NSF award includes as part of the award general terms and conditions an article that implements the annual reporting requirement specified above. See Chapter II.B.3. for additional information regarding violations of postaward disclosure requirements.
+
+#### 4. Award Closeout
+
+Award closeout is the process by which NSF determines that all applicable administrative actions and all required work of the award have been completed. See also Chapter VI.D.3.c for additional information on no cost extensions. The close out amount will be based on the costs recorded at that time. See also Chapter VIII.E.5 for additional information on post closeout adjustments and final disbursements. Awards are administratively closed after the award is financially closed. In most cases, awards are administratively closed automatically based solely on the financial closeout of the award. There are certain cases, such as if the award includes a cost sharing requirement or Federally-owned equipment, where the administrative close is held until the award is reviewed by an NSF Official. The administrative closeout of the award is an NSF action. If additional documentation is required, NSF will contact the recipient. In addition to the financial and administrative closeout, all required project reports, including the Final Annual Project Report and Project Outcomes Report, must also be submitted to completely close the award, and after determination that any other administrative requirements in the award have been met. Awards will be financially closed out 120 days after their expiration date.
+
+In accordance with 2 CFR § 200.344(i), if the recipient does not submit all required reports within one year of the period of performance end date,NSF must report the recipient's material failure to comply with the terms and conditions of the award with the OMB-designated integrity and performance system (currently FAPIIS). NSF may also pursue other enforcement actions per 2 CFR § 200.339.
+
+In the event a final audit has not been performed prior to the closeout of the award, NSF reserves the right to recover funds after fully considering the recommendations on disallowed costs resulting from the final audit.
+
+### E. Record Retention and Audit
+
+- Financial records, supporting documents, statistical records, and all other records pertinent to the NSF award must be retained by the recipient for a period of three years from award financial closeout described in Chapter VIII.E.3, except as noted in 2 CFR § 200.334.
+- It is the responsibility of recipients that are States, local governments, or non-profit organizations to arrange for the conduct of audits as required by 2 CFR § 200, Subpart F. They shall provide copies of the reports of these audits to the Federal Audit Clearinghouse (see 2 CFR § 200.512(b)). Any Federal audit deemed necessary by NSF shall build upon the results of such audit(s).
+- All awards issued by NSF meet the definition of Research and Development (R&D) at 2 CFR § 200.1. As such, auditees should identify NSF awards as part of the R&D cluster on the Schedule of Expenditures of Federal Awards (SEFA). The auditor should test NSF awards for compliance as instructed in Part V, Clusters of Programs. NSF recognizes that some awards may have another classification for purposes of indirect costs (F&A). The auditor is not required to report the disconnect (i.e., the award is classified as R&D for audit purposes but non-research for indirect cost rate (F&A) purposes), unless the auditee is charging indirect costs at a rate other than the rate(s) specified in the award document(s).
+
+#### Footnotes to Chapter VII
+
+[65] A shorter period is provided in situations falling under Chapter XI.A.1.g.
+
+[66] NSF's policy limits the number of co-PIs to four per award.
+
+[67] In the rare case of funding to a foreign organization or foreign individual, see Chapter I.E.2 for additional requirements.
+
+[68] See NSF's Revised Cost Sharing Policy Statement for the Foundation’s overarching policies on cost sharing.
+
+[69] See also Chapter VII.C for additional reporting requirements for NSF awards that require cost sharing.
+
+[70] The reporting requirement is a cumulative value of $50,000 or more per source during the reporting period.
+
+[71] NSF expects each IHE to coordinate with their related entities and expressly state, when completing its required annual report, which entities are included in that report.

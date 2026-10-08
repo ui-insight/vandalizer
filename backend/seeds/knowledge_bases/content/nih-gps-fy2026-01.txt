@@ -1,0 +1,2109 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 1: Glossary
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+PART I: NIH GRANTS—GENERAL INFORMATION
+This part contains a glossary defining terms and abbreviations commonly used throughout the NIHGPS;
+describes NIH and its relationship to other organizations within HHS; specifies recipient, NIH, and other
+HHS staff responsibilities; and outlines the grant application and review processes.
+1 GLOSSARY
+The glossary lists acronyms and other abbreviations used in the NIHGPS. The glossary also defines
+terms commonly used throughout the NIHGPS. The definitions may be amplified and additional definitions may be found throughout this document and in source documents, such as applicable statutes and
+grants administration regulations. This is the only location in the NIHGPS where these terms are defined.
+If an abbreviation used in the NIHGPS is unfamiliar, the reader should consult this list for its meaning.
+1.1 ABBREVIATIONS
+Exhibit 1:  Abbreviation and full language of acronyms used in the Grants Policy Statement
+Abbreviation
+Full Meaning of Abbreviation
+A&R
+Alteration and Renovation
+ACF
+Administration for Children and Families
+ACH
+Automated Clearinghouse
+ACL
+Administration for Community Living
+AHRQ
+Agency for Healthcare Research and Quality
+AIA
+American Institute of Architects
+AoA
+Administration on Aging
+AOR
+Authorized Organization Representative
+APAC
+Annual Payback Activities Certification
+AREA
+Academic Research and Enhancement Award
+ASHRAE
+American Society of Heating, Refrigeration and Air Conditioning Engineers
+BSO
+Biological Safety Officer
+CAS
+Cost Allocation Services
+CDA
+Career Development Award
+CDC
+Centers for Disease Control and Prevention
+CF
+Common Form (previously known as Standard Form)
+CFR
+Code of Federal Regulations
+(GPS page I-1)
+
+Abbreviation
+Full Meaning of Abbreviation
+CGMO
+Chief Grants Management Officer
+CM
+Construction Manager
+CMS
+Centers for Medicare and Medicaid Services
+CoC
+Certificate of Confidentiality
+COR
+Career Opportunities in Research Education and Training Program
+CSR
+Center for Scientific Review
+DAB
+Departmental Appeals Board
+DCGP
+Division of Central Grants Processing, OER, NIH
+DCIS
+Departmental Contracts Information System
+DEA
+Drug Enforcement Administration
+DES
+Department of Engineering Services, NIH
+DFAS
+Division of Financial Advisory Services, NIH
+DGCO
+Division of Grants Compliance and Oversight, OPERA, OER, NIH
+DGP
+Division of Grants Policy, OPERA, OER, NIH
+DGSI
+Division of Grant Systems Integration, OPERA, OER, NIH
+DNA
+Deoxyribonucleic acid
+DoC
+Department of Commerce
+DoD
+Department of Defense
+DoL
+Department of Labor
+DPI
+Division of Program Integrity, OMA, NIH
+DRR
+Division of Receipt and Referral, CSR
+DSMB
+Data and Safety Monitoring Board
+EA
+Environmental Assessment
+FFR
+Federal Financial Report
+EIN
+Entity Identification Number
+EIS
+Environmental Impact Statement
+EO
+Executive Order
+eRA
+Electronic Research Administration
+ESI
+Early Stage Investigator
+eSNAP
+Electronic Streamlined Non-competing Award Process
+(GPS page I-2)
+
+Abbreviation
+Full Meaning of Abbreviation
+F&A
+Facilities and Administrative (costs)
+FAC
+Federal Audit Clearinghouse
+FAIN
+Federal Award Identification Number
+FAR
+Federal Acquisition Regulation
+FCOI
+Financial Conflict of Interest
+FDA
+Food and Drug Administration
+FDAAA
+Food and Drug Administration Amendments Act of 2007
+FDP
+Federal Demonstration Partnership
+FEMA
+Federal Emergency Management Agency
+FFATA
+Federal Funding Accountability and Transparency Act
+FFR
+Federal Financial Report (SF425)
+FIC
+Fogarty International Center
+FICA
+Federal Insurance Contributions Act
+FOI
+Freedom of Information
+FOIA
+Freedom of Information Act
+FTR
+Federal Travel Regulation
+FWA
+Federalwide Assurance
+GAAP
+Generally Accepted Accounting Principles
+GAGAS
+Generally Accepted Government Accounting Standards
+GeMCRIS
+Genetic Modification Clinical Research Information System
+GMO
+Grants Management Officer
+GMP
+Guaranteed Maximum Price
+GMS
+Grants Management Specialist
+GPO
+Government Printing Office
+GSA
+General Services Administration
+GWAS
+Genome-wide Association Studies
+hESC
+Human Embryonic Stem Cells
+HHS
+U.S. Department of Health and Human Services
+HIPAA
+Health Insurance Portability and Accountability Act
+HPSL
+Health Professional Student Loan
+(GPS page I-3)
+
+Abbreviation
+Full Meaning of Abbreviation
+HRSA
+Health Resources and Services Administration
+HVAC
+Heating, Ventilating, and Air Conditioning
+IACUC
+Institutional Animal Care and Use Committee
+IBC
+Institutional Biosafety Committee
+IBS
+Institutional Base Salary
+IC
+Institute or Center
+IDE
+Investigational Device Exception
+IHE
+Institutions of Higher Education
+IHS
+Indian Health Service
+IND
+Investigational New Drug
+IPA
+Intergovernmental Personnel Act
+IPF
+Institutional Profile File
+IR&D
+Independent Research and Development
+IRB
+Institutional Review Board
+IRG
+Integrated Review Group
+IRS
+Internal Revenue Service
+IVF
+In vitro Fertilization
+K award
+Career Award
+Kirschstein-
+NRSA
+Ruth L. Kirschstein National Research Service Award
+LWOP
+Leave Without Pay
+MARC-
+U*STAR
+Maximizing Access to Research Careers Undergraduate Student Training in Academic
+Research Program
+MOU
+Memorandum of Understanding
+MTDC
+Modified Total Direct Cost
+NCATS
+National Center for Advancing Translational Sciences
+NCT
+National Clinical Trial
+ND
+Not Discussed
+NEARC
+National External Audit Review Center, OIG
+NEI
+National Eye Institute
+NEPA
+National Environmental Policy Act
+(GPS page I-4)
+
+Abbreviation
+Full Meaning of Abbreviation
+NFI
+Notice of Federal Interest
+NFPA
+National Fire Protection Association
+NHSC
+National Health Service Corps
+NICHD
+Eunice Kennedy Shriver National Institute for Child Health and Human Development
+NIDCR
+National Institute of Dental and Craniofacial Research
+NIGMS
+National Institute of General Medical Sciences
+NIH
+National Institutes of Health
+NIH MSID
+NIH manuscript submission reference number
+NIHGPS
+National Institutes of Health Grants Policy Statement
+NIMH
+National Institute of Mental Health
+NINR
+National Institute on Nursing Research
+NLM
+National Library of Medicine
+NoA
+Notice of Award
+NOFO
+Notice of Funding Opportunity
+NTIS
+National Technical Information Service
+OASH
+Office of the Assistant Secretary for Health
+OCR
+Office for Civil Rights, HHS
+OER
+Office of Extramural Research, NIH
+OFCCP
+Office of Federal Contract Compliance Programs, DoL
+OFM
+Office of Financial Management, NIH
+OHRP
+Office for Human Research Protections, HHS
+OIG
+Office of the Inspector General
+OIR
+Office of Intramural Research, NIH
+OLAW
+Office of Laboratory Animal Welfare, NIH
+OMA
+Office of Management Assessment, NIH
+OMB
+Office of Management and Budget
+ONR
+Office of Naval Research
+OPERA
+Office of Policy for Extramural Research Administration, OER, NIH
+ORI
+Office of Research Integrity, HHS
+OSC
+Other Significant Contributor
+(GPS page I-5)
+
+Abbreviation
+Full Meaning of Abbreviation
+P.L.
+Public Law
+PA
+Program Announcement
+PAR
+Program Announcement with Special Review Criteria and/or Special Receipt Dates
+PD/PI
+Program Director/Principal Investigator
+PDF
+Portable Document Format
+PHS
+Public Health Service
+PII
+Personally Identifiable Information
+PMC
+PubMed Central
+PMCID
+PubMed Central Identification/reference number
+PMS
+Payment Management System, Payment Management Service, HHS
+PO
+Program Official
+PSC
+Payback Service Center, NIH, or Program Support Center, HHS
+PTE
+Pass-through Entity
+R&D
+Research and Development
+R&R
+Research and Related
+RePORT
+Research Portfolio Online Reporting Tool
+RFA
+Request for Applications
+RFP
+Request for Proposals
+ROTC
+Reserve Officer Training Corps
+RPPR
+Research Performance Progress Report
+S&W
+Salaries and Wages
+SAM
+System for Award Management
+SAMHSA
+Substance Abuse and Mental Health Services Administration
+SBA
+Small Business Administration
+SBC
+Small Business Concern
+SBIR
+Small Business Innovation Research Program
+SEP
+Special Emphasis Panel
+SEVIS
+Student and Exchange Visitor Information System
+SF
+Standard Form
+SF424(R&R)
+Standard Form 424 for Research and Research-Related (R&R)
+(GPS page I-6)
+
+Abbreviation
+Full Meaning of Abbreviation
+SII
+Successor-In-Interest
+SNAP
+Streamlined Non-competing Award Process
+SO
+Signing Official
+SPOC
+State Single Point of Contact
+SRG
+Scientific Review Group
+SRO
+Scientific Review Officer
+STTR
+Small Business Technology Transfer Program
+TVPA
+Trafficking Victims Protection Act
+U.S.
+United States
+U.S.C.
+United States Code
+USCIS
+United States Citizenship and Immigration Services
+USDA
+United States Department of Agriculture
+USPS
+United States Postal Service
+VA
+Department of Veterans Affairs
+VAMC
+VA Medical Center
+VANPC
+VA-Affiliated Non-Profit research Corporation
+VAT
+Value Added Tax
+VHA
+Veterans Health Administration
+WIC
+Women, Infants and Children
+1.2 DEFINITION OF TERMS
+Exhibit 2:  Definitions of terms used in the Grants Policy Statement
+(GPS page I-7)
+
+Term
+Definition
+Acquisition cost
+The total cost of the asset including the cost to ready the asset for its intended
+use. For example, acquisition cost for equipment,  means the net invoice price of
+the equipment, including the cost of any modifications, attachments, accessories,
+or auxiliary apparatus necessary to make it usable for the purpose for which it is
+acquired. Acquisition costs for software include those development costs capitalized in accordance with generally accepted accounting principles (GAAP).
+Ancillary charges, such as taxes, duty, protective in transit insurance, freight, and
+installation may be included in or excluded from the acquisition cost in accordance with the recipient's or subrecipient’s regular accounting practices.
+Activity code
+A 3-character code used to identify a specific category of extramural research
+activity, applied to financial assistance mechanisms. NIH uses three funding
+mechanisms for extramural research awards: grants, cooperative agreements
+and contracts. Within each funding mechanism, NIH uses 3-character activity
+codes (e.g., F32, K08, P01, R01, T32, etc.) to differentiate the wide variety of
+research-related programs NIH supports. A comprehensive list of activity codes
+is on the Activity Code Search Results webpage.
+Additive alternative
+A use of program income earned during or after the project period that permits
+income that is generated under a grant to be added to funds committed to the project by the Federal awarding agency and recipient and used to further eligible project or program objectives. (See definitions for deductive alternative and cost
+sharing or matching alternative and Administrative Requirements—Management
+Systems and Procedures—Program Income).
+Administrative
+supplement
+A request for (or the award of) additional funds during a current project period to
+provide for an increase in costs due to unforeseen circumstances. All additional
+costs must be within the current scope of the peer reviewed and approved project. Administrative supplements do not require peer review.
+Advance payment
+A payment that a Federal  agency or pass through entity makes by any appropriate payment mechanism and payment method, before the recipient or subrecipient disburses the funds for program purposes.
+Allocation
+The process of assigning a cost, or a group of costs, to one or more cost objective(s), in reasonable proportion to the benefit provided or other equitable relationship. The process may entail assigning a cost(s) directly to a final cost
+objective or through one or more intermediate cost objectives. For additional
+information, see Cost Considerations—The Cost Principles.
+(GPS page I-8)
+
+Term
+Definition
+Allowable cost
+A cost incurred by a recipient that is: (1) reasonable for the performance of the
+award; (2) allocable; (3) in conformance with any limitations or exclusions set
+forth in the Federal cost principles applicable to the organization incurring the
+cost or in the NoA as to the type or amount of cost; (4) consistent with regulations, policies, and procedures of the recipient that are applied uniformly to
+both federally supported and other activities of the organization; (5) accorded consistent treatment as a direct or indirect cost; (6) determined in accordance with
+generally accepted accounting principles; and (7) not included as a cost in any
+other federally supported award (unless specifically authorized by statute).
+For additional information on each, see Cost Considerations—The Cost Principles.
+Alteration and
+renovation
+Alteration and renovation (A&R) activities are considered as modernization activities and are typically supported under research grants where the primary purpose for the grant is other than construction or modernization. The determination
+of whether proposed A&R is major or minor is made by the NIH Program Official.
+See definition for Modernization.
+Applicable clinical trial
+Applicable clinical trial is the term used in Title VIII of the Food and Drug Administration Amendments Act (FDAAA) of 2007 (P.L. 110-85) to designate the scope
+of clinical trials that may be subject to the registration and results reporting
+requirements in FDAAA.
+Animal Welfare
+Assurance
+The Animal Welfare Assurance is part of the required documentation to receive
+an award for organizations involved in live, vertebrate animal activity conducted
+or supported by the Public Health Service (PHS). The Animal Welfare Assurance
+enumerates the organization’s commitment to compliance with the PHS Policy
+on Humane Care and Use of Laboratory Animals and other incorporated laws
+and policies.
+Applicable credit
+Those receipts that offset or reduce direct or indirect costs. Typical examples of
+such transactions include purchase discounts, rebates, or allowances; recoveries or indemnities on losses, insurance refunds; and adjustments of overpayments or erroneous charges.
+Application
+A request for financial support of a project or activity submitted to NIH on specified forms and in accordance with NIH instructions. (See Application Information and Processes for detailed information about the application process,
+including an explanation of the types of applications).
+Application type code
+A single-digit code identifying the type of application received and processed.
+Application type codes include the following: 1=New; 2=Renewal; 3=Revision;
+4=Extension; 5=Non-Competing Continuation; 6=Change of Organization Status
+(Successor-In-Interest); 7=Change of Recipient or Training Institution; 8=Change
+of Institute or Division (Type 5 transfer to another NIH IC); 9=Change of Institute
+or Division (Type 2 transfer to another NIH IC).
+Appropriation Act
+The statute that provides the authority for Federal agencies to incur obligations to
+and make payments out of the U.S. treasury for specified purposes.
+(GPS page I-9)
+
+Term
+Definition
+Assistance listing
+number
+A unique number assigned to identify an Assistance Listing.
+Assistance listing
+program title
+The title that corresponds to the Assistance Listing Number.
+Assurance
+A certification by an applicant, normally included with the application or State
+plan, indicating that the entity is in compliance with, or that it will abide by, a particular requirement if awarded a Federal grant.
+Audit finding
+Deficiencies which an auditor is required to report in the schedule of findings and
+questioned costs. (See 2 CFR Part 200.516(a)).
+Audit resolution
+The process of resolving audit findings, including those related to management
+and systems deficiencies and monetary findings (that is, questioned costs).
+Authorized
+organization
+representative
+The individual, named by the applicant organization, who is authorized to act for
+the applicant and to assume the obligations imposed by the Federal laws, regulations, requirements, and conditions that apply to grant applications or grant
+awards. This individual is equivalent to the signing official in the eRA Commons,
+i.e., holds the SO Role.
+Award
+The provision of funds by NIH, based on an approved application and budget or
+progress report, to an organizational entity or an individual to carry out a project
+or activity.
+Awarding IC
+NIH IC responsible for the award, administration, and monitoring of grant supported activities.
+Budget
+The financial plan for the project or program that the Federal  agency or passthrough entity approves during the Federal award process or in subsequent
+amendments to the Federal award. It may include the Federal and non-Federal
+share or only the Federal share, as determined by the Federal agency or pass
+through entity.  The approved budget specified in the NoA may be shown in
+detailed budget categories or as total costs without a categorical breakout.
+Expenditures charged to an approved budget that consists of both Federal and
+non-Federal shares are deemed to be borne by the recipient in the same proportion as the percentage of Federal/non-Federal participation in the overall
+budget.
+Budget period
+The time interval from the start date of a funded portion of an award to the end
+date of that funded portion (usually 12 months) during which recipients and subrecipients are authorized to incur financial obligations of the funds awarded,
+including any funds carried forward or other revisions.  NIH award project periods
+(periods of performance) are typically divided by budget periods for budgetary
+and funding purposes. See Project Period.  See Period of Performance.
+(GPS page I-10)
+
+Term
+Definition
+Capital assets
+Tangible or intangible assets used in operations having a useful life of more than
+one year which are capitalized in accordance with GAAP. Capital assets include:
+(1) Land, buildings (facilities), equipment, and intellectual property (including software) whether acquired by purchase, construction, manufacture, lease-purchase, exchange, or through capital leases; and (2) Additions, improvements,
+modifications, replacements, rearrangements, reinstallations, renovations or
+alterations to capital assets that materially increase their value or useful life (not
+ordinary repairs and maintenance).
+Capital expenditures
+Expenditures to acquire capital assets or expenditures to make additions,
+improvements, modifications, replacements, rearrangements, reinstallations,
+renovations, or alterations to capital assets that materially increase their value or
+useful life.  (See Administrative Requirements—Changes in Project and Budget—
+Prior Approval Requirements—Capital Expenditures).
+Carryover
+Unobligated Federal funds remaining at the end of any budget period that, with
+the approval of the GMO or under an automatic authority, may be carried forward
+to another budget period to cover allowable costs of that budget period (whether
+as an offset or additional authorization). Obligated, but unliquidated, funds are
+not considered carryover.
+Change in scope
+An activity whereby the objectives or specific aims identified in the approved
+grant application are significantly changed by the recipient after award. GMO
+prior approval is required for a change in scope to be allowable under an award.
+See Administrative Requirements—Changes in Project and Budget—Prior
+Approval Requirements—Change of Scope for additional information.
+Change of PD/PI
+A process, usually initiated by the recipient, whereby the federally approved
+PD/PI is replaced by another individual, with the approval of the GMO.
+Change of recipient
+organization
+Transfer of the legal and administrative responsibility for a grant-supported project or activity from one legal entity to another before the completion date of the
+approved project period (competitive segment).
+Chief Grants
+Management Officer
+The Grants Management Officer within an awarding agency who is the principal
+Grants Officer in the Institute or Center. The Chief Grants Management Officer
+provides leadership to an organizational component that is responsible for the
+business and fiscal management of an IC’s grant portfolio. Generally, the CGMO
+will have the authority to appoint and exercise line authority over one or more
+GMOs. At NIH each IC has a CGMO.
+Claim
+Depending on the context, either: (1) A written demand or  assertion by one of the
+parties to a Federal award seeking as a matter of right: (i) The payment of money;
+(ii) The adjustment or interpretation of the terms and conditions of the Federal
+award; or (iii) Other relief arising under or relating to a Federal award. (2) A
+request for payment not in dispute when submitted.
+(GPS page I-11)
+
+Term
+Definition
+Clinical research
+Research with human subjects that is:
+ 1)  Patient-oriented research.  Research conducted with human subjects (or on
+material of human origin such as tissues, specimens, and cognitive phenomena)
+for which an investigator (or colleague) directly interacts with human subjects.
+Excluded from this definition are in vitro studies that utilize human tissues that
+cannot be linked to a living individual. It includes: (a) mechanisms of human disease, (b), therapeutic interventions, (c) clinical trials, or (d) development of new
+technologies.
+2)  Epidemiological and behavioral studies.
+3)  Outcomes research and health services research
+Studies falling under 45 CFR Part 46.101(b)(4) (the “Common Rule” prior to July
+19, 2018 and 45 CFR Part 46.104(d)
+4) (the “Revised Common Rule” effective July 19, 2018, Exemption 4) are not
+considered clinical research by this definition.
+(GPS page I-12)
+
+Term
+Definition
+Clinical trial
+ A research study in which one or more human subjects are prospectively
+assigned to one or more interventions (which may include placebo or other control) to evaluate the effects of those interventions on health-related biomedical or
+behavioral outcomes.
+ l See 45 CFR Part 46, Subpart A, referred to as the “Revised Common
+Rule" definition of research at 45 CFR Part 46.102(l).  Pre-2018, see 45
+CFR Part 46, Subpart A, referred to as the “Common Rule” definition of
+research at 45 CFR Part 46.102(d)
+ l See Revised Common Rule definition of human subject at 45 CFR Part
+46.102(e)(1). See Common Rule definition of human subject at 45 CFR
+Part 46.102(f)
+ l The term “prospectively assigned” refers to a pre-defined process (e.g.,
+randomization) specified in an approved protocol that stipulates the
+assignment of research subjects (individually or in clusters) to one or
+more arms (e.g., intervention, placebo or other control) of the clinical
+trial.
+ l An intervention is defined as a manipulation of the subject or subject’s
+environment for the purpose of modifying one or more health-related processes and/or endpoints.  Examples include, but are not limited, to: drugs/small molecules/compounds, biologics, devices; procedures (e.g.,
+surgical techniques); delivery systems (e.g., telemedicine, face-to-face);
+strategies to change health-related behavior (e.g., diet, cognitive therapy, exercise, development of new habits); and treatment, prevention,
+and diagnostic strategies.
+ l A health-related biomedical or behavioral outcome is defined as the prespecified effect of an intervention on the study subjects.  Examples
+include positive or negative changes to physiological or biological parameters (e.g., improvement of lung capacity, gene expression); psychological or neurodevelopmental parameters (e.g., mood management
+intervention for smokers; reading comprehension and/or information
+retention); disease processes; health-related behavior; and well-being or
+quality of life.
+Biomedical clinical trials of an experimental drug, treatment, device, or behavioral
+intervention may proceed through four phases:
+Phase I. Tests a new biomedical intervention in a small group of people (e.g., 20-
+80) for the first time to determine efficacy and evaluate safety (e.g., determine a
+safe dosage range and identify side effects).
+Phase II. Study the biomedical or behavioral intervention in a larger group of
+people (several hundred) to determine efficacy and further evaluate safety.
+Phase III. Study to determine efficacy of the biomedical or behavioral intervention
+in large groups of people (from several hundred to several thousand) by comparing the intervention to other standard or experimental interventions as well as
+to monitor adverse effects, and to collect information that will allow the interventions to be used safely.
+(GPS page I-13)
+
+Term
+Definition
+Phase IV. Studies conducted after the intervention has been marketed. These
+studies are designed to monitor the effectiveness of the approved intervention in
+the general population and to collect information about any adverse effects associated with widespread use.
+Closeout
+The process by which the Federal  agency or pass-through entity determines that
+all applicable administrative actions and all required work of the Federal award
+have been completed and takes actions as described in 2 CFR Part 200.344.
+Cluster of programs
+A grouping of closely related programs that share common compliance requirements. The types of clusters of programs are research and development (R&D),
+student financial aid (SFA), and other clusters. “Other clusters” are defined by
+OMB in the compliance supplement or  designated by a state for Federal awards
+the state provides to its subrecipients that meet the definition of a cluster of programs. When designating  “other clusters,” a state must identify the Federal
+awards included in the cluster and advise the subrecipients of compliance
+requirements applicable to the cluster, consistent with 2 CFR Part 200.332. A
+cluster of programs must be considered  one program when determining major
+programs as described in 2 CFR Part 200.518 and with the exception of R&D as
+described in 2 CFR Part 200.501(d), whether a program-specific audit may be
+elected.
+Code of Federal
+Regulations
+The codified regulations of the Federal government based on the final agency
+regulations published in the Federal Register.
+Cognizant agency for
+audit
+The Federal agency designated to carry out the responsibilities as described in 2
+CFR Part 200.513. The cognizant agency for audit is not necessarily the same as
+the cognizant agency for indirect costs. A list of Federal agency Single Audit contacts may be found at the FAC web site.
+Cognizant agency for
+indirect costs
+The Federal agency responsible for reviewing, negotiating, and approving cost
+allocation plans or indirect cost proposals  on behalf of all Federal agencies. The
+cognizant agency for indirect cost is not necessarily the same as the cognizant
+agency for audit. For assignments of cognizant agencies see the following: (1)
+For IHEs: 2 CFR Part 200, Appendix III, C.11. (2) For nonprofit organizations: 2
+CFR Part 200, Appendix IV, C.2. (3) For state and local governments: 2 CFR Pt
+200, Appendix V, F.1. (4) For Indian Tribes: 2 CFR Pt 200, Appendix VII, D.1.
+Co-Investigator
+An individual involved with the PD/PI in the scientific development or execution of
+a project. The Co-Investigator (collaborator) may be employed by, or be affiliated
+with, the applicant/recipient organization or another organization participating in
+the project under a consortium agreement. A Co-Investigator typically devotes a
+specified percentage of time to the project and is considered senior/key personnel. The designation of a Co-Investigator, if applicable, does not affect the
+PD/PI’s roles and responsibilities as specified in the NIHGPS, nor is it a role
+implying multiple PD/PI.
+Competitive revision
+A request for (or the award of) additional funds during a current project period to
+support new or additional activities which are not identified in the current award
+that reflect an expansion of the scope of the grant-approved activities. Competitive revisions require peer review.
+(GPS page I-14)
+
+Term
+Definition
+Competitive segment
+The initial project period recommended for support (up to 5 years) or each extension of a project period resulting from a renewal award.
+Compliance
+Supplement
+Appendix XI to 2 CFR Part 200. See Section 93 for HHS Agency Program
+Requirements.
+Component
+For the purposes of applications and progress reports, a component is a distinct,
+reviewable part of a multi-project application or progress report for which there is
+a business need to gather detailed information identified in the Notice of Funding
+Opportunity (NOFO).  Components typically include general information (component organization, project period, project title, etc.), performance sites, personnel, and budget. The NOFO defines the construction and naming convention
+for the application; the funded application defines the construction and naming
+convention for the progress report.  Components may also be referred to as
+“cores” or “projects.”  Note, for RPPR Question G.9, the term “foreign component”
+is distinct from “component” as defined here.  However, a “foreign component”
+may also be a “component” in the RPPR. (See definition of foreign component for
+more information).
+Computing devices
+Machines that acquire, store, analyze, process, and publish data and other
+information electronically, including accessories (or ‘‘peripherals’’) for printing,
+transmitting and receiving, or storing electronic information. See also “supplies”
+and “information technology systems.”
+Conference (domestic
+or international)
+A symposium, seminar, workshop, or any other organized and formal meeting,
+whether conducted face-to-face or via the Internet, where individuals assemble
+(or meet virtually) to exchange information and views or explore or clarify a
+defined subject, problem, or area of knowledge, whether or not a published report
+results from such meeting.
+Conference grant
+A grant whose purpose is to support activities related to the conduct of a conference(s) or defined set of conference-related activities.
+Conflict of interest
+Conflict of Interest is a cross-cutting issue that affects many policy areas such as
+peer review, financial conflict of interest, and responsible conduct of research.
+There are different uses of this term throughout this document. It generally
+means that a competing personal interest could affect, or could appear to affect,
+an individual’s judgment or could cause the individual’s impartiality to be questioned. Conflicts of Interest (actual or potential) may arise in the objective review
+process or in other activities or phases of the financial assistance process. See
+also Financial Conflict of Interest for a specific definition covering that policy area.
+Consortium
+agreement
+A formalized agreement whereby a research project is carried out by the recipient
+and one or more other organizations that are separate legal entities. Under the
+agreement, the recipient must perform a substantive role in the conduct of the
+planned research and not merely serve as a conduit of funds to another party or
+parties. These agreements typically involve a specific level of effort from the consortium organization’s PD/PI and a categorical breakdown of costs, such as personnel, supplies, and other allowable expenses, including indirect costs. The
+relationship between the recipient and the collaborating organizations is considered a subaward relationship. (See Consortium Agreements chapter in IIB).
+(GPS page I-15)
+
+Term
+Definition
+Construction
+Construction of a new building, structure or facility, including the installation of
+fixed equipment, which provides space not presently available. It excludes the
+purchase of land and ancillary improvements, for example, parking lots, roads or
+fencing. The construction of shell space is not allowable as a construction activity
+since shell space does not provide usable space for research activities.) See Construction chapter in IIB.
+Consultant
+An individual who provides professional advice or services for a fee, but normally
+not as an employee of the engaging party. In unusual situations, an individual
+may be both a consultant and an employee of the same party, receiving compensation for some services as a consultant and for other work as a salaried
+employee. To prevent apparent or actual conflicts of interest, recipients and consultants must establish written guidelines indicating the conditions of payment of
+consulting fees. Consultants also include firms that provide professional advice
+or services. (See Cost Considerations—Allowability of Costs/Activities—Selected Items of Cost—Consultant Services).
+Contact PD/PI
+When multiple PD/PIs are designated, NIH requires that the applicant organization identify one of the PD/PIs as the Contact PD/PI to serve as a primary point
+of contact. Serving as Contact PD/PI confers no special authorities or responsibilities within the project team. The Contact PD/PI must meet all eligibility requirements for PD/PI status. However, as with the single PD/PI model, if the Contact
+PD/PI is not an employee, the applicant organization must have a formal written
+agreement with the Contact PD/PI that specifies an official relationship between
+the parties. See Multiple PI chapter in IIB for additional information.
+Continuation funding
+The second or subsequent budget period within an identified period of performance. See non-competing continuation application/award.
+Contract
+A legal instrument by which a recipient or subrecipient conducts procurement
+transactions under a Federal award. The term as used in 2 CFR Part 200 does
+not include a legal instrument, even if the recipient or subrecipient considers it a
+contract, when the substance of the transaction meets the definition of a Federal
+award or subaward.  See Subaward.
+Contractor
+An entity that receives a contract. See contract.
+Cooperative
+agreement
+See grant or cooperative agreement.
+Cost allocation plan
+Central service or public assistance cost allocation plan.
+Cost objective
+A program, function, activity, award, organizational subdivision, contract, or work
+unit for which cost data are desired and for which provision is made to accumulate and measure the cost of processes, products, jobs and capital projects. A
+cost objective may be a major function of the recipient or subrecipient, a particular service or project, a Federal award, or an indirect  cost activity, as
+described in 2 CFR Part 200, Subpart E—Cost Principles.
+Cost overrun
+Any amount charged in excess of the Federal share of costs for the project period
+(competitive segment).
+(GPS page I-16)
+
+Term
+Definition
+Cost principles
+The government-wide principles established under 2 CFR Part 200  for determining the allowable costs incurred by non-Federal entities under Federal awards.
+The principles are for the purpose of cost determination and are not intended to
+identify the circumstances or dictate the extent of Federal Government participation in the financing of a particular program or project. The principles are
+designed to provide that Federal awards bear their fair share of cost recognized
+under these principles except where restricted or prohibited by statute.  In the
+case of hospitals, they follow the cost principles in 2 CFR Part 200, Appendix IX,
+“Hospital Cost Principles.” In the case of for-profit organizations, there are no
+cost principles specifically applicable; the cost principles for for-profit organizations are set forth in the FAR (48 CFR Part 31.2). See Cost Considerations—
+The Cost Principles for additional details.
+Cost sharing
+The portion of project costs not paid by Federal funds or contributions (unless
+authorized by Federal statute). This term includes matching, which refers to
+required levels of cost share that must be provided. See 2 CFR Part 200.306.
+Cost sharing or
+matching alternative
+An alternative use of program income whereby income accrued during the period
+of grant support may be used to satisfy a cost sharing or matching requirement.
+(See also definitions for additive alternative and deductive alternative and Administrative Requirements—Management Systems and Procedures—Program
+Income).
+Cost-type contract
+A contract or subcontract under a grant in which the contractor or subcontractor
+is paid on the basis of the allowable costs it incurs, with or without a fee.
+Data and safety
+monitoring plan
+For each NIH-supported clinical trial, NIH requires a data and safety monitoring
+plan that will provide oversight and monitoring to ensure the safety of participants
+and the validity and integrity of the data. The level of monitoring should be commensurate with the risks and the size and complexity of the clinical trial. A
+detailed data and safety monitoring plan must be submitted to the applicant’s IRB
+and subsequently to the awarding IC for approval prior to the accrual of human
+subjects.
+Data Management
+The process of validating, organizing, protecting, maintaining, and processing scientific data to ensure the accessibility, reliability, and quality of the scientific data
+for its users.
+Data Management
+and Sharing Plan
+(DMS Plan)
+A plan describing the data management, preservation, and sharing of scientific
+data and accompanying metadata.
+Data Sharing
+The act of making scientific data available for use by others (e.g., the larger
+research community, institutions, the broader public), for example, via an established repository.
+(GPS page I-17)
+
+Term
+Definition
+Debarment and
+suspension
+The actions taken by a debarring official in accordance with OMB guidance at 2
+CFR Part 180, “Non-procurement Debarment and Suspension,” as implemented
+by HHS in 2 CFR Part 376, to exclude a person or organization from participating
+in grants and other non-procurement awards government-wide. If debarred or
+suspended, the person or organization may not receive financial assistance
+(under a grant, cooperative agreement, or subaward, or contract under a grant)
+for a specified period of time. Debarments and suspensions carried out pursuant
+to 2 CFR Part 376 are distinct from post-award suspension action by an awarding
+agency. (See also Public Policy Requirements and Objectives—Debarment and
+Suspension).
+Debt collection
+The process of collecting funds owed by recipients to the Federal government,
+which, under grants, generally are owed as a result of formal cost disallowances.
+Debt instrument
+A document used to record a legal obligation of one party to pay a financial obligation to another in accordance with predetermined terms and conditions.
+Deductive alternative
+An alternative for the use of program income earned during the period of grant
+support under which allowable costs of the project or program to be paid by the
+Federal government are offset by the amount of the program income. (See also
+definitions for additive alternative and cost sharing or matching alternative and
+Administrative Requirements—Management Systems and Procedures—Program Income).
+Departmental Grants
+Appeals Board
+The independent office established in the Office of the Secretary with delegated
+authority from the Secretary to review and decide certain disputes between recipients of HHS funds and HHS awarding agencies under 45 CFR Part 16 and to perform other review, adjudication and mediation services as assigned.
+Deviation
+A departure on a single-case or class basis from a regulatory or policy requirement. A single-case deviation represents a request for waiver or exception
+sought for one grant only that arises on a case-by-case basis. A class deviation
+involves more than one grant for which the same type of deviation action is being
+requested.
+Direct costs
+Costs that can be identified specifically with a particular sponsored project, an
+instructional activity, or any other institutional activity, or that can be directly
+assigned to such activities relatively easily with a high degree of accuracy.
+Disallowed costs
+Charges to a Federal award that the Federal  agency or pass-through entity
+determines to be unallowable, in accordance with the applicable Federal statutes, regulations, provisions of 2 CFR Part 200, or the terms and conditions of the
+Federal award.
+Discretionary Award
+An award in which NIH, in keeping with its statutory authority to exercises judgement (“discretion”), selects the recipient or the amount of funding through a competitive process.  Generally, NIH awards are discretionary.  See Non-
+Discretionary Award.
+(GPS page I-18)
+
+Term
+Definition
+Domestic
+organization
+A public (including a State or other governmental agency) or private non-profit or
+for-profit organization that is located in the United States or its territories, is subject to U.S. laws, and assumes legal and financial accountability for awarded
+funds and for the performance of the grant-supported activities.
+Early Stage
+Investigator
+An individual who is classified as a New Investigator and is within 10 years of
+completing their terminal research degree or is within 10 years of completing
+medical residency (or the equivalent) is considered an Early Stage Investigator
+(ESI). See definition of New Investigator.
+Entity Identification
+Number
+A three-part coding scheme of 12 characters used in PMS to identify organizations and individuals. The first character identifies the recipient as an organization or an individual. The next nine characters are the Employer Identification
+Number. The last two characters are a suffix to provide distinction between organizational entities that are assigned a single EIN and those that have more than
+one. (Also known as Payment System Identifier.)
+Equipment
+Tangible personal property (including information technology systems) having a
+useful life of more than one year and a per-unit acquisition cost that equals or
+exceeds the lesser of the capitalization level established by the recipient or subrecipient for financial statement purposes, or $10,000. (See also capital assets,
+computing devices, general purpose equipment, information technology
+systems, special purpose equipment, and supplies).
+eRA Commons
+The Electronic Research Administration (eRA) Commons is a virtual meeting
+place where NIH extramural recipient organizations, recipients, and the public
+can receive and transmit information about the administration of biomedical and
+behavioral research. The eRA Commons is divided into both unrestricted and
+restricted portions that provide for public and confidential information, respectively.
+Expanded authorities
+A standard term of all NIH awards  to allow recipients several flexibilities to waive
+the requirement for prior approval for specified actions. NIH extended expanded
+authorities to all NIH awards except for the provision to automatically carry over
+unobligated balances for certain awards.  (see Administrative Requirements—
+Changes in Project and Budget—NIH Standard Terms of Award).
+Expenditure report
+Means: (1) For non-construction grants, the SF-425 Federal Financial Report
+(FFR) (or other OMB-approved equivalent report); (2) for construction grants, the
+SF-271 “Outlay Report and Request for Reimbursement” (or other OMB-
+approved equivalent report)
+(GPS page I-19)
+
+Term
+Definition
+Expenditures
+Charges made by a recipient or subrecipient to a project or program for which a
+Federal award is received.
+ 1. The charges may be reported on a cash or accrual basis, as long as the
+methodology is disclosed and  consistently applied.
+ 2. For reports prepared on a cash basis, expenditures are the sum of:
+ i. Cash disbursements for direct charges for property and services;
+ ii. The amount of indirect expense charged;
+ iii. The value of third-party in-kind contributions applied; and
+ iv. The amount of cash advance payments and payments made to
+subrecipients.
+ 3. For reports prepared on an accrual basis, expenditures are the sum of:
+ i. Cash disbursements for direct charges for property and services;
+ ii. The amount of indirect expense incurred;
+ iii. The value of third-party in-kind contributions applied; and
+ iv. The net increase or decrease in the amounts owed by the recipient and subrecipient for:
+ A. Goods and other property received;
+ B. Services performed by employees, contractors, subrecipients, and other payees; and
+ C. Programs for which no current services or performance are
+required such as annuities, insurance claims, or other
+benefit payments.
+Facilities and
+Administrative (F&A)
+costs (or indirect
+costs)
+See definition of "indirect costs."
+Federal agency
+An ‘‘agency’’ as defined at 5 U.S.C. 551(1), which outlines what is not an agency,
+and further clarified by 5 U.S.C. 552(f), which outlines what is an agency. The
+term generally refers to the agency that provides a Federal award directly to a
+recipient unless the context indicates otherwise. See also definitions of Federal
+award and recipient.
+Federal Audit
+Clearinghouse (FAC)
+The repository of record designated by OMB where non-Federal entities must
+transmit the reporting packages required by Subpart F—Audit Requirements of 2
+CFR Part 200 Subpart F – Audit Requirements. The mailing address of the FAC
+is Federal Audit Clearinghouse, Bureau of the Census, 1201 E. 10th Street, Jeffersonville, IN 47132. Any future updates to the location of the FAC may be found
+at the Federal Audit Clearinghouse web site.
+(GPS page I-20)
+
+Term
+Definition
+Federal award
+Depending on the context, in either paragraph (1) or (2) of this section:
+(1)(i) The Federal financial assistance that a recipient  receives directly from a
+Federal agency or indirectly from a pass-through entity, as described in 2 CFR
+Part 200.101; or
+(ii) The cost-reimbursement contract under the Federal Acquisition Regulation
+that a non-Federal entity receives directly from a Federal agency or indirectly
+from a pass-through entity, as described in 2 CFR Part 200.101.
+(2) The instrument setting forth the terms and conditions. The instrument is the
+grant agreement, cooperative agreement, other agreement for assistance
+covered in paragraph (2) of Federal financial assistance, or the cost-reimbursement contract awarded under the Federal Acquisition Regulations.
+(3) Federal award does not include other contracts that a Federal agency uses to
+buy goods or services from a contractor or a contract to operate governmentowned, contractor-operated  (GOCOs) facilities.
+(4) See also definitions of Federal financial assistance, grant agreement, and
+cooperative agreement.
+Federal award date
+The date when the  authorized official of the Federal  agency signed (physically or
+digitally) the Federal award or when an alternative, consistent with the requirements of 31 U.S.C. 1501, is reached with the recipient. The Federal award date is
+distinct from the budget start date.
+Federal Award
+Identification Number
+A unique number assigned to a financial assistance award to assist recipients in
+correctly reporting subawards.  The public can use the FAIN and the Assistance
+listing number together to find one accurate result when searching online in such
+databases as USASpending.gov.  The FAIN can be found on the notice of award.
+NIH implements the FAIN by deriving it from the core elements of the grant number.  For example, the FAIN for 1R0lHL654321-01 would be R01HL654321.
+Federal awarding
+agency
+The Federal agency that provides a Federal award directly to another entity. See
+also Awarding IC.
+Federal
+Demonstration
+Partnership
+A cooperative initiative among some Federal agencies, including NIH, selected
+organizations receiving Federal funding for research, and certain professional
+associations. Its efforts include demonstration projects intended to simplify and
+standardize Federal requirements in order to increase research productivity and
+reduce administrative costs.
+(GPS page I-21)
+
+Term
+Definition
+Federal financial
+assistance
+ 1.  Federal financial assistance means assistance that non-Federal entities
+receive or administer in the form of:
+ i. Grants;
+ ii. Cooperative agreements;
+ iii. Non-cash contributions or donations of property (including
+donated surplus property);
+ iv. Direct appropriations;
+ v. Food commodities; and
+ vi. Other financial assistance (except assistance listed in paragraph
+(b) of this section).
+ 2. For 2 CFR Part 200.202 and 2 CFR Part 200 Subpart F, federal financial
+assistance also includes assistance that non-Federal entities receive or
+administer in the form of:
+ i. Loans;
+ ii. Loan Guarantees;
+ iii. Interest subsidies; and
+ iv. Insurance.
+ 3. Federal financial assistance does not include amounts received as reimbursement for services rendered to individuals as described in 2 CFR
+Part 200.502(h) and (i).
+Federal institution
+A Cabinet-level department or independent agency of the executive branch of the
+Federal government or any component organization of such a department or
+agency. For the purposes of this document, this term is used in the context of a
+Federal institution as a recipient.  See also Awarding IC.
+Federal interest
+For purposes 2 CFR Part 200.330 or when used in connection with the acquisition or improvement of real property, equipment, or supplies under a Federal
+award, the dollar amount that is the product of the: (1) Federal share of total project costs; and (2) Current fair market value of the property, improvements, or
+both, to the extent the costs of acquiring or improving the property were included
+as project costs.
+Federal program
+ 1. All Federal awards which are assigned a single number in the Assistance
+listings.
+ 2. When no Assistance listing number is assigned, all Federal awards to
+non- Federal entities from the same agency made for the same purpose
+should be combined and considered one program.
+ 3. Notwithstanding paragraphs (1) and (2) of this definition, a cluster of programs. The types of clusters of programs are:
+ i. Research and development (R&D);
+ ii. Student financial aid (SFA); and
+ iii. ‘‘Other clusters,’’ as described in the definition of Cluster of Programs.
+(GPS page I-22)
+
+Term
+Definition
+Federal share
+The portion of the total project costs that are paid by Federal funds.
+Federalwide
+Assurance
+The Federalwide Assurance is the only type of assurance of compliance accepted and approved by OHRP for institutions engaged in nonexempt research
+involving human subjects conducted or supported by HHS. Under a FWA, an
+institution commits to HHS that it will comply with the requirements set forth in 45
+CFR Part 46, as well as the terms of assurance.
+Fee
+An amount, in addition to actual, allowable costs, paid to an organization providing goods or services consistent with normal commercial practice. This payment
+also is referred to as profit. (See Grants to For-Profit Organizations—Small Business Innovation Research and Small Business Technology Transfer Programs—
+Allowable Costs and Fee—Profit or Fee).
+Financial conflict of
+interest
+A financial conflict of interest exists when the recipient’s designated official(s)
+reasonably determines that an investigator’s significant financial interest could
+directly and significantly affect the design, conduct, or reporting of the PHS-funded research. See 42 CFR Part 50, Subpart F, Responsibility of Applicants for
+Promoting Objectivity in Research for which PHS funding is sought and Public
+Policy Requirements and Objectives—Financial Conflict of Interest.
+Fixed Award Amount
+A type of grant or cooperative agreement pursuant to which NIH or a passthrough entity provides a specific amount of funding without regard to actual
+costs incurred under the Federal award.
+Foreign component
+The performance of any significant scientific element or segment of a project outside of the United States, either by the recipient or by a researcher employed by a
+foreign organization, whether or not grant funds are expended. Activities that
+would meet this definition include, but are not limited to, (1) the involvement of
+human subjects or animals at a foreign site, (2) extensive foreign travel by recipient project staff for the purpose of data collection, surveying, sampling, and similar activities, or (3) any activity of the recipient that may have an impact on U.S.
+foreign policy through involvement in the affairs or environment of a foreign country. Examples of other grant-related activities that may be significant are:
+ l collaborations with investigators at a foreign site anticipated to result in
+co-authorship;
+ l  use of facilities or instrumentation at a foreign site; or
+ l  receipt of financial support or resources from a foreign entity.
+Foreign travel for consultation is not considered a foreign component. (See
+Grants to Foreign Organizations, International Organizations, and Domestic
+Grants with Foreign Components chapter in IIB).
+(GPS page I-23)
+
+Term
+Definition
+Foreign organization
+An entity that is:
+ 1. A public or private organization located in a country other than the United
+States and its territories that is subject to the laws of the country in which
+it is located, irrespective of the citizenship of project staff or place of performance;
+ 2. A private nongovernmental organization located in a country other than
+the United States that solicits and receives cash contributions from the
+general public;
+ 3. A charitable organization located in a country other than the United
+States that is nonprofit and tax-exempt under the laws of the country
+where it is registered and is not a university, college, accredited degree
+granting institution of education, private foundation, hospital, an organization engaged exclusively in research or scientific activities, church,
+synagogue, mosque or other similar entities organized primarily for religious purposes; or
+ 4. An organization located in a country other than the United States not
+recognized as a Foreign Public Entity.
+Foreign public entity
+(1) A foreign government or foreign governmental entity; (2) A public international
+organization, which is an organization entitled to enjoy privileges, exemptions,
+and immunities as an international organization under the International Organizations Immunities Act (22 U.S.C. 288–288f); (3) An entity owned (in whole or in
+part) or controlled by a foreign government; or (4) Any other entity consisting
+wholly or partially of one or more foreign governments or foreign governmental
+entities.
+For-profit organization
+An organization  or  entity organized  for the purpose of earning a profit, including
+but not limited to, an “S” corporation incorporated under subchapter S of the
+Internal Revenue Code, a corporation incorporated under another authority, a
+partnership, a limited liability company or partnership, and a sole proprietorship.  .
+A for-profit organization is considered to be a small business if it is independently
+owned and operated, if it is not dominant in the field in which research is proposed, and if it employs no more than 500 persons. (Also see definition for small
+business concern).
+Full-time appointment
+The number of days per week and/or months per year representing full-time effort
+at the applicant/recipient organization, as specified in organizational policy. The
+organization’s policy must be applied consistently regardless of the source of support.
+General purpose
+equipment
+Equipment that is not limited to research, medical, scientific, or other technical
+activities. Examples include office equipment and furnishings, modular offices,
+telephone networks, information technology equipment and systems, air conditioning equipment, reproduction and printing equipment, and motor vehicles.
+See also “Equipment” and “Special Purpose Equipment.”
+(GPS page I-24)
+
+Term
+Definition
+Generally Acceptable
+Accounting Principles
+(GAAP)
+The meaning specified in accounting standards issued by the Government
+Accounting Standards Board (GASB) and the Financial Accounting Standards
+Board (FASB).
+Generally Accepted
+Government Auditing
+Standards (GAGAS)
+Also known as the Yellow Book, generally accepted government auditing standards issued by the Comptroller General of the United States, which apply to financial audits.
+Grant number
+A grant number is a unique identifier for a grant composed of the application type
+code, activity code, Organizational Code, 6-digit serial number, support year and
+/or suffix code for the support year of the grant, or other information, such as a
+supplement (S1), resubmission (A1), or a fellowship’s institutional allowance. In
+Federalwide systems (e.g., USASpending.gov, FFATA) the Federal Award Identifier Number (FAIN) is used to identify grants for Federalwide implications. Similar to the NIH Grant Number, the FAIN consists of the activity code,
+Organizational Code, and 6-digit serial number.
+Sample Grant Number: 1 R01 AI 123456-01 A1 S1
+
+Sample FAIN: R01 AI 654321
+Grant or cooperative
+agreement
+A legal instrument of financial assistance between a Federal agency and a recipient or between a pass-through entity and a subrecipient that, consistent with 31
+U.S.C. 6302, 6304:
+ 1. Is used to enter into a relationship the principal purpose of which is to
+transfer anything of value from the Federal awarding agency or passthrough entity to the recipient and subrecipient to carry out a public purpose authorized by a law of the United States (see 31 U.S.C. 6101(3));
+and not to acquire property or services for the Federal agency or passthrough entity’s direct benefit or use;
+ 2. A grant is distinguished from a cooperative agreement in that it does not
+provide for substantial involvement between the Federal  agency or passthrough entity and the recipient and subrecipient in carrying out the activity contemplated by the Federal award.
+ 3. Does not include an agreement that provides only:
+ i. Direct United States Government cash assistance to an individual;
+ ii. A subsidy;
+ iii. A loan;
+ iv. A loan guarantee; or
+ v. Insurance.
+(GPS page I-25)
+
+Term
+Definition
+Grants Management
+Officer
+An NIH official responsible for the business management aspects of grants and
+cooperative agreements, including review, negotiation, award, and administration, and for the interpretation of grants administration policies and provisions. GMOs are delegated the authority from the CGMO to obligate NIH to the
+expenditure of funds and permit changes to approved projects on behalf of NIH.
+Each NIH IC that awards grants has one or more GMOs with responsibility for particular programs or awards. See also Chief Grants Management Officer definition.
+Grants Management
+Specialist
+An NIH staff member who oversees the business and other non-programmatic
+aspects of one or more grants and/or cooperative agreements. These activities
+include, but are not limited to, evaluating grant applications for administrative content and compliance with statutes, regulations, and guidelines; negotiating
+grants; providing consultation and technical assistance to recipients; and administering grants after award.
+Grants.gov
+Grants.gov has been designated by the Office of Management and Budget as the
+single access point for all grant programs offered by 26 Federal grant-making
+agencies. It provides a single interface for agencies to announce their grant
+opportunities and for all applicants to find and apply for those opportunities.
+Grant-supported
+project or activity
+Those activities specified or described in a grant application or in a subsequent
+submission that are approved by an NIH IC for funding, regardless of whether
+Federal funding constitutes all or only a portion of the financial support necessary
+to carry them out.
+Honoraria
+Payments given in support of professional services for the purpose of conferring
+distinction or to symbolize respect, esteem, or admiration. In other words, if the
+service is related to research oversight, research supervision, co-authoring
+research papers, then the payments are not honoraria but considered research
+funding.
+Hospital
+A facility licensed as a hospital under the law of any state or a facility operated as
+a hospital by the United States, a state, or a subdivision of a state. Also includes
+a non-profit or for-profit hospital or a medical care provider component of a nonprofit organization (for example, a foundation).
+Human biospecimens
+A quantity of tissue, blood, urine, or other human-derived material.  A single
+biopsy may generate several human biospecimens, including multiple paraffin
+blocks or frozen sample.  A human biospecimen can comprise subcellular structures, cells, tissue (e.g., bone, muscle, connective tissue, and skin), organs (e.g.,
+liver, bladder, heart, and kidney), blood, gametes (sperm and ova), embryos,
+fetal tissue, and waste (urine, feces, sweat, hair and nail clippings, shed epithelial
+cells, and placenta). Human biospecimens include those that are isolated and
+propagated into new cell lines.
+(GPS page I-26)
+
+Term
+Definition
+Human Fetal Tissue
+Human Fetal Tissue is defined as tissue or cells obtained from a dead human
+embryo or fetus after a spontaneous or induced abortion or stillbirth. This definition does not include established human fetal cell lines. Research involving the
+transplantation of human fetal tissue must be conducted in accordance with
+applicable Federal, State and local laws as well as NIH guidance.  See also
+Human Fetal Tissue Research.
+Human subject
+Common Rule (45 CFR Part 46, effective July 19, 2018): A living individual
+about whom an investigator (whether professional or student) conducting
+research:
+ (i) Obtains information or biospecimens through intervention or interaction with the individual, and uses, studies, or analyzes the information or biospecimens; or
+ (ii) Obtains, uses, studies, analyzes, or generates identifiable private
+information or identifiable biospecimens.
+Regulations governing the use of human subjects in research extend to use of
+human organs, tissues, and body fluids from identifiable individuals as human
+subjects and to graphic, written, or recorded information derived from such
+individuals. (See Public Policy Requirements and Objectives—Human Subjects
+Protections).
+
+Impact score
+The impact score is the rating which is assigned to an individual application by an
+SRG and designates the reviewers’ assessment of scientific and technical merit
+of the application.  For research projects, this is defined as the likelihood for the
+project to exert a sustained, powerful influence on the research field(s) involved,
+in consideration of established review criteria. The impact score is one mechanism by which the SRG makes a recommendation to the funding component
+concerning the application’s scientific and technical merit. Impact scores may be
+numeric (10 – 90) or alphabetical (ND, for example).
+Improper payment
+Any payment that should not have been made or that was made in an incorrect
+amount (including overpayments and underpayments) under statutory, contractual, administrative, or other legally applicable requirements.
+The term improper payment includes: any payment to an ineligible recipient; any
+payment for an ineligible good or service; any duplicate payment; any payment
+for a good or service not received, except for those payments where authorized
+by law; any payment that is not authorized by law; and any payment that does not
+account for credit for applicable discounts. See OMB Circular A-123 Appendix C,
+Requirements for Payment Integrity Improvement for additional definitions and
+guidance on the requirements for payment integrity.
+(GPS page I-27)
+
+Term
+Definition
+Indian Tribe (or
+“federally recognized
+Indian Tribe”)
+Any Indian Tribe, band, nation, or other organized group or community, including
+any Alaska Native village or regional or village corporation as defined in or established pursuant to the Alaska Native Claims Settlement Act (43 U.S.C. Chapter
+33), which is recognized as eligible for the special programs and services
+provided by the United States to Indians because of their status as Indians. See
+25 U.S.C. 5304(e). This includes any Indian Tribe identified in the  annually published Bureau of Indian Affairs list of "Indian Entities Recognized and Eligible to
+Receive Services" and other entities that qualify as an Alaska Native village or
+regional village corporation as defined in or established pursuant to the Alaska
+Native Claims Settlement Act.
+Indirect costs
+Costs incurred for a common or joint purpose benefitting more than one cost
+objective, and not readily assignable to the cost objectives specifically benefitted,
+without effort disproportionate to the results achieved. It may be necessary to
+establish multiple pools of indirect costs to facilitate equitable distribution of indirect expenses to the cost objectives served. Indirect cost pools must be distributed to benefitted cost objectives on basis that will produce an equitable result
+in consideration of relative benefits derived. For Institutions of Higher Education
+(IHE), the term facilities and administrative (F&A) cost is often used to refer to
+indirect costs.
+Information
+technology systems
+Computing devices, ancillary equipment, software, firmware, and similar procedures, services (including support services), and related resources. See also
+computing devices and equipment.
+Innovation
+Something new or improved, including research for (1) development of new technologies, (2) refinement of existing technologies, or (3) development of new
+applications for existing technologies. For the purposes of PHS programs, an
+example of innovation would be new medical or biological products for improved
+value, efficiency, or costs.
+Institute or Center
+The NIH organizational component responsible for a particular grant program or
+set of activities. The terms “NIH IC,” or “awarding IC” are used throughout this
+document to designate a point of contact for advice and interpretation of grant
+requirements and to establish the focal point for requesting necessary prior
+approvals or changes in the terms and conditions of award.
+Institutional Animal
+Care and Use
+Committee
+The PHS Policy on Humane Care and Use of Laboratory Animals incorporates
+the U.S. Government Principles for the Utilization and Care of Vertebrate Animals used in Testing, Research, and Training, and requires the recipient to maintain an animal care and use program based on the Guide for the Care and Use of
+Laboratory Animals. An Institutional Animal Care and Use Committee (IACUC)
+appointed by the Chief Executive Officer or designee, is federally mandated to
+oversee the institution's animal program, facilities, and procedures (Public Law
+99-158, Sec. 495). IACUC review and approval is required for all PHS supported
+activities involving live vertebrate animals prior to funding.
+(GPS page I-28)
+
+Term
+Definition
+Institutional base
+salary
+The annual compensation paid by an organization for an employee’s appointment, whether that individual’s time is spent on research, teaching, patient care,
+or other activities. Base salary excludes any income that an individual may be permitted to earn outside of duties for the applicant/recipient organization. Base
+salary may not be increased as a result of replacing organizational salary funds
+with NIH grant funds. (See Cost Considerations—Allowability of Costs/Activities—Selected Items of Cost—Salaries and Wages).
+Institutional Review
+Board (IRB)
+An administrative body established to protect the rights and welfare of human
+research subjects recruited to participate in research activities conducted under
+the auspices of the organization with which it is affiliated. The Institutional Review
+Board has the authority to approve, require modifications in, or disapprove all
+research activities that fall within its jurisdiction.
+Institution of Higher
+Education (IHE)
+IHE is defined at 20 U.S.C. 1001.
+Intangible property
+Property having no physical existence, such as trademarks, copyrights, data
+(including data licenses), websites, IP licenses, trade secrets, patents,  patent
+applications and property, such as loans, notes and other debt instruments, lease
+agreements, stocks and other instruments of property ownership of either tangible or intangible property, such as intellectual property, software, or software
+subscriptions or licenses.
+Intergovernmental
+Personnel Act (IPA)
+The Intergovernmental Personnel Act Mobility Program provides for the temporary assignment of personnel between the Federal Government and state and
+local governments, colleges and universities, Indian tribe (or "federally recognized Indian tribe" governments, federally funded research and development centers, and other eligible organizations. The goal of the Intergovernmental
+Personnel Act mobility program is to facilitate the movement of employees, for
+short periods of time, when this movement serves a sound public purpose.
+(GPS page I-29)
+
+Term
+Definition
+Internal control over
+compliance
+requirements for
+Federal awards
+A process implemented by recipients and subrecipients designed to provide reasonable assurance regarding the achievement of the following objectives for
+Federal award:
+ 1. Transactions are properly recorded and accounted for, in order to:
+ i. Permit the preparation of reliable financial statements and
+Federal reports;
+ ii. Maintain accountability over assets; and
+ iii. Demonstrate compliance with Federal statutes, regulations, and
+the terms and conditions of the Federal award;
+ 2. Transactions are executed in compliance with:
+ i. Federal statutes, regulations, and the terms and conditions of the
+Federal award that could have a direct and material effect on a
+Federal program; and
+ ii. Any other Federal statutes and regulations that are identified in
+the Compliance Supplement; and
+ 3.  Funds, property, and other assets are safeguarded against loss from
+unauthorized use or disposition.
+Internal controls
+A process, implemented by recipients and subrecipients, designed to provide
+reasonable assurance regarding the achievement of objectives in the following
+categories: (1) Effectiveness and efficiency of operations; (2) Reliability of reporting for internal and external use; and (3) Compliance with applicable laws and
+regulations.
+International
+organization
+An organization that identifies itself as international or intergovernmental and has
+membership from, and represents the interests of, more than one country,
+without regard to whether the headquarters of the organization and location of
+the activity are inside or outside of the United States.
+Invention reporting
+The requirement pursuant to 37 CFR Part 401 that recipients of contracts, grants
+or cooperative agreements fully disclose any subject inventions made during the
+performance of work under a funding agreement in order to protect the Federal
+government's rights.
+Investigational new
+drug
+A new drug or biological drug that is used in a clinical investigation.
+Investigator-initiated
+research
+Research funded as a result of an investigator, on their own, submitting a
+research application in response to Parent Announcements only. Also known as
+unsolicited research.
+IPF number
+Institutional Profile File (IPF) number is a unique number used by NIH for tracking/reporting awards to recipient institutions.
+(GPS page I-30)
+
+Term
+Definition
+Just-in-Time
+NIH policy allows the submission of certain elements of a competing application
+to be deferred until later in the application process, after review when the application is under consideration for funding. Within the Status module of the eRA
+Commons, users will find a feature to submit Just-In-Time information when
+requested by  NIH. Through this module, institutions can electronically submit the
+information that is requested after the review, but before award. See Completing
+the Pre-Award Process—Just-In-Time Procedures for additional information.
+Liquidated damages
+An amount defined in a contract and chargeable against funds due to the contractor for each day the contractor fails to complete the project beyond the contract completion date.
+Local government
+Any unit of government within a state, including a: (1) County; (2) Borough; (3)
+Municipality; (4) City; (5) Town; (6) Township; (7) Parish; (8) Local public authority, including any public housing agency under the United States Housing Act of
+1937; (9) Special district; (10) School district; (11) Intrastate district; (12) Council
+of governments, whether or not incorporated as a nonprofit corporation under
+state law; and (13) Any other agency or instrumentality of a multi-, regional, or
+intra-state or local government.
+Major A&R
+Alteration and renovation (A&R) activities are considered as modernization activities and are typically supported under research grants where the primary purpose for the grant is other than construction or modernization. The determination
+of whether proposed A&R is major, or minor is made by the NIH Program Official.
+Major A&R is an unallowable activity or cost under foreign grants and foreign
+components in domestic grants.  See "Modernization" on page I-35
+(GPS page I-31)
+
+Term
+Definition
+Malign foreign talent
+recruitment program
+(MFRTP)
+As outlined in the CHIPS and Science Act (Public Law No: 117-167) malign
+foreign talent recruitment program means:
+ a. Any program, position, or activity that includes compensation in the
+form of cash, in-kind compensation, including research funding, promised future compensation, complimentary foreign travel, things of non
+de minimis value, honorific titles, career advancement opportunities, or
+other types of remuneration or consideration directly provided by a foreign country at any level (national, provincial, or local) or their
+designee, or an entity based in, funded by, or affiliated with a foreign
+country, whether or not directly sponsored by the foreign country, to
+the targeted individual, whether directly or indirectly stated in the
+arrangement, contract, or other documentation at issue, in exchange for
+the individual —
+ 1. engaging in the unauthorized transfer of intellectual property,
+materials, data products, or other nonpublic information owned
+by a United States entity or developed with a Federal research
+and development award to the government of a foreign country
+or an entity based in, funded by, or affiliated with a foreign
+country regardless of whether that government or entity
+provided support for the development of the intellectual property, materials, or data products;
+ 2. being required to recruit trainees or researchers to enroll in
+such program, position, or activity;
+ 3. establishing a laboratory or company, accepting a faculty position, or undertaking any other employment or appointment in
+a foreign country or with an entity based in, funded by, or affiliated with a foreign country if such activities are in violation
+of the standard terms and conditions of a Federal research and
+development award;
+ 4. being unable to terminate the foreign talent recruitment program contract or agreement except in extraordinary circumstances;
+ 5. through funding or effort related to the foreign talent recruitment program, being limited in the capacity to carry out a
+research and development award or required to engage in work
+that would result in substantial overlap or duplication with a
+Federal research and development award;
+ 6. being required to apply for and successfully receive funding
+from the sponsoring foreign government's funding agencies
+with the sponsoring foreign organization as the recipient;
+(GPS page I-32)
+
+Term
+Definition
+ 7. being required to omit acknowledgment of the recipient institution with which the individual is affiliated, or the Federal
+research agency sponsoring the research and development
+award, contrary to the institutional policies or standard terms
+and conditions of the Federal research and development award;
+ 8. being required to not disclose to the Federal research agency
+or employing institution the participation of such individual in
+such program, position, or activity; or
+ 9. having a conflict of interest or conflict of commitment contrary to the standard terms and conditions of the Federal
+research and development award. And
+ b.  A program that is sponsored by —
+ 1. a foreign country of concern or an entity based in a foreign
+country of concern, whether or not directly sponsored by the
+foreign country of concern;
+ 2. an academic institution on the list developed under section
+1286(c)(8) of the John S. McCain National Defense Authorization Act for Fiscal Year 2019 (10 U.S.C. 2358 note; Public
+Law 115–232); or
+ 3. a foreign talent recruitment program on the list developed
+under section 1286(c)(9) of the John S. McCain National
+Defense Authorization Act for Fiscal Year 2019 (10 U.S.C.
+2358note; 1 Public Law 115–232).
+
+The following are not considered malign foreign talent recruitment programs
+unless such activities are funded, organized, or managed by an academic institution or a foreign talent recruitment program on the lists developed under paragraphs (8) and (9) of section 1286(c) of the John S. McCain National Defense
+Authorization Act for Fiscal Year 2019 (10 U.S.C. 4001 note; Public Law
+115–232):
+ 1. making scholarly presentations and publishing written materials regarding scientific information not otherwise controlled under current law;
+ 2. participation in international conferences or other international
+exchanges, research projects or programs that involve open and reciprocal exchange of scientific information, and which are aimed at advancing international scientific understanding and not otherwise controlled
+under current law;
+ 3. advising a foreign student enrolled at an institution of higher education
+or writing a recommendation for such a student, at such student's
+request.
+(GPS page I-33)
+
+Term
+Definition
+Mechanism
+Extramural awards are divided into three types of financial assistance: grants,
+cooperative agreements and contracts. A mechanism is the type of funded application or transaction used by NIH. Within each mechanism NIH includes
+programs. Programs can be further refined by specific activity codes.
+Merger
+A legal action resulting in the unification of two or more legal entities. When such
+an action involves the transfer of NIH grants, the procedures for the recognizing a
+successor-in-interest will apply. When the action does not involve the transfer of
+NIH grants, the procedures for recognizing a name change will apply.
+Metadata
+Data that provide additional information intended to make scientific data interpretable and reusable (e.g., date, independent sample and variable construction
+and description, methodology, data provenance, data transformations, any intermediate or descriptive observational variables).
+Micro-purchase
+An individual procurement transaction for supplies or services using simplified
+acquisition procedures, the aggregate amount of which does not exceed the
+micro-purchase threshold. Micro-purchases  comprise a subset of a recipient's or
+subrecipient’s small purchases. Micro-purchase threshold means the dollar
+amount at or below which a recipient or subrecipient may purchase property or
+services using micro-purchase  procedures (see § 2 CFR Part 200.320).  Generally,  the micro-purchase threshold for  procurement activities administered
+under Federal awards is not to exceed  the amount set by the FAR at 48 CFR Part
+2, Subpart 2.1, unless a higher  threshold is requested by the recipient or subrecipient and approved by the  cognizant agency for indirect costs (Cost Allocation Services for non-profits or DFAS for for-profit organizations).
+Minor A&R
+Alteration and renovation (A&R) activities are considered as modernization
+activities and are typically supported under research grants where the primary
+purpose for the grant is other than construction or modernization. The determination of whether proposed A&R is major, or minor is made by the NIH Program Official.  See "Modernization" on the next page.
+Minor A&R is not an allowable activity or cost under grants to individuals or
+grants for limited purposes, such as grants in support of scientific meetings
+(conference grants). Routine maintenance and repair of the organization’s physical plant or its equipment is not considered A&R; these types of costs are typically treated as indirect costs.
+(GPS page I-34)
+
+Term
+Definition
+Modernization
+Alteration, renovation, remodeling, improvement, expansion or repair of, or
+completion of shell space in an existing building (whether for storage or for
+human occupancy), necessary to make the building suitable for use for the purposes of a particular program. Modernization is distinct from construction in
+that it leaves the existing structure in place. This can range from updating flooring to replacing everything except for the existing mainframe and foundations.
+When the primary purpose of the award is to modernize biomedical research
+facilities, the grant cannot support the conduct of any research.
+Alteration and renovation (A&R) activities are considered as modernization
+activities and are typically supported under research grants where the primary
+purpose for the grant is other than construction or modernization. The determination of whether proposed A&R is major or minor is made by the NIH Program Official. Major A&R is an unallowable activity or cost under foreign
+grants and foreign components in domestic grants.
+ Examples of activities of Major A&R are as follows:
+ l  A structural change (e.g., to the foundation, roof, floor or exterior
+load-bearing walls of a facility, or extension of an existing facility) to
+increase the floor area and/or change the function and purpose of a
+facility.
+ Examples of activities of Minor A&R are as follows:
+ l Changes to physical characteristics (interior dimensions, surfaces, and
+finishes); internal environments (temperature, humidity, ventilation,
+and acoustics); or utility services (plumbing, electricity, gas, vacuum,
+and other laboratory fittings);
+ l Installation of fixed equipment (including casework, fume hoods, large
+autoclaves, biological safety cabinets);
+ l Replacement, removal, or reconfiguration of interior non-load bearing
+walls, doors, frames, or windows in order to place equipment in a permanent location;
+ l Making unfinished shell space suitable for purposes other than human
+occupancy, such as storage of pharmaceuticals; or
+ l Alterations to meet requirements for accessibility by physically disabled individuals.
+Modified Total Direct
+Cost (MTDC)
+All direct salaries and wages, applicable fringe benefits, materials and supplies,
+services, travel, and subawards up to the first $25,000 of each subaward (regardless of the period of performance of the subawards under the award). MTDC
+excludes equipment, capital expenditures, charges for patient care, rental costs,
+tuition remission, scholarships and fellowships, participant support costs, and the
+portion of each subaward in excess of $25,000. Other items may only be
+excluded when necessary to avoid a serious inequity in the distribution of indirect
+costs, and with the approval of the cognizant agency for indirect costs.
+(GPS page I-35)
+
+Term
+Definition
+Modular application
+A type of grant application in which support is requested in specified increments
+without the need for detailed supporting information related to separate budget
+categories. When modular procedures apply, they affect not only application preparation but also review of the application, award, and post-award administration.
+Monitoring
+A process whereby the programmatic and business management performance
+aspects of a grant are assessed by reviewing information gathered from various
+required reports, audits, site visits, and other sources.
+Name change
+An action whereby the name of an organization is changed without otherwise
+affecting the rights and obligations of that organization as a recipient.
+New Investigator
+A PD/PI who has not previously competed successfully as a PD/PI for a substantial NIH independent research award is considered a New Investigator. For
+example, a PD/PI who has previously received a competing NIH R01 research
+grant is no longer considered a New Investigator. However, a PD/PI who has
+received a Small Grant (R03) or an Exploratory/Developmental Research Grant
+Award (R21) retains their status as a New Investigator. A complete list of NIH
+grants that do not disqualify a PD/PI from being considered a New Investigator
+can be found at https://grants.nih.gov/policy-and-compliance/policy-topics/earlystage-investigators/list-smaller-grants.
+See also the definition of Early Stage Investigator.
+No-cost extension
+An extension of time to a project period and/or budget period to complete the
+work of the grant under that period, without additional Federal funds or competition. See NIH Standard Terms of Award and Prior Approval Requirements.
+Non-competing
+continuation
+application/award
+A financial assistance request (in the form of an application or progress report) or
+resulting award for a subsequent budget period within a previously approved project period for which a recipient does not have to compete with other applicants.
+Non-Discretionary
+Award
+An award made by NIH to specific recipients in accordance with statutory, eligibility and compliance requirements, in which NIH cannot exercise judgment.
+The award amount could be specifically determined or by formula.  NIH does not
+typically make non-discretionary awards.  See "Discretionary Award" on page I-
+18.
+Non-Federal entity
+A state, local government, Indian tribe, institution of higher education (IHE), or
+nonprofit organization that carries out a Federal award as a recipient or subrecipient.
+Non-Federal share
+When cost sharing or matching is required as a condition of an award, the portion
+of allowable project/program costs not borne by the Federal government.
+Non-profit
+organization
+Any  organization that: (1) Is operated primarily for scientific, educational, service,
+charitable, or similar purposes in the public interest; (2) Is not organized primarily
+for profit; (3) Uses net proceeds to maintain, improve, or expand the organization's operations, and (4) is not an IHE.
+(GPS page I-36)
+
+Term
+Definition
+Notice of Award
+The official, legally binding document, signed (or the electronic equivalent of signature) by a Grants Management Officer that outlines the budgetary information
+as well as standard and specific award conditions. Generally, the NoA:
+ 1. notifies the recipient of the award of a grant / cooperative agreement;
+ 2. contains or references all the terms and conditions of the grant including
+any specific conditions, and Federal funding limits and obligations; and,
+ 3. documents the basis for recording the obligation of Federal funds in the
+NIH accounting system.
+Notice of Funding
+Opportunity (NOFO)
+A publicly available document by which a Federal Agency makes known its intentions to award discretionary grants or cooperative agreements, usually as a result
+of competition for funds. NIH Notices of Funding Opportunities may also be
+known as program announcements, requests for applications, notices of funding
+availability, solicitations, or other names as described in 2 CFR 200.204,) depending on the Agency and type of program. Notices of Funding Opportunities can be
+found at Grants.gov.
+Obligations
+When used in connection with a non- Federal entity’s utilization of funds under a
+Federal award, obligations means orders placed for property and services, contracts and subawards made, and similar transactions during a given period that
+require payment by the non- Federal entity during the same or a future period.
+Office of Management
+and Budget (OMB)
+The Executive Office of the President, Office of Management and Budget.
+Offset
+IC or awarding agency approval/authorization of the use of unobligated grant
+funds remaining from a prior budget period to support grant activities of the current budget period.  An offset does not change the current budget period authorized amount of funding but does reduce the amount of current fiscal year funds
+provided to support the authorized award amount.
+Open Researcher and
+Contributor Identifiers
+(ORCID iDs)
+Unique, persistent digital identifiers that distinguish individual investigators and
+can be used to connect researchers with their contributions to science over time
+and across changes of name, location, and institutional affiliation.  These free
+identifiers are assigned and maintained by the non-profit organization ORCID.
+Organization
+A generic term used to refer to an Institution of Higher Education or other entity,
+including an individual, which applies for or receives an NIH grant or cooperative
+agreement.
+Other Significant
+Contributors
+Individuals who have committed to contribute to the scientific development or execution of the project, but are not committing any specified measurable effort (i.e.,
+person months) to the project. These individuals are typically presented at "effort
+of zero person months” or "as needed." Individuals with measurable effort may
+not be listed as Other Significant Contributors (OSCs). Consultants should be
+included if they meet this definition.
+(GPS page I-37)
+
+Term
+Definition
+Other support
+Includes all resources made available to researcher or senior key personnel in
+support of and/or related to all of their research endeavors, regardless of
+whether or not they have monetary value and regardless of whether they are
+based at the institution the researcher identifies for the current grant. Other support does not include training awards, prizes, start-up support from the US
+based institution, or gifts.
+Note:
+ l  Gifts are resources provided where there is no expectation of anything
+(e.g., time, services, specific research activities, money, etc.) in return.
+ l Monetary donations given to institutions or directly to senior/key personnel that support research activities related to an individual are given
+with an expectation and therefore, such donations must be reported as
+other support
+Oversight agency for
+audit
+The Federal agency that provides the predominant amount of funding directly (direct funding) (as listed on the schedule of expenditures of Federal awards, see 2
+CFR Part 200.510(b)) to a recipient or subrecipient unless OMB designates a
+specific cognizant agency for audit. When the direct funding represents less than
+25 per-cent of the total Federal expenditures (as direct and subawards) by the
+recipient or subrecipient, then the Federal agency that is the predominant
+amount of total funding (direct and subawards) is the designated cognizant
+agency. When there is no direct funding, the Federal  agency which is the predominant source of pass-through funding must assume the oversight responsibilities. The duties of the oversight agency for audit and the process for any
+reassignments are described in 2 CFR Part 200.513(b).
+Parent announcement Broad NOFO enabling applicants to electronically submit an investigator-initiated
+grant application for a specific activity code, e.g., Research Project Grant (Parent
+R01).
+Participant support
+costs
+Direct costs that support participants and their involvement in a Federal award
+such as stipends, subsistence allowances, travel allowances, registration fees,
+temporary dependent care, and per diem paid directly to or on behalf of participants.  For the purposes of Kirschstein-NRSA programs and Education Grants
+(e.g., R25), this term does not apply.  NIH will continue to use the terms trainees,
+trainee-related expenses, and trainee travel for those programs.
+Pass-through entity
+A non- Federal entity that provides a subaward to a subrecipient (including lower
+tier subrecipients) to carry out part of a Federal program (see 2 CFR 200.1). The
+authority of the pass-through entity under this part flows through the subaward
+agreement between the pass-through entity and subrecipient.
+(GPS page I-38)
+
+Term
+Definition
+Payback
+Requirement that the recipient of a NRSA postdoctoral fellowship engage in qualified health-related research, health-related research training, or health-related
+teaching activities for a length of time equal to the period of NRSA support
+received. Only the first year of training incurs a payback obligation. In general,
+payback activity must involve at least 20 hours per week and be conducted over
+12 consecutive months; special exceptions may be considered on a case-bycase basis. See Ruth L. Kirschstein National Research Service Awards—Payback for additional information.
+Payment
+Management System
+The HHS centralized grants payment system operated by the  Payment Management Service, Program Support Center. Most HHS (and some other Federal
+government agencies') recipients receive grant payments through this system.
+Peer review
+The two-stage process that involves the consistent application of standards and
+procedures that produce fair, equitable, timely, and objective examinations of
+applications based on an evaluation of scientific or technical merit or other relevant aspects of the application. The review is performed by experts (Peer
+Reviewers) in the field of endeavor for which support is requested. Peer review is
+intended to provide guidance and recommendations to the NIH individuals
+responsible for making award decisions.
+Period of performance The time interval between the start and end date of a Federal award, which may
+include  one or more  budget  periods. Identification of the period of performance
+(project period) in the Federal award does not commit the Federal agency to fund
+the award beyond the currently approved budget period.  The period of performance for NIH awards is noted on the Notice of Award.  See "Project period"
+on page I-41 as well as "Budget period" on page I-10.
+Person months
+The metric for expressing the effort (amount of time) PD/PI(s), faculty and other
+senior/key personnel devote to a specific project. The effort is based on the type
+of appointment of the individual with the organization; e.g., calendar year, academic year, and/or summer term; and the organization's definition of such. For
+instance, some institutions define the academic year as a 9-month appointment
+while others define it as a 10-month appointment.
+Personal property
+Property of any kind except real property. It may be tangible, or intangible, such
+as copyrights, patents, or securities.
+Personally Identifiable
+Information (PII)
+Information that can be used to distinguish or trace an individual’s identity, either
+alone or when combined with other personal or identifying information that is
+linked or linkable to a specific individual. Some PII is available in public sources
+such as telephone books, web sites, and university listings. The definition of PII is
+not attached to any single category of information or technology. Instead, it
+requires a case-by-case assessment of the specific risk that an individual can be
+identified. Non-PII can become PII whenever additional information is made publicly available, in any medium and from any source, that could be used to identify
+an individual when combined with other available information.
+(GPS page I-39)
+
+Term
+Definition
+Phase III clinical trial
+As defined by NIH, a broadly based prospective Phase III clinical investigation
+(usually involving several hundred or more human subjects) to evaluate an experimental intervention in comparison with a standard or control intervention or to
+compare two or more existing treatments. The definition includes pharmacologic,
+non-pharmacologic, and behavioral interventions given for disease prevention,
+prophylaxis, diagnosis, or therapy. Community trials and other population-based
+intervention trials also are included. (See clinical trial definition).
+Pre-award costs
+Any cost incurred prior to the beginning date of the project period or the initial
+budget period of a competitive segment (under a multi-year award), in anticipation of the award and at the applicant’s own risk, for otherwise allowable
+costs.
+Prior approval
+Written approval obtained in advance by an authorized official of a Federal
+agency or pass-through entity of certain costs or programmatic decisions (see
+Administrative Requirements—Changes in Project and Budget—Prior Approval
+Requirements).
+Profit
+See definition for fee.
+Program
+A coherent assembly of plans, project activities, and supporting resources contained within an administrative framework, the purpose of which is to implement
+an organization’s mission or some specific program-related aspect of that mission. For the NIHGPS, “program” refers to those NIH programs that carry out
+their missions through the award of grants or cooperative agreements to other
+organizations.
+Program
+Director/Principal
+Investigator
+The individual(s) designated by the applicant organization/recipient to have the
+appropriate level of authority and responsibility to direct the project or program to
+be supported by the award. The applicant organization may designate multiple
+individuals as program directors/principal investigators (PD/PIs) who share the
+authority and responsibility for leading and directing the project, intellectually and
+logistically. When multiple PD/PIs are named, each is responsible and accountable to the official(s) at the applicant organization/recipient, or as appropriate, to
+a collaborating organization for the proper conduct of the project, program, or
+activity including the submission of all required reports. The presence of more
+than one PD/PI on an application or award diminishes neither the responsibility
+nor the accountability of any individual PD/PI.
+(GPS page I-40)
+
+Term
+Definition
+Program income
+Gross income earned by the recipient or subrecipient that is directly generated by
+a supported activity or earned as a result of the Federal award during the period
+of performance except as provided in 2 CFR Part 200.307(f). (See Period of performance.) Program income includes but is not limited to income from fees for services performed, the use or rental or real or personal property acquired under
+Federal awards, the sale of commodities or items fabricated under a Federal
+award, license fees and royalties on patents and copyrights, and principal and
+interest on loans made with Federal award funds. Interest earned on advances of
+Federal funds is not program income. Except as otherwise provided in Federal
+statutes, regulations, or the terms and conditions of the Federal award, program
+income does not include rebates, credits, discounts, and interest earned on any
+of them. See  2 CFR Part 200.307, 45 CFR Part 200.307, 2 CFR Part 200.407
+and 35 USC §§ 200-212 for inventions made under Federal awards.  (See Administrative Requirements—Management Systems and Procedures—Program
+Income).
+Program
+Official/Program
+Officer/Project Officer
+The NIH official responsible for the programmatic, scientific, and/or technical
+aspects of a grant or cooperative agreement.
+Progress report
+Periodic, usually annual, report submitted by the recipient and used by NIH to
+assess progress and, except for the final progress report of a project period, to
+determine whether to provide funding for the budget period subsequent to that
+covered by the report. This report may also be called the non-competing continuation progress report.
+Project period
+The total time for which Federal support of a project has been programmatically
+approved as shown in the NoA; however, it does not constitute a commitment by
+the Federal government to fund the entire period. The total project period comprises the initial competitive segment, any subsequent competitive segments resulting from a renewal award(s), and extensions. See "Period of performance" on
+page I-39. Also see "Budget period" on page I-10.
+Project/performance
+site
+Location(s) of where the work described in the research plan will be conducted.
+Property
+Real property or personal property.
+Protected Personally
+Identifiable
+Information
+(Protected PII)
+PII (see Personally Identifiable Information (PII)), except for PII that must be disclosed by law. Examples of PII include, but are not limited to, social security number; passport number; credit card numbers; clearances; bank numbers;
+biometrics; date and place of birth; mother’s maiden name; criminal; medical and
+financial records; and educational transcripts.
+(GPS page I-41)
+
+Term
+Definition
+Questioned cost
+Has the meaning given in paragraphs (1) through (3):
+ 1. 1. Questioned cost means an amount, expended or received from a
+Federal award, that in the auditor’s judgment:
+ i. Is noncompliant or suspected noncompliant with Federal statutes, regulations, or the terms and conditions of the Federal
+award;
+ ii.  At the time of the audit, lacked adequate documentation to
+support compliance; or
+ iii. Appeared unreasonable and did not reflect the actions a
+prudent person would take in the circumstances.
+ 2. The questioned cost amount under (1)(ii) is calculated as if the portion of
+a transaction that lacked adequate documentation were confirmed noncompliant.
+ 3. There is no questioned cost solely because of:
+ i. Deficiencies in internal control; or
+ ii. Noncompliance with the reporting type of compliance requirement (described in the compliance supplement) if this noncompliance does not affect the amount expended or received
+from the Federal award
+ 4. Known questioned cost means a questioned cost specifically identified
+by the auditor. Known questioned costs are a subset of likely questioned costs. Where the costs incurred appear unreasonable and do not
+reflect the actions a prudent person would take in the circumstances.
+ 5. Likely questioned cost means the auditor’s best estimate of total questioned costs, not just the known questioned costs. Likely questioned
+costs are developed by extrapolating from audit evidence obtained, for
+example, by projecting known questioned costs identified in an audit
+sample to the entire population from which the sample was drawn. In
+evaluating the effect of questioned costs on the opinion on compliance,
+the auditor considers the likely questioned costs.
+ 6. Questioned costs are not improper payments until reviewed and confirmed to be improper payments as defined in OMB Circular A–123
+Appendix C.
+Real property
+Land, including land improvements, structures and appurtenances thereto, and
+legal interests in land, including fee interest, licenses, rights of way, and easements. Real property  excludes moveable machinery and equipment.
+Recipient
+An entity  that receives a Federal award directly from a Federal agency  to carry
+out an activity under a Federal program. The term recipient does not include subrecipients, consortiums or individuals that are participants or beneficiaries of the
+award. See Non-Federal entity.
+(GPS page I-42)
+
+Term
+Definition
+Renewal application
+An application requesting additional funding for a period subsequent to that
+provided by a current award. Renewal applications compete for funds with all
+other peer reviewed applications, and must be developed as fully as though the
+applicant is applying for the first time. The previous NIH term was “competing continuation.”
+Renewal award
+A Federal award for which the start date is contiguous with, or closely follows, the
+end of the expiring Federal award. The start date of a renewal award begins a
+new and distinct period of performance.
+Research &
+Development (R&D)
+All basic and applied research activities, and all development activities  performed
+by HHS award recipients. The term research also includes activities involving the
+training of individuals in research techniques where such activities use the same
+facilities as other research and development activities and where such activities
+are not included in the instruction function. ‘‘Research’’ is the systematic study directed toward fuller scientific knowledge or understanding of the subject studied.
+‘‘Development’’ is the systematic use of knowledge and understanding gained
+from research to produce useful materials, devices, systems, or methods, including designing and developing  prototypes and processes.
+Research
+Administrator
+The Research Administrator acts as a local agent of the AOR and/or PD/PIs
+providing day-to-day grant-related support. See also Roles and Responsibilities—Recipient Staff.
+Research misconduct
+Fabrication, falsification, or plagiarism in proposing, performing, or reviewing
+research, or in reporting research results.
+ 1. Fabrication is making up data or results and recording or reporting them.
+ 2. Falsification is manipulating research materials, equipment, or processes, or changing or omitting data or results such that research is not
+accurately represented in the research record.
+ 3. Plagiarism is the appropriation of another person’s ideas, processes, results, or words without giving appropriate credit.
+ 4. Research misconduct does not include honest error or honest differences of opinion.
+Research patient care
+costs
+Costs of routine and ancillary services provided by hospitals to participants in
+research protocols.
+Responsible party
+Responsible party is the term used in Title VIII of the Food and Drug Administration Amendments Act (FDAAA) of 2007 (P.L. 110-85) to refer to the entity or
+individual who is responsible under FDAAA for registering a clinical trial and submitting clinical trial information to ClinicalTrials.gov.
+(GPS page I-43)
+
+Term
+Definition
+Resubmission
+application
+An application that has been previously submitted, but was not funded, and is
+being resubmitted for new consideration. Applicants must make significant
+changes to the application and can only resubmit once the summary statement is
+available from review of the first submission. Applicants must apply and undergo
+peer review. Additional policies on resubmissions can be found in the applicable
+Application Instruction Guide. The previous NIH term was "revision." A resubmission has a suffix in its application identification number, e.g., A1.
+Revision application
+As defined in the Federalwide SF424 (R&R): An application that proposes a
+change in 1) the Federal Government’s financial obligations or contingent liability
+from an existing obligation, or 2) any other change in the terms and conditions of
+the existing award. Note in general for NIH applicants, #2 would not require the
+submission of another application. NIH recipients use revision applications to
+request an increase in support in a current budget period for expansion of the project’s approved scope or research protocol. Applicants must apply and undergo
+peer review. The previous NIH term was "competing supplemental." NOTE: The
+former NIH term "revision," is now “resubmission”. A revision has a suffix in its
+application identification number; e.g., S1.
+Scientific Data
+The recorded factual material commonly accepted in the scientific community as
+of sufficient quality to validate and replicate research findings, regardless of
+whether the data are used to support scholarly publications. Scientific data do not
+include laboratory notebooks, preliminary analyses, completed case report
+forms, drafts of scientific papers, plans for future research, peer reviews, communications with colleagues, or physical objects, such as laboratory specimens.
+Scientific Review
+Group (SRG)
+A peer review committee group of primarily non-government experts (peer
+reviewers), qualified by training or experience in particular scientific or technical
+fields, or as authorities knowledgeable in the various disciplines and fields related
+to the applications under review, to evaluate and give expert advice on the scientific and technical merit of the applications. No more than one-fourth of the
+members of any SRG may be Federal employees, as noted in 42 CFR Part 52(h).
+Scientific Review
+Officer (SRO)
+The NIH official who serves as the designated Federal officer having legal
+responsibility for managing the peer review meeting, the procedures for evaluating the applications assigned to the SRG and the determinations and management of conflicts of interest, as noted in 42 CFR Part 52(h).
+Scope of work
+The aims, objectives, and purposes of a grant; as well as the methodology,
+approach, analyses or other activities; and the tools, technologies, and timeframes needed to meet the grant’s objectives. This includes the research or training plan included with the original grant application, along with any approved
+modifications.
+(GPS page I-44)
+
+Term
+Definition
+Senior/Key Personnel
+The PD/PI and other individuals who contribute to the scientific development or
+execution of a project in a substantive, measurable way, whether or not they
+receive salaries or compensation under the grant. Typically, these individuals
+have doctoral or other professional degrees, although individuals at the masters
+or baccalaureate level may be considered senior/key personnel if their involvement meets this definition. Consultants and those with a postdoctoral role also
+may be considered senior/key personnel if they meet this definition. Senior/key
+personnel must devote measurable effort to the project whether or not salaries or
+compensation are requested. "Zero percent" effort or "as needed" are not acceptable levels of involvement for those designated as Senior/Key Personnel.
+Significant
+rebudgeting
+A threshold that is reached when expenditures in a single direct cost budget category deviate (increase or decrease) from the categorical commitment level
+established for the budget period by more than 25 percent of the total costs awarded. Significant rebudgeting is one indicator of change in scope.
+Simplified acquisition
+threshold
+The dollar amount below which a recipient or subrecipient may purchase property or services using small purchase methods. Recipients and subrecipients
+adopt small purchase procedures in order to expedite the purchase of items costing less than the simplified acquisition threshold. The simplified acquisition
+threshold is set by the Federal Acquisition Regulation at 48 CFR Subpart 2.1.
+(See also Micro-purchase.)
+Small business
+concern
+A business that is independently owned and operated and not dominant in its
+field of operation; has its principal place of business in the United States and is
+organized for profit; is at least 51 percent owned, or in the case of a publicly
+owned business, at least 51 percent of its voting stock is owned by U.S. citizens
+or lawfully admitted permanent resident aliens; has, including its affiliates, not
+more than 500 employees; and meets other regulatory requirements established
+by the SBA at 13 CFR Part 121.
+Special purpose
+equipment
+Equipment that is used only for research, medical, scientific, or other similar technical activities. Examples of special purpose equipment include microscopes, xray machines, surgical instruments, spectrometers and associated software. See
+also Equipment and General purpose equipment.
+State
+Any state of the United States, the District of Columbia, the Commonwealth of
+Puerto Rico, the U.S. Virgin Islands, Guam, American Samoa, the Commonwealth of the Northern Mariana Islands, and any agency or instrumentality
+thereof exclusive of local governments.
+State government
+The government of any State of the United States, the District of Columbia, the
+Commonwealth of Puerto Rico, any U.S. territory or possession, or any agency
+or instrumentality of a State exclusive of local governments. For purposes of NIH
+grants, federally recognized Indian tribal governments generally are considered
+State governments. State institutions of higher education and State hospitals are
+not considered State governments for HHS’s general administrative requirements for grants and the NIHGPS.
+(GPS page I-45)
+
+Term
+Definition
+Stipend
+A payment made to an individual under a fellowship or training grant in accordance with pre-established levels to provide for the individual’s living expenses
+during the period of training. A stipend is not considered compensation for the services expected of an employee.
+Subaward
+An award provided by a pass-through entity to a subrecipient for the subrecipient
+to contribute to the goals and objectives of the project by carrying  out part of a
+Federal award received by the pass-through entity. It does not include payments
+to a contractor,  beneficiary or participant. A subaward may be provided through
+any form of legal agreement consistent with criteria in 2 CFR Part 200.331, including an agreement the pass-through entity considers a contract. The term includes
+consortium agreements. The recipient must enter into a formal written agreement, signed and agreed to by both parties, with each consortium participant/subrecipient (see Chapter 15).
+Subrecipient
+A non-Federal entity that receives a subaward from a pass-through entity to carry
+out part of a Federal award. The term subrecipient does not include a beneficiary
+or participant. A subrecipient may also be a recipient of other Federal awards directly from a Federal  agency. The term includes consortium participants.
+Subsidiary
+An entity in which more than 50 percent of the entity is owned or controlled directly by a parent corporation or through another subsidiary of a parent corporation.
+Successor-in-interest
+Process whereby the rights to and obligations under an NIH grant(s) are acquired
+incidental to the transfer of all of the assets of the recipient or the transfer of that
+part of the assets involved in the performance of the grant(s). A SII may result
+from legislative or other legal action, such as a merger or other corporate change.
+Supply
+All tangible personal property other than those described in  Equipment. A computing device is a supply if the acquisition cost is below the lesser of the capitalization level established by the recipient or subrecipient for financial statement
+purposes or $10,000, regardless of the length of its useful life. See Computing
+devices and Equipment.
+Suspension of award
+activities
+An action by the NIH awarding IC requiring the recipient to cease all activities on
+the award pending corrective action by the recipient. It is a separate action from
+suspension under HHS regulations (2 CFR Part 376) implementing Executive
+Orders 12549 and 12689.  (See Public Policy Requirements and Objectives—
+Debarment and Suspension and Administrative Requirements—Enforcement
+Actions).
+Termination
+The action a Federal agency or pass-through entity takes to discontinue  a
+Federal award, in whole or in part, at any time before  the planned end date of the
+period of performance. Termination does not include discontinuing a Federal
+award due to a lack of available funds.
+(GPS page I-46)
+
+Term
+Definition
+Terms and conditions
+of award
+All legal requirements imposed on a grant by NIH, whether based on statute, regulation, policy, or other document referenced in the grant award, or specified by
+the grant award document itself. The NoA may include both standard and specific
+award conditions that are considered necessary to attain the grant’s objectives,
+facilitate post-award administration of the grant, conserve grant funds, or otherwise protect the Federal government’s interests.
+Third-party in-kind
+contributions
+The value of non-cash contributions (meaning, property or services) that: (1)
+Benefit a project or program funded by a Federal award; and (2) Are contributed
+by non-Federal third parties, without charge, to a non- Federal entity under a
+Federal award.
+Total costs
+The total allowable costs (both direct costs and indirect costs) incurred by the
+recipient to carry out a grant-supported project or activity. Total project costs
+include costs charged to the NIH grant and costs borne by the recipient to satisfy
+a matching or cost-sharing requirement.
+Uniform
+Administrative
+Requirements
+(“Uniform Guidance”)
+The administrative requirements, cost principles and audit requirements for
+Federal awards to non-Federal entities as set forth in Part 200 of CFR Title 2
+(Federal Financial Assistance), also referred to as “Uniform Guidance”.
+Unique Entity
+Identifier (UEI)
+The identifier assigned by the System for Award Management (SAM)  to uniquely
+identify business entities.
+United States
+The 50 States, territories, and possessions of the United States, the Commonwealth of Puerto Rico, the Trust Territory of the Pacific Islands, and the District of Columbia.
+Unliquidated
+obligations
+Financial obligations incurred by the recipient or subrecipient but not paid (liquidated) for financial reports prepared on a cash basis. For reports prepared on an
+accrual basis, these are obligations incurred by the recipient or subrecipient but
+for which expenditures have not been recorded.
+Unobligated balance
+The amount of funds authorized under a Federal award that the recipient or subrecipient has not obligated. The amount is computed by subtracting the cumulative amount of the recipient's or subrecipient's unliquidated obligations and
+expenditures under the Federal award from the cumulative amount of  funds the
+Federal agency or pass-through entity authorized the recipient or subrecipient to
+obligate.
+U.S. Person
+As defined under 28 CFR § 202.256, any United States citizen, national, or lawful
+permanent resident; any individual admitted to the United States as a refugee
+under 8 U.S.C. 1157 or granted asylum under 8 U.S.C. 1158; any entity organized solely under the laws of the United States or any jurisdiction within the
+United States (including foreign branches); or any person in the United States.
+Withholding of
+support
+A decision by NIH not to make a non-competing continuation award within the current competitive segment.
+(GPS page I-47)

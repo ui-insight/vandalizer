@@ -1,0 +1,166 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 5: The Notice of Award
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+5 THE NOTICE OF AWARD
+The Notice of Award (NoA) is the legal document issued to notify the recipient that an award has been
+made and that funds may be requested from the designated HHS payment system or office. The NoA is
+issued for the initial budget period and each subsequent budget period in the approved project period.
+The NoA reflects any future-year commitments. A revised NoA may be issued during a budget period to
+affect an action resulting in a change in the period or amount of support or other change in the terms and
+conditions of award. NIH will not issue a revised NoA to reflect a recipient’s post-award rebudgeting.
+Until an IC has issued the NoA for the initial award, any costs incurred by the applicant for the project
+are incurred at its own risk (see Cost Considerations—Allowability of Costs/Activities—Selected Items
+of Cost—Pre-Award (Pre-Agreement) Costs for NIH policy on the allowability of pre-award costs).
+Notice of Award Page One
+HHS implemented a standardized page one of the NoA that serves as the first page of every HHS NoA
+for all discretionary awards. The standardized page one incorporates the following data elements:
+ o HHS Operating Division
+ o Federal Award Identification Number
+ o Federal Award Date
+ l Recipient Information
+ l Recipient Name
+ l Congressional District of Recipient
+ l Payment System Identifier (also known as Entity Identification Number)
+ l Employer Identification Number
+ l Data Universal Numbering System
+ l Recipient’s Unique Entity Identifier
+ l Project Director or Principal Investigator
+ l Authorized Official
+ l Federal Agency Information
+ l Awarding Agency Contact Information
+ l Program Official Contact Information
+ l Federal Award Information
+ l Award Number
+ l Unique Federal Award Identification Number
+ l Statutory Authority
+ l Federal Award Project Title
+ l Assistance Listing Number (formerly / also known as CFDA Number)
+(GPS page IIA-61)
+
+l Assistance Listing Program Title (formerly / also known as CFDA program title)
+Name
+ l Award Action Type
+ l Is this Award R&D?
+ l Summary Federal Award Financial Information
+ l Budget Period Start and End Date
+ l Total Amount of Federal Funds Obligated by this Action
+ l Direct Cost Amount
+ l Indirect Cost Amount
+ l Authorized Carryover
+ l Offset
+ l Total Amount of Federal Funds Obligated this Budget Period
+ l Total Approved Cost Sharing or Matching, where applicable
+ l Total Federal and Non-Federal Approved this Budget Period
+ l Project Period Start and End Date
+ l Total Amount of the Federal Award, including Approved Cost Sharing or Matching, this Project Period
+ l Authorized Treatment of Program Income
+ l Grants Management Officer Signature
+ l Remarks
+Remainder of the NIH NoA
+Additionally, the remainder of the NIH NoA sets forth pertinent information about the grant in Section I
+(Award Data), Section II (Payment Information), and Sections III and IV (Applicable Terms and Conditions of Award). This additional information, includes, but not limited to, the following:
+ l Cumulative budget approved by the NIH awarding IC
+ l Amount of anticipated future-year commitments (if applicable)
+ l Names of the cognizant IC PO, GMO, and GMS
+ l Indirect cost rate for the Federal award (including if the de minimis rate is charged per 45
+CFR Part 75.414)
+ l Applicable terms and conditions of award, either by reference or inclusion
+ l Federal award performance goals (as required by the periodic report in the RPPR or in the final
+RPPR when applicable)
+ l Any restriction on the use of funds
+Note: If applicable, section III of the NoA will also reference an institution’s participation in the current
+phase of the Federal Demonstration Partnership (FDP).
+(GPS page IIA-62)
+
+As specified in the NoA, all awards issued by the National Institutes of Health (NIH) meet the definition
+of “Research and Development” at 2 CFR Part 200. As such, auditees should identify NIH awards as
+part of the R&D cluster on the Schedule of Expenditures of Federal Awards (SEFA). The auditor should
+test NIH awards for compliance as instructed in Part V, Clusters of Programs. NIH recognizes that some
+awards may have another classification for purposes of indirect costs. The auditor is not required to
+report the disconnect (i.e., the award is classified as R&D for Federal Audit Requirement purposes but
+non-research for indirect cost rate purposes), unless the auditee is charging indirect costs at a rate other
+than the rate(s) specified in the award document(s).
+A recipient indicates acceptance of an NIH award and its associated terms and conditions by drawing or
+requesting funds from the designated HHS payment system or office. If the recipient cannot accept the
+award, including the legal obligation to perform in accordance with its provisions, it should notify the
+GMO immediately upon receipt of the NoA. If resolution cannot be reached, the GMO will void the
+grant. NIH’s determination of applicable terms and conditions of award or a GMO’s denial of a request
+to change the terms and conditions is discretionary and not subject to appeal (post-award appeal rights
+are discussed in Administrative Requirements—Grant Appeals Procedures). Once the award is accepted
+by the recipient, the contents of the NoA are binding on the recipient unless and until modified by a
+revised NoA signed by the GMO.
+5.1 NOTICE OF AWARD NOTIFICATION
+NIH notifies the recipient organization via e-mail when an award has been issued-i.e., on the Federal
+award date. In order to allow for the e-mail notification of the NoA, recipient organizations must register
+a valid e-mail address in the NoA E-mail field in the eRA Commons Institutional Profile once the initial
+eRA Commons registration process is complete. Organizations are encouraged to use a unique e-mail
+address that is not specific to an individual in order to avoid communication problems when personnel
+change. It is the responsibility of the recipient organization to maintain a current and accurate e-mail
+address for NoAs. NIH will not distribute NoAs other than through this system-generated e-mail notification process. Recipients that do not maintain a current NoA notification e-mail address will be
+responsible for accessing NoAs via the eRA Commons.
+On the Federal award date, the NoA is made available to recipient officials and corresponding PD/PIs in
+the eRA Commons through the Status module. The eRA Commons is the official repository for the NoA
+document.
+5.2 ASSOCIATED APPLICATIONS AND/OR AWARDS
+For some special initiatives a project or program may be funded by multiple awards that are associated
+with the others through specific terms and conditions. These terms include any reporting requirements
+that would need to be coordinated in future years. When multiple awards are issued for a particular project/program at different institutions, the coordination required among the recipient institutions administering the awards will be documented in the specific terms and conditions.
+5.3 FUNDING
+For most grants, NIH uses the project period system of funding. Under this system, projects are programmatically approved for support in their entirety but are funded in annual increments called budget
+periods. The length of an initial project period (competitive segment) or of any subsequent competitive
+segment is determined by the NIH awarding IC based on:
+ l any statutory or regulatory requirements,
+ l the length of time requested by the applicant to complete the project,
+(GPS page IIA-63)
+
+l limitation on the length of the project period recommended by the peer reviewers,
+ l  the awarding IC’s programmatic determination of the frequency of competitive review desirable
+for managing the project, and
+ l NIH funding principles.
+The total project period consists of the initial competitive segment, any additional competitive segments
+authorized by approval of a competing continuation application, and any non-competing extensions. NIH
+policy limits each competitive segment to a maximum of 5 years (exclusive of non-competing extensions). A single award covering the entire period of support generally is used only if the project is solely
+for construction or modernization of real property, if the total planned period of support will be less than
+18 months, or if the project is awarded under a special support mechanism.
+The initial NoA provides funds for the project during the first budget period. Budget periods usually are
+12 months long; however, shorter or longer budget periods may be established for compelling programmatic or administrative reasons. The NoA that documents approval of a project period that extends
+beyond the budget period for which funds are provided (including anticipated levels of future support)
+expresses NIH’s intention to provide continued financial support for the project. The amounts shown for
+subsequent years represent projections of future funding levels based on the information available at the
+time of the initial award. Such projected levels of future support are contingent on satisfactory progress,
+the availability of funds, and the continued best interests of the Federal government. They are not guarantees by NIH that the project will be funded or will be funded at those levels and create no legal obligation to provide funding beyond the ending date of the current budget period as shown in the NoA.
+Recipients are required to submit an annual progress report as a prerequisite to NIH approval and funding of each subsequent budget period (non-competing continuation award) within an approved project
+period (see Administrative Requirements—Monitoring—Reporting—Non-Competing Continuation Progress Report). A decision to fund the next budget period will be formalized by the issuance of the NoA
+indicating the new budget period and the amount of new funding. The NoA also will reflect any remaining future-year commitments. NIH may decide to withhold support for one or more of the reasons cited
+in Administrative Requirements—Enforcement Actions—Suspension, Termination, and Withholding of
+Support. A recipient may appeal this decision only if the withholding was for the recipient’s failure to
+comply with the terms and conditions of a previous award (see Administrative Requirements—Grant
+Appeals Procedures).
+All Federal agencies are required by 31 U.S.C. §1552(a) to close fixed year appropriation accounts and
+cancel any remaining balances by September 30 of the fifth fiscal year after the year of availability
+unless otherwise authorized by Congress. In order for NIH to meet its obligation to close these accounts
+and cancel any remaining balances by September 30, recipients must report disbursements on the  FFR no
+later than August 31 of the fifth fiscal year after the year of availability.  This provision may limit the
+availability of funds for carryover.  It may also limit or eliminate the authority to extend the final budget
+period when an entire project period is funded by a single award (e.g., multiyear funded awards).
+5.4 BUDGET
+Each NoA sets forth the amount of funds awarded. The amount may be shown either as a categorical
+(line item) budget or as an amount for total direct costs (not broken down by category) and an amount
+for indirect costs, if applicable. Modular awards represent a type of award made without a categorical
+budget (see Modular Applications and Awards chapter in IIB). The recipient has certain rebudgeting flexibility within the overall amount awarded (see Administrative Requirements—Changes in Project and
+Budget). The recipient may be required to provide matching funds under construction awards as spe-
+(GPS page IIA-64)
+
+cified in Construction Grants—Matching in IIB as well as under other NIH programs or awards if specified in the Notice of Funding Opportunity.
+5.5 ADDITIONAL TERMS AND CONDITIONS
+In addition to, or in lieu of, the standard terms and conditions of award specified in the NIHGPS, NIH
+may use terms and conditions for program-specific or award-specific reasons. For example, if, on the
+basis of a recipient’s application or other available information, the GMO finds—at the time of award or
+at any time subsequent to award—that the recipient’s management systems and practices are not
+adequate to ensure the appropriate stewardship of NIH funds or to achieve the objectives of the award,
+the GMO may impose special, more restrictive terms and conditions on the award in accordance with
+applicable regulations including 42 CFR Part 52.9 and 2 CFR Part 200.339 and 45 CFR Part 75.371. For
+example, NIH could require a recipient to obtain prior approval for expenditures that ordinarily do not
+require such approval or to provide more frequent reports. In addition to closer monitoring, NIH may
+assist the recipient in taking any necessary corrective action.
+(GPS page IIA-65)

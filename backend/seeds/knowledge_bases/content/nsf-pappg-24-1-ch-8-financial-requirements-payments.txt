@@ -1,0 +1,248 @@
+NSF PAPPG (NSF 24-1) — Chapter VIII: Financial Requirements and Payments
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-8-financial-requirements-payments
+
+The acceptance of an award from NSF creates a legal obligation on the part of the recipient organization to use the funds or property made available in accordance with the terms and conditions of the award. Payments may be made in advance of work performed or as a reimbursement for work performed and/or costs incurred by the recipient. Payments, however, may not be made prior to an award being signed by an NSF Grants and Agreements Officer.
+
+NSF has a reversionary interest in any:
+
+- (a) unused funds from advance payments;
+- (b) improperly applied funds (whether or not received as an advance payment); and
+- (c) property acquired through the award, to which NSF specifically either retains title or reserves the right to require title transfer.
+
+The provisions of this chapter apply to all NSF awards. Graduate fellowship awards made to domestic institutions of higher education are included, but contracts are excluded. All categories of recipients are covered by this chapter. The procedures in this chapter apply primarily to the comptroller's office or business office.
+
+### A. Standards for Financial Management
+
+NSF recipients must meet the financial management systems requirements of 2 CFR § 200.302
+
+### B. Definitions
+
+The following definitions are either not included elsewhere in Part II of the PAPPG or are repeated in this Chapter because of their special applicability.
+
+- Advance Payment - means a payment that NSF makes by any appropriate payment mechanism, including a predetermined payment schedule, before the recipient disburses the funds for program purposes.
+- Business Officer – means the financial official of the recipient organization who has primary responsibility for the accountability for, and reporting on, NSF award funds.
+- Cash on Hand – means a recipient organization's cash position relative to the funds received from NSF minus the costs incurred for the award.
+- Disbursements/Outlays/Expenditures– means charges made by the recipient to a project or program for which an NSF award was received.
+- Financial Functions – means the NSF systems and services used by recipients to transmit financial information to NSF. Recipients must access Financial Functions through Research.gov. The primary Financial Functions used by recipients are:
+
+-
+(a) Award Cash Management Service (ACM$) – means NSF's award payment process under which recipients provide award level detail at the time of the payment request. ACM$ replaced both the reporting of expenditures on the Federal Financial Report (FFR) and the Cash Request Function.
+
+(b) Federal Financial Report History – means the electronic version of the standard "Federal Financial Report". This was used by recipients prior to ACM$ implementation to report the financial activity of NSF awards on a quarterly basis.
+
+- Recipient - means an entity that receives an award directly from NSF. The term recipient does not include subrecipients or individuals that are beneficiaries of the award. NSF awards are normally made to organizations rather than to the PI and any co-PIs identified on a proposal. Categories of eligible proposers may be found in Chapter I.E.
+- Recipient Obligations – means orders placed for property and services, contracts and subawards made, and similar transactions during a given period that require payment by the recipient during the same or a future period.
+- Improper Payment – means any payment that should not have been made or that was made in an incorrect amount under statutory, contractual, administrative, or other legally applicable requirements.
+- NSF Obligations – means funds authorized by an NSF Grants and Agreements Officer for a specific NSF award creating a balance payable to a recipient.
+- Payments – means the funds transferred from NSF to the recipient by electronic funds transfer (Automated Clearing House (ACH)) and on some rare occasions by check or by wire for same day electronic funds transfer or international payments.
+- Unexpended Balance – means the sum of the awarded funds not yet obligated by the recipient and obligated balances not yet paid by the recipient. An unexpended balance is the result of awarded funds not being spent, or when the total expenditures for a project are less than the amount awarded. It can also be defined as the unspent portion of a budgeted amount, available for authorized future expenses during the award period.
+- Unliquidated Obligations –
+
+-
+(a) for recipients operating on a cash basis, means obligations incurred by the recipient that have not been paid (liquidated).
+
+(b) for recipients operating on an accrual expenditure basis, means obligations incurred by the recipient for which an expenditure has not been recorded.
+
+- Unobligated Balance – means the cumulative amount of budget authority that remains available for obligation under law in unexpired accounts.
+
+### C. Payment Requirements
+
+#### 1. Requesting Payments
+
+NSF recipients, except for some Special Payment recipients (see Chapter VIII.C.4), and some foreign recipients, are required to request payments electronically through ACM$. Under ACM$, recipients must provide award level detail at the time of the payment request.
+
+Certain Special Payment recipients and foreign recipients without access to a U.S. bank are required to request funds by submitting a "Request for Advance or Reimbursement Form", (SF 270), to NSF either through mail, email or by fax.
+
+#### 2. Payment Policies
+
+The purpose of this section is to prescribe the timing of advances and the procedures to be observed to ensure that cash payments occur only when essential to meet the needs of a recipient for its actual disbursements.
+
+- Timing of Payments. Advance payments to recipients must be limited to the minimum amounts needed. The timing of advanced payments must be in accordance with the actual, immediate cash requirements of the recipient in carrying out the purpose of the approved program or project. The timing and amount of advance payments must be as close as is administratively practicable to the actual disbursements by the recipient for direct program or project costs and the proportionate share of any allowable indirect costs (F&A).
+- Payments to Subrecipients and Contractors. Payments made by NSF recipients to subrecipients and contractors shall conform to the same standards of timing and amount as apply to payments by NSF to its recipients.
+-
+Withholding Payments. NSF reserves the right, upon written notice, to withhold future payments after a specified date if the recipient either:
+
+-
+(i) fails to comply with the terms and conditions of an NSF award, including the reporting requirements; or
+
+(ii) is indebted to the US Government.
+
+Payments will be released to the recipient upon subsequent compliance.
+
+- Safeguarding Funds. In no case will NSF funds be commingled with the personal funds of, or be used for personal purposes by, any officer, employee, or agent of the recipient; nor will any of these funds be deposited in personal bank accounts for disbursement by personal check.
+
+#### 3. Request for Payment
+
+- Recipients may submit requests for payments as often as they like and may submit payment requests for reimbursement or in advance of costs incurred. The following conditions must exist for recipients submitting payment requests in advance of costs incurred:
+
+-
+(i) Funds for the project period have been obligated by a Grants and Agreements Officer in the form of an electronically signed grant;
+
+(ii) The recipient has established written procedures that will minimize the time elapsing between the transfer of funds from the U.S. Treasury and their disbursement by the recipient; and
+
+(iii) The recipient's financial management system meets the standards for fund control and accountability prescribed in 2 CFR § 200.302.
+
+- Recipients shall maintain advances of NSF funds in interest bearing accounts as specified in Chapter VIII.D.3.
+
+#### 4. Special Payment Recipients
+
+When recipients do not meet the conditions specified in Chapter VIII.C.3 above, or when otherwise considered appropriate, NSF may restrict their capability to request funds through ACM$ or they may be required to request funds by using a Request for Advance or Reimbursement (SF 270) form. The cognizant NSF Grants and Agreements Officer is responsible for establishing the documentation requirements for special payment recipients. Documentation may be submitted by email, by fax to 703-292-9142, or through the mail to:
+
+National Science Foundation
+Division of Grants & Agreements
+2415 Eisenhower Avenue
+Alexandria, VA 22314
+
+#### 5. Working Capital Advance
+
+In those cases where the reimbursement method described in Chapter VIII.C.3 is not feasible, arrangements may be made whereby NSF projects are financed on a working capital advance basis. On this basis, funds may be advanced to the recipient to cover estimated disbursement needs for a given initial period. Thereafter, the recipient would be reimbursed for the amount of its actual cash disbursements. The amount of the initial advance shall be geared to the reimbursement cycle so that after the initial period, the advance approximately equals the average amount of the recipients’ unreimbursed program disbursements.
+
+#### 6. Recipient Banking Information for Payments
+
+The System for Award Management (SAM) is the NSF system of record for organizational financial information. Once an award is made, failure to maintain current and complete financial information within SAM could prevent the recipient from receiving funds.
+
+Individual recipients of Postdoctoral Fellowship awards are required to maintain their financial information within Research.gov, refer to the program's Information Handbook or Administrative Guide for more information.
+
+### D. Cash Refunds and Credits to NSF
+
+#### 1. Final Unexpended Balance
+
+NSF has a reversionary interest in the unexpended balance of an award upon the end date or completion of the award. Based on final payment amounts submitted through ACM$, the final unexpended balance will be computed by NSF and de-obligated from the award amount.
+
+#### 2. Erroneous Payments
+
+Advances or reimbursements made in error must be refunded to the National Science Foundation. Excess funds should be promptly refunded electronically or by check. Electronic remittances are preferred, where practical, and should be submitted through Pay.gov. Prior to submission of a remittance, the title of the Pay.gov's form must be confirmed by using "NSF Remittance Form – Grantees" to ensure that the remittance is sent to the correct agency.
+
+When electronic remittances are not practical, checks shall be mailed to NSF, Attn. Cashier, 2415 Eisenhower Avenue, Alexandria, VA 22314. Contact the NSF Division of Financial Management at (703) 292-8280 for additional information. The NSF Award ID(s) and the reason for the return (e.g., excess cash, funds not spent, interest, part interest part other, etc.) should be included in any remittance submitted to NSF.
+
+The only exception to the requirement for prompt refunding is when the funds involved will be disbursed immediately. This exception for prompt refunding should not be construed as approval by NSF for a recipient to maintain excessive funds on hand.
+
+#### 3. Interest Earned on Advance Payments
+
+The following provisions implement the applicable portions of 2 CFR § 200.305 on interest income.
+
+Recipients shall maintain advances of NSF funds in interest-bearing accounts, unless any of the following apply:
+
+- The recipient receives less than $250,000 in Federal awards per year;
+- The best reasonably available interest-bearing account would not be expected to earn interest in excess of $500 per year on Federal cash balances;
+- The depository would require an average or minimum balance so high that it would not be feasible within the expected Federal and non-Federal cash resources; or
+- A foreign government or banking system prohibits or precludes interest bearing accounts.
+
+Recipients may retain interest earned amounts up to $500 per year for administrative expenses. Any additional interest earned on Federal advance payments deposited in interest-bearing accounts must be remitted annually to the Department of Health and Human Services Payment Management System (PMS) through an electronic medium using either Automated Clearing House (ACH) network or a Fedwire Funds Service payment. Remittances must include an explanation stating that the refund is for interest, include NSF as the name of the awarding agency, and list the Federal award number(s) for which the interest was earned. The remittance must be submitted as follows:
+
+-
+(i) For ACH Returns:
+
+Routing Number: 051036706
+Account number: 303000
+Bank Name and Location: Credit Gateway—ACH Receiver St. Paul, MN
+
+-
+(ii) For Fedwire Returns*:
+
+Routing Number: 021030004
+Account Number: 75010501
+Bank Name and Location: Federal Reserve Bank Treas NYC/Funds Transfer Division New York, NY
+
+(* Please note organization initiating payment is likely to incur a charge from your Financial Institution for this type of payment)
+
+-
+(iii) For International ACH Returns:
+
+Beneficiary Account: Federal Reserve Bank of New York/ITS (FRBNY/ITS)
+Bank: Citibank N.A. (New York)
+Swift Code: CITIUS33
+Account Number: 36838868
+Bank Address: 388 Greenwich Street, New York, NY 10013 USA
+Payment Details (Line 70): Agency Locator Code (ALC): 75010501
+Name (abbreviated when possible) and ALC Agency POC: Michelle Haney, (301) 492-5065
+
+-
+(iv) For recipients that do not have electronic remittance capability, please make check** payable to: "The Department of Health and Human Services."
+
+Mail Check to Treasury approved lockbox:
+
+HHS Program Support Center, P.O. Box 530231, Atlanta, GA 30353-0231
+
+(**Please allow 4-6 weeks for processing of a payment by check to be applied to the appropriate PMS account)
+
+- (v) Questions can be directed to PMS at 877-614-5533 or PMSSupport@psc.hhs.gov.
+
+#### 4. Program Income
+
+-
+Background
+
+The following provisions implement the applicable portions of 2 CFR § 200.307 on program income.
+
+-
+Definition
+
+Program income means gross income earned by the recipient that is directly generated by a supported activity or earned as a result of the grant during the period of performance. Program income includes, but is not limited to, income from fees for services performed, the use of rental or real or personal property acquired under the grant, the sale of commodities or items fabricated under the grant, license fees and royalties on patents and copyrights, and principal and interest on loans made with grant funds. Interest earned on advances of Federal funds is not program income. Except as otherwise provided in Federal statutes, regulations, or the terms and conditions of the award, program income does not include rebates, credits, discounts, and interest earned on any of them. See also 35 U.S.C. §§ 200-212 "Disposition of Rights in Educational Awards" as it applies to inventions made under Federal awards.
+
+Note: Registration fees collected under NSF-supported conferences are considered program income.
+
+- NSF Policy
+
+-
+(i) Standard Treatment
+
+Unless otherwise specified in the grant, program income received or accruing to the recipient during the period of the grant is to be retained by the recipient, added to the funds committed to the project by NSF, and thus used to further project objectives. The recipient has no obligation to NSF with respect to program income received beyond the period of the grant. The recipient also shall have no obligation to NSF with respect to program income earned from license fees and royalties for copyrighted material, patents, patent applications, trademarks, and inventions produced under an award. However, Patent and Trademark Amendments (35 U.S.C. § 18) shall apply to inventions made under an award.
+
+Efforts should be made to avoid having unexpended program income remaining at the end date of the grant. Program income earned during the project period should be expended prior to requesting reimbursement against the grant. In the event a recipient has unexpended program income remaining at the end of the grant, it must be remitted to NSF by crediting costs otherwise chargeable against the grant. If it is not possible to record the credit via ACM$, the excess program income must be remitted to NSF electronically or by check payable to the National Science Foundation. (See section D.2 above for further information.)
+
+-
+(ii) Special Treatment
+
+In exceptional circumstances, the NSF Grants and Agreements Officer, in collaboration with Program Officers and other appropriate NSF offices, may approve use of a special grant provision to restrict or eliminate a recipient's control of income earned through NSF-supported activities if it determines that this would best serve the purposes of a particular program or grant. The special provisions may require treatment of the program income via use of the deductive method, the Federal share of program income be kept in a separate account, or reported on and/or remitted for such periods as may be reasonable under the circumstances.
+
+If, in accordance with the grant terms and conditions program income is designated for deductive treatment, it must be remitted to NSF by crediting costs otherwise chargeable against the grant. Program Income in excess of the award will be remitted to NSF electronically or by check payable to the National Science Foundation.
+
+-
+(iii) Program Income Reporting Requirements
+
+On an annual basis, recipients are required to submit a Program Income Reporting Worksheet to NSF in order to report program income earned and expended for any of their awards or to validate that they did not earn and expend program income for any of their grants during the applicable period.
+
+-
+(a) The Program Income Reporting Worksheet utilizes the standard, OMB-approved government-wide data elements from the Program Income section of the Federal Financial Report (SF 425).
+
+(b) The Program Income Reporting Worksheet in Microsoft Excel is available to recipients through the Program Income page of Research.gov. Recipients are required to report the award number, amount of program income earned, amount of program income expended, and the amount of unexpended program income remaining as of the applicable period. Recipients that have no program income to report will be able to validate that status by an email response. The Program Income Reporting Worksheet is due 45 calendar days after the end of the Federal fiscal year.
+
+(c) Postdoctoral Research Fellowship awards made directly to individuals and SBIR/STTR awards are exempt from this annual reporting requirement.
+
+Failure to report program income or to validate that no program income was earned/expended could result in suspension of future grant payments.
+
+#### 5. Other Cost Credits
+
+Purchase discounts, rebates, allowances, credits resulting from overhead rate adjustments and other credits relating to any allowable cost received by or accruing to the recipient shall be credited against NSF award costs if the grant has not been financially closed out. See also Chapter X.A.2.c.
+
+### E. Award Financial Reporting Requirements and Final Disbursements
+
+NSF does not require recipients to submit FFRs for each award for purposes of final award accountability. NSF procedures have been designed to extract the final financial data from the entries in ACM$. This is accomplished as follows:
+
+For any award listed on the ACM$ Payments screen, the recipient will enter the final payment amount in the Payment Amount Requested column to complete final financial reporting to NSF. Considerations for financial closeout are as follows:
+
+- After closeout, if final disbursements change by $1.00 or more from the final award amount, then the recipient should submit an "Adjustment to a Financially Closed Award' through the ACM$ payment process.
+- Recipients must liquidate all obligations incurred under their awards not later than 120 calendar days after the award end date.
+- NSF will financially close awards calendar 120 days after the award end date[72] and the award will be removed from the ACM$ payment screen for active awards. Any remaining funds that exceed the final payment amount will be deobligated from the award so the net award balance will equal total payments.
+- Recipients also have the option of using ACM$ to designate awards for financial closeout prior to NSF’s regularly scheduled close out date. Recipients can complete that action by selecting the Final Flag on the ACM$ payment screen. (Note that the flag cannot be unchecked at a later date and should typically not be used for original awards that transferred to another awardee organization). Selecting the Final Flag will financially close the award upon posting of the ACM$ transaction to the NSF financial accounting system, typically overnight.
+- Recipients are authorized to make upward or downward adjustments to the Federal share of costs for a financially closed award within the following time limits:
+
+- Upward adjustments may be submitted through ACM$ for up to 14 months after the financial closeout date of the award or until the appropriated funds cancel[73], whichever is earlier.
+- Downward adjustments may be submitted through ACM$ until the appropriated funding for the award cancels. The time limitation for ACM$ downward adjustments has no effect on the requirement that the recipient return any funds due to NSF as a result of later refunds, corrections, or other transactions including final indirect cost rate adjustments. In cases where the award appropriation has been canceled, the recipient should return the funds associated with the downward adjustment in accordance with section D. Cash Refunds and Credits to NSF.
+
+- Awards funded by canceling appropriations will be liquidated and returned to Treasury by September 30 of the Fiscal year. If only a portion of the awarded funds is cancelled, then NSF will reduce the available balance of the award. If all funds under the award are canceling appropriations, then NSF must financially close the award no later than September 30th regardless of the award end date. No extensions, requests for payment, or upward adjustments will be allowed beyond the end of the Federal fiscal year in which the funds cancel. Although in this situation awards may be financially closed early, recipients will still have the full 120-day closeout period to submit final annual project reports in accordance with the award terms and conditions.
+
+### F. Post-Award Financial Monitoring Notifications
+
+NSF regularly sends the following notifications to recipients to provide business assistance and to support effective post-award financial monitoring. These notifications are informational and are intended to alert recipients’ financial point(s) of contact to elevate the notification to personnel associated with the award, such as the respective PI and co-PI(s), or other relevant support staff, as appropriate.
+
+- Canceling Appropriations – NSF distributes notifications highlighting open awards with unexpended balances funded by canceling appropriations for recipients to properly expend and draw down funds before the end of the Federal fiscal year. Recipients must not interpret NSF's notification of canceling appropriations as direction to draw down NSF funds for which there is no associated expenditure need. Recipients are reminded that “the timing and amount of advance payments must be as close and as administratively practicable to the actual disbursements…” in accordance with Chapter VIII.C.2, and that all excess funds drawn must be returned to NSF promptly. See section C. above for additional information on award payments.
+- Final Unexpended Balances – NSF distributes notifications highlighting open awards approaching the end of their period of performance, with high remaining unexpended balances.
+- Grants with No ACM$ Payments – NSF distributes notifications highlighting open awards with no ACM$ payment requests in over one year, and over $5,000 in remaining unexpended balances.
+
+#### Footnotes to Chapter VIII
+
+[72] Awards that end on May 31 may be closed early, on or before the last day ACM$ is available for drawing down funds in September, to accommodate NSF’s Federal fiscal year end closeout.
+
+[73] In accordance with 31 U.S.C. § 1552(a), funds will no longer be available for expenditure for any purpose beyond September 30th of the fifth fiscal year after the expiration of a fixed appropriation's period of availability for incurring new obligations.

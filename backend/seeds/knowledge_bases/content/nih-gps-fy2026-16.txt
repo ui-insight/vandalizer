@@ -1,0 +1,283 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 16: Grants to Foreign Organizations, International Organizations, Domestic Grants with Foreign Components and Collaborative International Research Awards
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+16 GRANTS TO FOREIGN ORGANIZATIONS,
+INTERNATIONAL ORGANIZATIONS,  DOMESTIC
+GRANTS WITH FOREIGN COMPONENTS AND
+COLLABORATIVE INTERNATIONAL RESEARCH
+AWARDS
+16.1 GENERAL
+Most of the policies contained in IIA apply to NIH grants made to foreign organizations and international organizations (hereafter “foreign grants”), including the requirements of 2 CFR Part 200 and the
+cost principles incorporated by reference in those regulations. If an applicant/recipient would be unable
+to comply with these requirements, the AOR should contact the GMO. Specific exceptions and modifications of IIA requirements for foreign grants, and highlights of other policies, are set forth in this
+chapter. This chapter also includes policies that apply to domestic grants with a foreign component and
+to collaborative international research awards.
+16.2 ELIGIBILITY
+In general, foreign organizations and international organizations, including public or private non-profit or
+for-profit organizations, are eligible to apply for research project grants, but are not eligible to submit a
+modular grant application. International organizations are treated as foreign organizations for the purpose
+of eligibility. If the Notice of Funding Opportunity (NOFO) allows foreign organizations to apply, international organizations may apply. If the NOFO does not allow foreign organizations to apply, international organizations may not apply. Foreign organizations and international organizations are not
+eligible to apply for Kirschstein-NRSA institutional research training grants, program project grants, center grants, resource grants, SBIR/STTR grants, or construction grants. However, some activity codes,
+such as program project grants (P01), may support projects awarded to a domestic institution with a foreign component. For purposes of this policy, a foreign component is defined as performance of any significant element or segment of the project outside the United States either by the recipient or by a
+researcher employed by a foreign organization, whether or not grant funds are expended. Activities that
+would meet this definition include the following:
+ l The involvement of human subjects or vertebrate animals at a foreign site.
+ l Extensive foreign travel by recipient project staff for the purpose of data collection, surveying,
+sampling, and similar activities.
+ l Any activity of the recipient that may have an impact on U.S. foreign policy through involvement in the affairs or environment of a foreign country.
+Examples of other grant-related activities that may be significant are:
+ l collaborations with investigators at a foreign site anticipated to result in co-authorship;
+ l use of facilities or instrumentation at a foreign site; or
+ l receipt of financial support or resources from a foreign entity.
+Foreign travel exclusively for consultation is not considered a foreign component.
+(GPS page IIB-115)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+See Support of Scientific Meetings (Conference Grants) chapter for NIH policy on support of international conferences.
+Grants may not be made to individuals in a foreign location (i.e., outside of the United States and its territorial possessions). Occasionally, a Kirschstein-NRSA individual fellowship award is made to a U.S.
+citizen or a non-citizen national to study in a foreign organization. (A “non-citizen national” is a person
+who although not a citizen of the United States owes permanent allegiance to the United States, such as a
+resident of American Samoa.) See Ruth L. Kirschstein National Research Service Awards—Individual
+Fellowships for additional information.
+16.3 APPLICATION REVIEW
+Applications from foreign organizations or international organizations will be evaluated and scored during the initial review process using the appropriate peer review framework for the activity code.
+In addition, applications from foreign organizations or international organizations, or applications where
+multiple PD / PIs are located at foreign organizations  will be assessed as part of the review process and
+award decision:
+ l Whether the project presents special opportunities for further research programs through the use
+of unusual talent, resources, populations, or environmental conditions in other countries that are
+not readily available in the United States or that augment existing U.S. resources.
+ l Whether the proposed project has specific relevance to the mission and objectives of the IC and
+has the potential for significantly advancing the health sciences in the United States.
+Note, these additional considerations also apply to collaborative international research awards (see Collaborative International Research Awards) but are not applied to applications from domestic organizations with foreign components.
+Research grant applications from foreign organizations or international organizations, applications
+involving Multiple PD/PIs with foreign organization affiliations, and collaborative international research
+awards may not be funded unless approved by the IC National Advisory Council or Board.
+16.4 PUBLIC POLICY REQUIREMENTS AND OBJECTIVES
+A complete listing of public policy requirements and objectives and their applicability to foreign grants
+is included in NIHGPS Section 4.1 Public Policy Requirements, Objectives, and Other Appropriation
+Mandates in IIA. Several of the public policy requirements and objectives are highlighted below:
+ l Research Misconduct. The research misconduct requirements included in Public Policy Requirements, Objectives, and Other Appropriation Mandates—Research Misconduct apply to foreign
+grants.
+ l Animal Welfare. The animal welfare requirements contained in Public Policy Requirements,
+Objectives, and Other Appropriation Mandates—Animal Welfare apply to foreign grants, regardless of the requirements of the home country.
+ l Human Subjects. The human subjects requirements contained in Public Policy Requirements,
+Objectives, and Other Appropriation Mandates—Human Subjects Protections, including the
+requirement for an assurance pursuant to 45 CFR Part 46, apply to foreign grants and foreign
+consortium participants under domestic or foreign grants.
+(GPS page IIB-116)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+ l Financial Conflict of Interest. The financial conflict of interest requirements contained in Public
+Policy Requirements, Objectives, and Other Appropriation Mandates— Financial Conflict of
+Interest apply to foreign grants.
+ l Inclusiveness in Research Design. Foreign grants are subject to the requirements for inclusion
+of women, minorities, and individuals across the lifespan in research design as specified in
+Public Policy Requirements, Objectives, and Other Appropriation Mandates—Inclusion of Children as Subjects in Clinical Research and Inclusion of Women and Members of Racial and/or
+Ethnic Minority Groups in Clinical Research.
+ l Civil Rights. The civil rights requirements specified in Public Policy Requirements, Objectives,
+and Other Appropriation Mandates—Civil Rights do not apply to foreign grants.
+ l Lobbying. The requirements of Public Policy Requirements, Objectives, and Other Appropriation Mandates—Lobbying Prohibition, including disclosure reporting, apply to foreign
+grants.
+ l Debt. Foreign applicants are required to provide a certification of nondelinquency on debts owed
+to the United States as specified in Public Policy Requirements, Objectives, and Other Appropriation Mandates—Nondelinquency on Federal Debt.
+ l Debarment and Suspension. Applicants/recipients that are foreign governments or governmental
+entities, public international organizations, or foreign-government-owned or -controlled (in
+whole or in part) entities are not subject to the debarment or suspension certification requirement
+or to debarment or suspension under 2 CFR Part 376. All other foreign organizations and international organizations are subject to these requirements. See Public Policy Requirements, Objectives, and Other Appropriation Mandates—Debarment and Suspension for additional information
+on this requirement.
+ l Drug-Free Workplace. Foreign applicants and recipients may be exempted from the drug-free
+workplace requirements of 2 CFR Part 182 based on a documented finding by the NIH awarding
+IC that application of those requirements is inconsistent with U.S. international obligations or the
+laws and regulations of a foreign government. See Public Policy Requirements, Objectives, and
+Other Appropriation Mandates—Drug-Free Workplace for additional information on this requirement.
+16.5 FUNDING AND PAYMENT
+The application budget, requests for funds, and financial reports (see Reporting and Record Retention in
+this chapter) must be stated in U.S. dollars. Cost increases for fluctuations in exchange rates are allowable costs subject to the availability of funding, as determined by the awarding IC. Prior approval of
+exchange rate fluctuations is required only when the charge results in the need of additional Federal funding, or the increased costs result in the need to significantly reduce the scope of the project. The recipient
+is required to make reviews of local currency gains to determine the need for additional Federal funding
+before the expiration date of the Federal award. Subsequent adjustments for currency increases may be
+allowable only when the recipient  provides the awarding IC with adequate source documentation from a
+commonly used source in effect at the time the expense was made, and to the extent that sufficient
+Federal funds are available.
+Awards to foreign and international organizations are paid through PMS. PMS is operated by the PSC in
+accordance with Department of the Treasury and OMB requirements as implemented by 2 CFR Part
+200.305. These requirements are intended to minimize the time elapsing between the transfer of funds
+from the U.S. Federal government and disbursed by the recipient. Therefore, although the grant may be
+(GPS page IIB-117)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+financed by advance payments, the intent is that recipients draw funds on an as-needed basis – specifically, no more than 3 days before the funds are needed.
+Operational guidance for recipients is provided through a training from PSC. Inquiries regarding drawdown requests, cash management rules, and the disbursement of funds should be directed to PSC/PMS
+(see Part III).
+The funding and payment information outlined in this subsection applies when the foreign organization
+is the recipient organization. When a foreign component participates in a consortium arrangement, the
+funding and payment information should be reflected consistent with the requirements in 16.8, below.
+Recipients are required to maintain grant funds in an interest bearing account; however, interest earned
+in excess of $500 per year in the aggregate on advances of Federal funds must be returned in U.S. dollars by reimbursement check to OFM, and reflected on the annual FFR.
+For more information on payment, see Payment Chapter.
+Any questions regarding payments to foreign recipients may be addressed to the Grants Management
+Specialist noted on the NoA or PSC (see Part III for address and telephone and fax numbers).
+16.6 ALLOWABLE AND UNALLOWABLE COSTS
+The cost principles that apply to foreign organizations depend on the type of organization, i.e., for a university 2 CFR Part 200, Subpart E—Cost Principles would apply,  with the following exceptions:
+ l Major A&R. Unallowable under foreign grants and domestic grants with foreign components.
+ l Minor A&R. Generally allowable on grants made to foreign organizations or to the foreign component of a domestic grant, unless prohibited by the governing statute or implementing program
+regulations. Minor A&R costs may be included and justified in any detailed budget of a competing application. Further, rebudgeting of active grants to accommodate minor A&R is also
+allowable; however, this does require NIH prior approval of the GMO. Additional information
+may be required (see Administrative Requirements—Alteration and Renovation Projects under
+Non-construction Grants in IIB).
+ l Indirect costs. With the exception of the American University of Beirut and the World Health
+Organization, which are eligible for full indirect cost reimbursement, indirect costs under grants
+to foreign and international organizations will be funded at a fixed rate of 8 percent of modified
+total direct costs, exclusive of tuition and related fees, direct expenditures for equipment, and
+domestic subawards in excess of $25,000. These funds are paid to support the costs of compliance with federal requirements. Some examples of NIH compliance requirements are the protection of human subjects (including the required education in the protection of human research
+participants), animal welfare, invention reporting, other post-award reporting requirements, financial conflict of interest and research misconduct. Note, these are just a few representative
+examples of compliance requirement; this list is not all inclusive.  NIH will not support the
+acquisition of or provide for depreciation on any capital expenses (facilities) or the normal general operations of foreign and international organizations. Therefore, these expenses may not be
+requested as a direct cost; however, equipment is an allowable direct cost.  Other items normally
+treated as indirect costs (e.g., rent) may be requested as direct costs and will be evaluated by
+NIH for allowability.
+ l Patient Care Costs. Patient care costs are provided only in exceptional circumstances.
+(GPS page IIB-118)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+ l Travel Visas (including short-term). Generally, allowable direct cost as part of recruiting costs
+on an NIH grant, as long as the institution has an employee/employer relationship with the individual. Visa costs may also be allowable when identified in specific NOFOs or when within the
+scope of an approved research project. See 7.9.1 Recruiting Costs and  Travel Visas.
+16.7 ADMINISTRATIVE REQUIREMENTS
+For SNAP awards to foreign organizations  recipients are required to submit FFR expenditure data at the
+end of the competitive segment only. NIH staff now monitors financial aspects of these grants through
+subaccounts in PMS. For all non-SNAP awards to foreign organizations  recipients are required to submit
+FFR expenditure data annually.
+16.7.1 Changes in Project and Budget
+Foreign grants are subject to NIH Standard Terms of award, see Administrative Requirements—NIH
+Standard Terms of Award in IIA. Inclusion in SNAP is at the discretion of the NIH awarding IC and will
+be specified in the NoA.
+16.7.2 Change in Scope
+A change in the performance site within a foreign country or the addition of a performance site in a country other than that specified in the approved application requires NIH awarding IC prior approval. The
+transfer of work by a domestic recipient to a foreign component also requires awarding IC prior
+approval. NIH no longer recognizes foreign subawards and, therefore, will not consider requests for foreign subawards as a change in scope.
+16.7.3 Change of Recipient Organization
+A change of recipient organization that involves the transfer of a grant to or between foreign organizations or international organizations requires approval of the NIH awarding IC and its National Advisory Council or Board. NIH awarding IC approval also is required for the transfer of a grant from a
+foreign organization to a domestic organization. Recipients adding or changing a foreign performance
+site within a funded grant award must obtain approval from the GMO before work can be performed at
+the added or changed foreign site. NIH no longer recognizes foreign subawards and, therefore, will not
+consider requests that would result in a foreign subaward.
+16.7.4 Audit
+Foreign recipients that expend $750,000 (cumulative amount) or more under Federal grants, cooperative
+agreements, and/or procurement contracts during their fiscal year are required to conduct either a single
+audit, performed in accordance with the requirements outlined in 2 CFR 200 Subpart F, or program-specific audit (as required by the terms and conditions of award). A program-specific audit may not be elected unless all the Federal awards expended were received from the same Federal agency, or the same
+Federal agency and the same pass-through entity, and that Federal agency, or pass-through entity in the
+case of a subrecipient, approves in advance a program-specific audit.
+This audit requirement does not apply to international organizations, i.e., the World Health Organization
+(WHO), American University of Beirut, nor the United Nations Children’s Fund (UNICEF). For more
+information about audit requirements for foreign entities, recipients should review the Standard Terms
+and Conditions of the Notice of Award.
+(GPS page IIB-119)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+16.7.5 Reporting and Record Retention
+For SNAP awards, foreign recipients submit FFR expenditure data at the end of the competitive segment
+only.  Awards are administered in PMS using subaccounts and payments will be specific to each grant at
+the time the recipient draws funds.
+The FFR expenditure data must be submitted electronically through PMS and must be submitted in U.S.
+dollars and in English. The currency rate in effect at the time the funds are drawn down from PMS
+should be used in preparing the FFR. For the final FFR, NIH requires recipients to reimburse the U.S.
+government for funds not spent. Repayment instruction can be found on the HHS Returning Funds website.
+All foreign recipients, contractors, consortium participants, and/or subcontractors must comply with
+Bayh-Dole invention reporting requirements. Regarding intellectual property, foreign recipients have the
+same rights and obligations regarding invention ownership as U.S. recipients. (See Interagency Edison
+for more information.)
+Record retention requirements are the same as those for domestic recipients.
+16.8 COLLABORATIVE INTERNATIONAL RESEARCH
+AWARDS
+16.8.1 General
+This chapter highlights the policy requirements applicable to collaborative international research awards.
+To enhance transparency, strengthen financial oversight, protect U.S. national security interests, and
+ensure consistency across NIH and federal reporting systems, NIH utilizes a dedicated award structure
+for research grants and cooperative agreements that involve international collaborations. Unlike domestic
+collaborations supported through subrecipient agreements (see Consortium Agreements  chapter), the Collaborative International Research Awards allow NIH to have a direct legal relationship with both the
+domestic and foreign collaborating organizations. Unless otherwise specified in this chapter, all policies
+contained in IIA, including the requirements of 2 CFR Part 200, also apply to collaborative international
+research awards.
+16.8.2 Collaborative International Research Award Structure
+The Collaborative International Research Awards will leverage the complex, multi-project application
+structure, where a single collaborative application will include separate application components (i.e., subprojects) for the domestic (U.S.-based) applicant and any international organizations. NIH will utilize
+designated activity codes (i.e., PF5 for grants, UF5 for cooperative agreements) to identify these multiproject applications and primary awards.
+Prior to award, all international subprojects will be disaggregated and funded as separate RF2 grant
+awards (or UL2 cooperative agreement awards), in lieu of a foreign subaward. To manage compliance
+and track international funding, the NIH will award the RF2 directly to the foreign organization.
+The original complex application (PF5/UF5) will be retained for the domestic applicant organization and
+any domestic subrecipients. The primary PF5/UF5 award and any disaggregated RF2/UL2 awards will
+maintain a link in NIH systems, allowing for collaborative reporting of scientific progress and programmatic oversight.
+(GPS page IIB-120)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+This approach allows NIH to adequately track funds to international organizations individually, which
+protects national security, while scientific progress is reported collectively.
+16.8.3 Applicability
+All research grants and cooperative agreements involving NIH-funded international collaborations must
+be submitted in response to a NOFO that is specifically designated for Collaborative International
+Research Awards. With this application and award structure in place, NIH no longer recognizes foreign
+subawards.
+This requirement does not apply to foreign consultants, purchasing unique equipment or supplies from
+foreign vendors, or projects with non-monetary international collaborations, including use of equipment
+at a foreign site, or any foreign component that would not result in a foreign subaward.
+16.8.4 Application Review and Award
+Applications submitted under Collaborative International Research Award NOFOs will undergo peer
+review as a single integrated application. Because the international subproject components are intended
+to be funded as direct foreign awards, PF5/UF5 applications must be reviewed and approved by the IC
+National Advisory Council or Board (see 16.3 Application Review .)
+The primary PF5 or UF5 award and each linked RF2 or UL2 award will receive separate Notices of
+Award (NoA) and PMS subaccounts for financial tracking. To ensure timely and accurate information is
+received to address award requirements, NIH will utilize the Just-in-Time Process for both the PF5/UF5
+domestic organization applicants and RF2/UL2 foreign organization applicants (see 2.5.1. Just-in-Time
+Procedures  for more information).
+16.8.5 Public Policy Requirements
+Upon disaggregation of the linked international subprojects, the RF2/UL2 awards will be treated as foreign grants. Therefore, the public policies requirements pertaining to all foreign grants, referenced in section 16.4 Public Policy Requirements and Objectives, apply to RF2 and UL2 awards. A complete listing
+of public policy requirements and applicability to domestic prime and linked international recipients is
+included in IIA (see section 4.1 Public Policy Requirements, Objectives, and Other Appropriation Mandates).
+16.8.6 Allowable and Unallowable Costs
+Collaborative international research awards are subject to NIHGPS Chapter 7 Cost Considerations, and
+the cost principles set forth in 2 CFR Part 200, Subpart E, with the exceptions for international subprojects provided under NIHGPS section 16.6 Allowable and Unallowable Costs.
+For collaborative international research awards, the interaction between the domestic and international
+partners is not a subrecipient relationship. Therefore, costs associated with the international collaboration
+may not be included in MTDC when calculating indirect costs.
+16.8.7 Administrative Requirements
+Reporting
+All activities supported by the collaborative international research award must be reported through the
+Research Performance Progress Report (RPPR) process. While both the primary domestic recipient and
+(GPS page IIB-121)
+
+16 Grants to Foreign Organizations, International Organizations, Domestic Grants
+international recipient(s) will submit RPPRs, information does not have to be repeated. The primary
+domestic recipient will provide an attestation of support within the international recipient’s RPPR confirming collaborative goals are being addressed. NIH will be responsible for monitoring the RPPRs to
+ensure consistency.
+Each linked international award uses a distinct document number/PMS subaccount and is required to submit separate Federal Financial Reports (FFR). Rebudgeting of awarded funds is not permitted between
+the prime and linked international awards. Unless otherwise specified in the NOFO and/or Notice of
+Award, collaborative international research awards, including any linked awards, will be excluded from
+automatic carryover.
+Both the prime domestic and linked international awards will be expected to complete the closeout
+requirement detailed in 8.6 Closeout .
+Access to Records
+ l Linked international award recipients are required to provide access to copies of all lab notebooks, all data, and documentation that supports the research outcomes as described in the progress report, to NIH upon request, in accordance with 2 CFR 200.337.
+Written Agreement
+Collaborative research projects require planning and coordination to ensure that all parties can meet the
+goals and objectives of the research. Therefore, organizations working together on a collaborative international research project must establish written agreements prior to award. At a minimum, this agreement must include the following:
+ l Identification of roles and responsibilities of the individual(s) who will serve as the senior/key
+personnel at each site, as well as any other individuals responsible for elements of the research
+activity.
+ l Procedures for directing and monitoring the research effort.
+ l Procedures for managing disputes between the collaborative organizations and individuals on the
+project.
+ l A provision addressing ownership and disposition of data produced under the collaborative
+research award. This includes whether cell lines, samples or other resources will be freely available to other investigators in the scientific community or will be provided to particular investigators only.
+ l Expectations for authorship and co-authorship on publications.
+ l A provision requiring the linked international award recipients to provide access to copies of all
+lab notebooks, all data, and documentation that supports the research outcomes as described in
+the progress report, to the domestic (PF5/UF5) award recipient with a frequency of no less than
+annually, in alignment with the reporting requirements for the RPPR. Such access may be
+entirely electronic.
+While the framework for the collaborative international research written agreements may leverage elements of consortium written agreements, because the domestic institution will not be serving as a passthrough entity, terms implementing the financial and administrative oversight requirements of subrecipients by pass-through entities, as detailed in 2 CFR 200.332, is not appropriate to include in the collaborative international research award agreement.
+(GPS page IIB-122)

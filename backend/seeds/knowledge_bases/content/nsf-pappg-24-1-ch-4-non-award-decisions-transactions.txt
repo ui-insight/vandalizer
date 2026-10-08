@@ -1,0 +1,124 @@
+NSF PAPPG (NSF 24-1) — Chapter IV: Non-Award Decisions and Transactions
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-4-non-award-decisions-transactions
+
+### A. Proposal Withdrawal
+
+A proposal may be withdrawn at any time before a funding recommendation is made by the cognizant NSF Program Officer. Research.gov automates the proposal withdrawal process and provides a mechanism that will help organizations to more effectively manage their proposal portfolio, as well as to help eliminate the submission of duplicate proposals to NSF. The Withdrawals Module includes three processes:
+
+- Principal Investigator’s Proposal Withdrawal allows a PI to initiate a proposal withdrawal and forward it to the organization’s AOR for submission to NSF.
+- Sponsored Projects Office (SPO) Proposal Withdrawal allows an authorized individual in the organization’s SPO to initiate a proposal withdrawal and forward it to the AOR for submission to NSF.
+- Proposal Submission Duplicate Withdrawal prevents the AOR from submitting a new proposal if a duplicate (a proposal from the same organization with the same title and same PI and co-PIs) already has been submitted to NSF within the last two weeks prior to the current submission. If these conditions are met, the system will allow the AOR to either withdraw the previous duplicate proposal, and then proceed with the submission of the new proposal, or to modify the new proposal so it is different from the previous proposal.
+
+Authorized individuals[56] can initiate or review a proposal withdrawal using the "Proposal File Updates/Budget Revisions" function in Research.gov.
+
+In cases where NSF already has made a funding decision, proposals will not be permitted to be withdrawn via the electronic proposal withdrawal system. When a PI or other authorized official attempts to prepare a proposal withdrawal for such a proposal, a message will be displayed to contact the cognizant NSF Program Officer for further assistance.
+
+NSF must be notified if any funding for the proposed project is received from another source or sponsor. If it is brought to NSF's attention that funding for a proposal to NSF has been accepted from another sponsor, NSF will send a withdrawal confirmation to the PI and the SPO without waiting for the official withdrawal notification.
+
+If a proposal withdrawal is submitted for a proposal that is part of a collaborative effort, regardless of whether the organization is the lead or non-lead, the electronic proposal withdrawal system will withdraw that proposal along with the other remaining proposals that are identified as part of the collaborative effort. If the remaining organizations in the collaborative determine that the project can still proceed, a new collaborative proposal must be submitted.
+
+Copies of reviews received by NSF before a proposal is withdrawn will be provided to the PI. NSF provides notice of a withdrawal, return, declination, or reconsideration to both the PI and the SPO.
+
+### B. Proposal Not Accepted or Returned Without Review
+
+A proposal will not be accepted[57] or will be returned without review by NSF for the following reasons.
+
+The proposal:
+
+- is inappropriate for funding by the National Science Foundation (see Chapter I.B);
+- has the potential to negatively impact research security due to credible information of a national security concern (note: NSF envisions that such returns without review on this basis will be rare.)[58];
+- is submitted with insufficient lead-time before the activity is scheduled to begin;
+- is a full proposal that was submitted by a proposer that has received a “not invited” response to the submission of a preliminary proposal (see Chapter I.D.2. and Chapter I.D.2.a);
+- is a duplicate of, or substantially similar to, a proposal already under consideration by NSF from the same submitter (see Chapter I.G.1);
+- does not meet NSF proposal preparation requirements, such as page limitations, formatting instructions, and electronic submission, as specified in Part I of the Proposal and Award Policies and Procedures Guide (see Chapter II.A through II.D), the NSF Grants.gov Application Guide, or program solicitation;
+- is not responsive to the NSF funding opportunity;
+- does not meet an announced proposal deadline date;
+- was previously reviewed and declined and has not been substantially revised (see Chapter IV.E);
+- duplicates another proposal that was already awarded; and/or
+- does not contain each of the required sections of the proposal, as described in Chapter II.D.2.
+
+### C. Declinations
+
+A PI whose proposal for NSF support has been declined by the NSF Program Officer will receive information and an explanation of the reason(s) for declination along with copies of the reviews considered in making the decision. If the PI is not satisfied with that explanation, the PI may request additional information from the cognizant NSF Program Officer or Division Director. See Chapter III.G for additional information on the review information that can be provided.
+
+PIs and co-PIs may access review information from NSF after the decision has received the concurrence of the cognizant NSF Division Director, when all the review information has been released for their proposal.
+
+### D. Reconsideration
+
+#### 1. Overview
+
+- A proposer whose proposal has been declined may ask the cognizant NSF Program Officer or the cognizant NSF Division Director for information over and above the explanatory materials received with the declination notice. If the PI is not satisfied that the proposal was fairly handled and reasonably reviewed, the PI may request reconsideration by the cognizant Assistant Director (AD) or Office Head. An organization still not satisfied after reconsideration by the cognizant AD/Office Head may request further reconsideration by the Deputy Director of the Foundation. The decision made by the Deputy Director is final.
+- If a proposal has been declined after review by the NSB, only an explanation will be available.
+- The aim of any reconsideration is to ensure that NSF's review has been fair and reasonable, both substantively and procedurally. The scientific and technical merits may be examined within the context of budget availability and program priorities. Reconsideration also may address any procedural errors in peer review or other aspects of proposal review, including unaccounted-for conflict of interests or inappropriate consideration of records, information, or rumor.
+- Award of NSF assistance is discretionary, and reconsideration is not an adversarial process. A formal hearing, therefore, is not provided. Because factors such as program budget and priorities factor into the decision on a proposal, NSF cannot ensure proposers that reconsideration will result in an award even if error is established in connection with the initial review.
+- No revisions made to the proposal after declination will be considered in connection with the original proposal. A substantially revised proposal, however, may be submitted for review as a new proposal under standard procedures. NSF reserves the right to return without review a proposal that is substantially the same as one that was previously reviewed and declined whether or not a request for reconsideration was made.
+
+#### 2. Applicability
+
+NSF's reconsideration process is available to individuals and organizations concerning proposals for award funding. It does not apply to:
+
+- "discourage" (i.e., non-binding) decisions resulting from submission of a preliminary proposal;
+- proposals for:
+
+- (1) Fellowships;
+- (2) Travel;
+- (3) Planning;
+- (4) Rapid Response Research (RAPID);
+- (5) EArly-concept Grants for Exploratory Research (EAGER);
+- (6) Research Advanced by Interdisciplinary Science and Engineering (RAISE);
+- (7) Phase I proposals submitted under the Small Business Innovation Research (SBIR) program; and
+- (8) Phase I proposals submitted under the Small Business Technology Transfer (STTR) program.
+
+- proposals returned without review by NSF for failure to:
+
+-
+(1) be submitted with sufficient lead time before the activity is to begin;
+
+(2) meet an announced proposal deadline date; or
+
+(3) meet NSF proposal preparation requirements, such as page limitations, formatting instructions, and electronic submission, as specified in Part I of the PAPPG, the NSF Grants.gov Application Guide, or program solicitation.
+
+#### 3. Reconsideration Process
+
+The following paragraphs highlight the various stages of the NSF Reconsideration Process, including the necessary procedural aspects of each stage of the process.
+
+-
+Explanations by the NSF Program Officer or Division Director
+
+When a proposal is declined, the PI receives verbatim but unattributed copies of any ad hoc reviews and the panel summary (if applicable), a description of how the proposal was reviewed, and, if not otherwise provided in the panel summary, an explanation (written or telephoned) of the basis for the declination. A returned proposal also will be accompanied by an explanation. A PI who is considering asking for reconsideration should first contact the cognizant NSF Program Officer or Division Director, who will afford the PI an informal opportunity to seek further clarification.
+
+- Reconsideration by the Cognizant NSF Assistant Director
+
+-
+(1) If dissatisfied with the explanation provided by the NSF Program Officer or Division Director, the PI may request in writing that NSF reconsider its action. Such a request will be considered only if the PI has first sought and obtained further clarification from the cognizant NSF Program Officer or Division Director, and only if the request is received by the Foundation within 90 days after the declination or the return. The request should be addressed to the AD/Office Head for the Directorate or Office that handled the proposal and should explain why the PI believes that the declination or return was unwarranted.
+
+(2) The AD/Office Head will reconsider the record to determine whether NSF's review of the declined proposal was fair and reasonable, substantively and procedurally, taking into account availability of funds and the policies and priorities of the program and NSF. In the case of a returned proposal, the record will be reviewed to determine whether the proposed project was inappropriate for NSF consideration. The AD/Office Head may request additional information from the PI and may obtain additional reviews. If additional reviews are sought, they are subject to standard review procedures (e.g., instructions must be provided to reviewers and conflicts-of-interest policies must be followed). The AD/Office Head may conduct the reconsideration personally or may designate another NSF official who had no part in the initial review to do so. As used here, "AD/Office Head" includes such a designated official.
+
+(3) Within 45 days after the date of the request, the AD/Office Head will furnish the results of the reconsideration, in writing, to the PI. If results cannot be furnished within 45 days, the AD/Office Head will send the PI a written explanation of the need for more time, indicating the date when the results can be expected. If the AD/Office Head reaffirms the declination or return, the AD/Office Head will inform the PI that the PI's organization may obtain further reconsideration by the Deputy Director of NSF as provided below.
+
+- Further Reconsideration by the NSF Deputy Director
+
+-
+(1) Within 60 days after the AD/Office Head has notified the PI of the results of the reconsideration, the proposing organization may request further reconsideration by the Deputy Director of NSF.
+
+(2) A request for further reconsideration need not be in any particular format, but it must be in writing, and must be signed by the organization's president or other chief executive officer and by the PI. For declinations, it should explain why the organization believes that an error may have occurred in the initial evaluation and why it is not entirely satisfied with the reconsideration by the cognizant AD/Office Head. For returned proposals, it should explain why the organization believes that an error may have occurred in the initial determination that the proposal was inappropriate for NSF consideration.
+
+(3) The Deputy Director will review the request for further reconsideration and the record of earlier NSF actions, including the original review and the reconsideration by the AD/Office Head, to determine whether NSF's review of the declined proposal was fair and reasonable, or, in the case of a returned proposal, whether the proposed project was inappropriate for NSF consideration. The Deputy Director may request additional information from the PI or the proposing organization and may obtain additional reviews. If additional reviews are sought, they are subject to standard review procedures (e.g., instructions must be provided to reviewers and conflicts-of-interest policies must be followed).
+
+(4) The Deputy Director may conduct the further reconsideration personally or may designate another NSF official who had no part in the initial evaluation of the proposal or the earlier reconsideration to do so. As used here, "Deputy Director" includes such a designated official.
+
+(5) Within 30 days after a request for further reconsideration is received at NSF, the Deputy Director will furnish the results of the further reconsideration, in writing, to the organization. If results cannot be furnished within 30 days, the Deputy Director will send the organization a written explanation of the need for more time, indicating the date when the results can be expected.
+
+(6) The decision made by the Deputy Director is final.
+
+### E. Resubmission
+
+A declined proposal may be resubmitted, but only after it has undergone substantial revision. NSF programs that accept proposals at any time may have established guidelines in which a declined proposal (or reasonable facsimile of that proposal/topic by the same PI, and co-PIs, where applicable) is ineligible for resubmission for a specified period of time. This moratorium allows PIs/co-PIs sufficient time to digest the results of the merit review and revise/restructure the declined proposal accordingly. Please note that a proposal that the program considers too similar to a previous proposal that is under the moratorium period may be returned without review. A resubmitted proposal that has not clearly taken into account the major comments or concerns resulting from the prior NSF review may be returned without review. The Foundation will treat the revised proposal as a new proposal, subject to the standard review procedures.
+
+#### Footnotes to Chapter IV
+
+[56] AORs also can initiate a proposal withdrawal.
+
+[57] Proposal Not Accepted is defined as Research.gov will not permit submission of the proposal.
+
+[58] The Foundation will develop an NSF Risk Rubric, comprised of risk-based indicators to inform the basis of this decision-making process. The NSF Risk Rubric will be published on the NSF website.
