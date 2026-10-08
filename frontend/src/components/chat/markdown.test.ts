@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderMarkdown } from './markdown'
+import { normalizeCitationMarkup, renderMarkdown } from './markdown'
 
 function buttons(html: string): Array<{ action: string; label: string }> {
   const out: Array<{ action: string; label: string }> = []
@@ -111,5 +111,23 @@ describe('renderMarkdown sanitization', () => {
     const html = renderMarkdown('<script>alert(1)</script>hello')
     expect(html).not.toContain('<script>')
     expect(html).toContain('hello')
+  })
+})
+
+describe('gpt-oss citation markup (#1011)', () => {
+  it.each([
+    ['The deadline is Nov 12【p. 2】.', 'The deadline is Nov 12 (p. 2).'],
+    ['Nov 9【sponsor-notice.pdf†p. 2】【sponsor-amendment.pdf†p. 1】.', 'Nov 9 (sponsor-notice.pdf, p. 2) (sponsor-amendment.pdf, p. 1).'],
+    ['Capped【Source: notice.pdf】', 'Capped [Source: notice.pdf]'],
+    ['See this【3†L4-L10】 passage.', 'See this passage.'],
+    ['No markup (p. 2).', 'No markup (p. 2).'],
+  ])('rewrites %j', (input, expected) => {
+    expect(normalizeCitationMarkup(input)).toBe(expected)
+  })
+
+  it('is applied when rendering', () => {
+    const html = renderMarkdown('Nov 9【sponsor-notice.pdf†p. 2】.')
+    expect(html).toContain('Nov 9 (sponsor-notice.pdf, p. 2).')
+    expect(html).not.toContain('【')
   })
 })

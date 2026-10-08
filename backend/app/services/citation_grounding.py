@@ -172,23 +172,55 @@ def _sentences(text: str, page_ref_re: re.Pattern | None = None) -> list[tuple[i
     return [(s, e) for s, e in spans if text[s:e].strip()]
 
 
-def _claims_for_page(answer: str, page: int, page_ref_re: re.Pattern) -> list[str]:
-    """The sentences that cite *page*, with the page references removed.
+def _has_substance(text: str) -> bool:
+    """Whether *text* carries something to check: an anchor or two content words."""
+    anchors, _missing = _missing_anchors(text, "")
+    return anchors > 0 or len(_content_stems(text)) >= _MIN_CONTENT_WORDS
 
-    A reference standing alone ("… is $180,000. (p. 3)") belongs to the
-    sentence before it."""
+
+def _claim_for_ref(answer: str, ref: tuple[int, int], page_ref_re: re.Pattern) -> str:
+    """The part of the answer a page reference at *ref* (start, end) supports.
+
+    Normally the clause leading up to it, back to the previous reference in the
+    same sentence. In "the $200,000 draft (proposal, p. 2) exceeds the $180,000
+    cap (notice, p. 3)" each page is checked against its own figure, not both.
+    A reference that opens its clause ("Per p. 3, the cap is …") takes the
+    text after it; one with neither takes the whole sentence; a reference
+    standing alone ("… is $180,000. (p. 3)") takes the sentence before.
+    """
     spans = _sentences(answer, page_ref_re)
-    claims: list[str] = []
     for i, (start, end) in enumerate(spans):
-        sentence = answer[start:end]
-        if not any(_ref_page(m) == page for m in page_ref_re.finditer(sentence)):
+        if not start <= ref[0] < end:
             continue
-        claim = _strip_page_refs(sentence, page_ref_re)
+        sentence = answer[start:end]
+        refs = [(m.start() + start, m.end() + start) for m in page_ref_re.finditer(sentence)]
+        before_end = max((e for s_, e in refs if e <= ref[0]), default=start)
+        after_start = min((s_ for s_, e in refs if s_ >= ref[1]), default=end)
+        before = _without_file_names(_strip_page_refs(answer[before_end:ref[0]], page_ref_re))
+        after = _without_file_names(_strip_page_refs(answer[ref[1]:after_start], page_ref_re))
+        # A figure, date or quote is what a page has to support, wherever it
+        # sits; "The proposal draft (file, p. 1) lists … Nov 12" puts it after.
+        for candidate in (before, after):
+            if _missing_anchors(candidate, "")[0]:
+                return candidate
+        for candidate in (before, after):
+            if _has_substance(candidate):
+                return candidate
+        claim = _without_file_names(_strip_page_refs(sentence, page_ref_re))
         if not re.search(r"[A-Za-z0-9]{2,}", claim) and i > 0:
             prev_start, prev_end = spans[i - 1]
-            claim = _strip_page_refs(answer[prev_start:prev_end], page_ref_re)
-        claims.append(claim)
-    return claims
+            claim = _without_file_names(_strip_page_refs(answer[prev_start:prev_end], page_ref_re))
+        return claim
+    return ""
+
+
+_FILE_NAME = re.compile(r"[\w.\u2010-\u2015-]+\.(?:pdf|docx?|xlsx?|pptx?|txt|csv|html?|md)\b", re.IGNORECASE)
+
+
+def _without_file_names(text: str) -> str:
+    """A claim without the file names that attribute it: the page doesn't
+    contain "sponsor-notice.pdf", and that must not count against it."""
+    return _FILE_NAME.sub(" ", text)
 
 
 def _ref_page(match: re.Match) -> int | None:
@@ -221,20 +253,72 @@ def _best_passage(claims: list[str], page: str) -> str:
     return best[:_PREVIEW_CHARS]
 
 
-def ground_page_citation(
-    answer: str, page: int, page_text: str, page_ref_re: re.Pattern,
+def ground_citation(
+    answer: str,
+    refs: list[tuple[int, int]],
+    page_text: str,
+    page_ref_re: re.Pattern,
+    joint_text: str = "",
 ) -> tuple[str, str | None]:
-    """Whether the sentences citing *page* are supported by *page_text*.
+    """Whether the page references at *refs* (start, end) are supported by *page_text*.
 
     Returns ``(status, passage)``. ``passage`` is the best-matching sentence on
-    the page when the status is ``found``, else None. One supported sentence is
-    enough; otherwise any unsupported one makes the page ``not_found``.
+    the page when the status is ``found``, else None. One supported claim is
+    enough; otherwise any unsupported one makes the citation ``not_found``.
+
+    *joint_text* is the text of pages cited right alongside this one ("$50,000
+    on $200,000 = 25% (proposal, p. 2) (notice, p. 3)"): the claim is judged
+    against them together, as long as this page itself supplies part of it.
     """
-    claims = _claims_for_page(answer, page, page_ref_re)
-    verdicts = [_judge(c, page_text) for c in claims]
+    claims = [c for c in (_claim_for_ref(answer, r, page_ref_re) for r in refs) if c]
+    verdicts = []
+    for claim in claims:
+        verdict = _judge(claim, page_text)
+        if verdict == NOT_FOUND and joint_text and _contributes(claim, page_text):
+            verdict = _judge(claim, page_text + "\n" + joint_text)
+        verdicts.append(verdict)
     if FOUND in verdicts:
         supported = [c for c, v in zip(claims, verdicts) if v == FOUND]
         return FOUND, _best_passage(supported, page_text) or None
     if NOT_FOUND in verdicts:
         return NOT_FOUND, None
     return UNCHECKED, None
+
+
+def _contributes(claim: str, page: str) -> bool:
+    """Whether *page* states at least one of the claim's anchors."""
+    total, missing = _missing_anchors(claim, page)
+    return total > missing
+
+
+def ground_page_citation(
+    answer: str, page: int, page_text: str, page_ref_re: re.Pattern,
+) -> tuple[str, str | None]:
+    """``ground_citation`` for every reference to *page* in *answer*."""
+    refs = [m.span() for m in page_ref_re.finditer(answer) if _ref_page(m) == page]
+    return ground_citation(answer, refs, page_text, page_ref_re)
+
+
+# gpt-oss writes citations in its own syntax: 【p. 1】, 【sponsor-notice.pdf†p. 2】,
+# 【Source: budget.pdf】, and search-result anchors like 【3†L4-L10】 (#1011).
+# The chat shows them as raw text, and the file name inside them is how a
+# multi-document answer says whose page it means.
+_FULLWIDTH_CITATION = re.compile(r"\s*【([^】]{1,200})】")
+_RESULT_ANCHOR = re.compile(r"^\d+†L\d+(?:-L\d+)?$")
+
+
+def normalize_citation_markup(text: str) -> str:
+    """Rewrite 【…】 citations as the app's own "(…)" / "[Source: …]" text."""
+    if not text or "【" not in text:
+        return text
+
+    def repl(m: re.Match) -> str:
+        inner = m.group(1).strip()
+        if _RESULT_ANCHOR.match(inner):
+            return ""
+        inner = re.sub(r"\s*†\s*", ", ", inner)
+        if inner.lower().startswith("source:"):
+            return f" [{inner}]"
+        return f" ({inner})"
+
+    return _FULLWIDTH_CITATION.sub(repl, text)

@@ -42,7 +42,7 @@ from app.services.context_budget import (
     resolve_context_window,
     token_safety_margin,
 )
-from app.services.citation_grounding import ground_page_citation
+from app.services.citation_grounding import ground_citation, normalize_citation_markup
 from app.services.kb_answer_grounding import unsupported_figures
 from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
@@ -216,6 +216,72 @@ _PAGE_REF_RE = re.compile(r"\bp(?:p|age|g)?\.?\s*~?\s*(\d{1,4})\b", re.IGNORECAS
 _MAX_DERIVED_CITATIONS = 6
 
 
+_DASHES = str.maketrans({c: "-" for c in "‐‑‒–—―−"})
+_CITATION_WINDOW = 80
+_FILE_NAME_RE = re.compile(r"[\w.\u2010-\u2015-]+\.(?:pdf|docx?|xlsx?|pptx?|txt|csv|html?|md)\b", re.IGNORECASE)
+_OPENERS, _CLOSERS = "([{", ")]}"
+
+
+def _title_variants(title: str) -> list[str]:
+    """How an answer may name a file: with or without its extension."""
+    name = (title or "").translate(_DASHES).lower().strip()
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return [v for v in dict.fromkeys([name, stem]) if len(v) >= 4]
+
+
+def _cited_document(text: str, ref: tuple[int, int], named: list[tuple[list[str], object]]):
+    """The attached document a page reference names, or None.
+
+    Looks inside the brackets around the reference — "(sponsor-notice.pdf,
+    p. 2)", "[p. 3 of proposal-draft.pdf]", "[Source: budget.pdf (p. 2)]" —
+    or, outside brackets, within 80 characters on the same line, and takes the
+    name nearest the reference. A bare "p. 3" with several documents attached
+    names none.
+    """
+    lo, hi = ref
+    left = text[max(0, lo - _CITATION_WINDOW):lo]
+    right = text[hi:hi + _CITATION_WINDOW]
+    left = left[left.rfind("\n") + 1:]
+    nl = right.find("\n")
+    right = right[:nl] if nl >= 0 else right
+    # Inside a bracket group, look only within it.
+    depth, open_at = 0, -1
+    for i in range(len(left) - 1, -1, -1):
+        ch = left[i]
+        if ch in _CLOSERS:
+            depth += 1
+        elif ch in _OPENERS:
+            if depth == 0:
+                open_at = i
+                break
+            depth -= 1
+    if open_at >= 0:
+        left = left[open_at + 1:]
+        depth, close_at = 0, -1
+        for i, ch in enumerate(right):
+            if ch in _OPENERS:
+                depth += 1
+            elif ch in _CLOSERS:
+                if depth == 0:
+                    close_at = i
+                    break
+                depth -= 1
+        right = right[:close_at] if close_at >= 0 else right
+    left_n, right_n = left.translate(_DASHES).lower(), right.translate(_DASHES).lower()
+    best, best_distance = None, None
+    for variants, doc in named:
+        for v in variants:
+            i = left_n.rfind(v)
+            if i >= 0:
+                d = len(left_n) - (i + len(v))
+                if best_distance is None or d < best_distance:
+                    best, best_distance = doc, d
+            j = right_n.find(v)
+            if j >= 0 and (best_distance is None or j < best_distance):
+                best, best_distance = doc, j
+    return best
+
+
 def derive_document_citations(text: str, documents: list) -> list[dict]:
     """Citation chips for an attached-document answer, from the pages it cites.
 
@@ -223,60 +289,94 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
     to write "p. 3" inline and that string is inert text, so the promise that
     sources are always inspectable held only on the KB and web paths. Here the
     page references the model actually wrote are turned into the same chip the
-    KB path emits, anchored on that page's opening text so clicking lands on
-    the passage.
+    KB path emits, and each is checked against that page (#998).
 
-    Attribution has to be unambiguous to be honest, so this only fires when
-    exactly one attached document carries page markers — with two, "p. 3" does
-    not say whose page 3, and a chip pointing at the wrong document is worse
-    than no chip. Pages outside the document are ignored, and an interpolated
-    page keeps its ``page_approximate`` hedge through to the viewer.
+    Attribution has to be unambiguous to be honest. A reference that names an
+    attached file ("sponsor-notice.pdf, p. 2", "[p. 3 of proposal-draft.pdf]")
+    belongs to that file (#1011). A bare "p. 3" belongs to the only attached
+    document with page markers, and to none when there are several: "p. 3"
+    does not say whose page 3, and a chip pointing at the wrong document is
+    worse than no chip. Pages outside the document are ignored, and an
+    interpolated page keeps its ``page_approximate`` hedge through to the
+    viewer.
     """
     if not text or not documents:
         return []
 
-    candidates = []
+    candidates = {}
     for doc in documents:
         raw = getattr(doc, "raw_text", None) or ""
         positions = _page_positions(getattr(doc, "text_markers", None), len(raw))
         if positions:
-            candidates.append((doc, raw, positions))
-    if len(candidates) != 1:
+            candidates[doc.uuid] = (doc, raw, positions)
+    if not candidates:
         return []
+    named = [(_title_variants(getattr(d, "title", "")), d) for d in documents]
+    named = [(v, d) for v, d in named if v]
+    only = next(iter(candidates.values()))[0] if len(candidates) == 1 else None
 
-    doc, raw, positions = candidates[0]
-    by_page = {page: (offset, approx) for offset, page, approx in positions}
-    # Where each page's text ends: the next marker, or the end of the text.
-    page_end = {
-        page: (positions[i + 1][0] if i + 1 < len(positions) else len(raw))
-        for i, (_offset, page, _approx) in enumerate(positions)
-    }
-    order = [page for _offset, page, _approx in positions]
-
-    citations: list[dict] = []
-    seen: set[int] = set()
+    # Every reference, grouped by the (document, page) it cites, in order.
+    refs: dict[tuple[str, int], list[tuple[int, int]]] = {}
+    ordered: list[tuple[tuple[int, int], tuple[str, int]]] = []
     for match in _PAGE_REF_RE.finditer(text):
         try:
             page = int(match.group(1))
         except ValueError:
             continue
-        if page in seen or page not in by_page:
+        doc = _cited_document(text, match.span(), named)
+        if doc is None:
+            doc = only
+        if doc is None or doc.uuid not in candidates:
             continue
-        seen.add(page)
+        refs.setdefault((doc.uuid, page), []).append(match.span())
+        ordered.append((match.span(), (doc.uuid, page)))
+
+    def page_text(doc_uuid: str, page: int) -> tuple[str, int, bool] | None:
+        """The page as a reader would check it, its offset, and whether it is
+        interpolated. An interpolated page's boundaries are estimates, so its
+        neighbours are searched too."""
+        _doc, raw, positions = candidates[doc_uuid]
+        by_page = {p: (offset, approx) for offset, p, approx in positions}
+        if page not in by_page:
+            return None
+        ends = {
+            p: (positions[i + 1][0] if i + 1 < len(positions) else len(raw))
+            for i, (_offset, p, _approx) in enumerate(positions)
+        }
+        order = [p for _offset, p, _approx in positions]
         offset, approximate = by_page[page]
-        preview = " ".join(raw[offset:offset + 400].split())
-        if not preview:
-            continue
-        # The page as a reader would check it. An interpolated page's
-        # boundaries are estimates, so its neighbours are searched too.
-        start, end = offset, page_end[page]
+        start, end = offset, ends[page]
         if approximate:
             i = order.index(page)
             if i > 0:
                 start = by_page[order[i - 1]][0]
             if i + 1 < len(order):
-                end = page_end[order[i + 1]]
-        grounding, passage = ground_page_citation(text, page, raw[start:end], _PAGE_REF_RE)
+                end = ends[order[i + 1]]
+        return raw[start:end], offset, approximate
+
+    # References written side by side ("(proposal, p. 2) (notice, p. 3)") cite
+    # one claim together; each is judged with the others' pages alongside.
+    alongside: dict[tuple[str, int], set[tuple[str, int]]] = {}
+    for (span_a, key_a), (span_b, key_b) in zip(ordered, ordered[1:]):
+        if key_a != key_b and not re.search(r"[A-Za-z0-9]{3,}", _FILE_NAME_RE.sub(" ", text[span_a[1]:span_b[0]])):
+            alongside.setdefault(key_a, set()).add(key_b)
+            alongside.setdefault(key_b, set()).add(key_a)
+
+    citations: list[dict] = []
+    for (doc_uuid, page), spans in refs.items():
+        doc, raw, _positions = candidates[doc_uuid]
+        found_page = page_text(doc_uuid, page)
+        if found_page is None:
+            continue
+        own_text, offset, approximate = found_page
+        preview = " ".join(raw[offset:offset + 400].split())
+        if not preview:
+            continue
+        joint = "\n".join(
+            other[0] for other in (page_text(*k) for k in alongside.get((doc_uuid, page), ()))
+            if other
+        )
+        grounding, passage = ground_citation(text, spans, own_text, _PAGE_REF_RE, joint)
         citations.append({
             "document_uuid": doc.uuid,
             "document_title": doc.title,
@@ -2378,14 +2478,21 @@ async def chat_stream(
             if agent_run.result:
                 usage = agent_run.result.usage()
                 # Safety-net: strip any residual think tags the parser missed
-                assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+                # Stored with the model's own 【…】 citation syntax rewritten as
+                # plain "(file, p. N)" text, which is also what names the file
+                # behind a page in a multi-document answer (#1011).
+                assistant_message = normalize_citation_markup(
+                    _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+                )
                 thinking_text = "".join(full_thinking) or None
 
                 # Clean think tags from text segments before persisting
                 cleaned_segments: list[dict] = []
                 for seg in streamed_segments:
                     if seg.get("kind") == "text":
-                        cleaned = _THINK_BLOCK_RE.sub("", seg["content"]).strip()
+                        cleaned = normalize_citation_markup(
+                            _THINK_BLOCK_RE.sub("", seg["content"]).strip()
+                        )
                         if cleaned:
                             cleaned_segments.append({"kind": "text", "content": cleaned})
                     else:

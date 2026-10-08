@@ -17,6 +17,23 @@ export const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
 
 marked.setOptions({ breaks: true, gfm: true })
 
+// gpt-oss writes citations in its own syntax — 【p. 1】, 【sponsor-notice.pdf†p. 2】,
+// 【Source: a.pdf】 and search anchors like 【3†L4-L10】 — which showed as raw text.
+// Rewritten to the app's own "(file, p. N)" form; the backend stores the same
+// rewrite, so this covers the answer while it is still streaming (#1011).
+const FULLWIDTH_CITATION_RE = /\s*【([^】]{1,200})】/g
+const RESULT_ANCHOR_RE = /^\d+†L\d+(?:-L\d+)?$/
+
+export function normalizeCitationMarkup(text: string): string {
+  if (!text.includes('【')) return text
+  return text.replace(FULLWIDTH_CITATION_RE, (_match, raw: string) => {
+    const inner = raw.trim()
+    if (RESULT_ANCHOR_RE.test(inner)) return ''
+    const readable = inner.replace(/\s*†\s*/g, ', ')
+    return /^source:/i.test(readable) ? ` [${readable}]` : ` (${readable})`
+  })
+}
+
 // Display labels for a bare [ACTION:type] the model emitted without label
 // text. Unknown types fall back to the humanized type — actionRoute sends the
 // label as a chat message, so it must read like a request.
@@ -34,7 +51,7 @@ function actionButton(type: string, label: string): string {
 
 /** Render a markdown string to sanitized HTML. */
 export function renderMarkdown(text: string): string {
-  let cleaned = text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
+  let cleaned = normalizeCitationMarkup(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''))
   // Canonical (and escaped/backticked/spaced variants): [ACTION:type]Label[/ACTION]
   cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
     actionButton(type, label)
