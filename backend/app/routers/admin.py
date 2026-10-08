@@ -3913,7 +3913,9 @@ class AdminKBListResponse(BaseModel):
 
 @router.get("/knowledge-bases", response_model=AdminKBListResponse)
 async def admin_list_knowledge_bases(
-    search: Optional[str] = Query(None, description="Case-insensitive title substring"),
+    search: Optional[str] = Query(None, max_length=300, description="Case-insensitive title, owner email, team name or tag substring"),
+    status: Optional[Literal["empty", "building", "ready", "error"]] = Query(None),
+    sort: Literal["title", "updated", "created"] = Query("created"),
     limit: int = Query(1000, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
@@ -3927,7 +3929,7 @@ async def admin_list_knowledge_bases(
 
     from app.services import knowledge_service
 
-    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit, offset=offset)
+    kbs, total = await knowledge_service.admin_search_knowledge_bases(search=search, status=status, sort=sort, limit=limit, offset=offset)
 
     # Batch-resolve owner emails and team names so the table is readable
     # without an N+1 per row.
@@ -3962,4 +3964,4 @@ async def admin_list_knowledge_bases(
         )
         for kb in kbs
     ]
-    return AdminKBListResponse(total=await knowledge_service.admin_count_knowledge_bases(search), knowledge_bases=summaries)
+    return AdminKBListResponse(total=total, knowledge_bases=summaries)

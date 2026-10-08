@@ -6,7 +6,7 @@ import asyncio
 import datetime
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 import pymongo
@@ -28,6 +28,7 @@ from app.models.knowledge import (
     KnowledgeBaseUsage,
 )
 from app.models.user import User
+from app.models.team import Team
 from app.services import access_control, audit_service, name_conflicts
 from app.services.document_manager import get_document_manager
 from app.utils import kb_source_currency as currency
@@ -173,32 +174,42 @@ async def get_kb_usage_map(
     return {r.kb_uuid: r.last_used_at for r in records}
 
 
-async def admin_list_all_knowledge_bases(
+async def admin_search_knowledge_bases(
     search: str | None = None,
+    status: str | None = None,
+    sort: Literal["title", "updated", "created"] = "created",
     limit: int = 1000,
     offset: int = 0,
-) -> list[KnowledgeBase]:
-    """List EVERY knowledge base across all users/teams (admin-only).
+) -> tuple[list[KnowledgeBase], int]:
+    """Unscoped admin inventory: filter and sort before paging, with one count.
 
-    Unscoped — bypasses the per-user/team/org visibility filtering of
-    ``list_knowledge_bases``. Intended for admin review (e.g. auditing names
-    for versioning). Newest first; optional case-insensitive title search.
+    Owner/team joins are needed only for searches. Keeping the search in MongoDB
+    avoids loading the entire inventory or materializing an unbounded ID list.
+    The facet uses the same filtered records for the page and its total.
     """
-    query: dict = {}
+    pipeline: list[dict] = []
+    if status:
+        pipeline.append({"$match": {"status": status}})
     if search and search.strip():
-        query["title"] = {"$regex": re.escape(search.strip()), "$options": "i"}
-    return await (
-        KnowledgeBase.find(query)
-        .sort("-created_at", "_id")
-        .skip(max(0, offset))
-        .limit(max(1, min(limit, 5000)))
-        .to_list()
-    )
-
-async def admin_count_knowledge_bases(search: str | None = None) -> int:
-    query = {"title": {"$regex": re.escape(search.strip()), "$options": "i"}} if search and search.strip() else {}
-    return await KnowledgeBase.find(query).count()
-
+        regex = {"$regex": re.escape(search.strip()), "$options": "i"}
+        pipeline.extend([
+            {"$lookup": {"from": User.get_collection_name(), "localField": "user_id", "foreignField": "user_id", "as": "inventory_owner"}},
+            {"$lookup": {"from": Team.get_collection_name(), "localField": "team_id", "foreignField": "uuid", "as": "inventory_team"}},
+            {"$match": {"$or": [
+                {"title": regex}, {"tags": regex},
+                {"inventory_owner.email": regex}, {"inventory_team.name": regex},
+            ]}},
+            {"$project": {"inventory_owner": 0, "inventory_team": 0}},
+        ])
+    order = {"title": {"title": 1, "_id": 1}, "updated": {"updated_at": -1, "_id": 1}, "created": {"created_at": -1, "_id": 1}}[sort]
+    pipeline.append({"$facet": {
+        "records": [{"$sort": order}, {"$skip": max(0, offset)}, {"$limit": max(1, min(limit, 5000))}],
+        "count": [{"$count": "total"}],
+    }})
+    result = await KnowledgeBase.aggregate(pipeline, collation={"locale": "en", "strength": 2}).to_list()
+    page = result[0] if result else {}
+    counts = page.get("count", [])
+    return [KnowledgeBase.model_validate(record) for record in page.get("records", [])], counts[0]["total"] if counts else 0
 
 
 async def create_knowledge_base(

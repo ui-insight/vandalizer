@@ -1150,9 +1150,11 @@ export interface AdminKBListResponse {
 
 /** Org-wide KB inventory for reviewing names/versions. Backend gates on
  * admin-or-staff; renaming a KB you don't own additionally requires full admin. */
-export function getAdminKnowledgeBases(params?: { search?: string; limit?: number; offset?: number }) {
+export function getAdminKnowledgeBases(params?: { search?: string; status?: string; sort?: 'title' | 'updated'; limit?: number; offset?: number }) {
   const qs = new URLSearchParams()
   if (params?.search) qs.set('search', params.search)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.sort) qs.set('sort', params.sort)
   if (params?.limit) qs.set('limit', String(params.limit))
   if (params?.offset) qs.set('offset', String(params.offset))
   const q = qs.toString()

@@ -1,7 +1,8 @@
 import { useAdminViewState } from './shared/AdminViewState'
+import { InventoryPages } from './shared/InventoryPages'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
-import { useCallback, useMemo, useState, useRef, useLayoutEffect } from 'react'
+import { useCallback, useMemo, useState, useRef, useLayoutEffect, useId } from 'react'
 import { Search, RefreshCw, Pencil, Check, X, CheckCircle2, ArrowUpDown } from 'lucide-react'
 import {
   getAdminKnowledgeBases,
@@ -24,46 +25,19 @@ type SortKey = 'title' | 'updated'
  * is verified in the KB detail view; this surface is the bulk-rename overview. */
 export function KnowledgeBasesTab({ canEdit }: Props) {
   const [search, setSearch] = useAdminViewState('KnowledgeBasesTab.search', '')
-  const [statusFilter, setStatusFilter] = useAdminViewState('KnowledgeBasesTab.status', '')
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [moreError, setMoreError] = useState<string | null>(null)
-  const [sort, setSort] = useAdminViewState<SortKey>('KnowledgeBasesTab.sort', 'title')
-
-  const request = useCallback(() => getAdminKnowledgeBases({ limit: 500 }), [])
+  const [view, setView] = useAdminViewState('KnowledgeBasesTab.inventory', { query: '', status: '', sort: 'title' as SortKey, offset: 0 })
+  const [renamed, setRenamed] = useState(false)
+  const pageSize = 100
+  const sort = view.sort
+  const request = useCallback(() => getAdminKnowledgeBases({ search: view.query, status: view.status, sort: view.sort, offset: view.offset, limit: pageSize }), [view])
   const { data, setData, loading, error, load } = useAdminQuery(request)
   const kbs = useMemo(() => data?.knowledge_bases ?? [], [data])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = q
-      ? kbs.filter(kb =>
-          kb.title.toLowerCase().includes(q)
-          || (kb.owner_email ?? '').toLowerCase().includes(q)
-          || (kb.team_name ?? '').toLowerCase().includes(q)
-          || kb.tags.some(t => t.toLowerCase().includes(q)))
-      : kbs
-    const sorted = statusFilter ? rows.filter(kb => kb.status === statusFilter) : [...rows]
-    if (sort === 'title') {
-      sorted.sort((a, b) => a.title.localeCompare(b.title))
-    } else {
-      sorted.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
-    }
-    return sorted
-  }, [kbs, search, sort, statusFilter])
-
-  const loadMore = async () => {
-    if (loadingMore || loading) return
-    setLoadingMore(true)
-    setMoreError(null)
-    try {
-      const result = await getAdminKnowledgeBases({ limit: 500, offset: kbs.length })
-      setData(previous => previous ? { total: result.total, knowledge_bases: [...previous.knowledge_bases, ...result.knowledge_bases.filter(kb => !previous.knowledge_bases.some(old => old.uuid === kb.uuid))] } : result)
-    } catch (reason) { setMoreError(reason instanceof Error ? reason.message : 'Could not load more knowledge bases. Retry.') }
-    finally { setLoadingMore(false) }
-  }
+  const refresh = () => { setRenamed(false); load() }
+  const setSort = (sort: SortKey) => { setRenamed(false); setView(previous => ({ ...previous, sort, offset: 0 })) }
 
   const applyRename = useCallback((uuid: string, title: string) => {
     setData(prev => prev ? { ...prev, knowledge_bases: prev.knowledge_bases.map(kb => (kb.uuid === uuid ? { ...kb, title } : kb)) } : prev)
+    setRenamed(true)
   }, [setData])
 
   return (
@@ -78,6 +52,7 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: '100%' }}>
+          <form onSubmit={event => { event.preventDefault(); setRenamed(false); setView(previous => ({ ...previous, query: search.trim(), offset: 0 })) }} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: '100%' }}>
           <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 0 }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
@@ -85,16 +60,19 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
               onChange={e => setSearch(e.target.value)}
               aria-label="Search knowledge bases"
               placeholder="Search title, owner, team, tag…"
+              maxLength={300}
               style={{
                 padding: '8px 10px 8px 30px', fontSize: 13, fontFamily: 'inherit',
                 border: '1px solid #e5e7eb', borderRadius: 8, width: '100%', color: '#111827',
               }}
             />
           </div>
-          <label style={{ fontSize: 13 }}>Status <select aria-label="Knowledge base status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="">All statuses</option>{[...new Set(kbs.map(kb => kb.status))].map(status => <option key={status} value={status}>{status}</option>)}</select></label>
+          <button type="submit" className="admin-open-record">Search all records</button>
+          </form>
+          <label style={{ fontSize: 13 }}>Status <select aria-label="Knowledge base status" value={view.status} onChange={event => { setRenamed(false); setView(previous => ({ ...previous, status: event.target.value, offset: 0 })) }}><option value="">All statuses</option>{['empty', 'building', 'ready', 'error'].map(status => <option key={status} value={status}>{status}</option>)}</select></label>
           <button
-            disabled={loadingMore}
-            onClick={load}
+            disabled={loading}
+            onClick={refresh}
             title="Refresh"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px',
@@ -108,9 +86,9 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
         </div>
       </div>
 
-      <p style={{ fontSize: 13, color: '#475569' }}>{filtered.length} matching loaded records · {kbs.length} of {data?.total ?? 0} loaded. Search and status filters apply to loaded records, including owner, team and tags.</p>
-      {data && kbs.length < data.total && <button type="button" className="admin-open-record" disabled={loadingMore || loading} onClick={() => void loadMore()}>{loadingMore ? 'Loading records…' : 'Load more knowledge bases'}</button>}
-      {moreError && <p role="alert">{moreError}</p>}
+      <p style={{ fontSize: 13, color: '#475569' }}>Search title, owner email, team and tags across every knowledge base. Status and sorting apply to all matching records.{view.query && <> Results for “{view.query}”.</>}</p>
+      <InventoryPages offset={view.offset} count={kbs.length} total={data?.total} hasMore={!!data && view.offset + kbs.length < data.total} busy={loading} onChange={offset => { setRenamed(false); setView(previous => ({ ...previous, offset })) }} pageSize={pageSize} scopeNote="Search, status and sorting cover the full inventory." />
+      {renamed && <p role="status">Title saved. Refresh to update its position and search matches.</p>}
       {error && (
         <div role="alert" style={{ padding: 12, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13 }}>
           {error}
@@ -120,12 +98,12 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-        ) : filtered.length === 0 ? (
+        ) : kbs.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            {error ? 'Use Refresh to retry loading the inventory.' : kbs.length === 0 ? 'No knowledge bases found.' : 'No matches.'}
+            {error ? 'Use Refresh to retry loading the inventory.' : view.query || view.status ? 'No knowledge bases match these filters.' : 'No knowledge bases found.'}
           </div>
         ) : (
-          <TableRegion label="Knowledge base inventory — scroll for more columns"><table style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse' }}>
+          <TableRegion label="Knowledge base inventory — scroll for more columns"><table className="admin-kb-table" style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <Th>#</Th>
@@ -148,15 +126,12 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((kb, i) => (
-                <KBRow key={kb.uuid} kb={kb} index={i} canEdit={canEdit} onRenamed={applyRename} />
+              {kbs.map((kb, i) => (
+                <KBRow key={kb.uuid} kb={kb} index={view.offset + i} canEdit={canEdit} onRenamed={applyRename} />
               ))}
             </tbody>
           </table></TableRegion>
         )}
-      </div>
-      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-        {filtered.length} of {kbs.length} knowledge base{kbs.length === 1 ? '' : 's'}
       </div>
     </div>
   )
@@ -175,14 +150,17 @@ function KBRow({
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const renameRef = useRef<HTMLButtonElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
   const restoreFocus = useRef(false)
   useLayoutEffect(() => {
+    if (editing) editorRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
     if (!editing && restoreFocus.current) {
       restoreFocus.current = false
       renameRef.current?.focus()
     }
   }, [editing])
   const [rowError, setRowError] = useState<string | null>(null)
+  const errorId = useId()
 
   const startEdit = () => { setDraft(kb.title); setRowError(null); setEditing(true) }
   const cancel = () => { if (savingRef.current) return; restoreFocus.current = true; setEditing(false); setRowError(null) }
@@ -213,10 +191,12 @@ function KBRow({
       <Td style={{ color: '#6b7280', fontWeight: 600 }}>{index + 1}</Td>
       <Td>
         {editing ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div ref={editorRef} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               autoFocus
               aria-label="Knowledge base title"
+              aria-invalid={!!rowError}
+              aria-describedby={rowError ? errorId : undefined}
               disabled={saving}
               value={draft}
               onChange={e => setDraft(e.target.value)}
@@ -226,7 +206,7 @@ function KBRow({
               }}
               maxLength={300}
               style={{
-                flex: 1, minWidth: 220, padding: '5px 8px', fontSize: 13, fontFamily: 'inherit',
+                flex: 1, minWidth: 0, width: 180, padding: '5px 8px', fontSize: 13, fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, color: '#111827',
               }}
             />
@@ -252,7 +232,7 @@ function KBRow({
             )}
           </div>
         )}
-        {rowError && <div role="alert" style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{rowError}</div>}
+        {rowError && <div id={errorId} role="alert" style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{rowError}</div>}
       </Td>
       <Td>
         {kb.tags.length > 0 ? (

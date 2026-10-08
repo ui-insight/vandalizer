@@ -447,3 +447,7 @@
   .section-page__links button { white-space: nowrap; }
   .section-page__links button svg { flex-shrink: 0; }
 }
+
+/* Keep KB rename controls and feedback together inside a narrow table viewport. */
+.admin-table-region .admin-kb-table :is(th, td):first-child { min-width: 48px; width: 48px; }
+.admin-table-region .admin-kb-table :is(th, td):nth-child(2) { min-width: 280px; }

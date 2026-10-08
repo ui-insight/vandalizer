@@ -2283,7 +2283,7 @@ class TestAdminKBInventory:
             patch("app.dependencies.decode_token", return_value={"sub": "plebe", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch(
-                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                "app.services.knowledge_service.admin_search_knowledge_bases",
                 new_callable=AsyncMock,
             ) as mock_list,
         ):
@@ -2315,15 +2315,14 @@ class TestAdminKBInventory:
             patch("app.dependencies.decode_token", return_value={"sub": "boss", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch(
-                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                "app.services.knowledge_service.admin_search_knowledge_bases",
                 new_callable=AsyncMock,
             ) as mock_list,
-            patch("app.services.knowledge_service.admin_count_knowledge_bases", new_callable=AsyncMock, return_value=1),
             patch("app.routers.admin.User.find") as mock_user_find,
             patch("app.routers.admin.Team.find") as mock_team_find,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
-            mock_list.return_value = [kb]
+            mock_list.return_value = ([kb], 1)
             mock_user_find.return_value.to_list = AsyncMock(return_value=[])
             mock_team_find.return_value.to_list = AsyncMock(return_value=[])
 

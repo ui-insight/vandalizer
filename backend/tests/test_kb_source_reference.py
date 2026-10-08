@@ -48,44 +48,37 @@ class TestSetSourceReference:
         assert len(source.source_reference) == 2000
 
 
-class TestAdminListAllKnowledgeBases:
-    """admin_list_all_knowledge_bases is unscoped, newest-first, optionally
-    title-filtered, with the limit clamped."""
+class TestAdminSearchKnowledgeBases:
+    @patch("app.services.knowledge_service.KnowledgeBase")
+    async def test_inventory_count_and_page_share_one_filtered_pipeline(self, model):
+        from app.services.knowledge_service import admin_search_knowledge_bases
+        model.aggregate.return_value.to_list = AsyncMock(return_value=[{"records": [{"uuid": "kb-501"}], "count": [{"total": 503}]}])
+        model.model_validate.side_effect = lambda row: row
+        rows, total = await admin_search_knowledge_bases(status="ready", sort="updated", offset=500, limit=100)
+        assert rows == [{"uuid": "kb-501"}] and total == 503
+        pipeline = model.aggregate.call_args.args[0]
+        assert pipeline[0] == {"$match": {"status": "ready"}}
+        assert pipeline[-1]["$facet"]["records"] == [{"$sort": {"updated_at": -1, "_id": 1}}, {"$skip": 500}, {"$limit": 100}]
+        assert not any("$lookup" in stage for stage in pipeline)
 
-    def _mock_chain(self, mock_kb_cls, returns):
-        limit_result = MagicMock()
-        limit_result.to_list = AsyncMock(return_value=returns)
-        sort_result = MagicMock()
-        sort_result.skip.return_value = sort_result
-        sort_result.limit = MagicMock(return_value=limit_result)
-        find_result = MagicMock()
-        find_result.sort = MagicMock(return_value=sort_result)
-        mock_kb_cls.find = MagicMock(return_value=find_result)
-        return find_result, sort_result
+    @patch("app.services.knowledge_service.Team")
+    @patch("app.services.knowledge_service.User")
+    @patch("app.services.knowledge_service.KnowledgeBase")
+    async def test_search_is_literal_and_covers_owner_team_title_and_tags(self, model, users, teams):
+        from app.services.knowledge_service import admin_search_knowledge_bases
+        model.aggregate.return_value.to_list = AsyncMock(return_value=[{"records": [], "count": []}])
+        users.get_collection_name.return_value = "user"
+        teams.get_collection_name.return_value = "team"
+        assert await admin_search_knowledge_bases(search=" a.b ", sort="title") == ([], 0)
+        pipeline = model.aggregate.call_args.args[0]
+        match = next(stage["$match"] for stage in pipeline if "$match" in stage)
+        assert match["$or"] == [{field: {"$regex": r"a\.b", "$options": "i"}} for field in ["title", "tags", "inventory_owner.email", "inventory_team.name"]]
+        assert pipeline[-1]["$facet"]["records"][0] == {"$sort": {"title": 1, "_id": 1}}
+        assert model.aggregate.call_args.kwargs["collation"]["strength"] == 2
 
     @patch("app.services.knowledge_service.KnowledgeBase")
-    async def test_no_search_empty_query(self, mock_kb_cls):
-        from app.services.knowledge_service import admin_list_all_knowledge_bases
-        find_result, sort_result = self._mock_chain(mock_kb_cls, ["kb1", "kb2"])
-        out = await admin_list_all_knowledge_bases()
-        assert out == ["kb1", "kb2"]
-        mock_kb_cls.find.assert_called_once_with({})
-        find_result.sort.assert_called_once_with("-created_at", "_id")
-        sort_result.skip.assert_called_once_with(0)
-        sort_result.limit.assert_called_once_with(1000)
-
-    @patch("app.services.knowledge_service.KnowledgeBase")
-    async def test_search_builds_regex(self, mock_kb_cls):
-        from app.services.knowledge_service import admin_list_all_knowledge_bases
-        self._mock_chain(mock_kb_cls, [])
-        await admin_list_all_knowledge_bases(search="a.b")  # '.' is regex-special
-        mock_kb_cls.find.assert_called_once_with(
-            {"title": {"$regex": "a\\.b", "$options": "i"}}
-        )
-
-    @patch("app.services.knowledge_service.KnowledgeBase")
-    async def test_limit_clamped(self, mock_kb_cls):
-        from app.services.knowledge_service import admin_list_all_knowledge_bases
-        _, sort_result = self._mock_chain(mock_kb_cls, [])
-        await admin_list_all_knowledge_bases(limit=99999)
-        sort_result.limit.assert_called_once_with(5000)
+    async def test_limit_clamped_and_blank_search_needs_no_joins(self, model):
+        from app.services.knowledge_service import admin_search_knowledge_bases
+        model.aggregate.return_value.to_list = AsyncMock(return_value=[])
+        assert await admin_search_knowledge_bases(search="  ", limit=99999, offset=-5) == ([], 0)
+        assert model.aggregate.call_args.args[0] == [{"$facet": {"records": [{"$sort": {"created_at": -1, "_id": 1}}, {"$skip": 0}, {"$limit": 5000}], "count": [{"$count": "total"}]}}]
