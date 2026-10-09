@@ -1,0 +1,1135 @@
+{
+  "listing": {
+    "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+    "module_id": "validation_qa",
+    "course_version": "parallel-course-test",
+    "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+    "case": {
+      "schema_version": 1,
+      "id": "source-checked-suite-and-preserved-repair",
+      "revision": 1,
+      "module_id": "validation_qa",
+      "provenance": "authored_validation_assignment_not_observed_failure_or_retest",
+      "notice": "This is an unpublished synthetic validation assignment. You will save checked expectations, observe an actual failure and retest a corrected owned extraction. Authored examples and quality badges are not execution evidence or credit.",
+      "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results.",
+      "instructions": [
+        "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+        "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+        "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+        "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+        "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+        "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+        "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+      ],
+      "exclusions": [
+        "No real participant, sponsor or institutional decision is involved; use only the assigned synthetic sources.",
+        "No external write, batch delivery, workspace sharing or staff review is required.",
+        "Test counts, optional-field skipping, model assurances and historical quality badges do not award this practical assessment."
+      ],
+      "fields": [
+        {
+          "title": "Principal Investigator",
+          "meaning": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+          "comparison": "person_name"
+        },
+        {
+          "title": "Total Project Budget",
+          "meaning": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+          "comparison": "usd_amount"
+        },
+        {
+          "title": "Named Co-PI",
+          "meaning": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+          "comparison": "person_name_or_explicit_absence"
+        }
+      ],
+      "sources": [
+        {
+          "id": "nsf",
+          "filename": "nsf-proposal-alpine-ecology.pdf",
+          "sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+          "coverage": "A three-year project with a named Co-PI and annual budget columns that can be confused with the full requested amount.",
+          "source_scope": "complete_assigned_document_not_selected_excerpt"
+        },
+        {
+          "id": "nih",
+          "filename": "nih-r01-neuroscience.pdf",
+          "sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+          "coverage": "A five-year project with multiple named Co-Investigators but no explicitly named Co-PI; annual and whole-project budgets must remain distinct.",
+          "source_scope": "complete_assigned_document_not_selected_excerpt"
+        }
+      ],
+      "flawed_proposal": "For Total Project Budget, extract the Year 1 total from the budget table. Test only the NSF proposal and copy its extraction into expected values without source checking. Treat a high consistency score as accuracy. If the NIH case fails, remove it rather than repairing the field. This is a deliberately flawed authored proposal, not a saved learner artifact or observed execution.",
+      "questions": [
+        {
+          "id": "suite_design",
+          "outcome_id": "validation_qa.representative_tests",
+          "phase": "before_original_run",
+          "prompt": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish."
+        },
+        {
+          "id": "repair_review",
+          "outcome_id": "validation_qa.repair_and_retest",
+          "phase": "after_complete_retest",
+          "prompt": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations."
+        }
+      ],
+      "suite_rule": "learner_checked_expectations_for_every_field_and_source_preserved_across_revisions",
+      "execution_rule": "actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge",
+      "failure_rule": "observed_value_mismatch_required_technical_failure_is_unavailable_not_learning_failure",
+      "repair_rule": "same_owned_artifact_changed_revision_same_complete_suite_explicit_approval_no_deleted_failures",
+      "absence_rule": "explicit_absence_is_tested_even_if_the_product_quality_metric_skips_optional_fields",
+      "assessment_policy": "automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit",
+      "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658"
+    },
+    "captures": [
+      {
+        "input_snapshot_id": "7ae675c5241f48ceba5b0659a6ec391b",
+        "captured_at": "2026-10-08T23:43:43.256082+00:00",
+        "extraction_name": "Owned representative extraction"
+      }
+    ],
+    "older_captures_available": false,
+    "suites": [
+      {
+        "submission_id": "b03fcef847fe4c5ab427f53dad8655b4",
+        "submitted_at": "2026-10-08T23:43:44.359666+00:00",
+        "run_id": "7ae675c5241f48ceba5b0659a6ec391b",
+        "previous_submission_id": null
+      }
+    ],
+    "older_suites_available": false,
+    "runs": [
+      {
+        "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+        "state": "completed",
+        "phase": "original",
+        "prepared_at": "2026-10-08T23:43:46.557790+00:00",
+        "input_snapshot_id": "7ae675c5241f48ceba5b0659a6ec391b"
+      }
+    ],
+    "older_runs_available": false,
+    "submissions": [],
+    "older_submissions_available": false,
+    "extractions": [
+      {
+        "artifact_id": "a75edea0c426497490dd99ca973f8e16",
+        "title": "Owned representative extraction"
+      }
+    ],
+    "assigned_sources": [
+      {
+        "document_id": "6a96b05b04a54551a3ff1c7ba56c85e4",
+        "title": "nsf-proposal-alpine-ecology.pdf",
+        "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n",
+        "processing": false,
+        "provenance": "current_owned_workspace_ingestion"
+      },
+      {
+        "document_id": "52e3dcddf018430a9718c7a590a3ab4d",
+        "title": "nih-r01-neuroscience.pdf",
+        "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n\n\nSynthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n",
+        "processing": false,
+        "provenance": "current_owned_workspace_ingestion"
+      }
+    ],
+    "older_extractions_available": false,
+    "can_submit": true,
+    "read_only_reason": null
+  },
+  "original": {
+    "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+    "module_id": "validation_qa",
+    "course_version": "parallel-course-test",
+    "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+    "input_snapshot_id": "7ae675c5241f48ceba5b0659a6ec391b",
+    "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+    "model_names": [
+      "synthetic-model"
+    ],
+    "prepared_at": "2026-10-08T23:43:46.557790+00:00",
+    "phase": "original",
+    "changed_fields": [],
+    "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+    "state": "completed",
+    "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+    "scope_decision_id": "a17a02c6122e43cab9e5689aa692da3b",
+    "scope_decision_sha256": "3b32389cd60a06d2ee6a05eb3de068c8a7b0a3418cb0d2b2bb676f583a97c291",
+    "case_events": [
+      {
+        "receipt": {
+          "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+          "case_index": 0,
+          "consumed_input": {
+            "doc_texts": [
+              "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n"
+            ],
+            "document_id": "6a96b05b04a54551a3ff1c7ba56c85e4",
+            "field_keys": [
+              "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+              "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+              "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed."
+            ],
+            "field_metadata": [
+              {
+                "enum_values": [],
+                "is_optional": false,
+                "key": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator."
+              },
+              {
+                "enum_values": [],
+                "is_optional": false,
+                "key": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal."
+              },
+              {
+                "enum_values": [],
+                "is_optional": true,
+                "key": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed."
+              }
+            ],
+            "source_id": "nsf",
+            "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+            "source_text_sha256": "2e9d56ac1cc451e6802defde8170525618cf554e00eeceea1d8c45fefa992ab0"
+          },
+          "credit_awarded": false,
+          "kind": "case_started",
+          "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+          "previous_receipt_sha256": null,
+          "run_id": "6f3c270933ee4c86b7a01b8a969b0e55"
+        },
+        "receipt_sha256": "36dfdf6c0b9d55fcfe6744ec7ae2f0374cb4f6771408bf35ccf495bb7b6b3a0a"
+      },
+      {
+        "receipt": {
+          "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+          "case_index": 0,
+          "credit_awarded": false,
+          "kind": "case_completed",
+          "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+          "result": {
+            "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+            "entities": [
+              {
+                "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.": "177000",
+                "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.": "Dr. Michael Torres",
+                "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.": "Dr. Sarah Chen"
+              }
+            ],
+            "reason": null,
+            "source_id": "nsf",
+            "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+            "status": "completed"
+          },
+          "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+          "started_receipt_sha256": "36dfdf6c0b9d55fcfe6744ec7ae2f0374cb4f6771408bf35ccf495bb7b6b3a0a"
+        },
+        "receipt_sha256": "3d564dc24caceb0acd7d06401e5bfd2965a16a84148d4205a05f35935c272118"
+      },
+      {
+        "receipt": {
+          "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+          "case_index": 1,
+          "consumed_input": {
+            "doc_texts": [
+              "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n\n\nSynthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n"
+            ],
+            "document_id": "52e3dcddf018430a9718c7a590a3ab4d",
+            "field_keys": [
+              "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+              "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+              "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed."
+            ],
+            "field_metadata": [
+              {
+                "enum_values": [],
+                "is_optional": false,
+                "key": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator."
+              },
+              {
+                "enum_values": [],
+                "is_optional": false,
+                "key": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal."
+              },
+              {
+                "enum_values": [],
+                "is_optional": true,
+                "key": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed."
+              }
+            ],
+            "source_id": "nih",
+            "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+            "source_text_sha256": "157c2ad3582343e61f465f6e4440b0f4a9704e98235b46a73ea8e81b571e0915"
+          },
+          "credit_awarded": false,
+          "kind": "case_started",
+          "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+          "previous_receipt_sha256": "3d564dc24caceb0acd7d06401e5bfd2965a16a84148d4205a05f35935c272118",
+          "run_id": "6f3c270933ee4c86b7a01b8a969b0e55"
+        },
+        "receipt_sha256": "128c45ced9b82d047f31c3e3af19c98ccbdb76cbadcd119f57bb15940171ab5e"
+      },
+      {
+        "receipt": {
+          "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+          "case_index": 1,
+          "credit_awarded": false,
+          "kind": "case_completed",
+          "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+          "result": {
+            "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+            "entities": [
+              {
+                "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.": "1250000",
+                "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.": null,
+                "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.": "Dr. James Park"
+              }
+            ],
+            "reason": null,
+            "source_id": "nih",
+            "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+            "status": "completed"
+          },
+          "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+          "started_receipt_sha256": "128c45ced9b82d047f31c3e3af19c98ccbdb76cbadcd119f57bb15940171ab5e"
+        },
+        "receipt_sha256": "c3ead3a12d41445ce435b4ded503b4bb7dc8159ab2a2a57954a162318e4fdc0f"
+      }
+    ],
+    "result": {
+      "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+      "case_event_count": 4,
+      "case_events_sha256": "c31c606670010c1439d3c559767f69d159e5ef8c700abbaf850c414544e56e81",
+      "case_results": [
+        {
+          "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+          "entities": [
+            {
+              "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.": "177000",
+              "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.": "Dr. Michael Torres",
+              "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.": "Dr. Sarah Chen"
+            }
+          ],
+          "reason": null,
+          "source_id": "nsf",
+          "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+          "status": "completed"
+        },
+        {
+          "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+          "entities": [
+            {
+              "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.": "1250000",
+              "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.": null,
+              "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.": "Dr. James Park"
+            }
+          ],
+          "reason": null,
+          "source_id": "nih",
+          "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+          "status": "completed"
+        }
+      ],
+      "checks": {
+        "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+        "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+        "cases": [
+          {
+            "all_expected_values_source_supported": true,
+            "all_fields_checked": true,
+            "all_results_source_supported": false,
+            "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+            "consistency_proves_accuracy": false,
+            "credit_awarded": false,
+            "fields": [
+              {
+                "actual_value": "Dr. Sarah Chen",
+                "expected_source_supported": true,
+                "field": "Principal Investigator",
+                "matches_learner_expectation": true,
+                "matches_source": true,
+                "observed_value_mismatch": false,
+                "output_comparable": true,
+                "output_key": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+                "output_present": true,
+                "status": "supported"
+              },
+              {
+                "actual_value": "177000",
+                "expected_source_supported": true,
+                "field": "Total Project Budget",
+                "matches_learner_expectation": false,
+                "matches_source": false,
+                "observed_value_mismatch": true,
+                "output_comparable": true,
+                "output_key": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+                "output_present": true,
+                "status": "revision_required"
+              },
+              {
+                "actual_value": "Dr. Michael Torres",
+                "expected_source_supported": true,
+                "field": "Named Co-PI",
+                "matches_learner_expectation": true,
+                "matches_source": true,
+                "observed_value_mismatch": false,
+                "output_comparable": true,
+                "output_key": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+                "output_present": true,
+                "status": "supported"
+              }
+            ],
+            "observed_semantic_failure": true,
+            "optional_absence_checked": true,
+            "result_sha256": "68b68e9cdb53f2abfb1b57852347b19063885ea5a72e12b3269987affe8c5467",
+            "source_id": "nsf",
+            "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f"
+          },
+          {
+            "all_expected_values_source_supported": true,
+            "all_fields_checked": true,
+            "all_results_source_supported": true,
+            "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+            "consistency_proves_accuracy": false,
+            "credit_awarded": false,
+            "fields": [
+              {
+                "actual_value": "Dr. James Park",
+                "expected_source_supported": true,
+                "field": "Principal Investigator",
+                "matches_learner_expectation": true,
+                "matches_source": true,
+                "observed_value_mismatch": false,
+                "output_comparable": true,
+                "output_key": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+                "output_present": true,
+                "status": "supported"
+              },
+              {
+                "actual_value": "1250000",
+                "expected_source_supported": true,
+                "field": "Total Project Budget",
+                "matches_learner_expectation": true,
+                "matches_source": true,
+                "observed_value_mismatch": false,
+                "output_comparable": true,
+                "output_key": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+                "output_present": true,
+                "status": "supported"
+              },
+              {
+                "actual_value": null,
+                "expected_source_supported": true,
+                "field": "Named Co-PI",
+                "matches_learner_expectation": true,
+                "matches_source": true,
+                "observed_value_mismatch": false,
+                "output_comparable": true,
+                "output_key": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+                "output_present": true,
+                "status": "supported"
+              }
+            ],
+            "observed_semantic_failure": false,
+            "optional_absence_checked": true,
+            "result_sha256": "7fbed6d2db37a7fde3dec24f38da4a4e21af619cd645d3db6ef98eb818728aa0",
+            "source_id": "nih",
+            "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55"
+          }
+        ],
+        "complete": true,
+        "credit_awarded": false,
+        "module_completion_eligible": false,
+        "observed_semantic_failure": true,
+        "source_supported": false,
+        "suite_sha256": "aa335a1986806d1bbb1ee720abeb67c5c4e1d87880e7783dfa363a7cf1004fc6"
+      },
+      "credit_awarded": false,
+      "finished_at": "2026-10-08T23:43:58.429464+00:00",
+      "module_completion_eligible": false,
+      "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+      "repair_checks": null,
+      "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+      "started_at": "2026-10-08T23:43:55.243550+00:00",
+      "status": "completed"
+    },
+    "run_sha256": "98b70b657d3b6e1c44d119e0f3371f25fb4571e55b32576a4b652f0c26645cc1",
+    "suite": {
+      "uuid": "b03fcef847fe4c5ab427f53dad8655b4",
+      "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+      "module_id": "validation_qa",
+      "course_version": "parallel-course-test",
+      "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+      "case": {
+        "absence_rule": "explicit_absence_is_tested_even_if_the_product_quality_metric_skips_optional_fields",
+        "assessment_policy": "automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit",
+        "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+        "exclusions": [
+          "No real participant, sponsor or institutional decision is involved; use only the assigned synthetic sources.",
+          "No external write, batch delivery, workspace sharing or staff review is required.",
+          "Test counts, optional-field skipping, model assurances and historical quality badges do not award this practical assessment."
+        ],
+        "execution_rule": "actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge",
+        "failure_rule": "observed_value_mismatch_required_technical_failure_is_unavailable_not_learning_failure",
+        "fields": [
+          {
+            "comparison": "person_name",
+            "meaning": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+            "title": "Principal Investigator"
+          },
+          {
+            "comparison": "usd_amount",
+            "meaning": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+            "title": "Total Project Budget"
+          },
+          {
+            "comparison": "person_name_or_explicit_absence",
+            "meaning": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+            "title": "Named Co-PI"
+          }
+        ],
+        "flawed_proposal": "For Total Project Budget, extract the Year 1 total from the budget table. Test only the NSF proposal and copy its extraction into expected values without source checking. Treat a high consistency score as accuracy. If the NIH case fails, remove it rather than repairing the field. This is a deliberately flawed authored proposal, not a saved learner artifact or observed execution.",
+        "id": "source-checked-suite-and-preserved-repair",
+        "instructions": [
+          "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+          "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+          "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+          "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+          "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+          "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+          "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+        ],
+        "module_id": "validation_qa",
+        "notice": "This is an unpublished synthetic validation assignment. You will save checked expectations, observe an actual failure and retest a corrected owned extraction. Authored examples and quality badges are not execution evidence or credit.",
+        "provenance": "authored_validation_assignment_not_observed_failure_or_retest",
+        "questions": [
+          {
+            "id": "suite_design",
+            "outcome_id": "validation_qa.representative_tests",
+            "phase": "before_original_run",
+            "prompt": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish."
+          },
+          {
+            "id": "repair_review",
+            "outcome_id": "validation_qa.repair_and_retest",
+            "phase": "after_complete_retest",
+            "prompt": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations."
+          }
+        ],
+        "repair_rule": "same_owned_artifact_changed_revision_same_complete_suite_explicit_approval_no_deleted_failures",
+        "revision": 1,
+        "schema_version": 1,
+        "sources": [
+          {
+            "coverage": "A three-year project with a named Co-PI and annual budget columns that can be confused with the full requested amount.",
+            "filename": "nsf-proposal-alpine-ecology.pdf",
+            "id": "nsf",
+            "sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+            "source_scope": "complete_assigned_document_not_selected_excerpt"
+          },
+          {
+            "coverage": "A five-year project with multiple named Co-Investigators but no explicitly named Co-PI; annual and whole-project budgets must remain distinct.",
+            "filename": "nih-r01-neuroscience.pdf",
+            "id": "nih",
+            "sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+            "source_scope": "complete_assigned_document_not_selected_excerpt"
+          }
+        ],
+        "suite_rule": "learner_checked_expectations_for_every_field_and_source_preserved_across_revisions",
+        "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results."
+      },
+      "submission": {
+        "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+        "consent": "save_checked_representative_expectations_before_execution",
+        "expectations": [
+          {
+            "expected_kind": "value",
+            "expected_value": "Dr. Sarah Chen",
+            "field": "Principal Investigator",
+            "source_id": "nsf",
+            "source_reason": "The lead PI is explicitly named; the Co-PI is a different person.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Principal Investigator: Dr. Sarah Chen"
+              }
+            ]
+          },
+          {
+            "expected_kind": "value",
+            "expected_value": "485000",
+            "field": "Total Project Budget",
+            "source_id": "nsf",
+            "source_reason": "The full three-year request is USD 485000, not Year 1 expenditure of USD 177000.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Requested Amount: $485,000"
+              },
+              {
+                "page": 1,
+                "quote": "Total $177,000 $152,000 $156,000 $485,000"
+              }
+            ]
+          },
+          {
+            "expected_kind": "value",
+            "expected_value": "Dr. Michael Torres",
+            "field": "Named Co-PI",
+            "source_id": "nsf",
+            "source_reason": "The source explicitly labels Michael Torres as Co-PI; preserve that specific role.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Co-PI: Dr. Michael Torres"
+              }
+            ]
+          },
+          {
+            "expected_kind": "value",
+            "expected_value": "Dr. James Park",
+            "field": "Principal Investigator",
+            "source_id": "nih",
+            "source_reason": "James Park is the PI; neither named Co-Investigator replaces him.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Principal Investigator: Dr. James Park"
+              }
+            ]
+          },
+          {
+            "expected_kind": "value",
+            "expected_value": "1250000",
+            "field": "Total Project Budget",
+            "source_id": "nih",
+            "source_reason": "The full five-year budget is USD 1250000, not the USD 304000 first-year total.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Total Budget: $1,250,000"
+              },
+              {
+                "page": 2,
+                "quote": "Total $304,000 $240,000 $241,000 $246,000 $219,000 $1,250,000"
+              }
+            ]
+          },
+          {
+            "expected_kind": "explicit_absence",
+            "expected_value": null,
+            "field": "Named Co-PI",
+            "source_id": "nih",
+            "source_reason": "The complete assigned source names Co-Investigators, not a Co-PI. Do not promote another role or invent a person. This absence must be tested explicitly.",
+            "source_references": [
+              {
+                "page": 1,
+                "quote": "Dr. Lisa Yamamoto Co-Investigator 15% Psychology"
+              },
+              {
+                "page": 1,
+                "quote": "Dr. Raj Patel Co-Investigator 10% Computer Science"
+              }
+            ]
+          }
+        ],
+        "input_snapshot_id": "7ae675c5241f48ceba5b0659a6ec391b",
+        "input_snapshot_sha256": "d66774d0ef4a4f8f06b02db142608eb590c542217759d14c87ca438f8d7e3aa9",
+        "request_id": "b03fcef847fe4c5ab427f53dad8655b4",
+        "suite_design": "Both complete sources cover different project-wide and annual amounts. The NIH source tests an unnamed Co-PI; no Co-Investigator is promoted to that role. These two proposals do not cover all possible grants."
+      },
+      "test_cases": [
+        {
+          "document_id": "6a96b05b04a54551a3ff1c7ba56c85e4",
+          "expectations": [
+            {
+              "expected_kind": "value",
+              "expected_value": "Dr. Sarah Chen",
+              "field": "Principal Investigator",
+              "source_id": "nsf",
+              "source_reason": "The lead PI is explicitly named; the Co-PI is a different person.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Principal Investigator: Dr. Sarah Chen"
+                }
+              ]
+            },
+            {
+              "expected_kind": "value",
+              "expected_value": "485000",
+              "field": "Total Project Budget",
+              "source_id": "nsf",
+              "source_reason": "The full three-year request is USD 485000, not Year 1 expenditure of USD 177000.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Requested Amount: $485,000"
+                },
+                {
+                  "page": 1,
+                  "quote": "Total $177,000 $152,000 $156,000 $485,000"
+                }
+              ]
+            },
+            {
+              "expected_kind": "value",
+              "expected_value": "Dr. Michael Torres",
+              "field": "Named Co-PI",
+              "source_id": "nsf",
+              "source_reason": "The source explicitly labels Michael Torres as Co-PI; preserve that specific role.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Co-PI: Dr. Michael Torres"
+                }
+              ]
+            }
+          ],
+          "source_id": "nsf",
+          "source_scope": "complete_assigned_document_not_selected_excerpt",
+          "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+          "source_text_sha256": "2e9d56ac1cc451e6802defde8170525618cf554e00eeceea1d8c45fefa992ab0"
+        },
+        {
+          "document_id": "52e3dcddf018430a9718c7a590a3ab4d",
+          "expectations": [
+            {
+              "expected_kind": "value",
+              "expected_value": "Dr. James Park",
+              "field": "Principal Investigator",
+              "source_id": "nih",
+              "source_reason": "James Park is the PI; neither named Co-Investigator replaces him.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Principal Investigator: Dr. James Park"
+                }
+              ]
+            },
+            {
+              "expected_kind": "value",
+              "expected_value": "1250000",
+              "field": "Total Project Budget",
+              "source_id": "nih",
+              "source_reason": "The full five-year budget is USD 1250000, not the USD 304000 first-year total.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Total Budget: $1,250,000"
+                },
+                {
+                  "page": 2,
+                  "quote": "Total $304,000 $240,000 $241,000 $246,000 $219,000 $1,250,000"
+                }
+              ]
+            },
+            {
+              "expected_kind": "explicit_absence",
+              "expected_value": null,
+              "field": "Named Co-PI",
+              "source_id": "nih",
+              "source_reason": "The complete assigned source names Co-Investigators, not a Co-PI. Do not promote another role or invent a person. This absence must be tested explicitly.",
+              "source_references": [
+                {
+                  "page": 1,
+                  "quote": "Dr. Lisa Yamamoto Co-Investigator 15% Psychology"
+                },
+                {
+                  "page": 1,
+                  "quote": "Dr. Raj Patel Co-Investigator 10% Computer Science"
+                }
+              ]
+            }
+          ],
+          "source_id": "nih",
+          "source_scope": "complete_assigned_document_not_selected_excerpt",
+          "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+          "source_text_sha256": "157c2ad3582343e61f465f6e4440b0f4a9704e98235b46a73ea8e81b571e0915"
+        }
+      ],
+      "suite_sha256": "aa335a1986806d1bbb1ee720abeb67c5c4e1d87880e7783dfa363a7cf1004fc6",
+      "submitted_at": "2026-10-08T23:43:44.359666+00:00",
+      "source_correctness_verified": false,
+      "execution_authorized": false,
+      "credit_awarded": false,
+      "module_completion_eligible": false,
+      "suite_record_sha256": "ef47a1b6f877d9dd62bf868b15311f2ee337b36245b73257c012bfea3418d8ce",
+      "input_snapshot": {
+        "uuid": "7ae675c5241f48ceba5b0659a6ec391b",
+        "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+        "module_id": "validation_qa",
+        "course_version": "parallel-course-test",
+        "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+        "case": {
+          "absence_rule": "explicit_absence_is_tested_even_if_the_product_quality_metric_skips_optional_fields",
+          "assessment_policy": "automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit",
+          "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+          "exclusions": [
+            "No real participant, sponsor or institutional decision is involved; use only the assigned synthetic sources.",
+            "No external write, batch delivery, workspace sharing or staff review is required.",
+            "Test counts, optional-field skipping, model assurances and historical quality badges do not award this practical assessment."
+          ],
+          "execution_rule": "actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge",
+          "failure_rule": "observed_value_mismatch_required_technical_failure_is_unavailable_not_learning_failure",
+          "fields": [
+            {
+              "comparison": "person_name",
+              "meaning": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+              "title": "Principal Investigator"
+            },
+            {
+              "comparison": "usd_amount",
+              "meaning": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+              "title": "Total Project Budget"
+            },
+            {
+              "comparison": "person_name_or_explicit_absence",
+              "meaning": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+              "title": "Named Co-PI"
+            }
+          ],
+          "flawed_proposal": "For Total Project Budget, extract the Year 1 total from the budget table. Test only the NSF proposal and copy its extraction into expected values without source checking. Treat a high consistency score as accuracy. If the NIH case fails, remove it rather than repairing the field. This is a deliberately flawed authored proposal, not a saved learner artifact or observed execution.",
+          "id": "source-checked-suite-and-preserved-repair",
+          "instructions": [
+            "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+            "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+            "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+            "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+            "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+            "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+            "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+          ],
+          "module_id": "validation_qa",
+          "notice": "This is an unpublished synthetic validation assignment. You will save checked expectations, observe an actual failure and retest a corrected owned extraction. Authored examples and quality badges are not execution evidence or credit.",
+          "provenance": "authored_validation_assignment_not_observed_failure_or_retest",
+          "questions": [
+            {
+              "id": "suite_design",
+              "outcome_id": "validation_qa.representative_tests",
+              "phase": "before_original_run",
+              "prompt": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish."
+            },
+            {
+              "id": "repair_review",
+              "outcome_id": "validation_qa.repair_and_retest",
+              "phase": "after_complete_retest",
+              "prompt": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations."
+            }
+          ],
+          "repair_rule": "same_owned_artifact_changed_revision_same_complete_suite_explicit_approval_no_deleted_failures",
+          "revision": 1,
+          "schema_version": 1,
+          "sources": [
+            {
+              "coverage": "A three-year project with a named Co-PI and annual budget columns that can be confused with the full requested amount.",
+              "filename": "nsf-proposal-alpine-ecology.pdf",
+              "id": "nsf",
+              "sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+              "source_scope": "complete_assigned_document_not_selected_excerpt"
+            },
+            {
+              "coverage": "A five-year project with multiple named Co-Investigators but no explicitly named Co-PI; annual and whole-project budgets must remain distinct.",
+              "filename": "nih-r01-neuroscience.pdf",
+              "id": "nih",
+              "sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+              "source_scope": "complete_assigned_document_not_selected_excerpt"
+            }
+          ],
+          "suite_rule": "learner_checked_expectations_for_every_field_and_source_preserved_across_revisions",
+          "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results."
+        },
+        "artifact_id": "a75edea0c426497490dd99ca973f8e16",
+        "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+        "artifact": {
+          "cross_field_rules": [],
+          "domain": null,
+          "extraction_config": {},
+          "extraction_config_override": null,
+          "fields": [
+            {
+              "enum_values": [],
+              "id": "6ac82aa9efa7f6ec964523f0",
+              "is_optional": false,
+              "pdf_binding": null,
+              "searchphrase": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+              "searchtype": "extraction",
+              "text_blocks": [],
+              "title": "Principal Investigator"
+            },
+            {
+              "enum_values": [],
+              "id": "6ac82aa9efa7f6ec964523f1",
+              "is_optional": false,
+              "pdf_binding": null,
+              "searchphrase": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+              "searchtype": "extraction",
+              "text_blocks": [],
+              "title": "Total Project Budget"
+            },
+            {
+              "enum_values": [],
+              "id": "6ac82aa9efa7f6ec964523f2",
+              "is_optional": true,
+              "pdf_binding": null,
+              "searchphrase": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+              "searchtype": "extraction",
+              "text_blocks": [],
+              "title": "Named Co-PI"
+            }
+          ],
+          "item_order": [],
+          "set_type": "extraction",
+          "title": "Owned representative extraction",
+          "user_id": "validation-learner",
+          "uuid": "a75edea0c426497490dd99ca973f8e16"
+        },
+        "captured_at": "2026-10-08T23:43:43.256082+00:00",
+        "documents": [
+          {
+            "assigned_filename": "nsf-proposal-alpine-ecology.pdf",
+            "document_id": "6a96b05b04a54551a3ff1c7ba56c85e4",
+            "pages": [
+              "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n"
+            ],
+            "source_id": "nsf",
+            "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+            "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n",
+            "text_markers": [],
+            "text_origin": "original ingestion preserved separately from verified complete PDF page text",
+            "text_sha256": "5d3e53ec17bf127f6f9926c2676fe4aac980941e6b04e9393851184d24ead89e",
+            "title": "nsf-proposal-alpine-ecology.pdf"
+          },
+          {
+            "assigned_filename": "nih-r01-neuroscience.pdf",
+            "document_id": "52e3dcddf018430a9718c7a590a3ab4d",
+            "pages": [
+              "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n",
+              "Synthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n"
+            ],
+            "source_id": "nih",
+            "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+            "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n\n\nSynthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n",
+            "text_markers": [],
+            "text_origin": "original ingestion preserved separately from verified complete PDF page text",
+            "text_sha256": "a766b0b0b255da5b004eb7dd19322677dcb594018703850856003ee30117962a",
+            "title": "nih-r01-neuroscience.pdf"
+          }
+        ],
+        "input_snapshot_sha256": "d66774d0ef4a4f8f06b02db142608eb590c542217759d14c87ca438f8d7e3aa9",
+        "execution_authorized": false,
+        "credit_awarded": false
+      }
+    },
+    "input_snapshot": {
+      "uuid": "7ae675c5241f48ceba5b0659a6ec391b",
+      "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+      "module_id": "validation_qa",
+      "course_version": "parallel-course-test",
+      "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+      "case": {
+        "absence_rule": "explicit_absence_is_tested_even_if_the_product_quality_metric_skips_optional_fields",
+        "assessment_policy": "automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit",
+        "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+        "exclusions": [
+          "No real participant, sponsor or institutional decision is involved; use only the assigned synthetic sources.",
+          "No external write, batch delivery, workspace sharing or staff review is required.",
+          "Test counts, optional-field skipping, model assurances and historical quality badges do not award this practical assessment."
+        ],
+        "execution_rule": "actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge",
+        "failure_rule": "observed_value_mismatch_required_technical_failure_is_unavailable_not_learning_failure",
+        "fields": [
+          {
+            "comparison": "person_name",
+            "meaning": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+            "title": "Principal Investigator"
+          },
+          {
+            "comparison": "usd_amount",
+            "meaning": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+            "title": "Total Project Budget"
+          },
+          {
+            "comparison": "person_name_or_explicit_absence",
+            "meaning": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+            "title": "Named Co-PI"
+          }
+        ],
+        "flawed_proposal": "For Total Project Budget, extract the Year 1 total from the budget table. Test only the NSF proposal and copy its extraction into expected values without source checking. Treat a high consistency score as accuracy. If the NIH case fails, remove it rather than repairing the field. This is a deliberately flawed authored proposal, not a saved learner artifact or observed execution.",
+        "id": "source-checked-suite-and-preserved-repair",
+        "instructions": [
+          "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+          "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+          "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+          "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+          "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+          "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+          "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+        ],
+        "module_id": "validation_qa",
+        "notice": "This is an unpublished synthetic validation assignment. You will save checked expectations, observe an actual failure and retest a corrected owned extraction. Authored examples and quality badges are not execution evidence or credit.",
+        "provenance": "authored_validation_assignment_not_observed_failure_or_retest",
+        "questions": [
+          {
+            "id": "suite_design",
+            "outcome_id": "validation_qa.representative_tests",
+            "phase": "before_original_run",
+            "prompt": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish."
+          },
+          {
+            "id": "repair_review",
+            "outcome_id": "validation_qa.repair_and_retest",
+            "phase": "after_complete_retest",
+            "prompt": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations."
+          }
+        ],
+        "repair_rule": "same_owned_artifact_changed_revision_same_complete_suite_explicit_approval_no_deleted_failures",
+        "revision": 1,
+        "schema_version": 1,
+        "sources": [
+          {
+            "coverage": "A three-year project with a named Co-PI and annual budget columns that can be confused with the full requested amount.",
+            "filename": "nsf-proposal-alpine-ecology.pdf",
+            "id": "nsf",
+            "sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+            "source_scope": "complete_assigned_document_not_selected_excerpt"
+          },
+          {
+            "coverage": "A five-year project with multiple named Co-Investigators but no explicitly named Co-PI; annual and whole-project budgets must remain distinct.",
+            "filename": "nih-r01-neuroscience.pdf",
+            "id": "nih",
+            "sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+            "source_scope": "complete_assigned_document_not_selected_excerpt"
+          }
+        ],
+        "suite_rule": "learner_checked_expectations_for_every_field_and_source_preserved_across_revisions",
+        "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results."
+      },
+      "artifact_id": "a75edea0c426497490dd99ca973f8e16",
+      "artifact_sha256": "7ada8fd5808db3624f026bb14d4677cf6957e02da8a88529fe6822c6aea9d3e7",
+      "artifact": {
+        "cross_field_rules": [],
+        "domain": null,
+        "extraction_config": {},
+        "extraction_config_override": null,
+        "fields": [
+          {
+            "enum_values": [],
+            "id": "6ac82aa9efa7f6ec964523f0",
+            "is_optional": false,
+            "pdf_binding": null,
+            "searchphrase": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+            "searchtype": "extraction",
+            "text_blocks": [],
+            "title": "Principal Investigator"
+          },
+          {
+            "enum_values": [],
+            "id": "6ac82aa9efa7f6ec964523f1",
+            "is_optional": false,
+            "pdf_binding": null,
+            "searchphrase": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+            "searchtype": "extraction",
+            "text_blocks": [],
+            "title": "Total Project Budget"
+          },
+          {
+            "enum_values": [],
+            "id": "6ac82aa9efa7f6ec964523f2",
+            "is_optional": true,
+            "pdf_binding": null,
+            "searchphrase": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+            "searchtype": "extraction",
+            "text_blocks": [],
+            "title": "Named Co-PI"
+          }
+        ],
+        "item_order": [],
+        "set_type": "extraction",
+        "title": "Owned representative extraction",
+        "user_id": "validation-learner",
+        "uuid": "a75edea0c426497490dd99ca973f8e16"
+      },
+      "captured_at": "2026-10-08T23:43:43.256082+00:00",
+      "documents": [
+        {
+          "assigned_filename": "nsf-proposal-alpine-ecology.pdf",
+          "document_id": "6a96b05b04a54551a3ff1c7ba56c85e4",
+          "pages": [
+            "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n"
+          ],
+          "source_id": "nsf",
+          "source_sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+          "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNSF Grant Proposal\nDirectorate for Biological Sciences - Division of Environmental Biology\nProposal Number: BIO-2024-07821\nProgram: Ecosystem Science\nProgram Officer: Dr. Katherine Wells\nSubmission Date: October 15, 2024\nProject Information\nProject Title: Alpine Ecosystem Response to Climate Change in the Northern Rockies\nPrincipal Investigator: Dr. Sarah Chen\nCo-PI: Dr. Michael Torres\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences\nRequested Amount: $485,000\nProject Period: September 1, 2025 - August 31, 2028\nSponsoring Agency: National Science Foundation\nProject Abstract\nThis project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky Mountains.\nOur research combines long-term field monitoring, remote sensing, and ecological modeling to understand how\nrising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect plant community\ncomposition, soil microbial diversity, and ecosystem carbon cycling. The study will establish 24 permanent\nmonitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth and White Cloud mountain\nranges.\nBudget Overview\nCategory\nYear 1\nYear 2\nYear 3\nTotal\nPersonnel\n$95,000\n$98,000\n$101,000\n$294,000\nEquipment\n$35,000\n$5,000\n$5,000\n$45,000\nTravel\n$12,000\n$14,000\n$14,000\n$40,000\nSupplies\n$10,000\n$8,000\n$8,000\n$26,000\nIndirect Costs\n$25,000\n$27,000\n$28,000\n$80,000\nTotal\n$177,000\n$152,000\n$156,000\n$485,000\nBroader Impacts\nThis project will train 4 graduate students and 8 undergraduate researchers in alpine ecology and climate\nscience. Results will be shared with the Sawtooth National Recreation Area and the U.S. Forest Service to inform\nland management decisions. We will develop educational materials for Idaho high school science teachers,\nreaching an estimated 500 students per year through a summer workshop program.\n",
+          "text_markers": [],
+          "text_origin": "original ingestion preserved separately from verified complete PDF page text",
+          "text_sha256": "5d3e53ec17bf127f6f9926c2676fe4aac980941e6b04e9393851184d24ead89e",
+          "title": "nsf-proposal-alpine-ecology.pdf"
+        },
+        {
+          "assigned_filename": "nih-r01-neuroscience.pdf",
+          "document_id": "52e3dcddf018430a9718c7a590a3ab4d",
+          "pages": [
+            "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n",
+            "Synthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n"
+          ],
+          "source_id": "nih",
+          "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+          "text": "Synthetic training document | Unpublished 5.0 draft\nPage 1\nNIH Research Project Grant (R01)\nNational Institute of Neurological Disorders and Stroke (NINDS)\nGrant Number: 1R01NS123456-01\nFOA Number: PA-23-152\nStudy Section: Neurotransporters, Receptors, and Calcium Signaling (NTRC)\nFunding Mechanism: R01 - Research Project Grant\nSubmission Date: February 5, 2024\nProject Information\nProject Title: Neural Circuit Mechanisms of Working Memory in Prefrontal Cortex\nPrincipal Investigator: Dr. James Park\nDegree: Ph.D.\nInstitution: University of Idaho\nDepartment: Department of Biological Sciences - Neuroscience Program\nTotal Budget: $1,250,000\nProject Period: July 1, 2024 - June 30, 2029\nSponsoring Agency: National Institutes of Health\nHuman Subjects: No\nVertebrate Animals: Yes - Mouse model (Mus musculus)\nClinical Trial: No\nSpecific Aims\nAim 1: Characterize the firing patterns of prefrontal cortex (PFC) neurons during working memory tasks using\ntwo-photon calcium imaging in head-fixed mice.\nAim 2: Determine the causal role of PFC-to-hippocampal projections in working memory maintenance using\noptogenetic manipulation.\nAim 3: Develop a computational model of PFC circuit dynamics that predicts working memory capacity from\nneural population activity patterns.\nKey Personnel\nName\nRole\nEffort\nDepartment\nDr. James Park\nPI\n30%\nBiological Sciences\nDr. Lisa Yamamoto\nCo-Investigator\n15%\nPsychology\nDr. Raj Patel\nCo-Investigator\n10%\nComputer Science\nTBD\nPostdoctoral Fellow\n100%\nBiological Sciences\nTBD\nGraduate Student 1\n50%\nNeuroscience Program\nTBD\nGraduate Student 2\n50%\nNeuroscience Program\n\n\nSynthetic training document | Unpublished 5.0 draft\nPage 2\nBudget Justification\nCategory\nYear 1\nYear 2\nYear 3\nYear 4\nYear 5\nTotal\nPersonnel\n$120,000\n$124,000\n$128,000\n$132,000\n$121,000\n$625,000\nEquipment\n$85,000\n$15,000\n$10,000\n$10,000\n$5,000\n$125,000\nTravel\n$8,000\n$10,000\n$10,000\n$12,000\n$10,000\n$50,000\nSupplies\n$30,000\n$28,000\n$28,000\n$25,000\n$24,000\n$135,000\nOther\n$10,000\n$10,000\n$10,000\n$10,000\n$10,000\n$50,000\nIndirect (52%)\n$51,000\n$53,000\n$55,000\n$57,000\n$49,000\n$265,000\nTotal\n$304,000\n$240,000\n$241,000\n$246,000\n$219,000\n$1,250,000\nResearch Strategy\nWorking memory, the ability to transiently hold and manipulate information, is fundamental to cognition. Deficits\nin working memory are observed in schizophrenia, ADHD, and age-related cognitive decline. Despite decades of\nresearch, the circuit-level mechanisms by which prefrontal cortex (PFC) neurons maintain persistent activity\nduring working memory remain poorly understood.\nThis project employs state-of-the-art two-photon calcium imaging to record the activity of hundreds of PFC\nneurons simultaneously in behaving mice performing a delayed non-match-to-sample task. Combined with\noptogenetic manipulation of specific projection pathways and computational modeling, we aim to provide a\ncomprehensive understanding of how PFC circuits support working memory.\nVertebrate Animals\nAll procedures will be performed in accordance with the NIH Guide for the Care and Use of Laboratory Animals\nand approved by the University of Idaho IACUC (Protocol #2024-015). We will use approximately 200 adult\nC57BL/6J mice (both sexes, 8-12 weeks old) over the project period. Mice will be housed in the university\nvivarium with standard 12h light/dark cycles and ad libitum food and water access.\n",
+          "text_markers": [],
+          "text_origin": "original ingestion preserved separately from verified complete PDF page text",
+          "text_sha256": "a766b0b0b255da5b004eb7dd19322677dcb594018703850856003ee30117962a",
+          "title": "nih-r01-neuroscience.pdf"
+        }
+      ],
+      "input_snapshot_sha256": "d66774d0ef4a4f8f06b02db142608eb590c542217759d14c87ca438f8d7e3aa9",
+      "execution_authorized": false,
+      "credit_awarded": false
+    },
+    "scope_decision": {
+      "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+      "course_version": "parallel-course-test",
+      "credit_awarded": false,
+      "enrollment_id": "39a29e9e37935af3ba478f0470e56864",
+      "input_snapshot_id": "7ae675c5241f48ceba5b0659a6ec391b",
+      "input_snapshot_sha256": "d66774d0ef4a4f8f06b02db142608eb590c542217759d14c87ca438f8d7e3aa9",
+      "manifest_sha256": "9e260334115b6aaca7fbcca80a10d3f2e961005c239570546968bc5d6940e037",
+      "module_id": "validation_qa",
+      "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+      "previous_scope_decision_id": null,
+      "prompt": {
+        "execution_choice": "approve",
+        "id": "validation_scope_approval",
+        "phase": "before_execution",
+        "prompt": "Approve or hold this exact owned extraction revision, both complete sources, saved expectations and resolved models for the entire internal validation suite. Model usage may be incurred. A retest preserves the original failure and reruns both cases; no external action or credit is authorized."
+      },
+      "prompt_id": "validation_scope_approval",
+      "prompt_sha256": "82f8c83bafd8d76e2360fabc90f8a3b32c3bdc05f4da69bd8cd0e139273ed0f6",
+      "record_kind": "validation_suite_scope",
+      "request_sha256": "5ca2d0d9e3cae5d7cdda6fb024ec2ac2b6b7487f57eb226b696c0f0bc67f49bc",
+      "run_id": "6f3c270933ee4c86b7a01b8a969b0e55",
+      "run_state_at_submission": "prepared",
+      "submission": {
+        "case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+        "choice": "approve",
+        "consent": "save_validation_suite_scope_decision",
+        "plan_sha256": "469b613eabac9af0d9e813633bf9298eb6688be1f87bfb7bf8706226d8667ace",
+        "reason": "I checked both complete source documents, all saved expectations and this exact revision and model.",
+        "request_id": "a17a02c6122e43cab9e5689aa692da3b",
+        "run_id": "6f3c270933ee4c86b7a01b8a969b0e55"
+      },
+      "submission_channel": "authenticated_learner_request",
+      "submitted_at": "2026-10-08T23:43:49.124421+00:00",
+      "user_id": "validation-learner",
+      "uuid": "a17a02c6122e43cab9e5689aa692da3b"
+    },
+    "original_run": null,
+    "authorization_sha256": "d64faa1d967e73c7957b6671d0559a55ba58b814f059bcad36ced1d91509d529",
+    "result_sha256": "7dde2df96f3bd02d5877b8773164761963a150263fa8b654fd8255324eeb4d34",
+    "case_events_sha256": "c31c606670010c1439d3c559767f69d159e5ef8c700abbaf850c414544e56e81",
+    "can_save_scope": false,
+    "can_execute": false,
+    "can_finalize": false,
+    "credit_awarded": false,
+    "module_completion_eligible": false
+  }
+}

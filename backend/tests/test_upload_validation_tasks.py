@@ -170,15 +170,17 @@ class TestSummarizeResults:
         summary = summarize_results(results, "doc-uuid", False)
 
         assert summary["valid"] is True
-        update_args = db.smart_document.update_one.call_args_list[0][0]
-        assert update_args[0] == {"uuid": "doc-uuid"}
+        update_args = next(call.args for call in db.smart_document.update_one.call_args_list
+                           if 'valid' in call.args[1].get('$set', {}))
+        from app.services.extraction_generations import extraction_generation_filter
+        assert update_args[0] == extraction_generation_filter('doc-uuid')
         assert update_args[1]["$set"]["valid"] is True
         assert update_args[1]["$set"]["validating"] is False
         # The status transition is a separate, guarded write: compliance
         # validation must not overwrite a failed extraction with "complete".
         assert "task_status" not in update_args[1]["$set"]
         status_call = db.smart_document.update_one.call_args_list[-1][0]
-        assert status_call[0] == {"uuid": "doc-uuid", "task_status": {"$ne": "error"}}
+        assert status_call[0] == {**extraction_generation_filter('doc-uuid'), "task_status": {"$ne": "error"}}
         assert status_call[1]["$set"]["task_status"] == "complete"
 
     @patch("app.tasks.upload_validation_tasks._get_secure_agent")
@@ -208,7 +210,8 @@ class TestSummarizeResults:
         summary = summarize_results(results, "doc-uuid", False)
 
         assert summary["valid"] is False
-        update_args = db.smart_document.update_one.call_args_list[0][0]
+        update_args = next(call.args for call in db.smart_document.update_one.call_args_list
+                           if 'valid' in call.args[1].get('$set', {}))
         assert update_args[1]["$set"]["valid"] is False
 
     @patch("app.tasks.upload_validation_tasks._get_secure_agent")
@@ -255,11 +258,10 @@ class TestSummarizeResults:
         assert summary["valid"] is False
         assert "PII detected" in summary["feedback"]
         # Should still persist to DB despite agent error
-        # Two writes now: the validation result, then a guarded status change.
-        assert db.smart_document.update_one.call_count == 2
-        assert "validation_feedback" in (
-            db.smart_document.update_one.call_args_list[0][0][1]["$set"]
-        )
+        result_writes = [call.args[1]['$set'] for call in db.smart_document.update_one.call_args_list
+                         if 'validation_feedback' in call.args[1].get('$set', {})]
+        assert len(result_writes) == 1
+        assert result_writes[0]['validating'] is False
 
 
 # ---------------------------------------------------------------------------

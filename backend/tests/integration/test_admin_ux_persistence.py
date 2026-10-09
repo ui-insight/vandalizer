@@ -12,7 +12,7 @@ from beanie import init_beanie
 from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.user import User
 from app.models.knowledge import KnowledgeBase
-from app.models.certification import CertificationProgress
+from app.models.certification import CertificationProgress, CertificationEnrollment, CertificationEnrollmentSelection
 from app.models.system_config import SystemConfig
 from app.routers import admin
 from app.dependencies import get_current_user
@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(not os.environ.get('ADMIN_UX_TEST_MONGO_URL'), r
 async def api(monkeypatch):
     client = AsyncIOMotorClient(os.environ['ADMIN_UX_TEST_MONGO_URL'], serverSelectionTimeoutMS=3000)
     name = 'admin_ux_test_' + uuid4().hex
-    await init_beanie(database=client[name], document_models=[Team, TeamMembership, TeamInvite, TeamJoinLink, User, SystemConfig, KnowledgeBase, CertificationProgress])
+    await init_beanie(database=client[name], document_models=[Team, TeamMembership, TeamInvite, TeamJoinLink, User, SystemConfig, KnowledgeBase, CertificationProgress, CertificationEnrollment, CertificationEnrollmentSelection])
     app = FastAPI()
     app.include_router(admin.router, prefix='/admin')
     actor = SimpleNamespace(user_id='qa-admin', is_admin=True, is_staff=False)

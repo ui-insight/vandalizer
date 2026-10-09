@@ -81,17 +81,25 @@ class TestClassifyDocument:
 
 class TestApplyClassification:
     @pytest.mark.asyncio
-    async def test_sets_fields_and_saves(self):
+    async def test_updates_classification_without_saving_stale_document(self):
         doc = MagicMock()
+        doc.classification = None
+        doc._extraction_restart_revision = 0
         doc.save = AsyncMock()
 
         from app.services.classification_service import apply_classification
 
-        result = await apply_classification(doc, "ferpa", 0.92, classified_by="auto")
+        collection = MagicMock()
+        collection.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
+        with patch("app.services.classification_service.SmartDocument.get_motor_collection", return_value=collection):
+            result = await apply_classification(doc, "ferpa", 0.92, classified_by="auto")
 
         assert doc.classification == "ferpa"
         assert doc.classification_confidence == 0.92
         assert doc.classified_by == "auto"
         assert doc.classified_at is not None
-        doc.save.assert_awaited_once()
+        doc.save.assert_not_awaited()
+        assert set(collection.update_one.call_args.args[1]['$set']) == {
+            'classification', 'classification_confidence', 'classified_at', 'classified_by',
+        }
         assert result is doc

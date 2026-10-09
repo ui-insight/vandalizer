@@ -103,3 +103,27 @@ async def test_endpoint_returns_pdf_named_for_the_user():
     text = _text(res.body)
     assert "ada@uidaho.edu" in text
     assert "0000ABCD" in text
+
+
+def test_versioned_certificate_uses_recorded_course_and_embedded_latin_fonts():
+    pdf = render_certificate_pdf(name='Alex Morgan', level='architect', certified_at=datetime.datetime(2024, 1, 2), credential_id='0123456789ABCDEF0123456789ABCDEF', course_title='Recorded course title', course_version='recorded-1', module_count=7)
+    with fitz.open(stream=pdf, filetype='pdf') as doc:
+        page = doc[0]
+        text = page.get_text()
+        assert 'all 7 modules' in text
+        assert 'Recorded course title | recorded-1' in text
+        assert 'January 2, 2024' in text
+        assert 'mastery' not in text
+        embedded = [font for font in page.get_fonts() if 'DejaVu' in font[3]]
+        assert len(embedded) == 2
+        assert all(doc.extract_font(font[0])[3] for font in embedded)
+        assert all(page.rect.contains(fitz.Rect(block[:4])) for block in page.get_text('blocks'))
+
+
+def test_unknown_legacy_date_and_version_are_not_invented():
+    pdf = render_certificate_pdf(name='Nguyễn Văn A', level='architect', certified_at=None, credential_id='record', course_title='Legacy certification - historical version unknown', legacy_unknown=True, module_count=0)
+    text = _text(pdf)
+    assert 'Original date unavailable' in text
+    assert 'historical version unknown' in text
+    assert 'has a preserved certification record' in text
+    assert 'all 0 modules' not in text

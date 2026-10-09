@@ -223,3 +223,20 @@ class TestCatalogItemNames:
             {"name": "Untitled", "kind": "knowledge_base"},
             {"name": "NSF Extractor", "kind": "workflow"},
         ]
+
+
+@pytest.mark.asyncio
+async def test_legacy_drip_defers_versioned_courses_without_sending_or_advancing():
+    user = _user(_naive_days_ago(1))
+    user.onboarding_drip_step = 0
+    user.onboarding_drip_next_at = _naive_days_ago(1)
+    user.email_preferences = {'onboarding': True}
+    with (
+        patch.object(engagement_service, 'User', fake_model([user])),
+        patch.object(engagement_service, 'existing_active_progress', AsyncMock(return_value=SimpleNamespace(enrollment_id='selected-course'))),
+        patch.object(engagement_service, 'send_email', AsyncMock()) as send,
+    ):
+        assert await engagement_service.process_onboarding_drips(_settings()) == 0
+    send.assert_not_awaited()
+    user.save.assert_not_awaited()
+    assert user.onboarding_drip_step == 0

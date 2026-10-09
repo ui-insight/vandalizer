@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { OnboardingStatus } from '../../api/config'
 import type { CertificationProgress } from '../../types/certification'
-import { CertificationPanelProvider } from '../../contexts/CertificationPanelContext'
+import { CertificationPanelProvider, useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 
 // The certification CTA reads the shared cert progress. Mock the API the
@@ -13,6 +13,7 @@ const certApi = vi.hoisted(() => ({
 }))
 vi.mock('../../api/certification', () => ({
   getProgress: () => Promise.resolve(certApi.progress),
+  getCourse: () => Promise.resolve({ versioned: true, enrollment_id: certApi.progress?.enrollment_id, course_version: certApi.progress?.course_version, manifest_sha256: certApi.progress?.manifest_sha256, modules: [] }),
   validateModule: vi.fn(),
   completeModule: vi.fn(),
   provisionModule: vi.fn(),
@@ -22,6 +23,11 @@ vi.mock('../../api/certification', () => ({
 
 function withCert(children: ReactNode) {
   return <CertificationPanelProvider>{children}</CertificationPanelProvider>
+}
+
+function CoursePanelProbe() {
+  const certification = useCertificationPanelOptional()
+  return <output aria-label="Selected course panel">{certification?.isOpen ? `Open ${certification.progress?.enrollment_id}` : 'Closed'}</output>
 }
 
 function certProgress(completedModules: string[]): CertificationProgress {
@@ -289,5 +295,48 @@ describe('ReturningHome', () => {
     await screen.findByText('Suggested questions')
     await Promise.resolve()
     expect(screen.queryByRole('button', { name: /certification/i })).not.toBeInTheDocument()
+  })
+})
+
+
+describe('selected certification course on home', () => {
+  it.each(['first-new', 'first-active', 'first-completed', 'returning-new', 'returning-active', 'returning-completed'])('opens the selected course directly without a chat call when chat actions are disabled: %s', async variant => {
+    const complete = variant.endsWith('completed')
+    certApi.progress = { ...certProgress(variant.endsWith('new') ? [] : ['ai_literacy']), enrollment_id: 'selected-enrollment',
+      course_version: 'original-course', manifest_sha256: 'a'.repeat(64), certified: complete }
+    const onSendMessage = vi.fn()
+    const props = { orgName: 'Vandalizer', brandIcon: null, disabled: true, onRunDemo: vi.fn(), onAttachFiles: vi.fn(),
+      onChooseKnowledgeBase: vi.fn(), onFocusComposer: vi.fn(), onSendMessage }
+    render(withCert(<>{variant.startsWith('first') ? <FirstSessionHome {...props} /> : <ReturningHome {...props} onOpenActivity={vi.fn()} status={baseStatus} suggestionPills={[]} />}<CoursePanelProbe /></>))
+    const direct = await screen.findByRole('button', { name: complete ? 'Review completed course' : 'Open course without chat' })
+    expect(direct).toBeEnabled()
+    if (!complete) expect(screen.getByRole('button', { name: /certification/i })).toBeDisabled()
+    fireEvent.click(direct)
+    expect(screen.getByLabelText('Selected course panel')).toHaveTextContent('Open selected-enrollment')
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
+  function home() {
+    return render(withCert(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      status={baseStatus} suggestionPills={[]} />))
+  }
+
+  it('counts only modules in the selected course and uses its own total', async () => {
+    certApi.progress = { ...certProgress(['ai_literacy', 'retired_module']), enrollment_id: 'selected-course', course_version: 'v5-test', manifest_sha256: 'a'.repeat(64),
+      module_ids: ['ai_literacy', 'new_module'], modules_total: 2 }
+    home()
+    expect(await screen.findByRole('button', { name: 'Continue certification (1/2)' })).toBeInTheDocument()
+  })
+
+  it.each(['lesson', 'assessment', 'scenario'])('offers continuation for saved %s work before the first module is completed', async kind => {
+    certApi.progress = { ...certProgress([]), enrollment_id: 'selected-course', course_version: 'v5-test', manifest_sha256: 'a'.repeat(64),
+      module_ids: ['ai_literacy'], modules_total: 1,
+      ...(kind === 'lesson' ? { learning_position: { module_id: 'ai_literacy', lesson_id: 'lesson-one', revision: 1, content_sha256: 'c', saved_at: '2026-10-05' } }
+        : kind === 'assessment' ? { pending_completions: [{ attempt_id: 'b'.repeat(32), module_id: 'ai_literacy', state: 'graded' as const, in_flight: false }] }
+          : { modules: { ai_literacy: { completed: false, stars: 0, completed_at: null, attempts: 0, xp_earned: 0, scenario_attempt_id: 'd'.repeat(32) } } }) }
+    home()
+    expect(await screen.findByRole('button', { name: 'Continue certification (0/1)' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Start the certification course' })).not.toBeInTheDocument()
   })
 })

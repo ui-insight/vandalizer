@@ -32,7 +32,7 @@ await page.route('**/api/**',async r=>{
  if(method!=='GET'&&(p.startsWith('/api/admin/')||p.startsWith('/api/organizations/')||p==='/api/knowledge/kb-admin/update')){
   writes.push({path:p,data:r.request().postDataJSON()});if(failWrite)return r.fulfill({status:503,json:{detail:'Change unavailable. Please retry.'}})
   if(p==='/api/knowledge/kb-admin/update')kb.title=r.request().postDataJSON().title
-  if(p==='/api/admin/certifications/user-1/unlock')progress.unlocked=r.request().postDataJSON().unlocked
+  if(p==='/api/admin/certifications/user-1/unlock'){progress.unlocked=r.request().postDataJSON().unlocked;return r.fulfill({json:{user_id:'user-1',unlocked:progress.unlocked}})}
   if(p==='/api/organizations/org-1')org.name=r.request().postDataJSON().name
   if(p==='/api/organizations/org-2/move'){org.children=[];movingChild.parent_id='org-3';otherOrg.children=[movingChild]}
   return r.fulfill({json:{ok:true,...(p==='/api/knowledge/kb-admin/update'?kb:{})}})
@@ -56,9 +56,19 @@ try{
   await page.getByRole('button',{name:`Save title for ${title}`,exact:true}).click();await page.getByRole('alert').filter({hasText:'Change unavailable'}).waitFor();assert.equal(await page.getByRole('textbox',{name:'Knowledge base title'}).inputValue(),title+' revised');await shot('admin-kb-rename-recovery-'+width)
   failWrite=false;await page.getByRole('button',{name:`Save title for ${title}`,exact:true}).click();await page.getByRole('button',{name:`Rename ${title} revised`,exact:true}).waitFor();await expect(page.getByRole('button',{name:`Rename ${title} revised`,exact:true})).toBeFocused()
   failRead=true;await go('certifications');await page.getByRole('alert').filter({hasText:'Records'}).waitFor();failRead=false;await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByText('4/10',{exact:true}).waitFor();await shot('admin-certifications-'+width)
-  progress.unlocked=false;failWrite=true;await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).click();await page.getByText(/Failed to unlock certification/).waitFor();await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).waitFor();failWrite=false;await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).click();await page.getByRole('button',{name:`Re-lock prerequisites for ${person.name}`,exact:true}).waitFor()
-  await page.getByRole('button',{name:`Re-lock prerequisites for ${person.name}`,exact:true}).click();await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).waitFor()
-  await page.getByRole('textbox',{name:'Search users...',exact:true}).fill('missing-person');await page.getByRole('button',{name:'Search all records',exact:true}).click();await page.getByText('No records match this search.',{exact:true}).waitFor()
+  progress.unlocked=false;failWrite=true
+  await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).click()
+  await page.getByRole('textbox',{name:'Reason for access change'}).fill('Synthetic administrator recovery')
+  await page.getByRole('button',{name:'Save access change',exact:true}).click()
+  await page.getByRole('alert').filter({hasText:'Change unavailable'}).waitFor()
+  failWrite=false;await page.getByRole('button',{name:'Retry same access change',exact:true}).click()
+  await page.getByRole('button',{name:`Re-lock prerequisites for ${person.name}`,exact:true}).click()
+  await page.getByRole('textbox',{name:'Reason for access change'}).fill('Restore prerequisite checks after review')
+  await page.getByRole('button',{name:'Save access change',exact:true}).click()
+  await page.getByRole('button',{name:`Unlock prerequisites for ${person.name}`,exact:true}).waitFor()
+  await page.getByRole('textbox',{name:'Search users or courses...',exact:true}).fill('missing-person')
+  await page.getByRole('button',{name:'Search all records',exact:true}).click()
+  await page.getByText('No records match this search.',{exact:true}).waitFor()
   failRead=true;await go('teams');await page.getByRole('button',{name:team.name,exact:true}).click();await page.getByRole('button',{name:'Retry members',exact:true}).waitFor();failRead=false;await page.getByRole('button',{name:'Retry members',exact:true}).click();await page.getByRole('button',{name:`Remove ${person.name} from ${team.name}`,exact:true}).waitFor();await shot('admin-team-members-'+width)
   failWrite=true;await page.getByRole('textbox',{name:`Add user to ${team.name}`,exact:true}).fill('new.researcher@example.test');await page.getByRole('button',{name:'Add',exact:true}).click();await page.getByText('Change unavailable. Please retry.',{exact:true}).waitFor();assert.equal(await page.getByRole('textbox',{name:`Add user to ${team.name}`,exact:true}).inputValue(),'new.researcher@example.test')
   await page.getByRole('tab',{name:'Usage Stats',exact:true}).click();await page.getByRole('button',{name:`View team usage: ${team.name}`,exact:true}).click();await page.getByText('Members (1)',{exact:true}).waitFor();await shot('admin-team-usage-'+width)

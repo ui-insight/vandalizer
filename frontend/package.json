@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "demo:check": "node scripts/render-demo.mjs --check",
     "demo:render": "node scripts/render-demo.mjs",
-    "ci": "npm run typecheck && npm run lint && npm run test:coverage && npm run build"
+    "ci": "npm run certification:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "certification:check": "node --test scripts/export-lessons.test.mjs && node scripts/export-lessons.mjs --check"
   },
   "dependencies": {
     "@fontsource-variable/public-sans": "^5.3.0",

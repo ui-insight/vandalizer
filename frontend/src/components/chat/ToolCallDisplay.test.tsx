@@ -6,8 +6,10 @@ import type { WorkflowStatus } from '../../types/workflow'
 
 const workspace = { openWorkflow: vi.fn() }
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => workspace }))
-vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn() }))
+vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn(), CertCheckCard: () => null }))
 vi.mock('../../api/workflows', () => ({ getWorkflowStatus: vi.fn() }))
+const courseRefresh = vi.hoisted(() => vi.fn())
+vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => ({ refresh: courseRefresh }) }))
 const status = (changes: Partial<WorkflowStatus> = {}): WorkflowStatus => ({ status:'running', num_steps_completed:1, num_steps_total:3, current_step_name:'Review findings', current_step_detail:null, current_step_preview:null, final_output:null, steps_output:{Extract:'Preserved findings'}, output_step_names:[], approval_request_id:null, ...changes })
 const call = {tool_name:'create_workflow', tool_call_id:'call-1',args:{name:'Review proposal'}}
 const result = (content: unknown) => ({tool_name:'create_workflow',tool_call_id:'call-1',content,quality:null})
@@ -101,6 +103,43 @@ it('renders a historical approval as a nonactionable record even when a callback
   expect(screen.getByRole('region', { name: 'Earlier action decision' })).toHaveTextContent('Workflow created')
   expect(screen.queryByRole('button', { name: 'Create workflow' })).toBeNull()
   expect(screen.queryByText('Your approval is needed')).toBeNull()
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['get_certification_progress', { modules: { wrong: 'shape' } }],
+  ['get_certification_lesson', { content: 'Incomplete teaching payload' }],
+  ['check_certification_module', { passed: 'false', checks: {} }],
+  ['complete_certification_module', { total_xp: 125, certified: 'false' }],
+  ['submit_certification_assessment', { stored: false }],
+])('does not render malformed %s as a successful course operation', (tool_name, content) => {
+  const confirm = vi.fn()
+  render(<ToolStatusLine call={{ tool_name, tool_call_id: 'cert-bad', args: {} }} result={{ tool_name, tool_call_id: 'cert-bad', content, quality: null }} onConfirm={confirm} />)
+  expect(screen.getByRole('status')).toHaveTextContent('Result needs review')
+  expect(screen.getByRole('alert')).toHaveTextContent('Saved work may already exist')
+  expect(screen.queryByRole('button', { name: 'Complete the module' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Review recovery options' })).not.toBeInTheDocument()
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+
+it('keeps the tool summary consistent with an optional check that did not pass', () => {
+  const tool_name = 'check_certification_module'
+  render(<ToolStatusLine result={{ tool_name, tool_call_id: 'advisory', quality: null, content: { module_id: 'foundations', title: 'Foundations', passed: true, stars: 1, checks: [{ name: 'Required run', passed: true, detail: 'Saved' }, { name: 'Enrichment', passed: false, detail: 'Optional' }] } }} />)
+  expect(screen.getByText('"Foundations" — module requirements met; review check details')).toBeInTheDocument()
+  expect(screen.queryByText(/all checks passed/)).not.toBeInTheDocument()
+})
+
+
+it('checks saved progress after an uncertain write without asking the agent to repeat it', async () => {
+  courseRefresh.mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(undefined)
+  const confirm = vi.fn(), tool_name = 'complete_certification_module'
+  render(<ToolStatusLine result={{ tool_name, tool_call_id: 'uncertain', content: { total_xp: 100 }, quality: null }} onConfirm={confirm} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Check saved course progress' }))
+  await screen.findByText('Progress could not be refreshed. Keep your saved work and try this read again.')
+  fireEvent.click(screen.getByRole('button', { name: 'Check saved course progress' }))
+  await screen.findByText('Current progress loaded. Open the learning panel to inspect your saved work.')
+  expect(courseRefresh).toHaveBeenCalledTimes(2)
   expect(confirm).not.toHaveBeenCalled()
 })
 

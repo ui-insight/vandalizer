@@ -30,7 +30,7 @@ WRITE_TOOLS = {
     # Certification writes: provision uploads lab documents, complete awards
     # XP / mutates CertificationProgress, submit stores assessment answers.
     "provision_certification_lab", "complete_certification_module",
-    "submit_certification_assessment",
+    "submit_certification_assessment", "save_certification_position",
 }
 
 

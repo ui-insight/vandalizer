@@ -121,7 +121,7 @@ Autovalidate **never changes anything until you apply it**, it tells you honestl
 | Ask… | The agent will… |
 |---|---|
 | *"What is a knowledge base?"* / *"Why not just use ChatGPT?"* | Explain the product itself |
-| *"Start the certification course."* | Run the Vandal Workflow Architect program right in chat — teaching lessons, setting up practice documents, and grading against your real workspace |
+| *"Start the certification course."* | Start or resume your selected certification course; learn in chat and use the Certification panel for its saved evidence, learner decisions and assessment actions |
 
 Certification progress is shared with the Certification panel in the top nav, so work done in either place counts in both.
 
@@ -186,6 +186,6 @@ Very long conversations get compacted to stay within the model's context. Recent
 
 ## Next steps
 
-- Ask the chat to *"start the certification course"* — Module 1 takes about 10 minutes and tours the agentic chat.
+- Ask the chat to *"start the certification course"* or open the **Certification** panel. Follow your selected course’s requirements and saved results; reading a lesson does not itself award assessment credit. Offered upgrades are optional and preserve the original course history and earned certificates.
 - Read [QUALITY_SIGNALS_EXPLAINED.md](./QUALITY_SIGNALS_EXPLAINED.md) for the full trust-signal explainer.
 - Dev/admin teams: see [AGENTIC_CHAT_TOOLS_REFERENCE.md](./AGENTIC_CHAT_TOOLS_REFERENCE.md) for the tool catalog and auth rules, and [DEPLOY.md](../DEPLOY.md#agentic-chat) for configuration.

@@ -161,7 +161,8 @@ def _mock_smart_document_class():
 
 @pytest.fixture
 async def client():
-    with patch("app.main.init_db", new_callable=AsyncMock):
+    with patch("app.main.init_db", new_callable=AsyncMock), \
+         patch("app.routers.automations.record_extraction_dispatch", new_callable=AsyncMock):
         from app.main import app
         from app.rate_limit import limiter
 

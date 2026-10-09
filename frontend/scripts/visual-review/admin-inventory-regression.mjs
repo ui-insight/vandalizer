@@ -36,13 +36,13 @@ try {
  await page.getByText('Learner 0000',{exact:true}).waitFor()
  await page.getByRole('button',{name:'Next page',exact:true}).click()
  await page.getByText('Learner 0100',{exact:true}).waitFor()
- await page.getByPlaceholder(/Search users/).fill('0502')
+ await page.getByPlaceholder('Search users or courses...').fill('0502')
  await page.getByRole('button',{name:'Search all records',exact:true}).click()
  await page.getByText('Learner 0502',{exact:true}).waitFor()
  assert.ok(requests.some(r=>r.path.endsWith('/certifications')&&r.offset===0&&r.q==='0502'))
  await shot('certification-global-search-390')
  assert.deepEqual(review.errors,[]); assert.deepEqual([...review.unmatched],[])
- review.observations.push({requests,evidence:'503 synthetic teams/certification records; late team reached after retry; enrollment search reaches outside the initial page.'})
+ review.observations.push({requests,evidence:'503 synthetic teams/enrollments; late team reached after retry; enrollment search reaches outside the initial page.'})
  console.log('Large inventory paging, retry, and global certification search passed')
 } catch(error) { await review.capture('inventory-blocked',String(error)); throw error }
 finally { await review.flush(); await review.browser.close() }

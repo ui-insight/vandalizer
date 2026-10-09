@@ -4,6 +4,7 @@ milestone tracking.
 """
 
 import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -177,7 +178,8 @@ class TestAnnouncementIdempotency:
         with patch("app.services.engagement_service.User") as MockUser, \
              patch("app.services.engagement_service.send_email", AsyncMock(return_value=True)) as mock_send:
             MockUser.find.return_value = qc
-            count = await engagement_service.process_v5_launch_announcement()
+            count = await engagement_service.process_v5_launch_announcement(
+                SimpleNamespace(promotional_emails_enabled=True, frontend_url='https://app.example.test'))
 
         assert count == 0
         mock_send.assert_not_called()
@@ -201,7 +203,8 @@ class TestAnnouncementIdempotency:
         with patch("app.services.engagement_service.User") as MockUser, \
              patch("app.services.engagement_service.send_email", AsyncMock(return_value=True)):
             MockUser.find.return_value = qc
-            count = await engagement_service.process_v5_launch_announcement()
+            count = await engagement_service.process_v5_launch_announcement(
+                SimpleNamespace(promotional_emails_enabled=True, frontend_url='https://app.example.test'))
 
         assert count == 1
         assert user.v5_announcement_sent_at is not None

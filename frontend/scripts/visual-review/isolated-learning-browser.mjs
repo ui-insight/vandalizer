@@ -48,7 +48,7 @@ try {
     for (const name of ['experience', 'comfort', 'concern']) await page.locator('input[type=radio][name="' + name + '"]').first().check()
     await submit.click()
   }
-  await page.getByRole('heading', { name: 'Self-Assessment Complete', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Reflection answers saved', exact: true }).waitFor()
   await shot('live-learning-assessment-saved-320')
   const complete = page.getByRole('button', { name: 'Complete Module', exact: true })
   if (await complete.count()) await complete.click()

@@ -21,6 +21,9 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const srcPath = path.join(here, '../src/components/certification/modules.ts')
 const assessPath = path.join(here, '../src/components/certification/SelfAssessment.tsx')
 const outPath = path.join(here, '../../backend/certification-data/lessons.json')
+const panelPath = path.join(here, '../../backend/certification-data/panel-modules.json')
+const structurePath = path.join(here, '../../backend/certification-data/course-structure.json')
+const constantsPath = path.join(here, '../src/components/certification/constants.ts')
 
 /** Extract a top-level literal that starts after `marker` and ends at the
  * first line that is exactly `closer` at column 0. */
@@ -42,6 +45,12 @@ function extractLiteral(file, marker, opener, closer) {
 const modules = extractLiteral(srcPath, 'export const MODULES', '[', ']')
 const assessments = extractLiteral(assessPath, 'export const MODULE_ASSESSMENTS', '{', '}')
 
+const lessonIds = new Set()
+for (const m of modules) for (const lesson of m.lessons) {
+  if (!lesson.id || !Number.isInteger(lesson.revision) || lesson.revision < 1 || lessonIds.has(lesson.id)) throw new Error(`Invalid or duplicate lesson identity: ${lesson.id}`)
+  lessonIds.add(lesson.id)
+}
+
 const out = {}
 for (const m of modules) {
   out[m.id] = {
@@ -52,10 +61,13 @@ for (const m of modules) {
     tips: m.tips ?? [],
     estimated_minutes: m.estimatedMinutes ?? null,
     lessons: (m.lessons ?? []).map((l) => ({
+      id: l.id,
+      revision: l.revision,
       title: l.title,
       objective: l.objective ?? '',
       content: l.content,
       variant: l.variant ?? 'concept',
+      ...(l.diagram ? { diagram: l.diagram } : {}),
       ...(l.knowledgeCheck ? { knowledge_check: l.knowledgeCheck } : {}),
     })),
     ...(assessments[m.id]
@@ -74,6 +86,18 @@ for (const m of modules) {
   }
 }
 
-writeFileSync(outPath, JSON.stringify(out, null, 2) + '\n')
+const serialized = JSON.stringify(out, null, 2) + '\n'
+const panelSerialized = JSON.stringify(modules, null, 2) + '\n'
+const structureSerialized = JSON.stringify({
+  levels: extractLiteral(constantsPath, 'export const LEVEL_THRESHOLDS', '[', ']'),
+  tiers: extractLiteral(constantsPath, 'export const TIERS', '[', ']'),
+}, null, 2) + '\n'
+if (process.argv.includes('--check')) {
+  if (readFileSync(outPath, 'utf8') !== serialized || readFileSync(panelPath, 'utf8') !== panelSerialized || readFileSync(structurePath, 'utf8') !== structureSerialized) throw new Error('Certification lesson export is stale. Run node scripts/export-lessons.mjs.')
+} else {
+  writeFileSync(outPath, serialized)
+  writeFileSync(panelPath, panelSerialized)
+  writeFileSync(structurePath, structureSerialized)
+}
 const counts = Object.entries(out).map(([id, m]) => `${id}:${m.lessons.length}`).join(' ')
-console.log(`Wrote ${outPath}\nLessons per module — ${counts}`)
+console.log(`${process.argv.includes('--check') ? 'Verified' : 'Wrote'} ${outPath}\nLessons per module — ${counts}`)

@@ -54,7 +54,9 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
  }else await installFixtures(context,state,unmatched);
  // Every navigation starts from the same layout and scope. Interactions within
  // a scenario retain state; separate scenarios cannot inherit a project or KB.
- await context.addInitScript(reset=>{if(reset){localStorage.clear();sessionStorage.clear()}localStorage.setItem('vandalizer:first-run-tour-dismissed','1')},resetStorage);
+ // Opaque initial popup documents and axe-created sandbox frames have no
+ // storage. Only fixture setup is optional; application errors remain tracked.
+ await context.addInitScript(reset=>{try{if(reset){localStorage.clear();sessionStorage.clear()}localStorage.setItem('vandalizer:first-run-tour-dismissed','1')}catch{}},resetStorage);
  if(process.env.REVIEW_TEXT_SCALE==='2')await context.addInitScript(()=>document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.fontSize='32px'}));
  const page=await context.newPage(); page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message)});
  const actionTimeout=Number(process.env.REVIEW_ACTION_TIMEOUT_MS || 30000);

@@ -1941,6 +1941,9 @@ class _FakeSmartDocuments:
                 elif op == "$lt":
                     if not present or value is None or not value < arg:
                         return False
+                elif op == "$exists":
+                    if present != arg:
+                        return False
                 else:
                     raise NotImplementedError(op)
             return True
@@ -1969,6 +1972,8 @@ class _FakeSmartDocuments:
         for row in self.rows:
             if self._matches(row, query):
                 row.update(update["$set"])
+                for key, increment in update.get('$inc', {}).items():
+                    row[key] = row.get(key, 0) + increment
                 return MagicMock(matched_count=1, modified_count=1)
         return MagicMock(matched_count=0, modified_count=0)
 

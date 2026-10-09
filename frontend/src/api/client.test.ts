@@ -321,3 +321,27 @@ describe('parseCsrfToken', () => {
     )
   })
 })
+
+it('preserves an execution-failure code and readable detail for completion recovery', async () => {
+  mockFetch.mockResolvedValueOnce(jsonResponse({ detail: { message: 'Assessment was interrupted', code: 'certification_execution_failed', attempt_id: 'a'.repeat(32) } }, 400))
+  await expect(apiFetch('/api/certification/modules/ai_literacy/complete', { method: 'POST' })).rejects.toMatchObject({
+    status: 400, message: 'Assessment was interrupted', code: 'certification_execution_failed',
+  })
+  expect(mockFetch).toHaveBeenCalledTimes(1)
+})
+
+it.each([
+  [409, 'CERTIFICATION_REVIEW_EXISTS', 'a'.repeat(32), 'a'.repeat(32)],
+  [409, 'OTHER', 'a'.repeat(32), undefined],
+  [503, 'CERTIFICATION_REVIEW_EXISTS', 'a'.repeat(32), undefined],
+  [409, 'CERTIFICATION_REVIEW_EXISTS', '../foreign', undefined],
+])('reads a scoped existing-review reference only from a valid conflict (%s, %s, %s)', async (status, code, id, expected) => {
+  mockFetch.mockResolvedValueOnce(jsonResponse({ detail: { code, attempt_id: id, message: 'Already requested' } }, status as number))
+  const error = await apiFetch('/api/certification/test', { method: 'POST' }).catch(error => error)
+  expect(error).toMatchObject({
+    status, code, message: 'Already requested', ...(expected ? { existingReviewId: expected } : {}),
+  })
+  expect(error).toBeInstanceOf(ApiError)
+  if (!(error instanceof ApiError)) throw new Error('Expected an API conflict')
+  expect(error.existingReviewId).toBe(expected)
+})

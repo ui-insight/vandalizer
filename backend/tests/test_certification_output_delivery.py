@@ -11,8 +11,11 @@ initialized Beanie connection.
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
 
 from app.services import certification_service as cs
+
+pytestmark = pytest.mark.usefixtures('certification_rubric')
 
 
 def _workflow_model(workflows):

@@ -11,6 +11,7 @@ vi.mock('./PanelResizer', () => ({ PanelResizer: () => <div data-testid="resizer
 vi.mock('./LeftPanel', () => ({ LeftPanel: () => <div data-testid="open-file">Open document</div> }))
 vi.mock('./RightPanel', () => ({ RightPanel: () => <div data-testid="library">Library and tools</div> }))
 vi.mock('./UtilityBar', () => ({ UtilityBar: () => <div>Navigation</div> }))
+vi.mock('../certification/CourseEditorReturn', () => ({ CourseEditorReturn: () => null }))
 vi.mock('./ProjectContextBar', () => ({ ProjectContextBar: () => null }))
 vi.mock('./ProjectManageModal', () => ({ ProjectManageModal: () => null }))
 vi.mock('./ProjectsPanel', () => ({ ProjectsPanel: () => <div>Projects</div> }))

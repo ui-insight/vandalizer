@@ -1,11 +1,12 @@
 """Tests for the Phase 11 certification chat tools in app.services.chat_tools.
 
-The tools are thin wrappers over certification_service (the same service the
-Certification panel calls), so these tests mock the service layer and verify
-argument plumbing, result shape, and error handling.
+Most tests mock certification_service to verify argument plumbing, result shape,
+and error handling. Progress contract tests use the actual service serializer,
+mocking only record retrieval, so obsolete fixtures cannot hide response drift.
 """
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -41,9 +42,8 @@ def _progress(modules=None, **overrides):
         "level": "apprentice",
         "certified": False,
         "certified_at": None,
-        "streak_days": 2,
         "last_activity_date": "2026-07-09",
-        "unlocked": [],
+        "unlocked": False,
     }
     base.update(overrides)
     return base
@@ -52,6 +52,43 @@ def _progress(modules=None, **overrides):
 # ---------------------------------------------------------------------------
 # get_certification_progress
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["new", "active", "certified"])
+@pytest.mark.parametrize("legacy_streak", [False, True])
+async def test_progress_service_contract(state, legacy_streak):
+    from app.services import certification_service as cert_svc
+
+    completed_ids = {
+        "new": [],
+        "active": cert_svc.MODULE_ORDER[:2],
+        "certified": cert_svc.MODULE_ORDER,
+    }[state]
+    stored = SimpleNamespace(**_progress(
+        modules={mid: {"completed": True, "stars": 3} for mid in completed_ids},
+        total_xp=0 if state == "new" else 150,
+        level="novice" if state == "new" else "apprentice",
+        certified=state == "certified",
+    ))
+    if legacy_streak:
+        stored.streak_days = 7
+
+    # Keep get_progress_dict real: the regression was at its boundary with
+    # the chat tool, not in the database lookup.
+    with patch.object(cert_svc, "get_progress", new=AsyncMock(return_value=stored)) as get_record:
+        result = await get_certification_progress(_make_context())
+
+    get_record.assert_awaited_once_with("user1")
+    assert result["modules_completed"] == len(completed_ids)
+    assert result["modules_total"] == len(cert_svc.MODULE_ORDER)
+    assert result["next_module_id"] == (
+        cert_svc.MODULE_ORDER[len(completed_ids)] if state != "certified" else None
+    )
+    assert result["certified"] is (state == "certified")
+    assert result["total_xp"] == stored.total_xp
+    assert "streak_days" not in result
+    assert all(row["completed"] == (row["module_id"] in completed_ids) for row in result["modules"])
 
 
 @pytest.mark.asyncio
@@ -230,7 +267,10 @@ async def test_get_lesson_returns_content_and_position():
                 "objective": "learn things",
                 "content": "second",
                 "variant": "insight",
-                "knowledge_check": {"question": "Q?", "options": []},
+                "knowledge_check": {"question": "Q?", "options": [
+                    {"text": "Inspect the source", "correct": True, "explanation": "Check the original evidence."},
+                    {"text": "Trust the claim", "correct": False, "explanation": "A claim alone is not evidence."},
+                ]},
             },
         ],
     }
@@ -437,3 +477,31 @@ async def test_assessment_stores_only_required_keys_stripped():
         "comfort": "pretty comfortable",
         "concern": "hallucinations",
     }
+
+
+@pytest.mark.asyncio
+async def test_real_lesson_export_preserves_identity_diagrams_and_practice():
+    """Exercise the actual authored export through the actual read-only tool."""
+    from app.services import certification_service as cert_svc
+
+    identities = set()
+    diagrams = set()
+    practice_count = 0
+    for module_id in cert_svc.MODULE_ORDER:
+        authored = cert_svc.get_lessons(module_id)
+        for index, lesson in enumerate(authored['lessons']):
+            result = await get_certification_lesson(_make_context(), module_id, index + 1)
+            assert result['content'] == lesson['content']
+            assert result['lesson_id'] == lesson['id']
+            assert result['lesson_revision'] == lesson['revision']
+            assert result['lesson_id'] not in identities
+            identities.add(result['lesson_id'])
+            assert result['diagram'] == lesson.get('diagram')
+            assert result['knowledge_check'] == lesson.get('knowledge_check')
+            if result['diagram']:
+                diagrams.add(result['diagram'])
+            if result['knowledge_check']:
+                practice_count += 1
+    assert len(identities) == 74
+    assert len(diagrams) == 8
+    assert practice_count == 18

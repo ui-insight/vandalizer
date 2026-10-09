@@ -40,6 +40,15 @@ def mock_celery():
 
 
 class TestDispatchUploadTasks:
+    def test_retry_generation_reaches_every_dispatched_task(self, mock_celery):
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks('doc-uuid', 'pdf', '/uploads/test.pdf', user_id='learner', extraction_revision=7)
+        calls = mock_celery.signature.call_args_list + mock_celery.send_task.call_args_list
+        assert len(calls) == 6
+        assert all(call.kwargs['kwargs']['extraction_revision'] == 7 for call in calls)
+        mock_celery._chain_result.apply_async.assert_called_once_with(link_error=mock_celery._cleanup_sig)
+
     def test_returns_task_id(self, mock_celery):
         from app.tasks.upload_tasks import dispatch_upload_tasks
 

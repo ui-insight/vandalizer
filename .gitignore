@@ -101,3 +101,8 @@ scripts/ui_endpoint_map.*
 /artifacts/visual-review/*/
 !/artifacts/visual-review/upgrade-review/
 /artifacts/visual-review/upgrade-review/*.png
+
+# Local certification release authoring locks and atomic-write staging.
+backend/certification-data/courses/.authoring.lock
+backend/certification-data/courses/.registry-*/
+backend/certification-data/courses/.draft-*/

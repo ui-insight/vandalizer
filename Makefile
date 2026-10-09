@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci helm-lint docker-build release-check security security-gate security-built-images
+.PHONY: certification-release-check frontend-certification-check help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci helm-lint docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
@@ -94,7 +94,10 @@ endpoint-map:
 endpoint-map-check:
 	cd $(BACKEND_DIR) && uv run python ../scripts/map_ui_endpoints.py --check --stdout >/dev/null
 
-backend-static: backend-lint backend-security endpoint-map-check
+certification-release-check:
+	cd $(BACKEND_DIR) && uv run python ../scripts/check_certification_releases.py
+
+backend-static: certification-release-check backend-lint backend-security endpoint-map-check
 
 backend-backlog: backend-typecheck backend-audit
 
@@ -151,7 +154,10 @@ frontend-build:
 frontend-audit:
 	./scripts/npm_audit_gate.sh
 
-frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
+frontend-certification-check:
+	cd $(FRONTEND_DIR) && npm run certification:check
+
+frontend-ci: frontend-certification-check frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
 
 ci: backend-ci frontend-ci
 

@@ -1,0 +1,232 @@
+[
+  {
+    "tool_name": "submit_certification_assessment",
+    "content": {
+      "course_version": "legacy-2026-10-02.1",
+      "course_title": "Vandal Workflow Architect \u2014 current course",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "state": "published",
+      "supported_for_existing": true,
+      "modules_total": 11,
+      "module_ids": [
+        "ai_literacy",
+        "foundations",
+        "process_mapping",
+        "workflow_design",
+        "extraction_engine",
+        "multi_step",
+        "advanced_nodes",
+        "output_delivery",
+        "validation_qa",
+        "batch_processing",
+        "governance"
+      ],
+      "maximum_xp": 2675,
+      "historical_provenance": "continuation-baseline",
+      "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+      "maximum_stars": 3,
+      "credit_basis": "legacy_rubric",
+      "stored": true,
+      "module_id": "ai_literacy",
+      "message": "Answers saved. Run check_certification_module then complete_certification_module to bank the XP."
+    }
+  },
+  {
+    "tool_name": "check_certification_module",
+    "content": {
+      "course_version": "legacy-2026-10-02.1",
+      "course_title": "Vandal Workflow Architect \u2014 current course",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "state": "published",
+      "supported_for_existing": true,
+      "modules_total": 11,
+      "module_ids": [
+        "ai_literacy",
+        "foundations",
+        "process_mapping",
+        "workflow_design",
+        "extraction_engine",
+        "multi_step",
+        "advanced_nodes",
+        "output_delivery",
+        "validation_qa",
+        "batch_processing",
+        "governance"
+      ],
+      "maximum_xp": 2675,
+      "historical_provenance": "continuation-baseline",
+      "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+      "maximum_stars": 3,
+      "credit_basis": "legacy_rubric",
+      "module_id": "ai_literacy",
+      "title": "AI Literacy",
+      "passed": true,
+      "stars": 3,
+      "checks": [
+        {
+          "name": "Self-assessment completed",
+          "passed": true,
+          "detail": "Answer all 3 reflection questions",
+          "role": "required"
+        }
+      ]
+    }
+  },
+  {
+    "tool_name": "complete_certification_module",
+    "content": {
+      "course_version": "legacy-2026-10-02.1",
+      "course_title": "Vandal Workflow Architect \u2014 current course",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "state": "published",
+      "supported_for_existing": true,
+      "modules_total": 11,
+      "module_ids": [
+        "ai_literacy",
+        "foundations",
+        "process_mapping",
+        "workflow_design",
+        "extraction_engine",
+        "multi_step",
+        "advanced_nodes",
+        "output_delivery",
+        "validation_qa",
+        "batch_processing",
+        "governance"
+      ],
+      "maximum_xp": 2675,
+      "historical_provenance": "continuation-baseline",
+      "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+      "maximum_stars": 3,
+      "credit_basis": "legacy_rubric",
+      "module_id": "ai_literacy",
+      "stars": 3,
+      "xp_earned": 125,
+      "total_xp": 125,
+      "level": "apprentice",
+      "level_up": true,
+      "certified": false,
+      "validation": {
+        "course_version": "legacy-2026-10-02.1",
+        "course_title": "Vandal Workflow Architect \u2014 current course",
+        "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+        "state": "published",
+        "supported_for_existing": true,
+        "modules_total": 11,
+        "module_ids": [
+          "ai_literacy",
+          "foundations",
+          "process_mapping",
+          "workflow_design",
+          "extraction_engine",
+          "multi_step",
+          "advanced_nodes",
+          "output_delivery",
+          "validation_qa",
+          "batch_processing",
+          "governance"
+        ],
+        "maximum_xp": 2675,
+        "historical_provenance": "continuation-baseline",
+        "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+        "maximum_stars": 3,
+        "credit_basis": "legacy_rubric",
+        "passed": true,
+        "stars": 3,
+        "checks": [
+          {
+            "name": "Self-assessment completed",
+            "passed": true,
+            "detail": "Answer all 3 reflection questions",
+            "role": "required"
+          }
+        ],
+        "rubric_id": "legacy-2026-10-02"
+      },
+      "attempt_id": "f05cc0444ab54526b9c4fd082c06ae0e",
+      "title": "AI Literacy"
+    }
+  },
+  {
+    "tool_name": "complete_certification_module",
+    "content": {
+      "course_version": "legacy-2026-10-02.1",
+      "course_title": "Vandal Workflow Architect \u2014 current course",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "state": "published",
+      "supported_for_existing": true,
+      "modules_total": 11,
+      "module_ids": [
+        "ai_literacy",
+        "foundations",
+        "process_mapping",
+        "workflow_design",
+        "extraction_engine",
+        "multi_step",
+        "advanced_nodes",
+        "output_delivery",
+        "validation_qa",
+        "batch_processing",
+        "governance"
+      ],
+      "maximum_xp": 2675,
+      "historical_provenance": "continuation-baseline",
+      "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+      "maximum_stars": 3,
+      "credit_basis": "legacy_rubric",
+      "module_id": "ai_literacy",
+      "stars": 3,
+      "xp_earned": 0,
+      "total_xp": 125,
+      "level": "apprentice",
+      "level_up": false,
+      "certified": false,
+      "validation": {
+        "course_version": "legacy-2026-10-02.1",
+        "course_title": "Vandal Workflow Architect \u2014 current course",
+        "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+        "state": "published",
+        "supported_for_existing": true,
+        "modules_total": 11,
+        "module_ids": [
+          "ai_literacy",
+          "foundations",
+          "process_mapping",
+          "workflow_design",
+          "extraction_engine",
+          "multi_step",
+          "advanced_nodes",
+          "output_delivery",
+          "validation_qa",
+          "batch_processing",
+          "governance"
+        ],
+        "maximum_xp": 2675,
+        "historical_provenance": "continuation-baseline",
+        "enrollment_id": "9b8cdbbb05565b60a1bf116a82ce35be",
+        "maximum_stars": 3,
+        "credit_basis": "legacy_rubric",
+        "passed": true,
+        "stars": 3,
+        "checks": [
+          {
+            "name": "Self-assessment completed",
+            "passed": true,
+            "detail": "Answer all 3 reflection questions",
+            "role": "required"
+          }
+        ],
+        "rubric_id": "legacy-2026-10-02"
+      },
+      "attempt_id": "c9fac4e92d2b4550b139af4e61ee2567",
+      "title": "AI Literacy"
+    }
+  },
+  {
+    "tool_name": "complete_certification_module",
+    "content": {
+      "error": "The selected course changed; reload before submitting",
+      "hint": "Reload certification progress before continuing."
+    }
+  }
+]

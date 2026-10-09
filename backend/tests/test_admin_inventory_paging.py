@@ -1,4 +1,4 @@
-"""Paging does not hide teams or certification users after a cap."""
+"""Paging does not hide teams or preserved certification enrollments after a cap."""
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
@@ -28,12 +28,13 @@ async def test_team_page_uses_stable_database_paging_and_counts():
 @pytest.mark.asyncio
 async def test_certification_search_and_paging_reach_beyond_500():
     progresses = [SimpleNamespace(id=str(i), user_id=f'user-{i:04d}', modules={}, level='novice', total_xp=0, certified=False, certified_at=None, last_activity_date=None, unlocked=False, updated_at=None) for i in range(502)]
-    with patch('app.routers.admin._require_admin', new_callable=AsyncMock), patch('app.models.certification.CertificationProgress') as model, patch('app.routers.admin.User') as users:
+    metadata = {str(i): {'module_ids': [], 'progress_id': str(i), 'course_title': 'Preserved course' if i == 501 else 'Selected course'} for i in range(502)}
+    with patch('app.routers.admin._require_admin', new_callable=AsyncMock), patch('app.models.certification.CertificationProgress') as model, patch('app.routers.admin.User') as users, patch('app.services.certification_versions.readers.support_metadata_many', new_callable=AsyncMock, side_effect=lambda _: {k: dict(v) for k,v in metadata.items()}):
         model.find.return_value.to_list = AsyncMock(return_value=progresses)
         users.find.return_value.to_list = AsyncMock(return_value=[])
         page = await list_certification_progress(limit=500, offset=500, q='', user=object())
         assert [item.user_id for item in page.items] == ['user-0500', 'user-0501']
         assert page.total == 502 and not page.capped
-        search = await list_certification_progress(limit=100, offset=0, q='user-0501', user=object())
+        search = await list_certification_progress(limit=100, offset=0, q='preserved', user=object())
         assert [item.user_id for item in search.items] == ['user-0501']
         assert search.total == 1

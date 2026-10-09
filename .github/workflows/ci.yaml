@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -28,8 +30,30 @@ jobs:
       - name: Install backend dependencies
         run: make backend-install
 
+      - name: Preserve published certification releases
+        env:
+          COURSE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$COURSE_BASE_REF" ] && [ "$COURSE_BASE_REF" != "0000000000000000000000000000000000000000" ]; then
+            cd backend && uv run python ../scripts/check_certification_releases.py --base-ref "$COURSE_BASE_REF"
+          fi
+
       - name: Run backend release checks
         run: make backend-static
+
+      - name: Verify certification outcome and teaching traceability
+        working-directory: backend
+        run: |
+          mkdir -p ../artifacts/certification
+          uv run python ../scripts/check_certification_outcomes.py > ../artifacts/certification/outcome-matrix.json
+
+      - name: Preserve certification outcome matrix
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: certification-outcome-matrix
+          path: artifacts/certification/outcome-matrix.json
+          if-no-files-found: warn
 
   backend-typecheck:
     name: Backend Mypy (advisory)
@@ -195,6 +219,52 @@ jobs:
 
       - name: Run Tier 2 (MongoDB)
         run: make backend-test-integration-t2
+
+  certification-persistence:
+    name: Certification persistence (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --ulimit nofile=65536:65536
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv
+      - name: Install backend dependencies
+        run: make backend-install
+      - name: Verify every certification persistence family
+        working-directory: backend
+        env:
+          CERTIFICATION_TEST_MONGO_URL: mongodb://127.0.0.1:27017
+          PROMOTIONAL_EMAILS_ENABLED: "false"
+        run: >-
+          uv run python ../scripts/run_certification_integration.py
+          --shard-index ${{ matrix.shard }} --shard-count 4
+          --report ../artifacts/certification/shard-${{ matrix.shard }}.json
+          --junitxml ../artifacts/certification/shard-${{ matrix.shard }}.xml
+      - name: Preserve certification case inventory and failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: certification-persistence-${{ matrix.shard }}
+          path: artifacts/certification/
+          if-no-files-found: warn
 
   frontend:
     name: Frontend
