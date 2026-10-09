@@ -1,3 +1,4 @@
+import { ExtractionFieldInstructions } from '../extractions/ExtractionFieldInstructions'
 import { useTestCaseSave } from '../../hooks/useTestCaseSave'
 import { SHARE_LABEL } from '../../lib/catalogLabels'
 import React, { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
@@ -1424,7 +1425,7 @@ function DesignTab({
   activeResultIdx,
   onSetActiveResultIdx,
 }: {
-  items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
+  items: { id: string; title?: string | null; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   itemsLoading: boolean
   results: Record<string, string>
   hasResults: boolean
@@ -1436,7 +1437,7 @@ function DesignTab({
   onExportCopy: () => void
   onSaveToProject?: () => void
   onRemoveItem: (id: string) => void
-  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
+  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => Promise<unknown> | void
   onReorder: (itemIds: string[]) => void
   searchSetUuid?: string
   onValueClick: (field: string, value: string) => void
@@ -1727,6 +1728,7 @@ function DesignTab({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {items.map((item, idx) => {
+            const fieldName = item.title || item.searchphrase
             const resultVal = results[item.searchphrase]
             const isDragging = dragIdx === idx
             const isOver = overIdx === idx && dragIdx !== idx
@@ -1746,7 +1748,7 @@ function DesignTab({
                   transition: 'opacity 0.15s',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                   <GripVertical
                     aria-hidden="true"
                     style={{
@@ -1783,8 +1785,8 @@ function DesignTab({
                       onChange={(e) => setEditDraft(e.target.value)}
                       onBlur={() => {
                         const trimmed = editDraft.trim()
-                        if (trimmed && trimmed !== item.searchphrase) {
-                          onUpdateItem(item.id, { searchphrase: trimmed, title: trimmed })
+                        if (trimmed && trimmed !== fieldName) {
+                          onUpdateItem(item.id, { title: trimmed, ...(item.searchphrase === fieldName ? { searchphrase: trimmed } : {}) })
                         }
                         setEditingId(null)
                       }}
@@ -1793,7 +1795,7 @@ function DesignTab({
                         if (e.key === 'Escape') setEditingId(null)
                       }}
                       style={{
-                        flex: 1,
+                        flex: '1 1 12rem', minWidth: 0,
                         fontSize: 'var(--workspace-font-body)',
                         fontFamily: 'inherit',
                         color: '#202124',
@@ -1826,14 +1828,14 @@ function DesignTab({
                           nameClickTimer.current = null
                         }
                         setEditingId(item.id)
-                        setEditDraft(item.searchphrase)
+                        setEditDraft(fieldName)
                       }}
                       aria-expanded={expandedSettingsId === item.id}
                       aria-controls={`field-settings-${item.id}`}
                       title="Click for settings, double-click to rename"
                       style={{
                         background: 'none', border: 'none', padding: 0, margin: 0,
-                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: 1,
+                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: '1 1 12rem',
                         minWidth: 0, cursor: 'pointer', textAlign: 'left',
                         display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                       }}
@@ -1842,9 +1844,9 @@ function DesignTab({
                         ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
                         : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
                       }
-                      {item.searchphrase}
+                      {fieldName}
                       {item.is_optional && (
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: "1px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', background: '#f3f4f6', borderRadius: 3, padding: "1px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
                       )}
                       {item.enum_values.length > 0 && (
                         <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: "1px var(--workspace-space-4)", fontWeight: 500 }}>{item.enum_values.length}</span>
@@ -1855,12 +1857,13 @@ function DesignTab({
                     type="button"
                     onClick={() => moveItem(idx, -1)}
                     disabled={idx === 0}
-                    aria-label={`Move ${item.searchphrase} up`}
+                    aria-label={`Move ${fieldName} up`}
                     title="Move up"
                     style={{
                       background: 'none',
                       border: 'none',
                       cursor: idx === 0 ? 'default' : 'pointer',
+                      marginLeft: 'auto',
                       padding: 'var(--workspace-space-4)',
                       color: '#6b7280',
                       opacity: idx === 0 ? 0.4 : 1,
@@ -1874,7 +1877,7 @@ function DesignTab({
                     type="button"
                     onClick={() => moveItem(idx, 1)}
                     disabled={idx === items.length - 1}
-                    aria-label={`Move ${item.searchphrase} down`}
+                    aria-label={`Move ${fieldName} down`}
                     title="Move down"
                     style={{
                       background: 'none',
@@ -1892,7 +1895,7 @@ function DesignTab({
                   <button
                     type="button"
                     onClick={() => onRemoveItem(item.id)}
-                    aria-label={`Remove ${item.searchphrase}`}
+                    aria-label={`Remove ${fieldName}`}
                     title="Remove"
                     style={{
                       background: 'none',
@@ -1929,14 +1932,14 @@ function DesignTab({
                       {(!resultVal || resultVal === 'N/A') && <p style={{ margin: '4px 0', color: '#92400e' }}>No confirmed value. Check the source; this does not establish that the information is absent.</p>}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                         {clickable && <button type="button"
-                          aria-label={`Inspect source for ${item.searchphrase}`}
+                          aria-label={`Inspect source for ${fieldName}`}
                           title={clickTitle}
                           onClick={() => onValueClick(item.searchphrase, resultVal)}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', background: '#fff', color: '#334155', font: 'inherit' }}>
                           <Eye size={14} aria-hidden="true" /> Inspect source
                           {badge && <span style={{ color: badge.color, background: badge.background, padding: '1px 4px', borderRadius: 3 }}>{badge.label(locator)}</span>}
                         </button>}
-                        <button type="button" aria-label={`Copy value for ${item.searchphrase}`}
+                        <button type="button" aria-label={`Copy value for ${fieldName}`}
                           onClick={() => { void navigator.clipboard.writeText(resultVal).then(() => toast('Value copied', 'success')).catch(() => toast('Could not copy value. Select the text to copy it.', 'error')) }}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px', background: '#fff', color: '#334155', font: 'inherit' }}>
                           <Copy size={14} aria-hidden="true" /> Copy value
@@ -1948,14 +1951,15 @@ function DesignTab({
                 {expandedSettingsId === item.id && (
                   <div id={`field-settings-${item.id}`} style={{
                     marginTop: 'var(--workspace-space-6)',
-                    marginLeft: 42,
+                    marginLeft: 0,
                     padding: "var(--workspace-space-8) var(--workspace-space-12)",
                     background: '#f9fafb',
                     borderRadius: 'var(--workspace-radius-small)',
                     border: "1px solid var(--workspace-border)",
                     fontSize: 'var(--workspace-font-meta)',
                   }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', marginBottom: 'var(--workspace-space-8)' }}>
+                    <ExtractionFieldInstructions fieldName={fieldName} instruction={item.searchphrase} onSave={value => onUpdateItem(item.id, { searchphrase: value })} />
+                    <label style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', marginBlock: 'var(--workspace-space-8)' }}>
                       <input
                         type="checkbox"
                         checked={item.is_optional}
@@ -1973,7 +1977,9 @@ function DesignTab({
                         onChange={(e) => setEnumDraft(e.target.value)}
                         onBlur={() => {
                           const vals = enumDraft.split(',').map(v => v.trim()).filter(Boolean)
-                          onUpdateItem(item.id, { enum_values: vals })
+                          if (vals.length !== item.enum_values.length || vals.some((value, index) => value !== item.enum_values[index])) {
+                            onUpdateItem(item.id, { enum_values: vals })
+                          }
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -3753,7 +3759,7 @@ function ValidateTab({
                               }}>
                                 {item.searchphrase}
                                 {item.is_optional && (
-                                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: "0px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
+                                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', background: '#f3f4f6', borderRadius: 3, padding: "0px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
                                 )}
                               </span>
                               <input

@@ -202,6 +202,7 @@ const indexRoute = createRoute({
     // Optional, so the many links that spell out the full search needn't name them.
     ...(search.docs ? { docs: search.docs as string } : {}),
     ...(search.folders ? { folders: search.folders as string } : {}),
+    ...((search.courseEditor === '1' || search.courseEditor === 1) ? { courseEditor: '1' as const } : {}),
     // Project scope — present when arriving from "Chat with this project".
     project: (search.project as string) || undefined,
     // Share-link tokens — present when arriving from a "Copy share link" URL

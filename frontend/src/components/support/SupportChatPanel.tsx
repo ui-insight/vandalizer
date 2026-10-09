@@ -27,6 +27,7 @@ import { useConfirm } from '../shared/useConfirm'
 import * as supportApi from '../../api/support'
 import { submitProductFeedback } from '../../api/feedback'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
+import type { SupportDraftContext } from '../../utils/supportPanel'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -1525,6 +1526,8 @@ export function SupportChatPanel({
   const [draft, setDraft] = useState<TicketDraft>(emptyTicketDraft)
   const [replyDrafts, setReplyDrafts] = useState<Record<string, ReplyDraft>>({})
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
+  const [pendingContext, setPendingContext] = useState<SupportDraftContext | null>(null)
+  const addedContexts = useRef(new Set<string>())
   const [activeTicket, setActiveTicket] = useState<string | null>(initialTicket || null)
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -1574,11 +1577,29 @@ export function SupportChatPanel({
       if (ticketUuid) {
         setActiveTicket(ticketUuid)
         setView('chat')
+      } else if (detail?.draft) {
+        setPendingContext(detail.draft)
       }
     }
     window.addEventListener('open-support-panel', handler)
     return () => window.removeEventListener('open-support-panel', handler)
   }, [])
+
+  // Keep an outgoing ticket's draft untouched until its request settles. New
+  // context is then added to the remaining draft, preserving text and files.
+  useEffect(() => {
+    if (!pendingContext || ticketSubmitting) return
+    if (!addedContexts.current.has(pendingContext.key)) {
+      addedContexts.current.add(pendingContext.key)
+      setDraft(current => ({
+        ...current,
+        subject: current.subject.trim() ? current.subject : pendingContext.subject,
+        message: current.message.trim() ? `${current.message}\n\n${pendingContext.message}` : pendingContext.message,
+      }))
+    }
+    setView('new')
+    setPendingContext(null)
+  }, [pendingContext, ticketSubmitting])
 
   // This panel is nonmodal: users may still read the workspace. Return focus
   // only when closing from inside it, without stealing focus from other work.
@@ -1663,6 +1684,7 @@ export function SupportChatPanel({
           onBack={() => setView('list')}
           onCreated={(ticket) => {
             setDraft(emptyTicketDraft())
+            addedContexts.current.clear()
             setActiveTicket(ticket.uuid)
             setView('chat')
             loadTickets()

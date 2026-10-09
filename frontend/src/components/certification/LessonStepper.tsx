@@ -22,6 +22,10 @@ export function LessonStepper({
   provisioning,
   isProvisioned,
   hasDocuments,
+  enrollmentId,
+  savedLessonId,
+  onSavePosition,
+  onReloadPosition,
 }: {
   lessons: LessonSection[]
   moduleId: string
@@ -33,28 +37,58 @@ export function LessonStepper({
   provisioning?: boolean
   isProvisioned?: boolean
   hasDocuments?: boolean
+  enrollmentId?: string
+  savedLessonId?: string
+  onSavePosition?: (lessonId: string) => Promise<void>
+  onReloadPosition?: () => Promise<void>
 }) {
   const { user } = useAuth()
-  // Resume from localStorage, scoped by user
-  const storageKey = `cert-lesson:${user?.user_id || ''}:${moduleId}`
-  const [currentIndex, setCurrentIndex] = useState(() => {
-    const saved = localStorage.getItem(storageKey)
-    const idx = saved ? parseInt(saved, 10) : 0
-    return isNaN(idx) || idx < 0 || idx >= lessons.length ? 0 : idx
-  })
-  const [readLessons, setReadLessons] = useState<Set<number>>(() => new Set([0]))
+  // Keep legacy numeric positions intact. Versioned positions belong to one
+  // enrollment and use authored identities, so other courses cannot reuse them.
+  const storageKey = enrollmentId ? `cert-lesson:${user?.user_id || ''}:${enrollmentId}:${moduleId}` : `cert-lesson:${user?.user_id || ''}:${moduleId}`
+  const usesServerPosition = Boolean(enrollmentId && onSavePosition)
+  const restorePosition = useCallback((): string | number => {
+    try {
+      if (usesServerPosition) return lessons.some(lesson => lesson.id === savedLessonId) ? savedLessonId! : (lessons[0]?.id ?? 0)
+      const saved = localStorage.getItem(storageKey)
+      if (enrollmentId) return saved && lessons.some(lesson => lesson.id === saved) ? saved : (lessons[0]?.id ?? 0)
+      const idx = saved ? parseInt(saved, 10) : 0
+      return Number.isInteger(idx) && idx >= 0 && idx < lessons.length ? idx : 0
+    } catch { return lessons[0]?.id ?? 0 }
+  }, [storageKey, enrollmentId, lessons, savedLessonId, usesServerPosition])
+  const [currentPosition, setCurrentPosition] = useState<string | number>(restorePosition)
+  const [positionStatus, setPositionStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const savingPosition = useRef(false)
+  const savePlace = useCallback(async (lessonId: string) => {
+    if (!onSavePosition || savingPosition.current) return
+    savingPosition.current = true
+    setPositionStatus('saving')
+    try {
+      await onSavePosition(lessonId)
+      setPositionStatus('saved')
+    } catch { setPositionStatus('error') }
+    finally { savingPosition.current = false }
+  }, [onSavePosition])
+  const setCurrentIndex = useCallback((index: number) => {
+    if (savingPosition.current) return
+    setCurrentPosition(enrollmentId ? (lessons[index]?.id ?? index) : index)
+    if (enrollmentId && lessons[index]?.id) void savePlace(lessons[index].id!)
+  }, [enrollmentId, lessons, savePlace])
+  const [readLessons, setReadLessons] = useState<Set<number>>(() => new Set())
   const { toast } = useToast()
 
   // Reset when moduleId changes (component reused for different module)
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey)
-    const idx = saved ? parseInt(saved, 10) : 0
-    setCurrentIndex(isNaN(idx) || idx < 0 || idx >= lessons.length ? 0 : idx)
-    setReadLessons(new Set([0]))
-  }, [moduleId, storageKey, lessons.length])
+    setCurrentPosition(restorePosition())
+  }, [restorePosition])
+  useEffect(() => {
+    setReadLessons(new Set())
+    setPositionStatus('idle')
+  }, [moduleId, enrollmentId])
 
   // Clamp index if it ever goes out of bounds
-  const safeIndex = currentIndex >= lessons.length ? 0 : currentIndex
+  const currentIndex = typeof currentPosition === 'string' ? lessons.findIndex(lesson => lesson.id === currentPosition) : currentPosition
+  const safeIndex = currentIndex < 0 || currentIndex >= lessons.length ? 0 : currentIndex
 
   // Keep a stable ref to onStepChange so the scroll effect doesn't re-fire
   // every time the parent re-renders (inline arrow functions change every render)
@@ -69,12 +103,12 @@ export function LessonStepper({
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     onStepChangeRef.current?.()
-  }, [safeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [safeIndex])
 
   // Persist current lesson to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, String(safeIndex))
-  }, [safeIndex, storageKey])
+    try { localStorage.setItem(storageKey, enrollmentId ? (lessons[safeIndex]?.id ?? '') : String(safeIndex)) } catch { /* Reading still works without local storage. */ }
+  }, [safeIndex, storageKey, enrollmentId, lessons])
 
   // Mark current lesson as read
   useEffect(() => {
@@ -93,17 +127,17 @@ export function LessonStepper({
       setCurrentIndex(nextIdx)
       setReadLessons(prev => {
         if (prev.has(nextIdx)) return new Set([...prev])
-        toast(`Lesson ${safeIndex + 1} of ${lessons.length} complete!`, 'success')
+        toast(`Lesson ${safeIndex + 1} of ${lessons.length} viewed`, 'success')
         return new Set([...prev, nextIdx])
       })
     }
-  }, [safeIndex, lessons.length, toast])
+  }, [safeIndex, lessons.length, toast, setCurrentIndex])
 
   const goPrev = useCallback(() => {
     if (safeIndex > 0) {
       setCurrentIndex(safeIndex - 1)
     }
-  }, [safeIndex])
+  }, [safeIndex, setCurrentIndex])
 
   // Notify when all lessons read
   useEffect(() => {
@@ -119,30 +153,40 @@ export function LessonStepper({
 
   return (
     <div className="space-y-4">
-      {/* Progress bar with dots */}
-      <div className="flex items-center gap-1.5 px-1">
+      {/* Numbered lesson navigation wraps within narrow and docked panels. */}
+      <nav aria-label="Lessons in this module" className="grid grid-cols-[repeat(auto-fit,minmax(2.75rem,1fr))] gap-1.5 px-1">
         {lessons.map((_, i) => (
           <button
             key={i}
             type="button"
+            disabled={positionStatus === 'saving'}
             onClick={() => setCurrentIndex(i)}
-            aria-label={`Lesson ${i + 1}: ${lessons[i].title}`}
+            aria-label={`Lesson ${i + 1}: ${lessons[i].title}${readLessons.has(i) ? ", viewed" : ""}`}
+            aria-current={i === safeIndex ? "step" : undefined}
             className={cn(
-              'h-2 flex-1 transition-all duration-300',
+              'min-h-11 min-w-0 text-sm font-semibold transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900',
               i === safeIndex
-                ? 'bg-highlight cert-dot-pulse'
+                ? 'bg-highlight text-highlight-text ring-2 ring-inset ring-highlight-text'
                 : readLessons.has(i)
-                  ? 'bg-green-400'
-                  : 'bg-gray-200',
+                  ? 'bg-green-400 text-gray-900'
+                  : 'bg-gray-200 text-gray-900',
             )}
             style={{
               borderRadius: 'var(--ui-radius, 12px)',
               ...(i === safeIndex ? { background: 'var(--highlight-color)' } : {}),
             }}
             title={`Lesson ${i + 1}: ${lessons[i].title}`}
-          />
+          ><span aria-hidden="true">{i + 1}</span></button>
         ))}
-      </div>
+      </nav>
+
+      {enrollmentId && onSavePosition && (
+        <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-gray-600">
+          <span role="status">{positionStatus === 'saving' ? 'Saving your place…' : positionStatus === 'saved' ? 'Place saved across devices.' : positionStatus === 'error' ? 'Your place could not be saved. Reload the saved place before trying again.' : 'Lesson navigation saves your place across devices.'}</span>
+          {positionStatus === 'error' && <button type="button" className="underline font-medium" onClick={() => { void onReloadPosition?.() }}>Refresh progress</button>}
+          <button type="button" className="underline font-medium disabled:opacity-50" disabled={positionStatus === 'saving'} onClick={() => { if (lessons[safeIndex].id) void savePlace(lessons[safeIndex].id!) }}>Save this place</button>
+        </div>
+      )}
 
       {/* Lesson counter + read time */}
       <div className="flex items-center justify-between px-1">
@@ -157,7 +201,9 @@ export function LessonStepper({
 
       {/* Lesson content with transition */}
       <div className="cert-slide-in" key={safeIndex}>
-        <LessonContent section={lessons[safeIndex]} />
+        <LessonContent section={lessons[safeIndex]} practiceScope={lessons[safeIndex].id && lessons[safeIndex].revision ? {
+          userId: user?.user_id || '', enrollmentId, moduleId, lessonId: lessons[safeIndex].id!, revision: lessons[safeIndex].revision!,
+        } : undefined} />
       </div>
 
       {/* Inline Set Up Lab CTA — shown when the lesson references the button */}
@@ -176,7 +222,7 @@ export function LessonStepper({
               <Upload size={16} className="text-blue-600 shrink-0" />
             )}
             <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
-              {isProvisioned ? 'Lab documents are ready' : 'Set up your lab to load the sample document'}
+              {isProvisioned ? 'Sample files are assigned; check their status above' : 'Set up your lab to load the sample document'}
             </span>
           </div>
           <button
@@ -198,7 +244,7 @@ export function LessonStepper({
             ) : isProvisioned ? (
               <>
                 <Check size={14} />
-                Ready
+                Assigned
               </>
             ) : (
               <>
@@ -252,7 +298,7 @@ export function LessonStepper({
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={goPrev}
-          disabled={safeIndex === 0}
+          disabled={safeIndex === 0 || positionStatus === 'saving'}
           className={cn(
             'flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all',
             'border border-gray-200 hover:border-gray-300 disabled:opacity-30 disabled:cursor-not-allowed',
@@ -275,6 +321,7 @@ export function LessonStepper({
         ) : (
           <button
             onClick={goNext}
+            disabled={positionStatus === 'saving'}
             className="flex items-center gap-1.5 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
             style={{ borderRadius: 'var(--ui-radius, 12px)' }}
           >

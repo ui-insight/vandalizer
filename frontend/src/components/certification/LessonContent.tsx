@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { BookOpen, Lightbulb, Play } from 'lucide-react'
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
+import { renderCertificationMarkdown } from '../../lib/certificationMarkdown'
 import { cn } from '../../lib/cn'
 import type { LessonSection } from '../../types/certification'
 import { KnowledgeCheck } from './KnowledgeCheck'
+import { practiceStorageKey, type PracticeScope } from '../../lib/certificationPractice'
 import { HowLLMWorksDiagram } from './diagrams/HowLLMWorks'
 import { AIHumanPatternDiagram } from './diagrams/AIHumanPattern'
 import { AISuitabilityDiagram } from './diagrams/AISuitability'
@@ -13,8 +13,6 @@ import { StepGranularityDiagram } from './diagrams/StepGranularity'
 import { ExtractionOutputExample } from './diagrams/ExtractionOutputExample'
 import { WorkflowResultExample } from './diagrams/WorkflowResultExample'
 import { ValidationPlanExample } from './diagrams/ValidationPlanExample'
-
-marked.setOptions({ breaks: true, gfm: true })
 
 const VARIANT_STYLES: Record<LessonSection['variant'], { icon: React.ComponentType<{ size?: number; className?: string }>; border: string; bg: string; label: string }> = {
   concept:     { icon: BookOpen,  border: 'border-blue-200',   bg: 'bg-blue-50/50',    label: 'Concept' },
@@ -58,17 +56,16 @@ function parseKeyTerms(content: string): { term: string; definition: string }[] 
   return terms.length >= 2 ? terms : null
 }
 
-export function LessonContent({ section }: { section: LessonSection }) {
+export function LessonContent({ section, practiceScope }: { section: LessonSection; practiceScope?: PracticeScope }) {
   const style = VARIANT_STYLES[section.variant]
   const Icon = style.icon
-  const DiagramComponent = section.diagram ? DIAGRAM_MAP[section.diagram] : null
 
   // For key-terms variant, try to parse as collapsible terms
   const keyTerms = section.variant === 'key-terms' ? parseKeyTerms(section.content) : null
 
   const renderedHtml = useMemo(() => {
     if (keyTerms) return null // Will render as collapsible cards instead
-    return DOMPurify.sanitize(marked.parse(section.content) as string)
+    return renderCertificationMarkdown(section.content)
   }, [section.content, keyTerms])
 
   return (
@@ -101,16 +98,33 @@ export function LessonContent({ section }: { section: LessonSection }) {
           />
         )}
 
-        {DiagramComponent && (
-          <div className="mt-4">
-            <DiagramComponent />
-          </div>
-        )}
       </div>
-
-      {section.knowledgeCheck && (
-        <KnowledgeCheck data={section.knowledgeCheck} />
-      )}
+      <LessonExtras diagram={section.diagram} knowledgeCheck={section.knowledgeCheck} practiceScope={practiceScope} />
     </div>
   )
+}
+
+
+const DIAGRAM_TEXT: Record<string, string> = {
+  'how-llm-works': 'Training text supplies patterns. During training the model learns those patterns; when prompted, it generates text from them. Generated text still needs verification.',
+  'ai-human-pattern': 'AI reads documents, extracts data and produces structured output. A human reviews the results, applies judgment and makes decisions.',
+  'ai-suitability': 'Ask whether the task is repetitive, document-based and rule-based. These traits suggest a candidate for AI assistance; tasks outside that pattern need further human judgment.',
+  'extract-reason-deliver': 'Extract structured data, reason over that data, then deliver useful output. Each stage has a distinct job.',
+  'step-granularity': 'One large step is hard to debug. Too many tiny steps add unnecessary complexity. Aim for a clear purpose per step, such as extraction, analysis and delivery.',
+  'extraction-output-example': 'The example below pairs extracted field names with their values. Read each value against its source before relying on the structured output.',
+  'workflow-result-example': 'The example below shows each workflow stage and the output it contributes to the next stage.',
+  'validation-plan-example': 'The example below lists validation checks and distinguishes passed, failed and review-needed results in text.',
+}
+
+/** Shared practice and illustrations for chat and the learning panel. */
+export function LessonExtras({ diagram, knowledgeCheck, practiceScope }: Pick<LessonSection, 'diagram' | 'knowledgeCheck'> & { practiceScope?: PracticeScope }) {
+  const Diagram = diagram ? DIAGRAM_MAP[diagram] : null
+  const storageKey = practiceStorageKey(practiceScope)
+  return <>
+    {Diagram && <figure className="mt-4 min-w-0">
+      <figcaption className="mb-2 text-sm leading-relaxed text-gray-700">{DIAGRAM_TEXT[diagram!]}</figcaption>
+      <div className="overflow-auto [&>*]:min-w-[480px]" role="region" aria-label="Lesson diagram" tabIndex={0}><Diagram /></div>
+    </figure>}
+    {knowledgeCheck && <KnowledgeCheck key={`${storageKey}:${JSON.stringify(knowledgeCheck)}`} data={knowledgeCheck} storageKey={storageKey} />}
+  </>
 }

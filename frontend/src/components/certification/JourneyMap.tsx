@@ -1,36 +1,38 @@
-import { CheckCircle2, Clock, Sparkles } from 'lucide-react'
+import { CheckCircle2, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type { ModuleDefinition, CertificationProgress } from '../../types/certification'
+import type { ModuleDefinition, CertificationProgress, TierDefinition } from '../../types/certification'
 import { TIERS } from './constants'
 import { ModuleCard } from './ModuleCard'
 
 export function JourneyMap({
   modules,
+  tiers = TIERS,
   progress,
   activeModule,
   isModuleLocked,
   onModuleClick,
+  prerequisites,
 }: {
   modules: ModuleDefinition[]
+  tiers?: TierDefinition[]
   progress: CertificationProgress | null
   activeModule: string | null
   isModuleLocked: (moduleId: string) => boolean
   onModuleClick: (moduleId: string) => void
+  prerequisites?: Record<string, string[]>
 }) {
-  const totalMinutes = modules.reduce((sum, m) => sum + (m.estimatedMinutes || 0), 0)
-
   return (
     <div className="space-y-8">
-      {/* Course-size line: time-strapped RAs decide whether to start here. */}
+      {/* Duration claims require learner evidence; explain resume instead. */}
       <p className="text-xs text-gray-500 flex items-center gap-1.5 -mb-4">
-        <Clock size={12} aria-hidden="true" />
-        {modules.length} bite-sized modules, 10–25 minutes each — about {Math.round(totalMinutes / 60 * 2) / 2} hours in total.
-        Do one whenever you have a gap; your place is always saved.
+        {modules.length} modules. Work at your own pace.
+        {progress?.enrollment_id ? ' Use Save this place in a lesson to resume on any device.' : ' Your reading place is saved in this browser.'}
       </p>
-      {TIERS.map((tier, tierIdx) => {
+      {tiers.map((tier, tierIdx) => {
         const tierModules = tier.moduleIds
           .map(id => modules.find(m => m.id === id)!)
           .filter(Boolean)
+        if (!tierModules.length) return null
         const completedInTier = tierModules.filter(
           m => progress?.modules[m.id]?.completed
         ).length
@@ -52,13 +54,13 @@ export function JourneyMap({
                 tierComplete ? 'bg-green-100' : 'bg-gray-100',
               )} style={{ borderRadius: 'var(--ui-radius, 12px)' }}>
                 {tierComplete ? (
-                  <CheckCircle2 size={22} className="text-green-600" />
+                  <CheckCircle2 size={22} aria-hidden="true" className="text-green-700" />
                 ) : tierIdx === 0 ? (
-                  <Sparkles size={22} className="text-blue-500" />
+                  <Sparkles size={22} aria-hidden="true" className="text-blue-500" />
                 ) : tierIdx === 1 ? (
-                  <Sparkles size={22} className="text-purple-500" />
+                  <Sparkles size={22} aria-hidden="true" className="text-purple-500" />
                 ) : (
-                  <Sparkles size={22} className="text-amber-500" />
+                  <Sparkles size={22} aria-hidden="true" className="text-amber-500" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -74,10 +76,10 @@ export function JourneyMap({
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5 italic">{tier.narrative}</p>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-right" role="progressbar" aria-label={`${tier.name} modules completed`} aria-valuemin={0} aria-valuemax={tierModules.length} aria-valuenow={completedInTier} aria-valuetext={`${completedInTier} of ${tierModules.length} modules complete`}>
                 <span className={cn(
                   'text-sm font-bold',
-                  tierComplete ? 'text-green-600' : pct > 0 ? 'text-highlight' : 'text-gray-500',
+                  tierComplete ? 'text-green-700' : pct > 0 ? 'text-highlight' : 'text-gray-500',
                 )} style={pct > 0 && !tierComplete ? { color: 'var(--highlight-on-light, #806600)' } : undefined}>
                   {pct}%
                 </span>
@@ -98,6 +100,12 @@ export function JourneyMap({
                   const locked = isModuleLocked(module.id)
                   const completed = modProgress?.completed || false
                   const prevModule = module.number > 0 ? modules.find(m => m.number === module.number - 1) : null
+                  const required = prerequisites?.[module.id]
+                  const remaining = required?.filter(id => !progress?.modules[id]?.completed)
+                  const lockedReason = prerequisites ? remaining?.length
+                    ? `Complete ${remaining.map(id => modules.find(item => item.id === id)?.title || id).join(', ')} to unlock.`
+                    : 'The requirements for this module could not be confirmed. Refresh your course.'
+                    : progress?.enrollment_id ? 'The requirements for this module could not be confirmed. Refresh your course.' : undefined
 
                   return (
                     <div key={module.id} className="relative flex items-start gap-3">
@@ -119,6 +127,7 @@ export function JourneyMap({
                           active={activeModule === module.id}
                           onClick={() => onModuleClick(module.id)}
                           previousModuleTitle={prevModule?.title}
+                          lockedReason={lockedReason}
                         />
                       </div>
                     </div>

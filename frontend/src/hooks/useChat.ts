@@ -52,7 +52,14 @@ type SendArgs = [
   projectUuid?: string,
 ]
 
-export function useChat() {
+interface ChatEvents {
+  /** Called only from the incoming stream, never while loading/replaying history. */
+  onLiveToolResult?: (result: ToolResultInfo) => void
+}
+
+export function useChat({ onLiveToolResult }: ChatEvents = {}) {
+  const liveResultHandler = useRef(onLiveToolResult)
+  liveResultHandler.current = onLiveToolResult
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
   const [thinkingContent, setThinkingContent] = useState('')
@@ -111,6 +118,7 @@ export function useChat() {
         setError('This conversation could not be resumed. Reopen it from Activity before sending.')
         return
       }
+      const deliveredResults = new Set<string>()
       lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
@@ -235,6 +243,13 @@ export function useChat() {
                 tool_call_id: chunk.tool_call_id!,
                 content: chunk.content,
                 quality: chunk.quality || null,
+              }
+              // Dispatch before rendering: React may batch the call, result and
+              // end-of-stream into one mount. Transcript replay never enters here.
+              const eventKey = JSON.stringify([res.tool_name, res.tool_call_id, res.content])
+              if (!deliveredResults.has(eventKey)) {
+                deliveredResults.add(eventKey)
+                liveResultHandler.current?.(res)
               }
               toolResultsRef.current = [...toolResultsRef.current, res]
               setToolResults([...toolResultsRef.current])

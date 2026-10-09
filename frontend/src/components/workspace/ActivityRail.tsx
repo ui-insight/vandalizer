@@ -100,7 +100,7 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: () => void }) {
+export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: (destination?: 'certification') => void }) {
   const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid, openWorkflowId, openExtractionId } = useWorkspace()
   const { activities, loading, error, refresh, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
@@ -358,7 +358,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
         <button
           type="button"
           aria-label="Open learning panel"
-          onClick={() => { onNavigate?.(); togglePanel() }}
+          onClick={() => { onNavigate?.('certification'); togglePanel() }}
           title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
           style={{

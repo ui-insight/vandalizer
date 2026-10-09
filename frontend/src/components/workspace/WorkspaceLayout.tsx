@@ -1,3 +1,4 @@
+import { CourseEditorReturn } from '../certification/CourseEditorReturn'
 import { InputReadinessNotice } from './InputReadinessNotice'
 import { RetainedPanel } from '../shared/PanelVisibility'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -29,12 +30,13 @@ export function WorkspaceLayout() {
   const [manageOpen, setManageOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
-  const activityNavigating = useRef(false)
-  const openActivity = () => { activityNavigating.current = false; setActivityOpen(true) }
+  const activityNavigating = useRef<'workspace' | 'certification' | null>(null)
+  const openActivity = () => { activityNavigating.current = null; setActivityOpen(true) }
   useEffect(() => {
     if (activityOpen || !activityNavigating.current) return
     const frame = requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('[aria-label="Tools and assistant"]')?.focus({ preventScroll: true })
+      const destination = activityNavigating.current === 'certification' ? '[data-cert-panel]' : '[aria-label="Tools and assistant"]'
+      document.querySelector<HTMLElement>(destination)?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
   }, [activityOpen])
@@ -162,6 +164,7 @@ export function WorkspaceLayout() {
             transition: 'margin-right 0.3s ease',
           }}
         >
+          <CourseEditorReturn />
           {isCompact && !isChat && (
             <div role="group" aria-label="Workspace panels" className="flex shrink-0 flex-wrap gap-1 border-b border-gray-200 bg-white p-2">
               <button type="button" aria-label={isProjects ? 'Projects panel' : isAutomations ? 'Automations panel' : isKnowledge ? 'Knowledge panel' : 'Files panel'} aria-pressed={showLeftOnly} onClick={() => choosePanel(workspaceMode, 'source')} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
@@ -220,7 +223,7 @@ export function WorkspaceLayout() {
             onClick={() => setActivityOpen(false)}
           />
         )}
-        <FocusTrap active={drawerOpen} focusTrapOptions={{ initialFocus: () => document.querySelector<HTMLElement>('[data-activity-return="true"]') ?? document.getElementById('close-workspace-activity')!, escapeDeactivates: false, allowOutsideClick: true, setReturnFocus: node => activityNavigating.current ? false : node, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
+        <FocusTrap active={drawerOpen} focusTrapOptions={{ delayInitialFocus: false, initialFocus: () => document.querySelector<HTMLElement>('[data-activity-return="true"]') ?? document.getElementById('close-workspace-activity')!, escapeDeactivates: false, allowOutsideClick: true, setReturnFocus: node => activityNavigating.current ? false : node, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
         <div
           aria-label={drawerOpen ? 'Activity' : undefined}
           aria-modal={drawerOpen || undefined}
@@ -250,7 +253,7 @@ export function WorkspaceLayout() {
               <X className="h-4 w-4" />
             </button>
           )}
-          <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={() => { activityNavigating.current = true; setActivityOpen(false) }} />
+          <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={destination => { activityNavigating.current = destination ?? 'workspace'; setActivityOpen(false) }} />
         </div>
         </FocusTrap>
       </div>

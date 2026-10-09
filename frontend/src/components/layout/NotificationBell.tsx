@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { AlertTriangle, Bell, CheckCheck, CheckCircle2, FileX, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
@@ -103,6 +103,25 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const popupId = useId()
+  const [placement, setPlacement] = useState({ left: 8, top: 48, width: 320, maxHeight: 320 })
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const bounds = trigger.current?.getBoundingClientRect()
+      if (!bounds) return
+      const width = Math.min(320, window.innerWidth - 16)
+      const top = Math.max(8, Math.min(bounds.bottom + 8, window.innerHeight - 160))
+      setPlacement({ left: Math.max(8, Math.min(bounds.right - width, window.innerWidth - width - 8)),
+        top, width, maxHeight: Math.max(80, window.innerHeight - top - 8) })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
+  }, [open])
 
   const refresh = useCallback(async () => {
     try {
@@ -135,7 +154,17 @@ export function NotificationBell() {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
+      trigger.current?.focus()
+    }
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', escape)
+    }
   }, [open])
 
   const handleToggle = () => {
@@ -174,33 +203,36 @@ export function NotificationBell() {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={trigger}
         onClick={handleToggle}
         className="relative flex items-center justify-center rounded-full border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-100 transition-all"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-expanded={open}
+        aria-controls={open ? popupId : undefined}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+          <span className="absolute -top-1 -right-1 flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-red-600 text-white text-xs font-bold">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-[9000] w-80 bg-white border border-gray-200 rounded-lg shadow-xl">
+        <section id={popupId} aria-label="Notifications" style={placement} className="fixed z-[9000] flex flex-col overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xl">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                className="flex min-h-8 items-center gap-1 text-xs text-gray-600 hover:text-gray-900"
               >
                 <CheckCheck className="h-3 w-3" />
                 Mark all read
               </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="min-h-0 max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-500">
                 No notifications yet
@@ -214,17 +246,16 @@ export function NotificationBell() {
                   <button
                     key={n.uuid}
                     onClick={() => handleMarkRead(n)}
-                    className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${
-                      n.read ? 'opacity-60' : ''
-                    } ${isFailure && !n.read ? 'bg-red-50/60' : ''}`}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${isFailure && !n.read ? 'bg-red-50/60' : ''}`}
                   >
+                    <span className="sr-only">{n.read ? 'Read notification. ' : 'Unread notification. '}</span>
                     <Icon className="h-4 w-4 shrink-0 mt-0.5" style={{ color }} />
                     <div className="min-w-0 flex-1">
-                      <p className={`text-sm ${n.read ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+                      <p className={`text-sm [overflow-wrap:anywhere] ${n.read ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
                         {n.title}
                       </p>
                       {n.body && (
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                        <p className={`text-xs text-gray-500 mt-0.5 [overflow-wrap:anywhere] ${n.kind === 'certification_complete' ? '' : 'line-clamp-2'}`}>{n.body}</p>
                       )}
                       <p className="text-xs text-gray-500 mt-1">
                         {n.created_at && relativeTime(n.created_at)}
@@ -247,7 +278,7 @@ export function NotificationBell() {
               })
             )}
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

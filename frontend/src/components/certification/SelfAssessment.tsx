@@ -1,25 +1,11 @@
-import { useState } from 'react'
-import { Check, CheckCircle2, Lightbulb, Loader2, Star } from 'lucide-react'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { Check, CheckCircle2, Lightbulb, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import type { AssessmentDefinition } from '../../types/certification'
+import { AuthContext } from '../../contexts/AuthContext'
+import { readReflectionDraft, reflectionDraftKey, saveReflectionDraft } from '../../lib/certificationReflectionDraft'
 
 type AssessmentQuestion = { key: string; question: string; options: readonly string[] }
-
-function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; size?: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: max }).map((_, i) => (
-        <Star
-          key={i}
-          size={size}
-          className={cn(
-            'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
-          )}
-        />
-      ))}
-    </div>
-  )
-}
 
 export const MODULE_ASSESSMENTS: Record<string, { title: string; subtitle: string; questions: readonly AssessmentQuestion[] }> = {
   ai_literacy: {
@@ -152,18 +138,47 @@ export const MODULE_ASSESSMENTS: Record<string, { title: string; subtitle: strin
   },
 }
 
-export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting }: {
+type SelfAssessmentProps = {
   moduleId: string
+  enrollmentId?: string
   existingAnswers?: Record<string, string>
   onSubmit: (answers: Record<string, string>) => void
   submitting: boolean
-}) {
-  const [answers, setAnswers] = useState<Record<string, string>>(existingAnswers || {})
-  const assessment = MODULE_ASSESSMENTS[moduleId]
+  definition?: AssessmentDefinition
+}
 
-  if (!assessment) return null
+export function SelfAssessment(props: SelfAssessmentProps) {
+  const auth = useContext(AuthContext)
+  const definition = props.definition ?? MODULE_ASSESSMENTS[props.moduleId]
+  if (!definition) return null
+  const storageKey = reflectionDraftKey(auth?.user?.user_id, props.moduleId, props.enrollmentId)
+  return <ReflectionForm key={JSON.stringify([storageKey, props.moduleId, definition])} {...props} definition={definition} storageKey={storageKey} />
+}
 
+function ReflectionForm({ existingAnswers, onSubmit, submitting, definition: assessment, storageKey }: SelfAssessmentProps & { definition: AssessmentDefinition; storageKey?: string }) {
+  const submissionPending = useRef(false)
+  const [restored] = useState(() => {
+    try { return { answers: readReflectionDraft(storageKey, assessment), unavailable: false } }
+    catch { return { answers: {}, unavailable: true } }
+  })
+  const [answers, setAnswers] = useState<Record<string, string>>({ ...existingAnswers, ...restored.answers })
+  const [draftState, setDraftState] = useState<'empty' | 'saved' | 'unavailable'>(restored.unavailable ? 'unavailable' : Object.keys(restored.answers).length ? 'saved' : 'empty')
+  const id = useId()
   const isCompleted = existingAnswers && assessment.questions.every(q => existingAnswers[q.key])
+  useEffect(() => {
+    if (isCompleted && storageKey) {
+      try { sessionStorage.removeItem(storageKey) } catch { /* Confirmed server answers remain authoritative. */ }
+    }
+  }, [isCompleted, storageKey])
+
+  function choose(question: string, answer: string) {
+    const next = { ...answers, [question]: answer }
+    setAnswers(next)
+    if (storageKey) {
+      try { saveReflectionDraft(storageKey, assessment, next); setDraftState('saved') }
+      catch { setDraftState('unavailable') }
+    }
+  }
 
   const allAnswered = assessment.questions.every(q => answers[q.key])
 
@@ -174,9 +189,8 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
         style={{ borderRadius: 'var(--ui-radius, 12px)' }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <CheckCircle2 size={20} className="text-green-600" />
-          <h4 className="text-sm font-semibold text-green-800">Self-Assessment Complete</h4>
-          <Stars count={3} size={14} />
+          <CheckCircle2 size={20} aria-hidden="true" className="text-green-600" />
+          <h4 className="text-sm font-semibold text-green-800">Reflection answers saved</h4>
         </div>
         <div className="space-y-3">
           {assessment.questions.map(q => (
@@ -196,23 +210,29 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
       style={{ borderRadius: 'var(--ui-radius, 12px)' }}
     >
       <div className="flex items-center gap-2 mb-1">
-        <Lightbulb size={18} className="text-blue-600" />
+        <Lightbulb size={18} aria-hidden="true" className="text-blue-600" />
         <h4 className="text-sm font-semibold text-blue-800">{assessment.title}</h4>
       </div>
       <p className="text-xs text-gray-500 mb-4">
         {assessment.subtitle}
       </p>
+      <p id={`${id}-instructions`} className="mb-4 text-sm text-gray-700">Select one answer for each question. All questions are required.</p>
+      <p className={`mb-4 text-xs ${draftState === 'unavailable' ? 'text-amber-900' : 'text-gray-600'}`} role={draftState === 'unavailable' ? 'alert' : 'status'}>
+        {draftState === 'unavailable' ? 'This browser could not save your draft. Keep this page open to retain your choices until you submit.'
+          : draftState === 'saved' ? 'Draft saved in this browser tab. Submit to save these reflection answers to your course.'
+            : storageKey ? 'Unsubmitted choices are kept in this browser tab for this course.' : 'Your choices stay on this page until you submit.'}
+      </p>
 
       <div className="space-y-5">
         {assessment.questions.map(q => (
           <div key={q.key}>
-            <p className="text-sm font-medium text-gray-900 mb-2">{q.question}</p>
-            <div className="space-y-1.5">
+            <p id={`${id}-${q.key}`} className="text-sm font-medium text-gray-900 mb-2">{q.question}</p>
+            <div role="radiogroup" aria-labelledby={`${id}-${q.key}`} aria-describedby={`${id}-instructions`} aria-required="true" className="space-y-1.5">
               {q.options.map(option => (
                 <label
                   key={option}
                   className={cn(
-                    'flex items-start gap-2.5 p-2.5 border cursor-pointer transition-all text-sm',
+                    'flex items-start gap-2.5 p-2.5 border cursor-pointer transition-all text-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-800',
                     answers[q.key] === option
                       ? 'border-blue-400 bg-blue-50'
                       : 'border-gray-200 bg-white hover:border-blue-200',
@@ -221,10 +241,11 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
                 >
                   <input
                     type="radio"
-                    name={q.key}
+                    name={`${id}-${q.key}`}
+                    disabled={submitting}
                     value={option}
                     checked={answers[q.key] === option}
-                    onChange={() => setAnswers(prev => ({ ...prev, [q.key]: option }))}
+                    onChange={() => choose(q.key, option)}
                     className="mt-0.5 accent-blue-600"
                   />
                   <span className="text-gray-700">{option}</span>
@@ -236,19 +257,24 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
       </div>
 
       <button
-        onClick={() => onSubmit(answers)}
+        onClick={async () => {
+          if (submissionPending.current || submitting || !allAnswered) return
+          submissionPending.current = true
+          try { await onSubmit({ ...answers }) }
+          finally { submissionPending.current = false }
+        }}
         disabled={!allAnswered || submitting}
         className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ borderRadius: 'var(--ui-radius, 12px)' }}
       >
         {submitting ? (
           <>
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 size={14} aria-hidden="true" className="animate-spin" />
             Saving...
           </>
         ) : (
           <>
-            <Check size={14} />
+            <Check size={14} aria-hidden="true" />
             Submit Self-Assessment
           </>
         )}

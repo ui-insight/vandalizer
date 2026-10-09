@@ -399,6 +399,16 @@
   .support-reply-composer > textarea { grid-column: 1 / -1; grid-row: 1; width: 100%; }
   .support-reply-composer > button:last-child { justify-self: end; }
 }
+.workspace-utility { min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.workspace-utility > button { flex-shrink: 0; }
+.workspace-utility-toggle { display: none; }
+@media (max-width: 767px) {
+  .workspace-utility:not(.workspace-utility--expanded) { width: 56px !important; }
+  .workspace-utility:not(.workspace-utility--expanded) > button { width: 44px !important; min-height: 48px !important; }
+  .workspace-utility:not(.workspace-utility--expanded) .workspace-utility-label { display: none; }
+  .workspace-utility .workspace-utility-toggle { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; color: #fff; background: transparent; border: 0; border-radius: 4px; }
+}
+
 /* Account actions remain reachable even with long team memberships or a short viewport. */
 .account-menu-popup { position: absolute; right: 0; z-index: 1000; margin-top: 8px; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 80px); overflow-y: auto; overscroll-behavior: contain; border: 1px solid #d1d5db; border-radius: 8px; background: white; box-shadow: 0 8px 24px #0002; }
 .account-team-list { max-height: min(224px, 28dvh); overflow-y: auto; overscroll-behavior: contain; }

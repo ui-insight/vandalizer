@@ -22,6 +22,9 @@ import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { AttachKBModal } from './AttachKBModal'
 import { useChat } from '../../hooks/useChat'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import { isCertificationWriteResult } from '../../lib/certificationEvents'
+import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
 import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useOpenActivity } from '../../hooks/useOpenActivity'
@@ -93,6 +96,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange }: ChatPanelProps) {
+  const certification = useCertificationPanelOptional()
   const branding = useBranding()
   const brandIcon = branding.iconUrl
   const {
@@ -129,7 +133,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     stop,
     loadHistory,
     setActivity,
-  } = useChat()
+  } = useChat({ onLiveToolResult: result => {
+    if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
+  } })
 
   const { workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
 
@@ -294,6 +300,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setConvertingToKB(false)
     }
   }
+
+  // Remember handoff position without rendering during a native control's
+  // click/key capture phase. A render there can restore its old checked value
+  // before React receives the change event.
+  const rememberReadingPosition = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (el && el.offsetParent !== null && !restoringReadingPosition.current) readingPosition.current = el.scrollTop
+  }, [])
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
@@ -932,8 +946,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // Focus can scroll a citation just before it opens another pane,
         // before the browser has delivered its scroll event. Save that final
         // visible position before the action changes the workspace.
-        onClickCapture={handleScroll}
-        onKeyDownCapture={handleScroll}
+        onClickCapture={rememberReadingPosition}
+        onKeyDownCapture={rememberReadingPosition}
         className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
       >
@@ -1558,6 +1572,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           submits mid-run queue into the current turn instead of sending. */}
       {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
       {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
+      <CertificationRefreshNotice />
       <ChatInput
         initialDraft={initialDraft}
         onDraftChange={onDraftChange}

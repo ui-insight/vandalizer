@@ -1,11 +1,12 @@
+import { ValidationResults } from '../components/certification/ValidationResults'
+import { CompletionResumeNotice } from '../components/certification/CompletionResumeNotice'
+import { CourseSelectionNotice } from '../components/certification/CourseSelectionNotice'
+import { CourseLearningPolicy } from '../components/certification/CourseLearningPolicy'
+import { ApiError } from '../api/client'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Award,
   Cog,
-  ShieldCheck,
-  Star,
-  Target,
-  X,
   Zap,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
@@ -13,17 +14,18 @@ import { useCertification } from '../hooks/useCertification'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { cn } from '../lib/cn'
-import type { ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../types/certification'
+import type { ValidationResult, CompletionResult, CertExercise } from '../types/certification'
 
 // Components
 import { CertifiedBanner } from '../components/certification/CertifiedBanner'
+import { CredentialHistory } from '../components/certification/CredentialHistory'
 import { CelebrationOverlay } from '../components/certification/CelebrationOverlay'
 import { ModuleDetail } from '../components/certification/ModuleDetail'
 import { useQueryClient } from '@tanstack/react-query'
 import { JourneyMap } from '../components/certification/JourneyMap'
-import { LEVEL_CONFIG, LEVEL_THRESHOLDS, TOTAL_XP, TIERS } from '../components/certification/constants'
+import { LEVEL_CONFIG, LEVEL_THRESHOLDS as LEGACY_LEVELS, TOTAL_XP as LEGACY_TOTAL_XP, TIERS as LEGACY_TIERS } from '../components/certification/constants'
 import { useModuleLock } from '../components/certification/useModuleLock'
-import { MODULES } from '../components/certification/modules'
+import { MODULES as LEGACY_MODULES } from '../components/certification/modules'
 
 // ---------------------------------------------------------------------------
 // Progress ring component
@@ -112,67 +114,17 @@ function XPBar({ current, nextThreshold, prevThreshold, nextLevel }: {
 // Validation results
 // ---------------------------------------------------------------------------
 
-function ValidationResults({ result, onDismiss }: { result: ValidationResult; onDismiss: () => void }) {
-  return (
-    <div
-      role={result.passed ? 'status' : 'alert'}
-      aria-live={result.passed ? 'polite' : 'assertive'}
-      className={cn(
-        'border-2 p-4 cert-slide-in',
-        result.passed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50',
-      )}
-      style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {result.passed
-            ? <ShieldCheck size={18} className="text-green-600" />
-            : <Target size={18} className="text-amber-600" />
-          }
-          <span className={cn('font-semibold text-sm', result.passed ? 'text-green-800' : 'text-amber-800')}>
-            {result.passed ? 'All checks passed!' : 'Some objectives remaining'}
-          </span>
-          {result.passed && (
-            <div className="flex gap-0.5">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Star
-                  key={i}
-                  size={14}
-                  className={cn(
-                    'transition-all duration-300',
-                    i < result.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
-                  )}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-        <button type="button" onClick={onDismiss} aria-label="Dismiss results" className="text-gray-400 hover:text-gray-600">
-          <X size={16} aria-hidden="true" />
-        </button>
-      </div>
-      <div className="space-y-1.5">
-        {result.checks.map((check: ValidationCheck, i: number) => (
-          <div key={i} className="flex items-center gap-2 text-sm">
-            {check.passed
-              ? <span className="text-green-600 shrink-0">&#10003;</span>
-              : <X size={14} className="text-red-500 shrink-0" />
-            }
-            <span className={check.passed ? 'text-green-800' : 'text-red-700'}>{check.name}</span>
-            <span className="text-gray-500 text-xs">{check.detail}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export default function Certification() {
-  const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
+  const { progress, course, pendingCompletions, loading, validate, complete, provision, getExercise, submitAssessment, savePosition, refresh } = useCertification()
+  const MODULES = course?.modules ?? LEGACY_MODULES
+  const LEVEL_THRESHOLDS = course?.levels ?? LEGACY_LEVELS
+  const TOTAL_XP = course?.maximum_xp ?? LEGACY_TOTAL_XP
+  const TIERS = course?.tiers ?? LEGACY_TIERS
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -180,16 +132,33 @@ export default function Certification() {
   const [activeModule, setActiveModuleState] = useState<string | null>(() => {
     try { return localStorage.getItem(`cert-active-module:${uid}`) } catch { return null }
   })
+  useEffect(() => {
+    if (progress?.enrollment_id) return
+    try { setActiveModuleState(localStorage.getItem(`cert-active-module:${uid}`)) } catch { setActiveModuleState(null) }
+  }, [uid, progress?.enrollment_id])
+  const restoredEnrollment = useRef<string | null>(null)
+  useEffect(() => {
+    if (!progress?.enrollment_id || restoredEnrollment.current === progress.enrollment_id) return
+    restoredEnrollment.current = progress.enrollment_id
+    setActiveModuleState(progress.learning_position?.module_id ?? null)
+  }, [progress])
   const setActiveModule = useCallback((id: string | null) => {
     setActiveModuleState(id)
     try { if (id) localStorage.setItem(`cert-active-module:${uid}`, id); else localStorage.removeItem(`cert-active-module:${uid}`) } catch {}
   }, [uid])
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const validationScope = JSON.stringify([uid, progress?.enrollment_id, progress?.course_version, progress?.manifest_sha256, activeModule])
+  const currentValidationScope = useRef(validationScope)
+  currentValidationScope.current = validationScope
+  const [validationRecord, setValidationResult] = useState<{ scope: string; result: ValidationResult } | null>(null)
+  const [validationNotice, setValidationNotice] = useState<{ scope: string; state: 'checking' | 'unavailable' } | null>(null)
+  const validationResult = validationRecord?.scope === validationScope ? validationRecord.result : null
+  const validationRecheckState = validationNotice?.scope === validationScope ? validationNotice.state : undefined
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
   const [validating, setValidating] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [provisioning, setProvisioning] = useState(false)
   const [submittingAssessment, setSubmittingAssessment] = useState(false)
+  const pendingPanelActions = useRef(new Set<string>())
   const [exercise, setExercise] = useState<CertExercise | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 
@@ -218,17 +187,17 @@ export default function Certification() {
   }, [totalXp]) // eslint-disable-line react-hooks/exhaustive-deps
   const completedCount = useMemo(() => {
     if (!progress) return 0
-    return Object.values(progress.modules).filter(m => m.completed).length
-  }, [progress])
+    return MODULES.filter(module => progress.modules[module.id]?.completed).length
+  }, [progress, MODULES])
 
   // Find next level threshold
   const currentLevelIdx = LEVEL_THRESHOLDS.findIndex(l => l.name === level)
   const nextLevel = LEVEL_THRESHOLDS[currentLevelIdx + 1] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
   const prevLevel = LEVEL_THRESHOLDS[currentLevelIdx] || LEVEL_THRESHOLDS[0]
 
-  const overallPct = (totalXp / TOTAL_XP) * 100
+  const overallPct = Math.min(100, Math.max(0, (totalXp / TOTAL_XP) * 100))
 
-  const isModuleLocked = useModuleLock(progress)
+  const isModuleLocked = useModuleLock(progress, MODULES, course?.prerequisites)
 
   // Load exercise when active module changes
   useEffect(() => {
@@ -236,41 +205,63 @@ export default function Certification() {
       setExercise(null)
       return
     }
-    getExercise(activeModule).then(setExercise).catch(() => setExercise(null))
+    let cancelled = false
+    setExercise(null)
+    getExercise(activeModule).then(value => { if (!cancelled) setExercise(value) }).catch(() => { if (!cancelled) setExercise(null) })
+    return () => { cancelled = true }
   }, [activeModule, getExercise])
 
   const handleValidate = async (moduleId: string) => {
+    if (pendingPanelActions.current.has('validate')) return
+    pendingPanelActions.current.add('validate')
     setValidating(true)
-    setValidationResult(null)
+    setValidationNotice({ scope: validationScope, state: 'checking' })
     try {
       const result = await validate(moduleId)
-      setValidationResult(result)
+      if (currentValidationScope.current !== validationScope) {
+        pendingPanelActions.current.delete('validate'); setValidating(false)
+        return
+      }
+      setValidationResult({ scope: validationScope, result }); setValidationNotice(null)
     } catch {
       // A bare try/finally re-throws on failure (e.g. a 5xx while the backend is
       // restarting), escaping as a global "Request failed" unhandled rejection.
-      toast('Could not validate the module right now. Please try again.', 'error')
+      if (currentValidationScope.current === validationScope) {
+        setValidationNotice({ scope: validationScope, state: 'unavailable' })
+        toast('Could not validate the module right now. Please try again.', 'error')
+      }
     } finally {
-      setValidating(false)
+      pendingPanelActions.current.delete('validate'); setValidating(false)
     }
   }
 
-  const handleComplete = async (moduleId: string) => {
+  const handleComplete = async (moduleId: string, requestId?: string) => {
+    if (pendingPanelActions.current.has('complete')) return
+    pendingPanelActions.current.add('complete')
     setCompleting(true)
     try {
-      const result = await complete(moduleId)
+      const result = requestId ? await complete(moduleId, requestId) : await complete(moduleId)
       setCompletionResult(result)
       // Check if a tier was just completed
       checkTierCompletion(moduleId)
-    } catch {
-      // Validation failed - show what's missing
-      toast('Module not ready. Check the requirements below.', 'error')
-      await handleValidate(moduleId)
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'certification_execution_failed') {
+        toast(error.message, 'error')
+        await refresh()
+      } else if (error instanceof ApiError && error.status === 400) {
+        toast('Module not ready. Check the requirements below.', 'error')
+        await handleValidate(moduleId)
+      } else {
+        toast(error instanceof ApiError && error.status === 409 ? error.message : 'Completion could not be confirmed. Resume the original request to finish or retrieve its saved result.', 'error')
+      }
     } finally {
-      setCompleting(false)
+      pendingPanelActions.current.delete('complete'); setCompleting(false)
     }
   }
 
   const handleProvision = async (moduleId: string) => {
+    if (pendingPanelActions.current.has('provision')) return
+    pendingPanelActions.current.add('provision')
     setProvisioning(true)
     try {
       await provision(moduleId)
@@ -281,11 +272,13 @@ export default function Certification() {
       // as a global "Request failed" unhandled rejection.
       toast('Could not set up the exercise right now. Please try again.', 'error')
     } finally {
-      setProvisioning(false)
+      pendingPanelActions.current.delete('provision'); setProvisioning(false)
     }
   }
 
   const handleSubmitAssessment = async (moduleId: string, answers: Record<string, string>) => {
+    if (pendingPanelActions.current.has('reflection')) return
+    pendingPanelActions.current.add('reflection')
     setSubmittingAssessment(true)
     try {
       await submitAssessment(moduleId, answers)
@@ -294,7 +287,7 @@ export default function Certification() {
       // global "Request failed" unhandled rejection.
       toast('Could not submit your answers right now. Please try again.', 'error')
     } finally {
-      setSubmittingAssessment(false)
+      pendingPanelActions.current.delete('reflection'); setSubmittingAssessment(false)
     }
   }
 
@@ -320,7 +313,7 @@ export default function Certification() {
         setTierCelebration({ tierName: tier.name, message: tier.celebration })
       }
     }
-  }, [progress])
+  }, [progress, TIERS])
 
   // Auto-navigate to next module after celebration dismissal
   const handleCelebrationDismiss = useCallback(() => {
@@ -343,9 +336,9 @@ export default function Certification() {
     }
     // Clear lesson localStorage for completed module
     if (completedModuleId) {
-      localStorage.removeItem(`cert-lesson:${uid}:${completedModuleId}`)
+      if (!progress?.enrollment_id) localStorage.removeItem(`cert-lesson:${uid}:${completedModuleId}`)
     }
-  }, [completionResult, isModuleLocked, toast])
+  }, [completionResult, isModuleLocked, toast, MODULES, setActiveModule, uid, progress?.enrollment_id])
 
   if (loading && !progress) {
     return (
@@ -362,10 +355,15 @@ export default function Certification() {
   return (
     <PageLayout>
       <div className="p-6 max-w-5xl mx-auto space-y-8">
+        {course && <p className="text-sm font-medium text-gray-700" aria-label="Your course">{course.course_title}</p>}
 
+        <CourseSelectionNotice key={`selection:${uid}`} enrollmentId={progress?.enrollment_id} onRefreshCourse={refresh} />
+        {course && <CourseLearningPolicy course={course} />}
+        <CompletionResumeNotice pending={pendingCompletions} modules={MODULES} course={course ?? progress} busy={completing || loading} onOpen={setActiveModule} onRetry={handleComplete} onRefresh={refresh} />
         {/* Hero Section */}
+        {progress?.enrollment_id && <CredentialHistory refreshKey={`${progress.enrollment_id}:${progress.certified}`} />}
         {progress?.certified ? (
-          <CertifiedBanner />
+          <CertifiedBanner progress={progress} />
         ) : (
           <div
             className="flex flex-col sm:flex-row items-center gap-8 p-6 bg-white border border-gray-200"
@@ -391,7 +389,7 @@ export default function Certification() {
                 Vandal Workflow Architect
               </h1>
               <p className="text-sm text-gray-500 mb-2">
-                Complete all 11 modules to earn your official certification
+                Complete all {MODULES.length} modules to earn your official certification
               </p>
               <div
                 className="flex items-center gap-2 px-3 py-2 mb-4 border border-yellow-200 bg-yellow-50/60"
@@ -419,7 +417,7 @@ export default function Certification() {
                 >
                   <Award size={14} className="text-highlight-on-light" style={{ color: 'var(--highlight-on-light, #806600)' }} />
                   <span className="font-semibold text-gray-900">{completedCount}</span>
-                  <span className="text-gray-500">/ 11 modules</span>
+                  <span className="text-gray-500">/ {MODULES.length} modules</span>
                 </div>
                 <div
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
@@ -439,6 +437,7 @@ export default function Certification() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Training Modules</h2>
           <JourneyMap
             modules={MODULES}
+          tiers={TIERS}
             progress={progress}
             activeModule={activeModule}
             isModuleLocked={isModuleLocked}
@@ -450,6 +449,12 @@ export default function Certification() {
         {activeModuleDef && (
           <div ref={detailRef} className="space-y-4">
             <ModuleDetail
+              key={`${progress?.enrollment_id ?? 'legacy'}:${activeModuleDef.id}`}
+              enrollmentId={progress?.enrollment_id}
+              savedLessonId={progress?.modules[activeModuleDef.id]?.learning_position?.lesson_id}
+              onSavePosition={progress?.enrollment_id ? lessonId => savePosition(activeModuleDef.id, lessonId) : undefined}
+              onReloadPosition={refresh}
+          onScenarioSaved={refresh}
               module={activeModuleDef}
               moduleProgress={progress?.modules[activeModuleDef.id] ? {
                 completed: progress.modules[activeModuleDef.id].completed,
@@ -457,6 +462,7 @@ export default function Certification() {
                 attempts: progress.modules[activeModuleDef.id].attempts,
                 provisioned_docs: progress.modules[activeModuleDef.id].provisioned_docs,
                 self_assessment: progress.modules[activeModuleDef.id].self_assessment,
+            scenario_attempt_id: progress.modules[activeModuleDef.id].scenario_attempt_id,
               } : null}
               onValidate={() => handleValidate(activeModuleDef.id)}
               onComplete={() => handleComplete(activeModuleDef.id)}
@@ -470,7 +476,7 @@ export default function Certification() {
             />
 
             {validationResult && (
-              <ValidationResults result={validationResult} onDismiss={() => setValidationResult(null)} />
+              <ValidationResults result={validationResult} recheckState={validationRecheckState} recheckDisabled={validating} onRecheck={() => { void handleValidate(activeModuleDef.id) }} onDismiss={() => setValidationResult(null)} />
             )}
           </div>
         )}

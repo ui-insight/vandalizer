@@ -1,4 +1,5 @@
-import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban } from 'lucide-react'
+import { useState } from 'react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban, PanelLeftOpen, PanelLeftClose } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
@@ -10,6 +11,7 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
   const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
+  const [showLabels, setShowLabels] = useState(false)
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
   const activeMode = workspaceMode === 'projects' && activeProjectUuid ? 'chat' : workspaceMode
@@ -20,6 +22,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
   return (
     <nav
       aria-label="Workspace navigation"
+      className={`workspace-utility${showLabels ? ' workspace-utility--expanded' : ''}`}
       style={{
         width: 88,
         background: 'var(--color-panel-dark)',
@@ -32,6 +35,9 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         flexShrink: 0,
       }}
     >
+      <button type="button" className="workspace-utility-toggle" aria-label={showLabels ? 'Hide navigation labels' : 'Show navigation labels'} aria-expanded={showLabels} onClick={() => setShowLabels(value => !value)}>
+        {showLabels ? <PanelLeftClose size={20} aria-hidden="true" /> : <PanelLeftOpen size={20} aria-hidden="true" />}
+      </button>
       {/* Projects — drops any active project scope and shows the project picker
           (the drawer). Being scoped into a project is exclusive with the list. */}
       <button
@@ -56,7 +62,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         }}
       >
         <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#b6bdc7' }} />
-        <span style={{ fontSize: 12, color: projectsActive ? '#fff' : '#b6bdc7' }}>Projects</span>
+        <span className="workspace-utility-label" style={{ fontSize: 12, color: projectsActive ? '#fff' : '#b6bdc7' }}>Projects</span>
       </button>
       <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-2) 0 var(--workspace-space-4)" }} />
 
@@ -94,7 +100,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
               size={20}
               style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#b6bdc7' }}
             />
-            <span style={{ fontSize: 12, color: active ? '#fff' : '#b6bdc7' }}>{label}</span>
+            <span className="workspace-utility-label" style={{ fontSize: 12, color: active ? '#fff' : '#b6bdc7' }}>{label}</span>
             {showDot && (
               <span
                 style={{

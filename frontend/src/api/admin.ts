@@ -945,6 +945,17 @@ export function backfillAgenticChatDrip(batch_size: number, dry_run: boolean) {
 
 export interface CertificationProgressItem {
   user_id: string
+  progress_id?: string
+  enrollment_id?: string | null
+  course_version?: string | null
+  course_title?: string | null
+  enrollment_state?: string | null
+  is_active?: boolean | null
+  can_unlock?: boolean
+  progression_policy_id?: string | null
+  learning_order?: string | null
+  unlock_unavailable_reason?: string | null
+  reconciliation_error?: string | null
   name: string | null
   email: string | null
   level: string
@@ -959,6 +970,7 @@ export interface CertificationProgressItem {
 }
 
 export interface CertificationProgressDetail extends CertificationProgressItem {
+  support_summary?: CertificationSupportSummary | null
   modules: Record<string, {
     completed?: boolean
     stars?: number
@@ -966,6 +978,45 @@ export interface CertificationProgressDetail extends CertificationProgressItem {
     attempts?: number
     xp_earned?: number
   }>
+}
+
+export interface CertificationSupportSummary {
+  access_changes?: {
+    state: 'recorded' | 'not_recorded' | 'unavailable'
+    historical_unlocked: boolean
+    older_available: boolean
+    changes: { request_id: string; actor_user_id: string; previous_unlocked: boolean; unlocked: boolean; reason: string; recorded_at: string; credit_effect: 'none' }[]
+  }
+  operations?: CertificationSupportOperations | null
+  observed_at: string
+  read_only: true
+  manifest_sha256?: string
+  position_status: 'saved' | 'not_recorded' | 'unavailable'
+  last_saved_lesson: { module_id: string; module_title: string; lesson_id: string; lesson_title: string; revision: number; saved_at: string | null } | null
+  pending_credential: boolean
+  explanation: string
+  pending_completions: { attempt_id: string; module_id: string; module_title: string; state: string; in_flight: boolean; next_step: string }[]
+  recent_completions: { attempt_id?: string; module_id?: string; module_title?: string; state: string; created_at?: string | null; next_step: string; selected_evidence?: { review_attempt_id?: string; scenario_attempt_id?: string }; failed_required_outcomes?: { outcome_id: string; statement: string }[] }[]
+  older_completions_available: boolean
+}
+
+export interface CertificationSupportOperations {
+  worker_marked_in_flight: boolean
+  course_change_pending: boolean
+  groups: {
+    kind: 'automatic_review' | 'lab_run' | 'private_handoff'
+    more_pending: boolean
+    more_recent: boolean
+    records: {
+      request_id?: string
+      module_id?: string
+      module_title?: string
+      state: string
+      next_step: string
+      references?: Record<string, string>
+      failed_required_outcomes?: { outcome_id: string; statement: string }[]
+    }[]
+  }[]
 }
 
 export interface CertificationProgressListResponse {
@@ -978,14 +1029,16 @@ export function getCertificationProgressList(limit: number = 500, offset = 0, q 
   return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`)
 }
 
-export function getCertificationProgressDetail(userId: string) {
-  return apiFetch<CertificationProgressDetail>(`/api/admin/certifications/${userId}`)
+export function getCertificationProgressDetail(userId: string, enrollmentId?: string) {
+  return apiFetch<CertificationProgressDetail>(`/api/admin/certifications/${encodeURIComponent(userId)}${enrollmentId ? `?enrollment_id=${encodeURIComponent(enrollmentId)}` : ''}`)
 }
 
-export function setCertificationUnlock(userId: string, unlocked: boolean) {
+export interface CertificationAccessRequest { request_id: string; unlocked: boolean; reason: string }
+
+export function setCertificationUnlock(userId: string, request: CertificationAccessRequest, enrollmentId?: string) {
   return apiFetch<{ user_id: string; unlocked: boolean }>(
-    `/api/admin/certifications/${userId}/unlock`,
-    { method: 'PUT', body: JSON.stringify({ unlocked }) },
+    `/api/admin/certifications/${encodeURIComponent(userId)}/unlock${enrollmentId ? `?enrollment_id=${encodeURIComponent(enrollmentId)}` : ''}`,
+    { method: 'PUT', body: JSON.stringify(request) },
   )
 }
 
@@ -1236,4 +1289,68 @@ export function getOptimizerActivity(params?: {
   if (params?.limit) qs.set('limit', String(params.limit))
   const q = qs.toString()
   return apiFetch<OptimizerActivityResponse>(`/api/admin/optimizer/activity${q ? `?${q}` : ''}`)
+}
+
+export interface CertificationRecoverySnapshot {
+  user_id: string
+  enrollment_id: string
+  course_version: string
+  course_title: string
+  manifest_sha256: string
+  selection_revision: number
+  review_sha256: string
+  kind: 'none' | 'worker' | 'attempt'
+  write_id: string | null
+  attempt_id: string | null
+  module_id: string | null
+  module_title: string | null
+  attempt_state: string | null
+  in_flight: boolean
+  can_recover: boolean
+  explanation: string
+  operation: string | null
+  started_at: string | null
+  total_xp: number
+  certified: boolean
+}
+
+export interface CertificationRecoveryReceipt {
+  request_id: string
+  enrollment_id: string
+  status: 'no_assessment_started' | 'saved_result' | 'retry_saved_grade' | 'interrupted_before_grade' | 'review_changed'
+  attempt_id: string | null
+  reason: string
+  actor_user_id: string
+}
+
+export interface CertificationRecoveryReview {
+  review: CertificationRecoverySnapshot
+  can_apply: boolean
+  history: {
+    request_id: string
+    actor_user_id: string
+    reason: string
+    state: 'started' | 'completed'
+    created_at: string
+    attempt_id: string | null
+    write_id: string | null
+    review_sha256: string
+    review: CertificationRecoverySnapshot
+    can_resume: boolean
+    result: CertificationRecoveryReceipt | null
+  }[]
+}
+
+export interface CertificationRecoveryAction {
+  request_id: string
+  review_sha256: string
+  reason: string
+}
+
+export function getCertificationRecovery(userId: string, enrollmentId: string) {
+  return apiFetch<CertificationRecoveryReview>(`/api/admin/certifications/${encodeURIComponent(userId)}/recovery?enrollment_id=${encodeURIComponent(enrollmentId)}`)
+}
+
+export function recoverCertificationCompletion(userId: string, enrollmentId: string, body: CertificationRecoveryAction) {
+  return apiFetch<CertificationRecoveryReceipt>(`/api/admin/certifications/${encodeURIComponent(userId)}/recovery?enrollment_id=${encodeURIComponent(enrollmentId)}`, { method: 'POST', body: JSON.stringify(body) })
 }

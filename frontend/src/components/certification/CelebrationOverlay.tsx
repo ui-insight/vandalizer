@@ -6,14 +6,15 @@ import { LEVEL_CONFIG } from './constants'
 
 function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; size?: number }) {
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-0.5" role="img" aria-label={`${count} of ${max} stars`}>
       {Array.from({ length: max }).map((_, i) => (
         <Star
           key={i}
+          aria-hidden="true"
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
+            i < count ? 'text-amber-700 fill-amber-700' : 'text-gray-500',
           )}
           style={i < count ? { animationDelay: `${i * 0.15}s` } : undefined}
         />
@@ -31,11 +32,12 @@ export function CelebrationOverlay({
   onDismiss: () => void
   tierCelebration?: { tierName: string; message: string } | null
 }) {
-  const levelConfig = LEVEL_CONFIG[result.level] || LEVEL_CONFIG.novice
+  const levelConfig = LEVEL_CONFIG[result.level] || { ...LEVEL_CONFIG.novice, label: result.level.replaceAll('_', ' ') }
+  const outcomeCompletion = result.validation.assessment_kind === 'selected_outcome_validation'
 
   return (
     <FocusTrap focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false }}>
-    <div role="dialog" aria-modal="true" aria-label={result.certified ? 'Course complete' : 'Module complete'} className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onDismiss() } }}>
+    <div data-cert-celebration role="dialog" aria-modal="true" aria-label={result.certified ? 'Course complete' : 'Module complete'} className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onDismiss() } }}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 cert-fade-in" />
 
@@ -58,10 +60,11 @@ export function CelebrationOverlay({
 
       {/* Content */}
       <div
-        className="relative bg-white p-5 sm:p-8 max-w-md w-full mx-4 max-h-[90dvh] overflow-y-auto text-center cert-pop-in"
+        className="relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden bg-white text-center cert-pop-in mx-4"
         style={{ borderRadius: 'var(--ui-radius, 12px)' }}
         onClick={e => e.stopPropagation()}
       >
+        <div role="region" aria-label="Completion details" tabIndex={0} className="min-h-0 overflow-y-auto p-5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-700 sm:p-8">
         {result.certified ? (
           <>
             <div className="cert-badge-glow mx-auto mb-4 w-24 h-24 flex items-center justify-center rounded-full"
@@ -72,17 +75,18 @@ export function CelebrationOverlay({
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
               University of Idaho
             </p>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1 title-shimmer">
-              Vandal Workflow Architect
+            <h2 className="break-words text-2xl font-bold text-gray-900 mb-1 title-shimmer">
+              {result.course_title || 'Vandal Workflow Architect'}
             </h2>
             <p className="text-sm font-semibold mb-3" style={{ color: 'var(--highlight-on-light, #806600)' }}>
               Certified Professional
             </p>
+            {result.course_version && <p className="text-xs text-gray-600 mb-2">Course version: {result.course_version}</p>}
             <p className="text-gray-600 text-sm mb-2">
-              You have completed all 11 modules and demonstrated mastery of AI-powered document workflow design, construction, validation, and governance for research administration.
+              {result.modules_total ? `You have completed all ${result.modules_total} modules in this course.` : 'You have completed the requirements for this course.'}
             </p>
             <p className="text-gray-500 text-xs">
-              This credential recognizes your ability to turn real research administration processes into reliable, automated pipelines.
+              Your earned credential stays associated with the course you completed. Later course updates do not change it.
             </p>
           </>
         ) : tierCelebration ? (
@@ -109,15 +113,15 @@ export function CelebrationOverlay({
         <div className="flex items-center justify-center gap-6 my-6">
           <div className="text-center">
             <div className="text-3xl font-bold" style={{ color: 'var(--highlight-on-light, #806600)' }}>
-              +{result.xp_earned}
+              {result.credit_origin === 'transferred' ? result.xp_carried : `+${result.xp_earned}`}
             </div>
-            <div className="text-xs text-gray-500 font-medium">XP EARNED</div>
+            <div className="text-xs text-gray-500 font-medium">{result.credit_origin === 'transferred' ? 'XP CARRIED · NO NEW REWARD' : 'XP EARNED'}</div>
           </div>
-          <div className="w-px h-10 bg-gray-200" />
+          {!outcomeCompletion && <><div className="w-px h-10 bg-gray-200" />
           <div className="text-center">
             <Stars count={result.stars} size={24} />
             <div className="text-xs text-gray-500 font-medium mt-1">STARS</div>
-          </div>
+          </div></>}
         </div>
 
         {/* Level up */}
@@ -137,13 +141,16 @@ export function CelebrationOverlay({
           </div>
         )}
 
+        </div>
+        <div className="shrink-0 border-t border-gray-200 px-5 py-3 sm:px-8">
         <button
           onClick={onDismiss}
-          className="mt-2 px-6 py-2.5 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
+          className="min-h-11 max-w-full break-words px-4 py-2.5 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
           style={{ borderRadius: 'var(--ui-radius, 12px)' }}
         >
           {result.certified ? 'View Certificate' : 'Continue'}
         </button>
+        </div>
       </div>
     </div>
     </FocusTrap>

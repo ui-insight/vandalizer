@@ -15,6 +15,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface DocumentViewerProps {
   docUuid: string
+  unavailableHelp?: string
   highlightTerms?: string[]
   // 1-based page hint for highlightTerms (extraction source tracking). Used
   // to prefer matches on that page, and to still jump the viewer there when
@@ -139,7 +140,7 @@ export function highlightMissLabel(
     : `passage not matched — showing page ${page}`
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar }: DocumentViewerProps) {
+export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar, unavailableHelp = 'The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.' }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -905,7 +906,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     return <div role="alert" style={{ padding: 'var(--workspace-space-24)', color: '#374151', fontSize: 'var(--workspace-font-body)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
       <h3 style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-8)' }}>Source unavailable</h3>
       <p>{loadError}</p>
-      <p style={{ marginTop: 'var(--workspace-space-8)' }}>The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.</p>
+      <p style={{ marginTop: 'var(--workspace-space-8)' }}>{unavailableHelp}</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginTop: 'var(--workspace-space-16)' }}>
         <button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: '1px solid #9ca3af', background: '#fff', color: '#1f2937' }}>Retry source</button>
         <a href={inlineUrl} target="_blank" rel="noreferrer" style={{ padding: "var(--workspace-space-8) 0", color: '#1d4ed8' }}>Open original in new tab</a>

@@ -117,6 +117,12 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-cert-panel] *,
+  [data-cert-celebration] * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
   .title-shimmer,
   .title-shimmer-loop {
     animation: none !important;
@@ -1267,6 +1273,9 @@ html {
 .cert-lesson-markdown li {
   margin-bottom: 0.25rem;
 }
+.cert-lesson-markdown ul { list-style-type: disc; }
+.cert-lesson-markdown ol { list-style-type: decimal; }
+.cert-lesson-markdown a { color: #1d4ed8; text-decoration: underline; }
 .cert-lesson-markdown code {
   padding: 0.1rem 0.3rem;
   background: #f3f4f6;

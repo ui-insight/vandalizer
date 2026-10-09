@@ -29,12 +29,19 @@ function useCertificationCta(): { label: string; message: string } | null {
   const cert = useCertificationPanelOptional()
   const progress = cert?.progress ?? null
   if (progress?.certified) return null
-  const completedCount = progress
-    ? Object.values(progress.modules ?? {}).filter((m) => m?.completed).length
-    : 0
-  if (completedCount > 0) {
+  const moduleIds = progress?.module_ids ?? cert?.course?.modules.map(module => module.id)
+  const selectedModules = moduleIds
+    ? moduleIds.map(id => progress?.modules[id])
+    : Object.values(progress?.modules ?? {})
+  const completedCount = selectedModules.filter(module => module?.completed).length
+  // Eleven is the unversioned continuation course only. Versioned metadata
+  // supplies both membership and the denominator for the selected course.
+  const total = progress?.modules_total ?? cert?.course?.modules.length ?? 11
+  const hasSavedWork = completedCount > 0 || !!progress?.learning_position || !!progress?.pending_completions?.length
+    || selectedModules.some(module => module?.scenario_attempt_id || module?.self_assessment || module?.provisioned_docs?.length)
+  if (hasSavedWork) {
     return {
-      label: `Continue certification (${completedCount}/11)`,
+      label: `Continue certification (${completedCount}/${total})`,
       message: 'Continue my certification — show my progress and the next module.',
     }
   }
@@ -42,6 +49,16 @@ function useCertificationCta(): { label: string; message: string } | null {
     label: 'Start the certification course',
     message: 'Start the Vandalizer certification course — show me where to begin.',
   }
+}
+
+function CertificationHomeActions({ disabled, onSendMessage }: { disabled?: boolean; onSendMessage: (message: string) => void }) {
+  const certCta = useCertificationCta()
+  const certification = useCertificationPanelOptional()
+  if (!certCta && !certification) return null
+  return <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+    {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
+    {certification && <button className="home-learning-link" type="button" onClick={certification.openPanel}><BookOpen size={14} /> {certification.progress?.certified ? 'Review completed course' : 'Open course without chat'}</button>}
+  </div>
 }
 
 const DEFAULT_RETURNING_PROMPTS = [
@@ -983,7 +1000,6 @@ interface SharedHomeProps {
 }
 
 export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage }: SharedHomeProps) {
-  const certCta = useCertificationCta()
   const openTour = useWorkspaceTour()
   return (
     <div className="chat-home first-session-home">
@@ -1021,13 +1037,12 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
       <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
       <GlossaryDisclosure />
       {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
-      {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
+      <CertificationHomeActions disabled={disabled} onSendMessage={onSendMessage} />
     </div>
   )
 }
 
 export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, status, suggestionPills }: SharedHomeProps & { onOpenActivity: (activityId: string) => void; status: OnboardingStatus | null; suggestionPills: string[] }) {
-  const certCta = useCertificationCta()
   const openTour = useWorkspaceTour()
   const primaryAction = deriveReturningPrimaryAction(status)
   const suggestions = starterSuggestions(status, suggestionPills).slice(0, 3)
@@ -1054,7 +1069,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
       </div>
       {readyBadges.length > 0 && <div className="home-ready-assets"><span>Ready in this workspace</span>{readyBadges.map(badge => <ReadyAssetBadge key={badge} label={badge} />)}</div>}
       {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
-      {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
+      <CertificationHomeActions disabled={disabled} onSendMessage={onSendMessage} />
     </div>
   )
 }

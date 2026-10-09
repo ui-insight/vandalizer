@@ -372,6 +372,7 @@ export function ChatMessage({
 
   return (
     <div
+      className={!isUser && Array.from(resultMap.values()).some(result => result.tool_name.includes('certification')) ? 'cert-chat-message' : undefined}
       style={{
         padding: 15,
         marginBottom: isUser ? 10 : 15,

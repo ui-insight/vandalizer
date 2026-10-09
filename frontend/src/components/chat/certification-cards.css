@@ -1,0 +1,41 @@
+.cert-chat-card {
+  --cert-text-muted: #4b5563;
+  --cert-text-success: #15803d;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.cert-chat-card button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.cert-chat-card button svg { flex-shrink: 0; }
+.cert-chat-card fieldset:disabled button {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border-color: #d1d5db !important;
+  cursor: not-allowed !important;
+}
+.cert-chat-card button:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 3px;
+}
+.cert-lesson-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 6px 8px;
+  margin-bottom: 8px;
+}
+.cert-lesson-heading > svg { margin-top: 2px; }
+.cert-lesson-position { grid-column: 2; }
+.cert-procedure > li::marker { font-weight: 700; }
+.cert-procedure > li > .chat-markdown > p { margin: 0; }
+@media (max-width: 640px) {
+  .cert-chat-message { padding: 8px !important; }
+  .cert-chat-card fieldset { padding: 8px; }
+  .cert-chat-card fieldset label { padding: 8px; }
+  .cert-chat-card { margin-left: 0 !important; }
+  .cert-chat-card > div { padding-inline: 12px !important; }
+}

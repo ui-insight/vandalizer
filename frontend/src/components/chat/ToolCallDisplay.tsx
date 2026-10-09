@@ -1,4 +1,5 @@
 import type { ApprovalRecord } from './approvalHistory'
+import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
@@ -10,9 +11,9 @@ import {
   CertLessonCard,
   CertModuleCard,
   CertProgressCard,
-  useCertificationSync,
 } from './CertificationCards'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
@@ -23,6 +24,22 @@ import type { WorkflowStatus } from '../../types/workflow'
 // ---------------------------------------------------------------------------
 
 type ToolCategory = 'read' | 'extract' | 'write' | 'workflow'
+
+function CertificationResponseRecovery() {
+  const certification = useCertificationPanelOptional()
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  return <div className="agent-tool-recovery" role="alert">
+    <p>Saved work may already exist. Inspect your current course progress and saved results before continuing. This message does not confirm a pass, an award or a failed write.</p>
+    {certification ? <button type="button" className="chat-action-btn" disabled={busy} onClick={async () => {
+      setBusy(true); setNotice('')
+      try { await certification.refresh(); setNotice('Current progress loaded. Open the learning panel to inspect your saved work.') }
+      catch { setNotice('Progress could not be refreshed. Keep your saved work and try this read again.') }
+      finally { setBusy(false) }
+    }}>{busy ? 'Checking saved progress…' : 'Check saved course progress'}</button> : <p>Open the learning panel to refresh progress and inspect your saved work.</p>}
+    {notice && <p role="status">{notice}</p>}
+  </div>
+}
 
 const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   search_documents:      { label: 'Searching documents',      category: 'read' },
@@ -72,6 +89,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   check_certification_module:      { label: 'Grading certification module',    category: 'read' },
   complete_certification_module:   { label: 'Completing certification module', category: 'write' },
   submit_certification_assessment: { label: 'Saving self-assessment',          category: 'write' },
+  save_certification_position:     { label: 'Saving lesson position',          category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -426,7 +444,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const passing = checks.filter((c) => c.passed).length
       return {
         text: obj.passed
-          ? `"${obj.title}" — all checks passed`
+          ? `"${obj.title}" — ${checks.length > 0 && passing === checks.length ? 'all checks passed' : 'module requirements met; review check details'}`
           : `"${obj.title}" — ${passing}/${checks.length} checks passing`,
         qualityHint: '',
       }
@@ -1151,13 +1169,10 @@ export function ToolStatusLine({
   const accent = CATEGORY_ACCENT[meta.category]
   const args = call?.args || {}
   const obj = (listErrorEntry(result?.content) ?? result?.content) as Record<string, unknown> | undefined
+  const certificationIssue = result ? certificationPayloadIssue(name, result.content) : null
   const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
-  const isError = !canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error')
+  const isError = Boolean(certificationIssue) || (!canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error'))
   const unconfirmed = !isActive && !!call && !result
-
-  // Keep the Certification panel / rail badge in sync with chat-driven
-  // certification writes (XP, lab provisioning, assessments).
-  useCertificationSync(name, Boolean(result))
 
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
   const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
@@ -1179,7 +1194,7 @@ export function ToolStatusLine({
     }
   }
   const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
-    : canceled ? 'Canceled' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
+    : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
@@ -1195,7 +1210,7 @@ export function ToolStatusLine({
 
 
   const activeHint = isActive ? getActiveHint(name, args) : ''
-  const { text: summaryText, qualityHint } = result
+  const { text: summaryText, qualityHint } = certificationIssue ? { text: certificationIssue, qualityHint: '' } : result
     ? summarizeResult(name, result.content, result.quality ?? null)
     : { text: '', qualityHint: '' }
 
@@ -1271,7 +1286,7 @@ export function ToolStatusLine({
         ) : isError ? (
           <>
             <span style={{ color: '#dc2626', fontWeight: 500 }}>
-              {meta.label} failed
+              {meta.label} {certificationIssue ? 'could not be confirmed' : 'failed'}
             </span>
             {summaryText && (
               <>
@@ -1301,7 +1316,7 @@ export function ToolStatusLine({
         <span style={{ flex: 1 }} />
 
         {/* Per-result copy button — shown on status line for tools without rich content blocks */}
-        {result && !isActive && hasCopyableContent(name, result.content) &&
+        {result && !isActive && !certificationIssue && hasCopyableContent(name, result.content) &&
           !hasRichContent(name, obj) && (
           <CopyButton
             text={toolResultToText(name, result.content)}
@@ -1310,7 +1325,7 @@ export function ToolStatusLine({
         )}
 
         {/* Quality badge — compact, with tooltip for details */}
-        {result?.quality && (
+        {result?.quality && !certificationIssue && (
           <QualityBadge quality={result.quality as QualityMeta} />
         )}
       </div>
@@ -1347,7 +1362,8 @@ export function ToolStatusLine({
         <CertCompletionCard content={obj} />
       )}
 
-      {isError && <div className="agent-tool-recovery">
+      {certificationIssue && <CertificationResponseRecovery />}
+      {isError && !certificationIssue && <div className="agent-tool-recovery">
         {typeof obj?.hint === 'string' && <p>{obj.hint}</p>}
         {typeof obj?.error_detail === 'string' && <p>{obj.error_detail}</p>}
         {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
