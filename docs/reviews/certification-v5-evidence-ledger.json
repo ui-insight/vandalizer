@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
+  "working_head_at_inventory": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 62290,
-    "sha256": "d3f9b468dd1041c2cc9c72f5b4a271cf7118b48ecaf48af8fd58e1b421c1bd7b"
+    "bytes": 62651,
+    "sha256": "35c7fb653bb89c0bc475da0c0beb45787ad2f59ae4c4bdb06c49e25d87d25251"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 731557,
-    "sha256": "564ac525ecccfb1cd397533b1c1b53766d7b0f7fc7b9eac481052b6fa91b957c"
+    "bytes": 737011,
+    "sha256": "c82c622263291f2406758d205fd0bb2d51ed856d737d25443b61fc4f343ea179"
   },
   "counts": {
-    "accepted": 64,
-    "open": 98,
+    "accepted": 65,
+    "open": 97,
     "items": 162,
-    "checkpoints": 305,
-    "browser_runs": 453,
-    "recorded_captures_including_diagnostics_and_repeats": 6045,
+    "checkpoints": 307,
+    "browser_runs": 459,
+    "recorded_captures_including_diagnostics_and_repeats": 6097,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -453,8 +453,8 @@
     },
     {
       "id": "C8-CONTENT-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Correct arithmetic guidance.** Clearly distinguish LLM analysis from deterministic calculation. The budget exercise must verify arithmetic through a supported calculation method or explicit human calculation; Deep Analysis alone is not proof that totals are correct."
+      "accepted": true,
+      "requirement": "P1 · Fix: Correct arithmetic guidance.** Clearly distinguish LLM analysis from deterministic calculation. The budget exercise must verify arithmetic through a supported calculation method or explicit human calculation; Deep Analysis alone is not proof that totals are correct. Accepted at checkpoints 291/292/307: the bounded budget exercise checks recorded calculations against source inputs; corrected working and V5 teaching separate model interpretation from independently checked arithmetic. A dated notice corrects six affected historical lessons in panel and old chat cards without rewriting their original requirements or credit."
     },
     {
       "id": "C8-CONTENT-04",
@@ -3166,6 +3166,20 @@
       "evidence_directories": [
         "certification-historical-corrections-2026-10-09"
       ]
+    },
+    {
+      "number": 306,
+      "title": "Reconcile baseline preservation and current build provenance on October 9 2026",
+      "evidence_directories": [
+        "certification-evidence-reconciliation-2026-10-09"
+      ]
+    },
+    {
+      "number": 307,
+      "title": "Checked arithmetic teaching and preserved-course correction on October 9 2026",
+      "evidence_directories": [
+        "certification-arithmetic-guidance-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3252,6 +3266,18 @@
       "available": true,
       "bytes": 1721,
       "sha256": "44642d42a5a57099962d7cb2aec9a0864af50d7bd22a10c67025195039b2d376"
+    },
+    {
+      "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/source-hashes.json",
+      "available": true,
+      "bytes": 1316,
+      "sha256": "b79468a60ae0b715ebec3b3dd11cefa3b8a1be1be8190d891d6ecd5a2300fb5e"
+    },
+    {
+      "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 788,
+      "sha256": "e153cc25fc7af6d436ce0fc65a7dc8da22ed7e6adf1f8a90c220d389158d60f0"
     },
     {
       "path": "artifacts/visual-review/certification-assessed-evidence-2026-10-08/checkpoint.json",
@@ -3834,6 +3860,18 @@
       "available": true,
       "bytes": 560,
       "sha256": "bd5c02c0f1095fe2df813d31e3f30977b452800617e8a475a3d8db3a19a5bada"
+    },
+    {
+      "path": "artifacts/visual-review/certification-evidence-reconciliation-2026-10-09/source-hashes-committed-renderer.json",
+      "available": true,
+      "bytes": 345,
+      "sha256": "fded774b7909aaab4be7cc62c5a05bc46e9779750421da9f1129101f28d07414"
+    },
+    {
+      "path": "artifacts/visual-review/certification-evidence-reconciliation-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 2897,
+      "sha256": "35dab2ae427f205c9fc003fe7d9c15a46866a491b5b6aa3f8ca5e8a9c0386327"
     },
     {
       "path": "artifacts/visual-review/certification-execution-config-2026-10-06/checkpoint.json",
@@ -17595,6 +17633,1888 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-ai-literacy-rewrite-2026-10-05-ui-centered/scenario-passed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/manifest.json",
+        "available": true,
+        "bytes": 8644,
+        "sha256": "aa0be8cc3b9c7131e85dfcb472aeb127b83970760ad74941e8f1998aae3f61fc"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:47:14.249Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "2e270c82c30bf3b7550ecc9c8d17396fb4caeae4480be3835e818c23e41e744b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 113689,
+        "sha256": "439e6953a5991c72282bc0229a2b83d0eac3eb8790c9263a0917bee1ef253da4"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-correction.png",
+              "available": true,
+              "bytes": 65214
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-correction.txt",
+              "available": true,
+              "bytes": 5389
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-preservation.png",
+              "available": true,
+              "bytes": 92586
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 5389
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 72184
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 3929
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 84366
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 3961
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 77016
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 7059
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 84407
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 7059
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-correction.png",
+              "available": true,
+              "bytes": 138964
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 5455
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 138964
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 5455
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 146850
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 3995
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 146850
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 3995
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 145284
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 7125
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 145284
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 7125
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/manifest.json",
+        "available": true,
+        "bytes": 6016,
+        "sha256": "4766eb696f74482556dd7c6835b978159c2a705445c89885e9e81d4f3f2fddea"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:47:40.634Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "2e270c82c30bf3b7550ecc9c8d17396fb4caeae4480be3835e818c23e41e744b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 113689,
+        "sha256": "439e6953a5991c72282bc0229a2b83d0eac3eb8790c9263a0917bee1ef253da4"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-correction.png",
+              "available": true,
+              "bytes": 183620
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-correction.txt",
+              "available": true,
+              "bytes": 5389
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-preservation.png",
+              "available": true,
+              "bytes": 219889
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-preservation.txt",
+              "available": true,
+              "bytes": 5389
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/panel-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-correction.png",
+              "available": true,
+              "bytes": 147660
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-correction.txt",
+              "available": true,
+              "bytes": 3929
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-preservation.png",
+              "available": true,
+              "bytes": 201281
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 3961
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/historical-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-correction.png",
+              "available": true,
+              "bytes": 172301
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-correction.txt",
+              "available": true,
+              "bytes": 7059
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-preservation.png",
+              "available": true,
+              "bytes": 200531
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 7059
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-history-native/unversioned-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/manifest.json",
+        "available": true,
+        "bytes": 9502,
+        "sha256": "bc14afa9d3db0e9f42fcfc7348f8544c8ecb09660a452e19ce417adf07aea9c7"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:47:16.598Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "2e270c82c30bf3b7550ecc9c8d17396fb4caeae4480be3835e818c23e41e744b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "advanced_nodes",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "advanced_nodes-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-320.png",
+              "available": true,
+              "bytes": 81275
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-320.png",
+              "available": true,
+              "bytes": 81275
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-320.png",
+              "available": true,
+              "bytes": 71076
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-feedback-320.png",
+              "available": true,
+              "bytes": 68014
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-feedback-320.txt",
+              "available": true,
+              "bytes": 6453
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-320.png",
+              "available": true,
+              "bytes": 78714
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-320.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-320.png",
+              "available": true,
+              "bytes": 77757
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-320.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-2-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-1440.png",
+              "available": true,
+              "bytes": 195813
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-1440.txt",
+              "available": true,
+              "bytes": 5843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-1440.png",
+              "available": true,
+              "bytes": 195813
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-1440.txt",
+              "available": true,
+              "bytes": 5843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working/advanced_nodes-5-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/manifest.json",
+        "available": true,
+        "bytes": 9764,
+        "sha256": "9c23a01a0e3a52a73e34217e3be909658304d9cbf75817568fff33df16176a9b"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:49:26.291Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "advanced_nodes",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "advanced_nodes-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-320.png",
+              "available": true,
+              "bytes": 81275
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-320.png",
+              "available": true,
+              "bytes": 81275
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-320.png",
+              "available": true,
+              "bytes": 71076
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-320.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-feedback-320.png",
+              "available": true,
+              "bytes": 67640
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-feedback-320.txt",
+              "available": true,
+              "bytes": 6444
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-320.png",
+              "available": true,
+              "bytes": 78714
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-320.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-320.png",
+              "available": true,
+              "bytes": 77757
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-320.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-1440.png",
+              "available": true,
+              "bytes": 188288
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-1440.txt",
+              "available": true,
+              "bytes": 6254
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-2-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-1440.png",
+              "available": true,
+              "bytes": 195813
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-1440.txt",
+              "available": true,
+              "bytes": 5843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-1440.png",
+              "available": true,
+              "bytes": 195813
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-1440.txt",
+              "available": true,
+              "bytes": 5843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-final/advanced_nodes-5-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/manifest.json",
+        "available": true,
+        "bytes": 6606,
+        "sha256": "0e67a82a9b6568e67eb1f789c2c0ab1934daab2a31e199b2f937559a166eaddc"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:47:44.368Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "2e270c82c30bf3b7550ecc9c8d17396fb4caeae4480be3835e818c23e41e744b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "advanced_nodes",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "advanced_nodes-2-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-reading-780.png",
+              "available": true,
+              "bytes": 151203
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-reading-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-detail-2-780.png",
+              "available": true,
+              "bytes": 147004
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-detail-2-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-practice-780.png",
+              "available": true,
+              "bytes": 118549
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-practice-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-feedback-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-feedback-780.png",
+              "available": true,
+              "bytes": 118192
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-feedback-780.txt",
+              "available": true,
+              "bytes": 6453
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-2-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-reading-780.png",
+              "available": true,
+              "bytes": 141302
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-reading-780.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-detail-1-780.png",
+              "available": true,
+              "bytes": 141599
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-detail-1-780.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native/advanced_nodes-5-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/manifest.json",
+        "available": true,
+        "bytes": 6868,
+        "sha256": "a457774c224a058b927ae68b16c65e257252e693b3d04795e7c407642ebf403a"
+      },
+      "checkpoints": [
+        307
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:49:24.473Z",
+      "reported_commit": "e33b87bfd07815dc91982b6975a73a16d1aa43a2",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "advanced_nodes",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "advanced_nodes-2-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-reading-780.png",
+              "available": true,
+              "bytes": 151203
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-reading-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-detail-2-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-detail-2-780.png",
+              "available": true,
+              "bytes": 147004
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-detail-2-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-practice-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-practice-780.png",
+              "available": true,
+              "bytes": 118549
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-practice-780.txt",
+              "available": true,
+              "bytes": 6142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-2-feedback-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-feedback-780.png",
+              "available": true,
+              "bytes": 117562
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-feedback-780.txt",
+              "available": true,
+              "bytes": 6444
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-2-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-reading-780.png",
+              "available": true,
+              "bytes": 141302
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-reading-780.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-5-detail-1-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-detail-1-780.png",
+              "available": true,
+              "bytes": 141599
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-detail-1-780.txt",
+              "available": true,
+              "bytes": 5777
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-detail-1-780.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -234870,7 +236790,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1108,
+    "1440x1000": 1124,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -234881,7 +236801,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 393,
+    "320x1000": 399,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -234891,19 +236811,19 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 564,
+    "320x844": 576,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 106,
+    "390x500": 118,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 26,
+    "390x800": 32,
     "390x844": 862,
     "390x850": 276,
     "390x900": 192,

@@ -12,8 +12,11 @@ const modules = await read('panel-modules.json')
 const module = modules.find(item => item.id === moduleId)
 assert.ok(module)
 assert.deepEqual(draft.replacements.map(lesson => lesson.id), module.lessons.map(lesson => lesson.id))
-module.lessons = draft.replacements.map(lesson => ({ ...lesson, knowledgeCheck: lesson.knowledge_check }))
-Object.assign(module, draft.module_patch)
+const workingTeaching = process.env.REVIEW_WORKING_TEACHING === '1'
+if (!workingTeaching) {
+  module.lessons = draft.replacements.map(lesson => ({ ...lesson, knowledgeCheck: lesson.knowledge_check }))
+  Object.assign(module, draft.module_patch)
+}
 const selectedIds = new Set((process.env.REVIEW_LESSONS || '').split(',').filter(Boolean))
 assert.ok([...selectedIds].every(id => module.lessons.some(lesson => lesson.id === id)), 'Requested lesson must belong to this module')
 const selectedLessons = module.lessons.filter(lesson => selectedIds.size === 0 || selectedIds.has(lesson.id))
@@ -52,7 +55,7 @@ await context.route('**/api/certification/**', async route => {
   return route.fallback()
 })
 async function capture(id) {
-  await review.capture(id, 'Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.')
+  await review.capture(id, `${workingTeaching ? 'Current working teaching' : 'Unpublished teaching draft'} in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.`)
   console.log(id)
 }
 try {
@@ -93,6 +96,7 @@ try {
           capturedTexts.add(text)
         }
       }
+      if (!lesson.knowledgeCheck) continue
       await page.getByText(lesson.knowledgeCheck.question, { exact: true }).scrollIntoViewIfNeeded()
       await capture(`${moduleId}-${index + 1}-practice-${width}`)
       if (width === practiceWidth) {
@@ -116,5 +120,5 @@ try {
     assert.equal(capture.pageWidth, capture.viewport.width)
     assert.deepEqual(JSON.parse(await readFile(`${review.out}/${capture.id}.axe.json`, 'utf8')), [], `Accessibility violations: ${capture.id}`)
   }
-  review.observations.push({ moduleId, lessons: selectedLessons.map(lesson => ({ id: lesson.id, revision: lesson.revision })), physicalWidths: widths, nativeZoom: nativeZoom ? 2 : 1, practiceCorrections: selectedLessons.length, unexpectedWrites: writes, creditAwarded: 0 })
+  review.observations.push({ moduleId, workingTeaching, lessons: selectedLessons.map(lesson => ({ id: lesson.id, revision: lesson.revision })), physicalWidths: widths, nativeZoom: nativeZoom ? 2 : 1, practiceCorrections: selectedLessons.filter(lesson => lesson.knowledgeCheck).length, unexpectedWrites: writes, creditAwarded: 0 })
 } catch (error) { await capture('blocked'); throw error } finally { await review.flush(); await review.browser.close() }

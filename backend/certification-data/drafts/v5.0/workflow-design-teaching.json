@@ -21,7 +21,7 @@
   "replacements": [
     {
       "id": "workflow_design.from-process-map-to-workflow-architecture",
-      "revision": 2,
+      "revision": 3,
       "title": "Turn the process map into a reviewable design",
       "variant": "concept",
       "objective": "Define each operation’s input, output and evidence before choosing task types.",

@@ -42,11 +42,12 @@ def test_wrong_package_unknown_lesson_and_unversioned_content_do_not_inherit_cor
 
 
 @pytest.mark.asyncio
-async def test_panel_direct_lesson_and_chat_keep_original_teaching_and_expose_same_correction():
+@pytest.mark.parametrize('notice_index', range(len(corrections._load().notices)))
+async def test_panel_direct_lesson_and_chat_keep_original_teaching_and_expose_same_correction(notice_index):
     package = CourseCatalog().load(VERSION, preview=True)
     original_bytes = package.artifact_bytes
-    module_id = 'ai_literacy'
-    lesson_id = corrections._load().notices[0].lesson_ids[0]
+    lesson_id = corrections._load().notices[notice_index].lesson_ids[0]
+    module_id = lesson_id.split('.')[0]
     assert lesson_id.startswith(module_id + '.')
     original = next(row for row in package.json('lessons.json')[module_id]['lessons'] if row['id'] == lesson_id)
     panel = next(row for row in public_modules(package) if row['id'] == module_id)

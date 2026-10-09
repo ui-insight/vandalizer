@@ -36,6 +36,34 @@
         "e0d615748c43ae5d7f1c7878f4e6587b84df20af79303d919d55151e1c5eace1",
         "cbc344ef1b93d59a127a0ab044983b44894eb26dd2440eb967a7cbdbce9ceb5d"
       ]
+    },
+    {
+      "id": "checked-arithmetic-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+        "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+        "ai_literacy.what-ai-is-genuinely-bad-at",
+        "workflow_design.from-process-map-to-workflow-architecture",
+        "advanced_nodes.build-a-workflow-with-advanced-nodes",
+        "advanced_nodes.glossary-review"
+      ],
+      "issued_at": "2026-10-09",
+      "title": "Correction to historical arithmetic guidance",
+      "paragraphs": [
+        "Deep Analysis uses model-based analysis and synthesis. It can interpret a budget, but it is not a deterministic calculator and cannot establish that totals are correct merely by saying it checked them.",
+        "Check the source amounts and units, state the formula, and preserve a calculator result or explicitly recorded human arithmetic. Authorized code is another option where available; elevated access is not required for the separate calculation route.",
+        "Compare the actual model output with that calculation. A memo that depends on the check must wait for its result. Correct addition alone cannot resolve a missing amount, wrong input or unclear cost category."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "86b51e591c056ebb3fad3c0ef492ffca88d1387abf39fca168fb233e66d08292",
+        "214389fdd85be16be1d0862476b371370640264f405a6ba94d54305f4278941b",
+        "9d27be03c4b619e384fd49480258a9d9f8a43a22e38aca420abe889969cff9c4",
+        "798c8561f84277b5b18a8e7a5e03a6be4564f4e799437e39f7986fb9e110aae8",
+        "9f10f2efde339ce232a6a8d04b7816d55ff81d6f8e7c5315cb51378611c64adf",
+        "f5f204aadefdfc777436945c715877ddd082623fea39ec98f5da459481e0f9ac"
+      ]
     }
   ]
 }

@@ -41,7 +41,7 @@ async function inspect(scope, prefix) {
   await notice.waitFor()
   await capture(prefix + '-correction', notice.getByText(noticeTitle, { exact: true }))
   await capture(prefix + '-preservation', notice.getByText(/Your saved course, assessment requirements and earned credit are preserved/))
-  assert.match(await scope.innerText(), /Every result carries a quality score/)
+  assert.ok((await scope.innerText()).includes(process.env.REVIEW_ORIGINAL_TEXT || 'Every result carries a quality score'))
 }
 try {
   for (const width of native ? [780] : [320, 1440]) {
