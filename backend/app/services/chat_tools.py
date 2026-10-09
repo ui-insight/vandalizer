@@ -3898,8 +3898,92 @@ async def regenerate_validation_plan(
 # Markdown and plain text are the only formats the agent authors directly — both
 # round-trip cleanly through raw_text, so the saved doc is immediately
 # chat-searchable, KB-ingestable, and usable as extraction/workflow input.
-_SAVE_EXTENSIONS = {"md", "txt"}
+_SAVE_EXTENSIONS = {"md", "txt", "docx", "xlsx"}
+_MAX_SAVE_SOURCES = 50
 MAX_SAVE_CHARS = 1_000_000
+
+
+async def _checked_save_sources(sources: list[dict], context) -> list[dict]:
+    """Sources for a saved file, each quote checked against its document (#1008).
+
+    A quote is only marked found when it appears in the named document's text,
+    and only documents this user can open are read.
+    """
+    from app.services.export_provenance import check_quote
+
+    rows: list[dict] = []
+    texts: dict[str, Optional[str]] = {}
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        doc_uuid = str(src.get("document_uuid") or "")
+        if doc_uuid and doc_uuid not in texts:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+            readable = doc is not None and (
+                doc.user_id == context.deps.user_id
+                or (context.deps.team_id and doc.team_id == context.deps.team_id)
+            )
+            texts[doc_uuid] = (doc.raw_text or "") if readable else None
+        page = src.get("page")
+        rows.append({
+            "item": str(src.get("item") or ""),
+            "document": str(src.get("document_title") or ""),
+            "page": f"p. {page}" if isinstance(page, int) else str(page or ""),
+            "quote": str(src.get("quote") or "").strip(),
+            "status": check_quote(str(src.get("quote") or ""), texts.get(doc_uuid)) if doc_uuid else "not checked",
+        })
+    return rows
+
+
+def _render_saved_file(ext: str, title: str, content: str, source_rows: list[dict]) -> bytes:
+    """The bytes save_to_folder writes for *ext*, with a Sources section when given."""
+    import io
+
+    from app.services.export_provenance import SOURCE_HEADERS, append_sources_to_docx, sources_markdown
+
+    if ext in ("md", "txt"):
+        sources = sources_markdown(source_rows)
+        return (f"{content.rstrip()}\n\n{sources}" if sources else content).encode("utf-8")
+    if ext == "docx":
+        from app.services.docx_service import markdown_to_docx
+
+        buf = io.BytesIO()
+        markdown_to_docx(content).save(buf)
+        return append_sources_to_docx(buf.getvalue(), source_rows)
+    # xlsx: the first Markdown table in content, plus a Sources sheet.
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    from app.services.docx_service import _split_md_table_row
+
+    rows: list[list[str]] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("|"):
+            cells = _split_md_table_row(stripped)
+            if all(set(c.strip()) <= set("-: ") for c in cells):
+                continue  # the |---|---| separator
+            rows.append(cells)
+        elif rows:
+            break
+    wb = Workbook()
+    sheet = wb.active
+    sheet.title = (re.sub(r"[\\/*?:\[\]]", " ", title.rsplit(".", 1)[0]).strip() or "Table")[:31]
+    for row in rows:
+        sheet.append(row)
+    if rows:
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
+    if source_rows:
+        src_sheet = wb.create_sheet("Sources")
+        src_sheet.append(SOURCE_HEADERS)
+        for cell in src_sheet[1]:
+            cell.font = Font(bold=True)
+        for r in source_rows:
+            src_sheet.append([r["item"], r["document"], r["page"], r["quote"], r["status"]])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
 
 
 async def save_to_folder(
@@ -3908,6 +3992,7 @@ async def save_to_folder(
     content: str,
     folder_uuid: Optional[str] = None,
     extension: str = "md",
+    sources: Optional[list[dict]] = None,
     confirmed: bool = False,
 ) -> dict:
     """Save generated text content as a document in the user's folder tree.
@@ -3924,6 +4009,14 @@ async def save_to_folder(
     For structured extraction or workflow results, render them as a Markdown
     table in ``content`` before saving.
 
+    When the user wants something to hand to someone (a memo to a PI, a
+    checklist, a budget table for routing), save it as "docx" (a Word
+    document) or, for a table, "xlsx" (a spreadsheet of the first Markdown
+    table in ``content``), not as pasted Markdown. Pass the evidence it rests
+    on in ``sources``: each quote is checked against the document it names and
+    saved with the file as a Sources section (Word) or a Sources sheet
+    (spreadsheet), so the reader can check it.
+
     Call first with confirmed=false to preview the destination. Then call again
     with confirmed=true after the user approves — this writes a file and mutates
     workspace state.
@@ -3935,7 +4028,12 @@ async def save_to_folder(
             viewer and round-trips as searchable text.
         folder_uuid: Destination folder UUID. Omit or pass null to save to the
             user's root folder. Use list_folders to resolve a folder by name.
-        extension: File type — "md" (default) or "txt".
+        extension: File type — "md" (default), "txt", "docx" (Word) or
+            "xlsx" (spreadsheet; ``content`` must contain a Markdown table).
+        sources: Optional evidence, up to 50 items, each
+            ``{"document_uuid", "document_title", "page", "quote", "item"}``:
+            the document and page a claim comes from and the exact quoted
+            passage. ``item`` names what it supports (a field or a claim).
         confirmed: Must be true to actually save. If false, returns a preview
             for user confirmation.
     """
@@ -3948,7 +4046,20 @@ async def save_to_folder(
 
     ext = (extension or "md").lower().lstrip(".")
     if ext not in _SAVE_EXTENSIONS:
-        return {"error": f"Unsupported extension '{ext}'. Use 'md' or 'txt'."}
+        return {"error": f"Unsupported extension '{ext}'. Use 'md', 'txt', 'docx' or 'xlsx'."}
+    if sources is not None and (not isinstance(sources, list) or len(sources) > _MAX_SAVE_SOURCES):
+        return {"error": f"sources must be a list of at most {_MAX_SAVE_SOURCES} items."}
+    if ext == "xlsx":
+        from app.services.docx_service import _split_md_table_row
+
+        if not any(
+            line.strip().startswith("|") and len(_split_md_table_row(line)) > 1
+            for line in (content or "").splitlines()
+        ):
+            return _err(
+                "A spreadsheet needs a Markdown table in content.",
+                hint="Put the rows in a Markdown table (| Field | Value |), or save as docx instead.",
+            )
 
     clean_title = (title or "").strip()
     if not clean_title:
@@ -4013,9 +4124,16 @@ async def save_to_folder(
 
     from app.services.storage import get_storage
 
+    try:
+        source_rows = await _checked_save_sources(sources or [], context)
+        payload = _render_saved_file(ext, display_title, content, source_rows)
+    except Exception as e:
+        logger.exception("save_to_folder: failed to build %s", relative_path)
+        return {"error": f"Failed to build the {ext} file: {e}"}
+
     storage = get_storage()
     try:
-        await storage.write(relative_path, content.encode("utf-8"))
+        await storage.write(relative_path, payload)
     except Exception as e:
         logger.exception("save_to_folder: failed to write %s", relative_path)
         return {"error": f"Failed to write the file: {e}"}
@@ -4056,6 +4174,7 @@ async def save_to_folder(
         "folder": target_folder,
         "extension": ext,
         "char_count": len(content),
+        "sources": [{k: r[k] for k in ("item", "document", "page", "status")} for r in source_rows],
         "message": (
             f'Saved "{display_title}" to {folder_name}. It\'s in your Files tab now and '
             "will be searchable in chat once indexing finishes — you can also add it to a "

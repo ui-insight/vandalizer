@@ -492,6 +492,20 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         media_type = media_type_map.get(file_type, "application/octet-stream")
         return file_bytes, media_type, file_type or "bin", output_data.get("filename", "output")
 
+    # The evidence behind the output: extracted fields' quotes and pages, and
+    # passages knowledge-base steps retrieved. Carried into every format that
+    # can hold it, so whoever receives the file can check it (#1008).
+    from app.services.export_provenance import (
+        append_sources_to_docx,
+        collect_run_sources,
+        field_source_cell,
+        output_step_field_sources,
+        sources_markdown,
+    )
+
+    source_rows = collect_run_sources(status)
+    row_sources = output_step_field_sources(status)
+
     if format == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -509,18 +523,35 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
             if data and isinstance(data[0], dict):
                 # Collect keys from ALL items so no columns are missing
                 headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-                writer.writerow(headers)
-                for row in data:
-                    writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
+                # Each field's source sits beside it, when the rows are the
+                # extraction's own (its sidecar is positional per row).
+                with_sources = len(row_sources) == len(data) and any(row_sources)
+                if with_sources:
+                    writer.writerow([c for h in headers for c in (h, f"{h} (source)")])
+                    for row, srcs in zip(data, row_sources):
+                        writer.writerow([
+                            c for h in headers
+                            for c in (_csv_cell(row.get(h, "")), field_source_cell(srcs.get(h)))
+                        ])
+                else:
+                    writer.writerow(headers)
+                    for row in data:
+                        writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
             else:
                 writer.writerow(["Value"])
                 for item in data:
                     writer.writerow([str(item)])
         elif isinstance(data, dict):
             # Transpose to Field/Value rows instead of one wide row
-            writer.writerow(["Field", "Value"])
-            for k, v in data.items():
-                writer.writerow([str(k), _csv_cell(v)])
+            srcs = row_sources[0] if len(row_sources) == 1 else {}
+            if srcs:
+                writer.writerow(["Field", "Value", "Source"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v), field_source_cell(srcs.get(k))])
+            else:
+                writer.writerow(["Field", "Value"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v)])
         else:
             writer.writerow(["Output"])
             text = str(data)
@@ -547,16 +578,25 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         from app.services.output_handlers import render_workflow_markdown
 
         md_text = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+        if source_rows:
+            md_text = f"{md_text.rstrip()}\n\n{sources_markdown(source_rows)}"
         return md_text.encode(), "text/markdown", "md", None
 
     if format == "pdf":
         from app.services.pdf_service import render_workflow_pdf
 
-        pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
+        if source_rows:
+            # Rendered through Markdown so the Sources table follows the output.
+            from app.services.output_handlers import render_workflow_markdown
+
+            body = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+            pdf_bytes = render_workflow_pdf(f"{body.rstrip()}\n\n{sources_markdown(source_rows)}", title="Workflow Results")
+        else:
+            pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
         return pdf_bytes, "application/pdf", "pdf", None
 
     if format == "docx":
-        docx_bytes = data_to_docx_bytes(output_data)
+        docx_bytes = append_sources_to_docx(data_to_docx_bytes(output_data), source_rows)
         return (
             docx_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
