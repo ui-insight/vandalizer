@@ -15,6 +15,16 @@ const report: CertificationHealthReport = {
 beforeEach(() => get.mockReset().mockResolvedValue(report))
 function open() { fireEvent.click(screen.getByText('Course health by version')) }
 
+it('separates a bounded client observation window from saved states and missing rates', async () => {
+  get.mockResolvedValue({ ...report, journey: { window_days: 30, source: 'client_observation',
+    window_started_at: report.started_at, window_ended_at: report.observed_at,
+    rows: [{ source: 'client_journey', course_version: 'course-v5', manifest_sha256: 'a'.repeat(64), state: 'position_save_failed', provenance: null, count: 2 }] } })
+  render(<CertificationCourseHealth />); open()
+  expect(await screen.findByText('Reading-place save failed: 2')).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Client-reported learning journeys' })).toHaveTextContent('last 30 days')
+  expect(screen.getByText(/Offline browsers and older app versions can miss events/)).toBeInTheDocument()
+})
+
 it('loads only when opened and separates package identities and unknown history', async () => {
   render(<CertificationCourseHealth />)
   expect(get).not.toHaveBeenCalled()

@@ -21,6 +21,7 @@ from app.models.system_config import SystemConfig
 from app.models.user_config import UserModelConfig
 from app.models.chat import ChatMessage, FileAttachment, UrlAttachment, ChatConversation
 from app.models.activity import ActivityEvent
+from app.models.certification_journey import CertificationJourneyEvent
 from app.models.library import LibraryFolder, LibraryItem, Library
 from app.models.feedback import ChatFeedback, ExtractionQualityRecord, ProductFeedback
 from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
@@ -86,6 +87,7 @@ ALL_MODELS = [
     UrlAttachment,
     ChatConversation,
     ActivityEvent,
+    CertificationJourneyEvent,
     LibraryFolder,
     LibraryItem,
     Library,

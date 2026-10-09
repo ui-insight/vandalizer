@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../api/certification'
 import { ApiError } from '../api/client'
+import { observeCertificationJourney } from '../api/certificationJourney'
 import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PendingCompletion, OutcomeCompletionSelection } from '../types/certification'
 function sessionRequest(key: string) {
   try { return sessionStorage.getItem(key) } catch { return null }
@@ -12,6 +13,7 @@ export function useCertification() {
   const [loading, setLoading] = useState(true)
   const [course, setCourse] = useState<CourseDefinition | null>(null)
   const cachedCourse = useRef<CourseDefinition | null>(null)
+  const hasLoadedProgress = useRef(false)
 
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const [savedWritePendingRefresh, setSavedWritePendingRefresh] = useState(false)
@@ -27,9 +29,11 @@ export function useCertification() {
   const refresh = useCallback(async () => {
     const version = ++requestVersion.current
     setLoading(true)
+    let observationIdentity: Pick<CertificationProgress, 'enrollment_id' | 'manifest_sha256'> | null = cachedCourse.current
     try {
       const data = await api.getProgress()
       if (version !== requestVersion.current) return
+      observationIdentity = data
       let definition: CourseDefinition | null = null
       if (data.enrollment_id) {
         const cached = cachedCourse.current
@@ -45,10 +49,12 @@ export function useCertification() {
       cachedCourse.current = definition
       setCourse(definition)
       setProgress(data)
+      hasLoadedProgress.current = true
       setRefreshError(null)
       setSavedWritePendingRefresh(false)
     } catch {
       if (version !== requestVersion.current) return
+      observeCertificationJourney(hasLoadedProgress.current ? 'progress_refresh_failed' : 'initial_progress_load_failed', observationIdentity)
       setRefreshError('Certification progress could not be refreshed.')
     } finally {
       if (version === requestVersion.current) setLoading(false)
@@ -238,6 +244,9 @@ export function useCertification() {
         ...previous, learning_position: result.learning_position, position_revision: result.position_revision,
         modules: { ...previous.modules, [moduleId]: { ...previous.modules[moduleId], learning_position: result.learning_position } },
       } : previous)
+    } catch (error) {
+      observeCertificationJourney('position_save_failed', progress)
+      throw error
     } finally {
       positionWritePending.current = false
       setLoading(false)

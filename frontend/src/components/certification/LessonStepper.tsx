@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import type { CertExercise, LessonSection } from '../../types/certification'
 import { LessonContent } from './LessonContent'
+import { observeCertificationJourney } from '../../api/certificationJourney'
 
 function estimateReadTime(content: string): number {
   const words = content.split(/\s+/).length
@@ -26,6 +27,7 @@ export function LessonStepper({
   savedLessonId,
   onSavePosition,
   onReloadPosition,
+  manifestSha256,
 }: {
   lessons: LessonSection[]
   moduleId: string
@@ -41,6 +43,7 @@ export function LessonStepper({
   savedLessonId?: string
   onSavePosition?: (lessonId: string) => Promise<void>
   onReloadPosition?: () => Promise<void>
+  manifestSha256?: string
 }) {
   const { user } = useAuth()
   // Keep legacy numeric positions intact. Versioned positions belong to one
@@ -89,6 +92,16 @@ export function LessonStepper({
   // Clamp index if it ever goes out of bounds
   const currentIndex = typeof currentPosition === 'string' ? lessons.findIndex(lesson => lesson.id === currentPosition) : currentPosition
   const safeIndex = currentIndex < 0 || currentIndex >= lessons.length ? 0 : currentIndex
+  const observedRestoration = useRef<{ key: string; lessonId?: string; reported: boolean } | null>(null)
+  useEffect(() => {
+    const key = `${enrollmentId}:${moduleId}`
+    if (observedRestoration.current?.key !== key) observedRestoration.current = { key, lessonId: savedLessonId, reported: false }
+    const restored = observedRestoration.current
+    if (!usesServerPosition || !restored.lessonId || lessons[safeIndex]?.id !== restored.lessonId
+      || restored.reported || !manifestSha256) return
+    restored.reported = true
+    observeCertificationJourney('saved_lesson_displayed', { enrollment_id: enrollmentId, manifest_sha256: manifestSha256 })
+  }, [enrollmentId, moduleId, usesServerPosition, savedLessonId, lessons, safeIndex, manifestSha256])
 
   // Keep a stable ref to onStepChange so the scroll effect doesn't re-fire
   // every time the parent re-renders (inline arrow functions change every render)

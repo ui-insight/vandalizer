@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
+  "working_head_at_inventory": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 720221,
-    "sha256": "d91ffd11007cc404afb11dc31bcf2329ad689c5ea0823aea753b45c674212b1e"
+    "bytes": 723540,
+    "sha256": "1d69c5ed54eae168652a2913318fc095e8ef0dcd86f1d651216a52e2bf3b8c31"
   },
   "counts": {
     "accepted": 62,
     "open": 100,
     "items": 162,
-    "checkpoints": 301,
-    "browser_runs": 438,
-    "recorded_captures_including_diagnostics_and_repeats": 5950,
+    "checkpoints": 302,
+    "browser_runs": 443,
+    "recorded_captures_including_diagnostics_and_repeats": 5971,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3110,6 +3110,13 @@
       "evidence_directories": [
         "certification-course-health-2026-10-09"
       ]
+    },
+    {
+      "number": 302,
+      "title": "Privacy-safe learner journey observations on October 9 2026",
+      "evidence_directories": [
+        "certification-journey-events-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3934,6 +3941,12 @@
       "available": true,
       "bytes": 438,
       "sha256": "6322c8fcbbf57677ba21f64a8c32af24d7a14ad4b7d332293b201da6f40f8822"
+    },
+    {
+      "path": "artifacts/visual-review/certification-journey-events-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 779,
+      "sha256": "56d6fde12a7d284b36a5ba4ffb457f6baaffbe40d4dd46a30f56cfb67baf95e5"
     },
     {
       "path": "artifacts/visual-review/certification-lab-entry-layout-2026-10-08/checkpoint.json",
@@ -126600,6 +126613,872 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 4040,
+        "sha256": "b14936f811a102635db59d4f8081c2ea9b4ac23435c8079cd4e71089b3a062e3"
+      },
+      "checkpoints": [
+        302
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T21:06:24.856Z",
+      "reported_commit": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
+      "reported_source_fingerprint": "34ca257c421f58dcb43dd7c756d8e91c523cb88a5a60cccea3ab464dc2e41d30",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic learner delivery and failure simulation using retained course content; admin report exported from actual disposable-MongoDB observations. No live learners or assessment writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "restored-lesson-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/restored-lesson-320.png",
+              "available": true,
+              "bytes": 69384
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/restored-lesson-320.txt",
+              "available": true,
+              "bytes": 6009
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/restored-lesson-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "failed-save-telemetry-unavailable-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/failed-save-telemetry-unavailable-320.png",
+              "available": true,
+              "bytes": 72025
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/failed-save-telemetry-unavailable-320.txt",
+              "available": true,
+              "bytes": 6063
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/failed-save-telemetry-unavailable-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-cert-panel]').getByRole('tab', { name: /Challenge/ }) to be visible\u001b[22m\n",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/blocked.png",
+              "available": true,
+              "bytes": 78150
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/blocked.txt",
+              "available": true,
+              "bytes": 10897
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/manifest.json",
+        "available": true,
+        "bytes": 6698,
+        "sha256": "e8a68bef76a79d1d0c6a273955ad915c33b8409bbb5e02da305dfe6a14534312"
+      },
+      "checkpoints": [
+        302
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T21:09:29.415Z",
+      "reported_commit": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
+      "reported_source_fingerprint": "b4e1bbd4496bf5f0210acbf47ab7025e3f4a51e146d903ac7f3d95125faa7587",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic learner delivery and failure simulation using retained course content; admin report exported from actual disposable-MongoDB observations. No live learners or assessment writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "received": [
+            {
+              "event_id": "a5f7664e35d54247a4dc31f59b5c0aa6",
+              "event": "saved_lesson_displayed",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            },
+            {
+              "event_id": "989a5d9e04d54c28be3250d51a29390c",
+              "event": "position_save_failed",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            },
+            {
+              "event_id": "d6d7048459364dd4b604e3cf247602cd",
+              "event": "bridge_assessment_requested",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            }
+          ],
+          "courseWrites": [
+            "/api/certification/position"
+          ],
+          "csrfFailureTested": true,
+          "assessmentWrites": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "restored-lesson-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/restored-lesson-320.png",
+              "available": true,
+              "bytes": 69384
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/restored-lesson-320.txt",
+              "available": true,
+              "bytes": 6009
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/restored-lesson-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "failed-save-telemetry-unavailable-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/failed-save-telemetry-unavailable-320.png",
+              "available": true,
+              "bytes": 72025
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/failed-save-telemetry-unavailable-320.txt",
+              "available": true,
+              "bytes": 6063
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/failed-save-telemetry-unavailable-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "bridge-entry-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/bridge-entry-320.png",
+              "available": true,
+              "bytes": 78150
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/bridge-entry-320.txt",
+              "available": true,
+              "bytes": 10897
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/bridge-entry-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-320.png",
+              "available": true,
+              "bytes": 110569
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-320.txt",
+              "available": true,
+              "bytes": 4666
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-320.png",
+              "available": true,
+              "bytes": 101263
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-320.txt",
+              "available": true,
+              "bytes": 4666
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-1440.png",
+              "available": true,
+              "bytes": 206150
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-1440.txt",
+              "available": true,
+              "bytes": 4752
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-1440.png",
+              "available": true,
+              "bytes": 206298
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-1440.txt",
+              "available": true,
+              "bytes": 4752
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-complete/journey-report-counts-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 3598,
+        "sha256": "d3d15fa1f6ec4ee7633a89e102c428c78d4309aaf86adbe29f41fca27c4999d5"
+      },
+      "checkpoints": [
+        302
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T21:12:22.792Z",
+      "reported_commit": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
+      "reported_source_fingerprint": "b4e1bbd4496bf5f0210acbf47ab7025e3f4a51e146d903ac7f3d95125faa7587",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic learner delivery and failure simulation using retained course content; admin report exported from actual disposable-MongoDB observations. No live learners or assessment writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "received": [],
+          "courseWrites": [],
+          "csrfFailureTested": false,
+          "assessmentWrites": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "journey-report-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-780.png",
+              "available": true,
+              "bytes": 261806
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-780.txt",
+              "available": true,
+              "bytes": 4666
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-counts-780.png",
+              "available": true,
+              "bytes": 245064
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-counts-780.txt",
+              "available": true,
+              "bytes": 4666
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-native/journey-report-counts-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/manifest.json",
+        "available": true,
+        "bytes": 7957,
+        "sha256": "29ed5df817fd5dac39ae2ef0d3043ac1c5f896b5d1d04acb901adc08be87e778"
+      },
+      "checkpoints": [
+        302
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:02:50.205Z",
+      "reported_commit": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
+      "reported_source_fingerprint": "4835c3958d2acb67db916b635949f7fa079ffca1624fa63b790294f7be618991",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic learner delivery and failure simulation using retained course content; admin report exported from actual disposable-MongoDB observations. No live learners or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 114113,
+        "sha256": "1c7192ceaddfef7b3b7fc372e0df2c9521678ebdee816eb4d3f7b9ce848badbe"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "received": [
+            {
+              "event_id": "076f43cbc4e54ed2a85738fd019101e3",
+              "event": "saved_lesson_displayed",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            },
+            {
+              "event_id": "b48f07469422410e999671a0ebf9ff0e",
+              "event": "position_save_failed",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            },
+            {
+              "event_id": "e0093ace99fe4a3485c4676ced807e17",
+              "event": "bridge_assessment_requested",
+              "enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+              "manifest_sha256": "ddaa633920b59429d03facb4e1107f2f38083adfe0f579c01bf6585dabecbe0b"
+            }
+          ],
+          "courseWrites": [
+            "/api/certification/position"
+          ],
+          "csrfFailureTested": true,
+          "assessmentWrites": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "restored-lesson-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/restored-lesson-320.png",
+              "available": true,
+              "bytes": 69384
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/restored-lesson-320.txt",
+              "available": true,
+              "bytes": 6009
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/restored-lesson-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "failed-save-telemetry-unavailable-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/failed-save-telemetry-unavailable-320.png",
+              "available": true,
+              "bytes": 72025
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/failed-save-telemetry-unavailable-320.txt",
+              "available": true,
+              "bytes": 6063
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/failed-save-telemetry-unavailable-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "bridge-entry-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/bridge-entry-320.png",
+              "available": true,
+              "bytes": 78150
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/bridge-entry-320.txt",
+              "available": true,
+              "bytes": 10897
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/bridge-entry-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-320.png",
+              "available": true,
+              "bytes": 107219
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-320.txt",
+              "available": true,
+              "bytes": 4327
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-320.png",
+              "available": true,
+              "bytes": 107219
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-320.txt",
+              "available": true,
+              "bytes": 4327
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-1440.png",
+              "available": true,
+              "bytes": 199064
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-1440.txt",
+              "available": true,
+              "bytes": 4413
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-1440.png",
+              "available": true,
+              "bytes": 199064
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-1440.txt",
+              "available": true,
+              "bytes": 4413
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-complete/journey-report-counts-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/manifest.json",
+        "available": true,
+        "bytes": 4857,
+        "sha256": "b4d3ea847af9afbc0e6524bf5e978d49b21ceeee86e4bc10a4aeef23ad200594"
+      },
+      "checkpoints": [
+        302
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:02:56.988Z",
+      "reported_commit": "27ec2aa51a65c6b684a6587a94c49d3b36485814",
+      "reported_source_fingerprint": "4835c3958d2acb67db916b635949f7fa079ffca1624fa63b790294f7be618991",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic learner delivery and failure simulation using retained course content; admin report exported from actual disposable-MongoDB observations. No live learners or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 114113,
+        "sha256": "1c7192ceaddfef7b3b7fc372e0df2c9521678ebdee816eb4d3f7b9ce848badbe"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-journey-events-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "received": [],
+          "courseWrites": [],
+          "csrfFailureTested": false,
+          "assessmentWrites": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "journey-report-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-780.png",
+              "available": true,
+              "bytes": 263603
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-780.txt",
+              "available": true,
+              "bytes": 4327
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "journey-report-counts-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-counts-780.png",
+              "available": true,
+              "bytes": 263603
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-counts-780.txt",
+              "available": true,
+              "bytes": 4327
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser-retained-native/journey-report-counts-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-lab-entry-layout-2026-10-08/browser/manifest.json",
         "available": true,
         "bytes": 28711,
@@ -231216,7 +232095,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1083,
+    "1440x1000": 1087,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -231227,7 +232106,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 370,
+    "320x1000": 383,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -231251,7 +232130,7 @@
     "390x700": 28,
     "390x800": 16,
     "390x844": 862,
-    "390x850": 272,
+    "390x850": 276,
     "390x900": 192,
     "720x250": 2,
     "720x500": 188,

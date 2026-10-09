@@ -184,6 +184,7 @@ async def delete_user_account(user_id: str) -> None:
         ("notification", {"user_id": user_id}),
         ("support_ticket", {"user_id": user_id}),
         ("certification_progress", {"user_id": user_id}),
+        ("certification_journey_events", {"user_id": user_id}),
         ("certification_enrollments", {"user_id": user_id}),
         ("certification_enrollment_selections", {"user_id": user_id}),
         ("certification_credentials", {"user_id": user_id}),

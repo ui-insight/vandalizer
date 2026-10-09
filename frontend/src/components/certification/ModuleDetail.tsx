@@ -102,7 +102,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   progressRefreshPending?: boolean
   courseIdentity?: ReadinessIdentity
 }) {
-  const [tab, setTab] = useState<'learn' | 'challenge'>('learn')
+  const [tab, setTab] = useState<'learn' | 'challenge'>(() => openChallengeRequest === undefined ? 'learn' : 'challenge')
   const challengeButton = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (openChallengeRequest === undefined) return
@@ -242,6 +242,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               moduleId={module.id}
               enrollmentId={enrollmentId}
               savedLessonId={savedLessonId}
+              manifestSha256={courseIdentity?.manifest_sha256}
               onSavePosition={onSavePosition}
               onReloadPosition={onReloadPosition}
               exercise={exercise}

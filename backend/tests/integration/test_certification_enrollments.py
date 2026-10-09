@@ -21,6 +21,7 @@ import pytest_asyncio
 
 from app.models.certification import CertificationEnrollment, CertificationEnrollmentSelection, CertificationProgress, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery
 from app.models.user import User
+from app.models.certification_journey import CertificationJourneyEvent
 from app.models.folder import SmartFolder
 from app.models.project import Project, ProjectMembership
 from app.models.team import Team, TeamMembership
@@ -41,7 +42,7 @@ pytestmark = pytest.mark.skipif(not os.environ.get('CERTIFICATION_TEST_MONGO_URL
 async def repo(tmp_path):
     client = AsyncIOMotorClient(os.environ['CERTIFICATION_TEST_MONGO_URL'], serverSelectionTimeoutMS=3000)
     name = 'certification_qa_' + uuid4().hex
-    await init_beanie(database=client[name], document_models=[CertificationEnrollment, CertificationEnrollmentSelection, CertificationProgress, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery, Notification, SmartDocument, SearchSet, SearchSetItem, User, Workflow, WorkflowStep, WorkflowStepTask, SmartFolder, Project, ProjectMembership, Team, TeamMembership, Library, LibraryItem])
+    await init_beanie(database=client[name], document_models=[CertificationJourneyEvent, CertificationEnrollment, CertificationEnrollmentSelection, CertificationProgress, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery, Notification, SmartDocument, SearchSet, SearchSetItem, User, Workflow, WorkflowStep, WorkflowStepTask, SmartFolder, Project, ProjectMembership, Team, TeamMembership, Library, LibraryItem])
     shutil.copytree(CATALOG_ROOT, tmp_path / 'courses')
     registry_path = tmp_path / 'courses/registry.json'
     registry = json.loads(registry_path.read_text())

@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { LessonSection } from '../../types/certification'
 import { LessonStepper } from './LessonStepper'
+import { observeCertificationJourney } from '../../api/certificationJourney'
+vi.mock('../../api/certificationJourney', () => ({ observeCertificationJourney: vi.fn() }))
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { user_id: 'learner' } }) }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
@@ -10,7 +12,20 @@ const lessons: LessonSection[] = [
   { id: 'module.first', revision: 1, title: 'First lesson', content: 'First body', variant: 'concept' },
   { id: 'module.second', revision: 1, title: 'Second lesson', content: 'Second body', variant: 'concept' },
 ]
-beforeEach(() => { localStorage.clear() })
+beforeEach(() => { localStorage.clear(); vi.mocked(observeCertificationJourney).mockClear() })
+
+it('observes a displayed original saved lesson once, without counting subsequent saves as resumes', () => {
+  const props = { lessons, moduleId: 'module', enrollmentId: 'a'.repeat(32), manifestSha256: 'b'.repeat(64), onSavePosition: vi.fn(), onGoToChallenge: vi.fn() }
+  const view = render(<LessonStepper {...props} savedLessonId="module.second" />)
+  expect(observeCertificationJourney).toHaveBeenCalledExactlyOnceWith('saved_lesson_displayed', { enrollment_id: props.enrollmentId, manifest_sha256: props.manifestSha256 })
+  view.rerender(<LessonStepper {...props} savedLessonId="module.first" />)
+  expect(observeCertificationJourney).toHaveBeenCalledOnce()
+  view.unmount()
+  vi.mocked(observeCertificationJourney).mockClear()
+  const fresh = render(<LessonStepper {...props} />)
+  fresh.rerender(<LessonStepper {...props} savedLessonId="module.second" />)
+  expect(observeCertificationJourney).not.toHaveBeenCalled()
+})
 
 it('preserves a lesson identity across reordering and isolates another enrollment', () => {
   localStorage.setItem('cert-lesson:learner:module', '1')

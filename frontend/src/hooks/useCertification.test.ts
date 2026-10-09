@@ -4,9 +4,24 @@ import * as api from '../api/certification'
 import { ApiError } from '../api/client'
 import type { CertificationProgress, CourseDefinition } from '../types/certification'
 import { useCertification } from './useCertification'
+import { observeCertificationJourney } from '../api/certificationJourney'
+vi.mock('../api/certificationJourney', () => ({ observeCertificationJourney: vi.fn() }))
 vi.mock('../api/certification', () => ({ getProgress: vi.fn(), getCourse: vi.fn(), validateModule: vi.fn(), getExercise: vi.fn(), completeModule: vi.fn(), provisionModule: vi.fn(), submitAssessment: vi.fn(), savePosition: vi.fn() }))
 const progress: CertificationProgress = { id: 'p1', user_id: 'u1', modules: {}, total_xp: 0, level: 'beginner', certified: false, certified_at: null, last_activity_date: null }
 beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); vi.mocked(api.getProgress).mockResolvedValue(progress) })
+
+it('observes initial and later read failures without treating either as a saved grade', async () => {
+  vi.mocked(api.getProgress).mockRejectedValueOnce(new Error('PRIVATE initial error'))
+  const { result } = renderHook(useCertification)
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  expect(observeCertificationJourney).toHaveBeenLastCalledWith('initial_progress_load_failed', null)
+  await act(async () => { await result.current.refresh() })
+  vi.mocked(api.getProgress).mockRejectedValueOnce(new Error('PRIVATE later error'))
+  await act(async () => { await result.current.refresh() })
+  expect(observeCertificationJourney).toHaveBeenLastCalledWith('progress_refresh_failed', null)
+  expect(result.current.progress).toEqual(progress)
+  expect(JSON.stringify(vi.mocked(observeCertificationJourney).mock.calls)).not.toContain('PRIVATE')
+})
 
 it.each(['reflection', 'provision', 'validate'] as const)('coalesces simultaneous %s actions through response and refresh', async kind => {
   let finish!: () => void

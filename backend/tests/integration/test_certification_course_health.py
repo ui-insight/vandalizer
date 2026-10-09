@@ -55,7 +55,8 @@ async def test_actual_aggregation_keeps_packages_states_and_upgrade_provenance_s
     assert len(report['rows']) == 8 and all(row['count'] == 1 for row in report['rows'])
     assert {row['manifest_sha256'] for row in report['rows']} == {'a' * 64, 'b' * 64}
     assert {row['state'] for row in report['rows'] if row['source'] == 'module_completions'} == {'rejected', 'applied'}
-    assert 'bridge_uptake' in report['unavailable_metrics'] and 'abandonment_rate' in report['unavailable_metrics']
+    assert 'journey_success_rates' in report['unavailable_metrics'] and 'abandonment_rate' in report['unavailable_metrics']
+    assert report['journey']['rows'] == []
     assert PRIVATE not in json.dumps(report) and 'user_id' not in json.dumps(report)
     assert await snapshot() == before
 

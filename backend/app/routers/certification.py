@@ -17,6 +17,7 @@ from app.routers.certification_batch import router as batch_router
 from app.routers.certification_governance import router as governance_router
 from app.routers.certification_selection import router as selection_router
 from app.routers.certification_upgrades import router as upgrades_router
+from app.routers.certification_journey import router as journey_router
 from app.services import certification_service as svc
 from app.services.certificate_pdf import render_certificate_pdf
 from app.services.certification_versions.runtime import course_operation
@@ -70,6 +71,7 @@ router.include_router(batch_router)
 router.include_router(governance_router)
 router.include_router(selection_router)
 router.include_router(upgrades_router)
+router.include_router(journey_router)
 
 
 async def _upgrade_comparison(user, enrollment_id, target_version=None):

@@ -25,6 +25,7 @@ import { UpgradeComparison } from './UpgradeComparison'
 import { SavedCourseChoices } from './SavedCourseChoices'
 import { CourseLearningPolicy } from './CourseLearningPolicy'
 import { CourseBridgePath } from './CourseBridgePath'
+import { observeCertificationJourney } from '../../api/certificationJourney'
 import { CourseHistory } from './CourseHistory'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { ModuleDetail } from './ModuleDetail'
@@ -560,6 +561,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
       </section>}
       {course && <CourseBridgePath course={course} progress={progress} onAssess={moduleId => {
         if (isModuleLocked(moduleId)) return
+        observeCertificationJourney('bridge_assessment_requested', course)
         setActiveModule(moduleId)
         setAssessmentEntry({ moduleId, nonce: Date.now() })
         setValidationResult(null)

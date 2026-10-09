@@ -27,6 +27,12 @@ export async function installFixtures(context, state = {empty:false, first:false
   else if(p==='/api/reviews/count') data={count:0};
   else if(p==='/api/certification/progress') data={id:'cert-review',user_id:'reviewer',modules:{},total_xp:0,level:'novice',certified:false,certified_at:null,last_activity_date:null};
   else if(p==='/api/certification/selection-status') data={read_only:true,current_enrollment_id:null,pending:null};
+  else if(p==='/api/certification/journey-events' && route.request().method()==='POST') {
+    const observation=route.request().postDataJSON();
+    if(Object.keys(observation).some(key=>!['event_id','event','enrollment_id','manifest_sha256'].includes(key)))throw new Error('Unexpected data in certification observation');
+    (state.certificationJourneyEvents ||= []).push(observation);
+    data={recorded:true,assessment_changed:false};
+  }
   else if(p==='/api/extractions/search-sets') data=[];
   else if(p==='/api/config/models') data=[{name:'Review model',tag:'review-model',context_window:128000,provider:'local'}];
   else if(p==='/api/config/user') data={model:'review-model',temperature:0.2,top_p:1,available_models:[{name:'Review model',tag:'review-model',context_window:128000}]};
