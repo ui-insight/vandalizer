@@ -4,11 +4,13 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from pymongo.errors import DuplicateKeyError
 
 from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, audit_service
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
@@ -39,10 +41,18 @@ async def upload_document(
     settings: Settings,
     folder: str | None = None,
     root_folder_name: str | None = None,
+    certification_provisioning_key: str | None = None,
 ) -> dict:
     safe_name = secure_filename(filename)
     extension = raw_extension.lower().lstrip(".")
     user_id = user.user_id
+
+    if certification_provisioning_key is not None and (
+        len(certification_provisioning_key) != 64
+        or any(char not in '0123456789abcdef' for char in certification_provisioning_key)
+        or root_folder_name or not folder or folder == '0'
+    ):
+        raise ValueError('Course sample creation requires its original identity and lab folder.')
 
     if not is_allowed_file(safe_name):
         raise ValueError(f"File type '{extension}' is not allowed.")
@@ -122,20 +132,12 @@ async def upload_document(
     relative_path_str = f"{user_id}/{uid}.{extension}"
     await storage.write(relative_path_str, file_data)
 
-    # Celery tasks need a local filesystem path; use public_path() for local
-    # storage or write a temporary file for remote backends (e.g. S3).
-    local_path = storage.public_path(relative_path_str)
-    if local_path is None:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
-        tmp.write(file_data)
-        tmp.close()
-        local_path = tmp.name
-
     relative_path = Path(relative_path_str)
 
     document = SmartDocument(
         title=safe_name,
         processing=True,
+        validating=True,
         valid=True,
         raw_text="",
         downloadpath=str(relative_path),
@@ -147,8 +149,36 @@ async def upload_document(
         folder=target_folder,
         task_id=None,
         task_status="layout",
+        certification_provisioning_key=certification_provisioning_key,
     )
-    await document.insert()
+    try:
+        await document.insert()
+    except DuplicateKeyError:
+        if certification_provisioning_key is None:
+            raise
+        # Another request inserted the same active course source. Each upload
+        # used a random storage path, so only this losing candidate is removed.
+        existing = await SmartDocument.find_one(
+            SmartDocument.certification_provisioning_key == certification_provisioning_key,
+            SmartDocument.user_id == user_id, SmartDocument.folder == target_folder,
+            SmartDocument.title == safe_name, SmartDocument.soft_deleted == False,  # noqa: E712
+        )
+        if existing is None or existing.path == relative_path_str:
+            raise
+        try:
+            await storage.delete(relative_path_str)
+        except Exception:
+            logger.exception('Could not remove losing course sample upload %s', relative_path_str)
+        return {"complete": True, "exists": True, "uuid": existing.uuid}
+
+    # Only the inserted candidate needs a local task path and dispatch. An
+    # interrupted/unknown dispatch still requires its own recovery protocol.
+    local_path = storage.public_path(relative_path_str)
+    if local_path is None:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
+        tmp.write(file_data)
+        tmp.close()
+        local_path = tmp.name
 
     # Dispatch Celery tasks for extraction + validation
     from app.tasks.upload_tasks import dispatch_upload_tasks
@@ -159,8 +189,7 @@ async def upload_document(
         document_path=local_path,
         user_id=user_id,
     )
-    document.task_id = task_id
-    await document.save()
+    await record_extraction_dispatch(document, task_id)
 
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
@@ -287,6 +316,8 @@ async def rename_document(doc_uuid: str, new_title: str, *, user: User) -> bool:
     doc = await access_control.get_authorized_document(doc_uuid, user, manage=True)
     if not doc:
         return False
+    if doc.title != new_title:
+        doc.certification_provisioning_key = None
     doc.title = new_title
     if not doc.downloadpath:
         doc.downloadpath = doc.path
@@ -310,6 +341,8 @@ async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
         raise ValueError("Cannot move files between personal and team folders.")
 
     old_folder = doc.folder
+    if old_folder != folder_id:
+        doc.certification_provisioning_key = None
     doc.folder = folder_id
     await doc.save()
 

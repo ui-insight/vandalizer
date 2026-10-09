@@ -229,7 +229,11 @@ async def retry_extraction(
             detail="Extraction is already in progress for this document",
         )
 
-    restart = await document_service.restart_extraction(doc, user.user_id)
+    from app.services.extraction_restarts import ExtractionRestartConflict
+    try:
+        restart = await document_service.restart_extraction(doc, user.user_id)
+    except ExtractionRestartConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     task_id = restart["task_id"]
     force_ocr = restart["force_ocr"]
     ocr_required = restart["ocr_required"]
@@ -280,7 +284,9 @@ async def reclassify_document(
     old_classification = doc.classification
 
     from app.services.classification_service import apply_classification
-    await apply_classification(doc, body.classification, confidence=1.0, classified_by=user.user_id)
+    applied = await apply_classification(doc, body.classification, confidence=1.0, classified_by=user.user_id)
+    if applied is None:
+        raise HTTPException(status_code=409, detail="Document changed or is no longer available. Refresh before classifying it.")
 
     await audit_service.log_event(
         action="document.classify",

@@ -4,6 +4,7 @@ Ported from Flask app/utilities/upload_manager.py.
 Uses pymongo (sync) for DB access.
 """
 
+import datetime
 import logging
 import os
 import time
@@ -26,6 +27,16 @@ def _get_db():
     from app.tasks import get_sync_db
 
     return get_sync_db()
+
+
+def _touch_validation(document_uuid: str, extraction_revision: int) -> bool:
+    from app.services.extraction_generations import extraction_generation_filter
+
+    result = _get_db().smart_document.update_one(
+        {**extraction_generation_filter(document_uuid, extraction_revision), 'validating': True},
+        {'$set': {'_validation_heartbeat_at': datetime.datetime.now()}},
+    )
+    return bool(result.matched_count)
 
 
 _DEFAULT_COMPLIANCE_RULES = (
@@ -97,6 +108,8 @@ def validate_chunk(
     index: int,
     total: int,
     user_id: str | None = None,
+    document_uuid: str | None = None,
+    extraction_revision: int = 0,
 ) -> dict:
     """Validate a single text chunk against compliance requirements.
 
@@ -106,6 +119,8 @@ def validate_chunk(
     reported as such, the same way a disabled check is, and the chord still
     completes so the document does not sit in ``validating`` forever.
     """
+    if document_uuid and not _touch_validation(document_uuid, extraction_revision):
+        return {'skipped': True, 'reason': 'obsolete_extraction', 'index': index}
     logger.info("Validating chunk %d/%d of %s", index, total, document_path)
     try:
         agent = _get_secure_agent()
@@ -155,6 +170,8 @@ def validate_chunk(
             return {"valid": True, "feedback": str(output), "index": index}
 
     except Exception as e:
+        if document_uuid and not _touch_validation(document_uuid, extraction_revision):
+            return {'skipped': True, 'reason': 'obsolete_extraction', 'index': index}
         logger.warning("Retrying chunk %d due to error: %s", index, e)
         raise self.retry(exc=e)
 
@@ -174,8 +191,20 @@ def summarize_results(
     document_uuid: str,
     background: bool = False,
     user_id: str | None = None,
+    extraction_revision: int = 0,
 ) -> dict:
     """Aggregate validation feedback from all chunks and update SmartDocument."""
+    from app.services.extraction_generations import extraction_generation_filter
+
+    db = _get_db()
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
+    document = db.smart_document.find_one(generation_query, {'validating': 1})
+    if not document:
+        return {'skipped': True, 'reason': 'obsolete_extraction'}
+    # Keep an active summary distinct from a lost chord. Legacy callbacks that
+    # did not set validating still retain their generation-checked write path.
+    if document.get('validating') and not _touch_validation(document_uuid, extraction_revision):
+        return {'skipped': True, 'reason': 'obsolete_extraction'}
     feedback_list = []
     all_valid = True
     skipped = 0
@@ -230,23 +259,25 @@ def summarize_results(
         summary = {"valid": all_valid, "feedback": combined[:2000]}
 
     # Persist to DB
-    db = _get_db()
     update_fields = {
         "valid": all_valid,
         "validation_feedback": summary.get("feedback", ""),
         "validating": False,
+        "_validation_heartbeat_at": None,
     }
 
-    db.smart_document.update_one(
-        {"uuid": document_uuid},
+    result = db.smart_document.update_one(
+        generation_query,
         {"$set": update_fields},
     )
+    if not result.matched_count:
+        return {'skipped': True, 'reason': 'obsolete_extraction'}
     # Compliance validation says nothing about whether the text could be read,
     # so it must not overwrite an extraction failure with a green checkmark.
     if not background:
         from app.tasks.document_tasks import mark_complete_unless_errored
 
-        mark_complete_unless_errored(db, document_uuid)
+        mark_complete_unless_errored(db, document_uuid, extraction_revision)
 
     logger.info(
         "Document %s validation updated: valid=%s, background=%s",
@@ -273,11 +304,18 @@ def perform_document_validation(
     chunk_overlap: int = 200,
     background: bool = False,
     user_id: str | None = None,
+    extraction_revision: int = 0,
 ) -> str:
     """Entry point: split document text, launch chunk validations via chord."""
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+    from app.services.extraction_generations import extraction_generation_filter
+
     db = _get_db()
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
+    doc = db.smart_document.find_one(generation_query)
+    if not doc:
+        return ""
 
     settings = _get_compliance_settings()
     if not settings["enabled"] or not (settings["rules"] or "").strip():
@@ -286,9 +324,10 @@ def perform_document_validation(
             "valid": True,
             "validation_feedback": "Compliance checks disabled.",
             "validating": False,
+            "_validation_heartbeat_at": None,
         }
         db.smart_document.update_one(
-            {"uuid": document_uuid},
+            generation_query,
             {"$set": skip_fields},
         )
         # Skipping a check the deployment turned off is not evidence that the
@@ -296,27 +335,28 @@ def perform_document_validation(
         if not background:
             from app.tasks.document_tasks import mark_complete_unless_errored
 
-            mark_complete_unless_errored(db, document_uuid)
+            mark_complete_unless_errored(db, document_uuid, extraction_revision)
         logger.info("Compliance disabled — skipping validation for %s", document_uuid)
         return ""
 
-    db.smart_document.update_one(
-        {"uuid": document_uuid}, {"$set": {"validating": True}}
+    result = db.smart_document.update_one(
+        generation_query, {"$set": {"validating": True, '_validation_heartbeat_at': datetime.datetime.now()}}
     )
+    if not result.matched_count:
+        return ""
     if not background:
         # Same guard as every other status write: an in-progress marker on a
         # document that already failed extraction erases the failure.
         from app.tasks.document_tasks import advance_task_status
 
-        advance_task_status(db, document_uuid, "security")
+        advance_task_status(db, document_uuid, "security", extraction_revision)
 
     start = time.perf_counter()
 
     # Get text
     text = document_text
     if not text:
-        doc = db.smart_document.find_one({"uuid": document_uuid})
-        text = doc.get("raw_text", "") if doc else ""
+        text = doc.get("raw_text", "") or ""
 
     if not text:
         # Try reading from file. Resolve the path the same way the extraction
@@ -379,11 +419,15 @@ def perform_document_validation(
     logger.info("Launching %d chunk validation tasks for %s", total, document_uuid)
 
     # Build chord: validate all chunks, then summarize
+    if not db.smart_document.find_one(generation_query, {'_id': 1}):
+        return ""
     header = [
-        validate_chunk.s(document_path, compliance, chunk_text, idx + 1, total, user_id=user_id)
+        validate_chunk.s(document_path, compliance, chunk_text, idx + 1, total,
+                         user_id=user_id, document_uuid=document_uuid, extraction_revision=extraction_revision)
         for idx, chunk_text in enumerate(chunks)
     ]
-    callback = summarize_results.s(document_uuid, background, user_id=user_id)
+    generation_kwargs = {'extraction_revision': extraction_revision} if extraction_revision else {}
+    callback = summarize_results.s(document_uuid, background, user_id=user_id, **generation_kwargs)
     chord(header)(callback)
 
     elapsed = time.perf_counter() - start

@@ -124,8 +124,13 @@ async def _reprocess_document_source(
     if extracting:
         return "waiting"
     if needs_read:
+        from app.services.extraction_restarts import ExtractionRestartConflict
         try:
             await document_service.restart_extraction(authorized_doc, user.user_id)
+        except ExtractionRestartConflict as error:
+            source.status, source.error_message, source.refresh_queued_at = previous
+            await source.save()
+            raise ReprocessRefused(409, str(error)) from error
         except Exception:
             source.status, source.error_message, source.refresh_queued_at = previous
             await source.save()

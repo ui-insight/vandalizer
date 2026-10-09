@@ -25,6 +25,7 @@ from app.services.name_conflicts import (
     ensure_model_identity_available,
 )
 from app.services.version_service import get_update_status
+from app.services.certification_versions.support_access import AccessChangeRequest
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.utils import url_validation
 from app.models.team import Team, TeamMembership
@@ -3587,6 +3588,17 @@ async def backfill_agentic_drip(
 
 class CertificationProgressItem(BaseModel):
     user_id: str
+    progress_id: Optional[str] = None
+    enrollment_id: Optional[str] = None
+    course_version: Optional[str] = None
+    course_title: Optional[str] = None
+    enrollment_state: Optional[str] = None
+    is_active: Optional[bool] = None
+    can_unlock: bool = True
+    progression_policy_id: Optional[str] = None
+    learning_order: Optional[str] = None
+    unlock_unavailable_reason: Optional[str] = None
+    reconciliation_error: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
     level: str
@@ -3602,6 +3614,7 @@ class CertificationProgressItem(BaseModel):
 
 class CertificationProgressDetail(CertificationProgressItem):
     modules: dict
+    support_summary: Optional[dict] = None
 
 
 class CertificationProgressListResponse(BaseModel):
@@ -3621,7 +3634,7 @@ async def list_certification_progress(
     await _require_admin(user)
 
     from app.models.certification import CertificationProgress
-    from app.services import certification_service as cert_svc
+    from app.services.certification_versions.readers import support_metadata_many
 
     progresses = await CertificationProgress.find().to_list()
     if not progresses:
@@ -3631,20 +3644,23 @@ async def list_certification_progress(
     users = await User.find({"user_id": {"$in": user_ids}}).to_list()
     user_map = {u.user_id: u for u in users}
 
-    total_modules = len(cert_svc.MODULE_ORDER)
+    metadata_by_progress = await support_metadata_many(progresses)
     items: list[CertificationProgressItem] = []
     for p in progresses:
         u = user_map.get(p.user_id)
-        completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+        metadata = metadata_by_progress[str(p.id)]
+        module_ids = metadata.pop('module_ids')
+        completed = sum(1 for mid in module_ids if isinstance(p.modules.get(mid), dict) and p.modules[mid].get('completed'))
         items.append(
             CertificationProgressItem(
+                **metadata,
                 user_id=p.user_id,
                 name=u.name if u else None,
                 email=u.email if u else None,
                 level=p.level,
                 total_xp=p.total_xp,
                 modules_completed=completed,
-                modules_total=total_modules,
+                modules_total=len(module_ids),
                 certified=p.certified,
                 certified_at=p.certified_at,
                 last_activity_date=p.last_activity_date,
@@ -3656,8 +3672,8 @@ async def list_certification_progress(
     if q.strip():
         needle = q.strip().casefold()
         items = [item for item in items if any(needle in (text or "").casefold()
-                 for text in (item.name, item.email, item.user_id))]
-    items.sort(key=lambda i: (-i.modules_completed, -i.total_xp, i.user_id))
+                 for text in (item.name, item.email, item.user_id, item.course_title, item.course_version))]
+    items.sort(key=lambda i: (-i.modules_completed, -i.total_xp, i.user_id, i.progress_id or "", i.enrollment_id or ""))
     total = len(items)
     capped = offset + limit < total
     return CertificationProgressListResponse(items=items[offset:offset + limit], total=total, capped=capped)
@@ -3666,70 +3682,120 @@ async def list_certification_progress(
 @router.get("/certifications/{user_id}", response_model=CertificationProgressDetail)
 async def get_certification_progress_detail(
     user_id: str,
+    enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
     """Get a single user's full certification progress including per-module state."""
     await _require_admin(user)
 
-    from app.models.certification import CertificationProgress
-    from app.services import certification_service as cert_svc
-
-    p = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
+    from app.services.certification_versions.readers import support_metadata, existing_active_progress
+    from app.services.certification_versions.enrollments import EnrollmentRepository, EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        p = await EnrollmentRepository().read_progress(user_id, enrollment_id) if enrollment_id else await existing_active_progress(user_id)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not p:
         raise HTTPException(status_code=404, detail="No certification progress for this user")
 
     target = await User.find_one(User.user_id == user_id)
-    completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+    metadata = await support_metadata(p)
+    module_ids = metadata.pop('module_ids')
+    completed = sum(1 for mid in module_ids if isinstance(p.modules.get(mid), dict) and p.modules[mid].get('completed'))
+    from app.services.certification_versions.support_snapshot import support_snapshot, progress_modules
+    try:
+        support = await support_snapshot(p, metadata, repository=EnrollmentRepository())
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return CertificationProgressDetail(
+        **metadata,
         user_id=p.user_id,
         name=target.name if target else None,
         email=target.email if target else None,
         level=p.level,
         total_xp=p.total_xp,
         modules_completed=completed,
-        modules_total=len(cert_svc.MODULE_ORDER),
+        modules_total=len(module_ids),
         certified=p.certified,
         certified_at=p.certified_at,
         last_activity_date=p.last_activity_date,
         unlocked=p.unlocked,
         updated_at=p.updated_at,
-        modules=p.modules,
+        modules=progress_modules(p, module_ids),
+        support_summary=support,
     )
 
 
-class CertificationUnlockRequest(BaseModel):
-    unlocked: bool
+class CertificationRecoveryRequest(BaseModel):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    review_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+@router.get("/certifications/{user_id}/recovery")
+async def review_certification_recovery(user_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+    """Read-only review of one explicitly selected enrollment; never enroll."""
+    await _require_admin(user)
+    from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    workflow = RecoveryWorkflow()
+    try:
+        return {'review': await workflow.inspect(user_id, enrollment_id),
+                'history': [{**item, 'can_resume': item['actor_user_id'] == user.user_id and item['state'] == 'started'}
+                            for item in await workflow.history(user_id, enrollment_id)], 'can_apply': bool(user.is_admin)}
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/certifications/{user_id}/recovery")
+async def recover_certification_completion(user_id: str, enrollment_id: str, payload: CertificationRecoveryRequest,
+                                         user: User = Depends(get_current_user)):
+    """Full admins only; persist the reviewed intent before revoking a worker."""
+    await _require_superadmin(user)
+    from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        return await RecoveryWorkflow().submit(user.user_id, user_id, enrollment_id,
+            request_id=payload.request_id, review_sha256=payload.review_sha256, reason=payload.reason)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+class CertificationUnlockRequest(AccessChangeRequest):
+    pass
 
 
 @router.put("/certifications/{user_id}/unlock")
 async def set_certification_unlock(
     user_id: str,
     payload: CertificationUnlockRequest,
+    enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
-    """Debug toggle — when unlocked, the user can pick any module without prerequisites."""
+    """Legacy prerequisite access control; assessed outcome requirements remain enforced."""
     await _require_admin(user)
 
-    from app.models.certification import CertificationProgress
-
-    prog = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
-    if not prog:
-        prog = CertificationProgress(user_id=user_id)
-        await prog.insert()
-
-    prog.unlocked = payload.unlocked
-    prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await prog.save()
+    from app.services.certification_versions.readers import set_support_unlock
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        prog = await set_support_unlock(user_id, payload.unlocked, enrollment_id,
+            actor_user_id=user.user_id, reason=payload.reason, request_id=payload.request_id)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     await _audit(
         user,
         "certification.unlock" if payload.unlocked else "certification.lock",
         f"{'Unlocked' if payload.unlocked else 'Locked'} certification for user {user_id}",
-        {"user_id": user_id, "unlocked": payload.unlocked},
+        {"user_id": user_id, "unlocked": payload.unlocked, "enrollment_id": prog.enrollment_id, "course_version": prog.course_version,
+         "reason": payload.reason, "request_id": payload.request_id, "credit_effect": "none"},
     )
 
-    return {"user_id": user_id, "unlocked": prog.unlocked}
+    return {"user_id": user_id, "unlocked": prog.unlocked, "enrollment_id": prog.enrollment_id, "course_version": prog.course_version}
 
 
 # ---------------------------------------------------------------------------

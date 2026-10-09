@@ -2,6 +2,7 @@
 
 import base64
 import datetime
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -13,6 +14,8 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
 from app.models.verification import VerificationRequest, VerificationStatus
+from app.services.certification_versions.runtime import course_operation, current_operation
+from app.services.certification_versions.writes import save_progress
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +28,9 @@ _EXERCISES: dict = {}
 
 
 def _load_exercises() -> dict:
+    operation = current_operation()
+    if operation:
+        return operation.package.json('exercises.json')
     global _EXERCISES
     if _EXERCISES:
         return _EXERCISES
@@ -47,6 +53,9 @@ _LESSONS: dict = {}
 
 
 def _load_lessons() -> dict:
+    operation = current_operation()
+    if operation:
+        return operation.package.json('lessons.json')
     global _LESSONS
     if _LESSONS:
         return _LESSONS
@@ -132,27 +141,92 @@ ASSESSMENT_KEYS = {
 
 def _compute_level(xp: int) -> str:
     level = "novice"
-    for name, threshold in LEVELS:
+    for name, threshold in course_levels():
         if xp >= threshold:
             level = name
     return level
+
+
+def course_levels():
+    operation = current_operation()
+    if operation:
+        from app.services.certification_versions.grading import load_rubric
+        rubric = load_rubric(operation.package)
+        if 'outcomes.json' in operation.package.manifest.artifacts:
+            return [(item['name'], item['xp']) for item in operation.package.json('course-structure.json')['levels']]
+        return rubric.LEVELS
+    return LEVELS
+
+
+def course_module_order() -> list[str]:
+    operation = current_operation()
+    return [module.id for module in operation.package.manifest.modules] if operation else MODULE_ORDER
+
+
+def course_module_xp() -> dict[str, int]:
+    operation = current_operation()
+    return {module.id: module.base_xp for module in operation.package.manifest.modules} if operation else MODULE_XP
+
+
+def course_module_titles() -> dict[str, str]:
+    operation = current_operation()
+    return {module.id: module.title for module in operation.package.manifest.modules} if operation else MODULE_TITLES
+
+
+def course_identity() -> dict:
+    operation = current_operation()
+    return ({**operation.package.summary(), 'enrollment_id': operation.progress.enrollment_id,
+             'maximum_stars': operation.package.manifest.maximum_stars,
+             'credit_basis': 'required_outcomes' if 'outcomes.json' in operation.package.manifest.artifacts else 'legacy_rubric'}
+            if operation else {})
+
+
+@course_operation()
+async def get_course_definition(user_id: str, *, enrollment_id: str | None = None) -> dict:
+    operation = current_operation()
+    if operation is None:
+        return {'versioned': False}
+    manifest = operation.package.manifest
+    from .certification_versions.delivery import public_modules
+    from .certification_versions.grading import selected_outcome_completion_available
+    from .certification_versions.progression_policy import public_progression_policy
+    from .certification_versions.credential_scope import public_credential_scope
+    from .certification_versions.bridge_path import public_bridge_path
+    return {
+        **course_identity(), 'versioned': True,
+        'modules': public_modules(operation.package),
+        'prerequisites': {module.id: list(module.prerequisites) for module in manifest.modules},
+        **operation.package.json('course-structure.json'),
+        'selected_outcome_completion': selected_outcome_completion_available(operation.package),
+        'progression_policy': public_progression_policy(operation.package),
+        'credential_scope': public_credential_scope(operation.package),
+        'bridge_path': public_bridge_path(operation.package),
+    }
 
 
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
 
+@course_operation()
 async def get_progress(user_id: str) -> CertificationProgress:
-    prog = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
-    if not prog:
-        prog = CertificationProgress(user_id=user_id)
-        await prog.insert()
-    return prog
+    operation = current_operation()
+    if operation:
+        return operation.progress
+    from .certification_versions.legacy_writes import read_progress
+    return await read_progress(user_id)
 
 
+@course_operation()
 async def get_progress_dict(user_id: str) -> dict:
     prog = await get_progress(user_id)
+    operation = current_operation()
+    pending = []
+    if operation:
+        from .certification_versions.attempts import AttemptRepository
+        pending = await AttemptRepository().pending(operation)
     return {
+        **course_identity(),
         "id": str(prog.id),
         "user_id": prog.user_id,
         "modules": prog.modules,
@@ -162,7 +236,20 @@ async def get_progress_dict(user_id: str) -> dict:
         "certified_at": prog.certified_at.isoformat() if prog.certified_at else None,
         "last_activity_date": prog.last_activity_date,
         "unlocked": prog.unlocked,
+        **({'learning_position': prog.learning_position, 'position_revision': prog.position_revision,
+            'pending_completions': pending} if operation else {}),
     }
+
+
+@course_operation(write=True)
+async def save_learning_position(user_id: str, module_id: str, lesson_id: str, expected_revision: int) -> dict:
+    from .certification_versions.catalog import CourseCatalogError
+    from .certification_versions.delivery import CourseDelivery
+
+    operation = current_operation()
+    if operation is None:
+        raise CourseCatalogError('Server lesson resume is unavailable for this course')
+    return await CourseDelivery.store_position(operation.progress, operation.package, module_id, lesson_id, expected_revision)
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +270,8 @@ def _touch_activity(prog: CertificationProgress) -> None:
 CERT_FOLDER_TITLE = "Certification Lab"
 
 
-async def provision_module_documents(user, module_id: str, settings) -> dict:
+@course_operation(write=True)
+async def provision_module_documents(user, module_id: str, settings, *, enrollment_id: str | None = None) -> dict:
     """Provision sample documents for a certification module.
 
     Creates a Certification Lab folder in the user's workspace if needed,
@@ -192,7 +280,11 @@ async def provision_module_documents(user, module_id: str, settings) -> dict:
 
     ``user`` is a ``User`` model instance.
     """
-    from app.services import file_service, folder_service
+    from app.services import file_service
+    from .access_control import get_authorized_folder
+    from .certification_versions.enrollments import EnrollmentConflict
+    from .certification_versions.lab_folders import ensure_lab_folder
+    from .certification_versions.source_access import owned_source
 
     user_id = user.user_id
 
@@ -204,40 +296,64 @@ async def provision_module_documents(user, module_id: str, settings) -> dict:
     if not doc_filenames:
         return {"provisioned_docs": []}
 
-    # Find or create Certification Lab folder in user's workspace
-    folder = await SmartFolder.find_one(
-        SmartFolder.title == CERT_FOLDER_TITLE,
-        SmartFolder.user_id == user_id,
-    )
-    if not folder:
-        folder = await folder_service.create_folder(
-            name=CERT_FOLDER_TITLE,
-            parent_id="0",
-            user=user,
+    operation = current_operation()
+    folder_title = f'{CERT_FOLDER_TITLE} — {operation.package.manifest.title}' if operation else CERT_FOLDER_TITLE
+    # Versioned labs have an enrollment-owned folder reference; identical
+    # filenames from another course must not select its sample documents.
+    if operation:
+        folder = await SmartFolder.find_one(
+            SmartFolder.uuid == operation.progress.lab_folder_id,
+            SmartFolder.user_id == user_id,
+        ) if operation.progress.lab_folder_id else None
+    else:
+        folder = await SmartFolder.find_one(
+            SmartFolder.title == CERT_FOLDER_TITLE,
+            SmartFolder.user_id == user_id,
         )
+    if folder:
+        if await get_authorized_folder(folder.uuid, user, contribute=True) is None:
+            raise EnrollmentConflict('The selected course lab is no longer accessible for provisioning')
+    # Validate and bind progress before any external creation. In particular,
+    # disabled versioning must not upload into an already pinned learner's lab.
+    prog = await get_progress(user_id)
+    if not folder:
+        folder = await ensure_lab_folder(user, prog, folder_title)
+        if await get_authorized_folder(folder.uuid, user, contribute=True) is None:
+            raise EnrollmentConflict('The selected course lab is no longer accessible for provisioning')
+        if operation:
+            operation.progress.lab_folder_id = folder.uuid
+            await save_progress(operation.progress)
 
     # Upload each document (skip if already exists)
     provisioned = []
+    assigned_names = {}
     docs_dir = _CERT_DATA_DIR / "documents"
 
     for filename in doc_filenames:
         filepath = docs_dir / filename
-        if not filepath.exists():
+        if not operation and not filepath.exists():
             log.warning("Certification PDF not found: %s", filepath)
             continue
 
-        # Check if already uploaded (skip soft-deleted docs)
-        existing = await SmartDocument.find_one(
+        # Reuse only this lab's copy, including for unversioned learners.
+        # A same-named personal file is not an assigned course sample.
+        filters = [
             SmartDocument.title == filename,
             SmartDocument.user_id == user_id,
+            SmartDocument.folder == folder.uuid,
             SmartDocument.soft_deleted != True,  # noqa: E712
-        )
+        ]
+        existing = await SmartDocument.find_one(*filters)
+        if existing:
+            if await owned_source(user_id, existing.uuid, lab_folder_id=folder.uuid) is None:
+                raise EnrollmentConflict('An assigned source is no longer accessible in this course lab')
         if existing:
             provisioned.append(existing.uuid)
+            assigned_names[existing.uuid] = filename
             continue
 
         # Read and base64-encode
-        pdf_bytes = filepath.read_bytes()
+        pdf_bytes = operation.package.read('documents/' + filename) if operation else filepath.read_bytes()
         blob = base64.b64encode(pdf_bytes).decode("utf-8")
 
         result = await file_service.upload_document(
@@ -247,18 +363,34 @@ async def provision_module_documents(user, module_id: str, settings) -> dict:
             user=user,
             settings=settings,
             folder=folder.uuid,
+            certification_provisioning_key=hashlib.sha256(json.dumps([
+                'vandalizer:course-sample:v1', user_id, str(prog.id),
+                prog.enrollment_id or 'unversioned', folder.uuid, filename,
+                hashlib.sha256(pdf_bytes).hexdigest(),
+            ], separators=(',', ':')).encode()).hexdigest(),
         )
         provisioned.append(result["uuid"])
+        assigned_names[result['uuid']] = filename
+
+    # Upload/storage/queue work can outlast a permission or document change.
+    # Recheck all assigned sources, including those reused before later uploads.
+    if await get_authorized_folder(folder.uuid, user, contribute=True) is None:
+        raise EnrollmentConflict('The selected course lab is no longer accessible for provisioning')
+    if len(assigned_names) != len(provisioned):
+        raise EnrollmentConflict('The assigned samples are no longer accessible as distinct course sources')
+    for document_id, filename in assigned_names.items():
+        source = await owned_source(user_id, document_id, lab_folder_id=folder.uuid)
+        if source is None or source.title != filename:
+            raise EnrollmentConflict('An assigned source is no longer accessible in this course lab')
 
     # Store provisioning info in progress
-    prog = await get_progress(user_id)
     module_data = prog.modules.get(module_id, {})
     module_data["provisioned_docs"] = provisioned
     prog.modules[module_id] = module_data
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await prog.save()
+    await save_progress(prog)
 
-    return {"provisioned_docs": provisioned}
+    return {"provisioned_docs": provisioned, "folder_name": folder_title}
 
 
 # ---------------------------------------------------------------------------
@@ -293,44 +425,127 @@ def _fuzzy_field_match(expected: str, field_names: list[str]) -> bool:
 # Module validation
 # ---------------------------------------------------------------------------
 
-async def validate_module(user_id: str, module_id: str) -> dict:
+@course_operation()
+async def validate_module(user_id: str, module_id: str, *, enrollment_id: str | None = None, assessment_selection: dict | None = None) -> dict:
     """Check a user's actual data against module completion criteria.
 
     Returns {passed: bool, stars: int, checks: [{name, passed, detail}]}
     """
+    operation = current_operation()
+    if operation:
+        from app.services.certification_versions.grading import grade
+        selected = {'assessment_selection': assessment_selection} if assessment_selection is not None else {}
+        return {**course_identity(), **await grade(operation.package, operation.progress, module_id, **selected)}
+    if assessment_selection is not None:
+        from .certification_versions.enrollments import EnrollmentConflict
+        raise EnrollmentConflict('Selected competency evidence requires an explicit versioned enrollment')
     if module_id not in MODULE_XP:
         return {"passed": False, "stars": 0, "checks": [{"name": "invalid", "passed": False, "detail": "Unknown module"}]}
 
     _prog = await get_progress(user_id)
 
-    # TEMP: prerequisite check bypassed for review
-    # idx = MODULE_ORDER.index(module_id)
-    # if idx > 0:
-    #     prev = MODULE_ORDER[idx - 1]
-    #     prev_data = prog.modules.get(prev, {})
-    #     if not prev_data.get("completed"):
-    #         return {
-    #             "passed": False,
-    #             "stars": 0,
-    #             "checks": [{"name": "prerequisite", "passed": False, "detail": f"Complete the previous module first"}],
-    #         }
+    # Preserve the original legacy requirements, which impose no module
+    # prerequisites. Versioned requirements use the pinned runner above;
+    # do not introduce an unrecorded lock into an existing learner's course.
 
     validator = _VALIDATORS.get(module_id)
     if not validator:
         return {"passed": False, "stars": 0, "checks": []}
 
-    return await validator(user_id)
+    from .certification_versions.check_roles import legacy_check_roles
+    from .certification_versions.legacy_access import with_legacy_field_access
+    return legacy_check_roles(module_id, await with_legacy_field_access(validator, user_id)(user_id))
 
 
-async def complete_module(user_id: str, module_id: str) -> dict:
+@course_operation(write=True)
+async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | None = None, request_id: str | None = None, assessment_selection: dict | None = None, expected_attempts: int | None = None) -> dict:
     """Mark a module complete after validation passes. Returns updated progress."""
-    validation = await validate_module(user_id, module_id)
+    operation = current_operation()
+    if assessment_selection is not None and not operation:
+        from .certification_versions.enrollments import EnrollmentConflict
+        raise EnrollmentConflict('Selected competency evidence requires an explicit versioned enrollment')
+    legacy_request = None
+    if operation:
+        from .certification_versions.legacy_completions import persist_pending
+        await persist_pending(operation.progress)
+    elif request_id is not None:
+        from .certification_versions import legacy_completions
+        legacy_completions.validate_request_id(request_id)
+        legacy_progress = await get_progress(user_id)
+        replay = await legacy_completions.previous(legacy_progress, module_id, request_id)
+        if replay is not None:
+            if legacy_progress.certified:
+                await _fire_certification_complete_hooks(user_id)
+            return replay
+        legacy_request = request_id
+    if operation and operation.progress.pending_credential:
+        await _finish_pending_credential(operation.progress)
+    attempt = None
+    if operation:
+        from .certification_versions.attempts import AttemptRepository, progress_digest, encode
+        from .certification_versions.enrollments import EnrollmentConflict
+        journal = AttemptRepository()
+        # An already recorded request replays its original outcome even after
+        # credit advances. Fence only a new request, before creating its journal.
+        if expected_attempts is not None and not (request_id and await journal.records.find_one({'uuid': request_id})):
+            from .certification_versions.completion_preconditions import check_completion_counter
+            check_completion_counter(operation.progress, module_id, expected_attempts)
+        attempt, started = await journal.begin(operation, module_id, request_id, assessment_selection=assessment_selection)
+        if attempt['state'] in ('applied', 'rejected', 'failed'):
+            result = journal.payload(attempt, 'result')
+            if attempt['state'] == 'applied' and operation.progress.certified:
+                await _fire_certification_complete_hooks(user_id, enrollment_id=operation.progress.enrollment_id)
+            return result
+        if not started:
+            receipt = operation.progress.completion_receipt
+            if receipt and receipt.get('attempt_id') == attempt['uuid']:
+                result = journal.payload(receipt, 'result')
+                result = await journal.finish(attempt, result)
+                if operation.progress.certified:
+                    await _fire_certification_complete_hooks(user_id, enrollment_id=operation.progress.enrollment_id)
+                return result
+            if attempt['state'] == 'evaluating':
+                raise EnrollmentConflict('An interrupted assessment needs reconciliation before grading again')
+            if progress_digest(operation.progress) != attempt['progress_sha256']:
+                raise EnrollmentConflict('Earned progress or answers changed after grading; reconcile the saved assessment')
+            validation = journal.payload(attempt, 'validation')
+        else:
+            try:
+                selected = journal.assessment_selection(attempt)
+                validation = await validate_module(user_id, module_id, **({'assessment_selection': selected} if selected is not None else {}))
+            except Exception:
+                await journal.finish(attempt, {'error': 'Assessment could not finish; submit a new request to try again', 'attempt_id': attempt['uuid']}, failed=True)
+                raise
+            attempt = await journal.graded(attempt, validation)
+    else:
+        if expected_attempts is not None:
+            from .certification_versions.completion_preconditions import check_completion_counter
+            check_completion_counter(await get_progress(user_id), module_id, expected_attempts)
+        validation = await validate_module(user_id, module_id)
     if not validation["passed"]:
-        return {"error": "Validation did not pass", "validation": validation}
+        result = {"error": "Validation did not pass", "validation": validation}
+        if attempt:
+            result['attempt_id'] = attempt['uuid']
+            await journal.finish(attempt, result)
+        if legacy_request:
+            result = legacy_completions.prepare(legacy_progress, module_id, legacy_request, result)
+            await save_progress(legacy_progress)
+            await legacy_completions.persist_pending(legacy_progress)
+        return result
 
     prog = await get_progress(user_id)
+    outcome_credit = None
+    repeated_outcomes = False
+    if operation and 'outcomes.json' in operation.package.manifest.artifacts:
+        from .certification_versions.catalog import CourseCatalogError
+        from .certification_versions.outcome_credit import freeze_credit, repeats_earned_outcomes
+        if attempt is None:
+            raise CourseCatalogError('Competency credit requires a durable completion request')
+        outcome_credit = freeze_credit(operation.package, prog, module_id, attempt)
+        repeated_outcomes = repeats_earned_outcomes(operation.package, prog, module_id, outcome_credit)
     module_data = prog.modules.get(module_id, {})
-    attempts = module_data.get("attempts", 0) + 1
+    transferred = validation.get('assessment_kind') == 'transferred_outcome_validation'
+    attempts = module_data.get("attempts", 0) + (0 if repeated_outcomes or transferred else 1)
     already_completed = module_data.get("completed", False)
 
     stars = validation["stars"]
@@ -338,42 +553,62 @@ async def complete_module(user_id: str, module_id: str) -> dict:
 
     # Only award XP for new completions or star upgrades
     xp_earned = 0
-    if not already_completed:
-        xp_earned = MODULE_XP[module_id]
+    xp_carried = 0
+    if transferred:
+        if already_completed:
+            raise EnrollmentConflict('This module already has credit; replay its original transfer receipt')
+        xp_carried = validation['credit_transfer']['xp_carried']
+    elif not already_completed:
+        xp_earned = course_module_xp()[module_id]
     # Bonus XP for star upgrades
     if stars > old_stars:
-        xp_earned += (stars - old_stars) * 25
+        operation = current_operation()
+        bonus = operation.package.manifest.star_bonus_xp if operation else 25
+        xp_earned += (stars - old_stars) * bonus
 
     prog.modules[module_id] = {
         **module_data,  # Preserve provisioned_docs
         "completed": True,
         "stars": max(stars, old_stars),
-        "completed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        # Keep first-earned credit dates on retries, including unknown legacy dates.
+        "completed_at": module_data.get("completed_at") if already_completed else datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
         "attempts": attempts,
         "xp_earned": module_data.get("xp_earned", 0) + xp_earned,
     }
+    if attempt and not repeated_outcomes:
+        prog.modules[module_id]['completion_attempt_id'] = attempt['uuid']
+    if outcome_credit is not None and not repeated_outcomes:
+        prog.modules[module_id]['outcome_credit'] = outcome_credit
+    if transferred:
+        prog.modules[module_id].update(credit_origin='transferred', xp_carried=xp_carried)
+    elif outcome_credit is not None and not repeated_outcomes:
+        prog.modules[module_id]['credit_origin'] = 'assessed'
 
-    prog.total_xp += xp_earned
+    prog.total_xp += xp_earned + xp_carried
     prog.level = _compute_level(prog.total_xp)
 
     # Check if fully certified
     all_complete = all(
         prog.modules.get(m, {}).get("completed", False)
-        for m in MODULE_ORDER
+        for m in course_module_order()
     )
     newly_certified = all_complete and not prog.certified
     if newly_certified:
         prog.certified = True
         prog.certified_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if operation:
+            from app.models.user import User
+            from .certification_versions.credentials import CredentialRepository
+            learner = await User.find_one(User.user_id == user_id)
+            name = (learner.name or learner.email) if learner else user_id
+            # Freeze the payload in the same progress save as graduation. A
+            # retry finishes this original issuance before awarding anything.
+            prog.pending_credential = CredentialRepository.prepare(prog, operation.package, name).model_dump(mode='json')
 
     _touch_activity(prog)
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await prog.save()
-
-    if newly_certified:
-        await _fire_certification_complete_hooks(prog.user_id)
-
-    return {
+    result = {
+        **course_identity(),
         "module_id": module_id,
         "stars": prog.modules[module_id]["stars"],
         "xp_earned": xp_earned,
@@ -383,6 +618,59 @@ async def complete_module(user_id: str, module_id: str) -> dict:
         "certified": prog.certified,
         "validation": validation,
     }
+    if attempt:
+        result['attempt_id'] = attempt['uuid']
+        if transferred:
+            result.update(credit_origin='transferred', xp_carried=xp_carried, source_enrollment_id=validation['credit_transfer']['source_enrollment_id'])
+        payload, digest = encode(result)
+        # Save the awarded result atomically with credit. A lost response or
+        # journal update can recover it without regrading mutable artifacts.
+        prog.completion_receipt = {'attempt_id': attempt['uuid'], 'result_json': payload, 'result_sha256': digest}
+    elif legacy_request:
+        result = legacy_completions.prepare(prog, module_id, legacy_request, result)
+    await save_progress(prog)
+    if legacy_request:
+        await legacy_completions.persist_pending(prog)
+
+    if operation and prog.pending_credential:
+        await _finish_pending_credential(prog)
+
+    if attempt:
+        await journal.finish(attempt, result)
+
+    if operation and prog.certified:
+        await _fire_certification_complete_hooks(prog.user_id, enrollment_id=prog.enrollment_id)
+    elif newly_certified:
+        await _fire_certification_complete_hooks(prog.user_id)
+
+    return result
+
+
+async def _finish_pending_credential(progress):
+    from app.models.certification import CertificationEnrollment
+    from .certification_versions.credentials import CredentialRepository, parse_credential_snapshot
+    from .certification_versions.enrollments import EnrollmentConflict
+    operation = current_operation()
+    record = parse_credential_snapshot(progress.pending_credential)
+    if not operation or not operation.writable or (
+        record.user_id != progress.user_id or record.enrollment_id != progress.enrollment_id
+        or record.course_version != progress.course_version
+        or record.manifest_sha256 != operation.package.manifest_sha256
+    ):
+        raise EnrollmentConflict('Pending credential does not match this course operation')
+    enrollments = CertificationEnrollment.get_motor_collection()
+    identity = {'uuid': progress.enrollment_id, 'user_id': progress.user_id,
+                'progress_id': str(progress.id), 'course_version': record.course_version,
+                'manifest_sha256': record.manifest_sha256, 'state': {'$in': ['active', 'completed']}}
+    if await enrollments.find_one(identity) is None:
+        raise EnrollmentConflict('The enrollment changed before completion could be recorded')
+    await CredentialRepository().persist(record)
+    # State is metadata; the inserted snapshot remains the issuance authority.
+    completed = await enrollments.update_one(identity, {'$set': {'state': 'completed'}})
+    if completed.matched_count != 1:
+        raise EnrollmentConflict('The enrollment changed while completion was being recorded; its original credential remains preserved')
+    progress.pending_credential = None
+    await save_progress(progress)
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +843,15 @@ def _union_fields(*field_lists: list[str]) -> list[str]:
 # Self-assessment storage
 # ---------------------------------------------------------------------------
 
-async def store_assessment(user_id: str, module_id: str, answers: dict) -> dict:
+@course_operation(write=True)
+async def store_assessment(user_id: str, module_id: str, answers: dict, *, enrollment_id: str | None = None) -> dict:
+    operation = current_operation()
+    if operation and module_id not in course_module_order():
+        from app.services.certification_versions.enrollments import EnrollmentConflict
+        raise EnrollmentConflict('This module is not part of the selected course')
+    if operation and 'outcomes.json' in operation.package.manifest.artifacts:
+        from app.services.certification_versions.enrollments import EnrollmentConflict
+        raise EnrollmentConflict('This course requires selected saved outcome evidence. Open module assessment in the Certification panel; legacy reflection answers cannot be submitted for this course.')
     prog = await get_progress(user_id)
     module_data = prog.modules.get(module_id, {})
     module_data["self_assessment"] = {
@@ -565,8 +861,8 @@ async def store_assessment(user_id: str, module_id: str, answers: dict) -> dict:
     prog.modules[module_id] = module_data
     _touch_activity(prog)
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await prog.save()
-    return {"stored": True}
+    await save_progress(prog)
+    return {**course_identity(), "stored": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1031,7 +1327,7 @@ _VALIDATORS = {
 }
 
 
-async def _fire_certification_complete_hooks(user_id: str) -> None:
+async def _fire_certification_complete_hooks(user_id: str, *, enrollment_id: str | None = None) -> None:
     """Side-effects for newly certified users: email + in-app notification.
 
     Never raises — logged and swallowed so that cert completion itself always
@@ -1040,6 +1336,27 @@ async def _fire_certification_complete_hooks(user_id: str) -> None:
     from app.models.user import User
     from app.services.engagement_service import send_certification_complete_email_for
     from app.services.notification_service import create_notification
+
+    if enrollment_id:
+        from app.config import Settings
+        from .certification_versions.completion_notices import CompletionNoticeRepository
+        notices = CompletionNoticeRepository()
+        try:
+            original = await notices.prepare(user_id, enrollment_id)
+        except Exception:
+            log.exception('Failed to preserve completion notice for %s', user_id)
+            return
+        try:
+            await notices.notify(original)
+        except Exception:
+            log.exception('Failed to create credential completion notification for %s', user_id)
+        try:
+            user = await User.find_one(User.user_id == user_id)
+            if user:
+                await notices.email(original, user, Settings())
+        except Exception:
+            log.exception('Failed to send credential completion email for %s', user_id)
+        return
 
     try:
         user = await User.find_one(User.user_id == user_id)
@@ -1053,7 +1370,7 @@ async def _fire_certification_complete_hooks(user_id: str) -> None:
             user_id=user_id,
             kind="certification_complete",
             title="You're a Certified Vandal Workflow Architect",
-            body="All 11 modules complete. Your Certified badge is now visible on every workflow you publish.",
+            body="Your course requirements are complete. Open Certification to view your earned certificate and course history.",
             link="/certification",
         )
     except Exception:

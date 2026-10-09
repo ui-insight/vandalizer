@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
+    # Staged rollout: enable only after enrollment rehearsal and all course
+    # surfaces have passed version-aware QA. Publication alone never enables it.
+    certification_versioning_enabled: bool = False
     # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
     # unset to derive it from environment + frontend_url (see
     # use_secure_cookies): Secure in production, EXCEPT when the deployment is

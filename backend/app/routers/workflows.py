@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from app.dependencies import get_api_key_user, get_current_user, get_current_user_or_api_key
 from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.schemas.workflows import (
@@ -1700,6 +1701,7 @@ async def run_workflow_integrated(
         doc = SmartDocument(
             title=upload.filename,
             processing=True,
+            validating=True,
             valid=True,
             raw_text="",
             downloadpath=str(relative_path),
@@ -1715,8 +1717,7 @@ async def run_workflow_integrated(
             document_uuid=uid, extension=ext, document_path=str(file_path),
             user_id=user.user_id,
         )
-        doc.task_id = task_id
-        await doc.save()
+        await record_extraction_dispatch(doc, task_id)
         doc_uuids.append(uid)
 
     if not doc_uuids:

@@ -28,6 +28,11 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
+from app.services.certification_versions.runtime import course_operation
+from app.services.certification_versions.tool_results import (
+    CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
+    ProvisionResult, ReflectionResult, certification_result,
+)
 from app.services.page_locator import annotate_chunk_pages, cited_pages
 
 logger = logging.getLogger(__name__)
@@ -5289,16 +5294,19 @@ async def update_plan(
 # ---------------------------------------------------------------------------
 
 
+@course_operation(tool=True)
+@certification_result(ProgressResult)
 async def get_certification_progress(
     context: RunContext[AgenticChatDeps],
 ) -> dict:
     """Get the user's Vandal Workflow Architect certification progress.
 
-    Returns overall XP, level, streak, per-module completion/stars, and the
+    Returns overall XP, level, per-module completion/stars, and the
     next incomplete module. Call this when the user says "start certification",
     "continue certification", asks how far along they are, or asks about XP,
-    levels, or badges. Progress is shared with the Certification panel — work
-    done in chat counts there and vice versa.
+    levels, or badges. Progress is shared with the Certification panel for
+    the selected enrollment. Only its applicable assessed requirements earn
+    credit; reading, drafting and practice do not become completion by chat.
 
     Args:
         context: The call context.
@@ -5308,43 +5316,54 @@ async def get_certification_progress(
     prog = await cert_svc.get_progress_dict(context.deps.user_id)
     modules = []
     next_module_id = None
-    for mid in cert_svc.MODULE_ORDER:
+    for mid in cert_svc.course_module_order():
         data = prog["modules"].get(mid, {})
-        completed = bool(data.get("completed"))
+        completed = data.get("completed", False)
+        if type(completed) is not bool:
+            raise TypeError('Stored certification completion must be a boolean')
         if not completed and next_module_id is None:
             next_module_id = mid
         modules.append({
             "module_id": mid,
-            "title": cert_svc.MODULE_TITLES.get(mid, mid),
-            "xp": cert_svc.MODULE_XP[mid],
+            "title": cert_svc.course_module_titles().get(mid, mid),
+            "xp": cert_svc.course_module_xp()[mid],
             "completed": completed,
             "stars": data.get("stars", 0),
         })
     completed_count = sum(1 for m in modules if m["completed"])
+    operation = cert_svc.current_operation()
+    from app.services.certification_versions.progression_policy import public_progression_policy
+    policy = public_progression_policy(operation.package) if operation else None
     return {
+        **cert_svc.course_identity(),
         "total_xp": prog["total_xp"],
         "level": prog["level"],
         "certified": prog["certified"],
-        "streak_days": prog["streak_days"],
         "modules_completed": completed_count,
         "modules_total": len(modules),
         "next_module_id": next_module_id,
         "modules": modules,
+        **({'progression_policy': policy} if policy is not None else {}),
+        **({"learning_position": prog.get("learning_position"), "position_revision": prog.get("position_revision", 0), "pending_completions": prog.get("pending_completions", [])} if prog.get("enrollment_id") else {}),
     }
 
 
+@course_operation(tool=True)
+@certification_result(ModuleResult)
 async def get_certification_module(
     context: RunContext[AgenticChatDeps],
     module_id: str,
 ) -> dict:
     """Get one certification module's exercise: overview, instructions, criteria.
 
-    Call this when presenting a module to work through in chat. Instructions
-    are chat-native. Teach the module's lessons FIRST (one at a time via
-    get_certification_lesson) before the challenge or assessment — the user
-    hasn't seen this material anywhere else. Offer to do the doable challenge
-    parts yourself (run extractions, build workflows, propose test cases)
-    since chat-driven work counts toward the same validators.
+    Use the returned assessment_mode and required_outcomes, never a module
+    name, to choose its assessment path. Teach relevant lessons and respect
+    the learner's saved position. Selected-outcome courses require the
+    learner's saved evidence and decisions in the Certification panel; chat
+    can explain and help author work but cannot choose or submit those
+    assessment decisions for the learner. Legacy requirements remain pinned.
+    The instructions field contains learner-visible steps. Follow separate
+    agent_guidance for assistant-specific coaching and evidence boundaries.
 
     Args:
         context: The call context.
@@ -5353,224 +5372,328 @@ async def get_certification_module(
     """
     from app.services import certification_service as cert_svc
 
-    if module_id not in cert_svc.MODULE_XP:
+    if module_id not in cert_svc.course_module_xp():
         return _err(
             f"Unknown module '{module_id}'.",
-            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+            hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
     exercise = cert_svc.get_exercise(module_id) or {}
     lessons = cert_svc.get_lessons(module_id) or {}
     prog = await cert_svc.get_progress_dict(context.deps.user_id)
     data = prog["modules"].get(module_id, {})
+    completed = data.get("completed", False)
+    if type(completed) is not bool:
+        raise TypeError('Stored certification completion must be a boolean')
     assessment = lessons.get("assessment") or {}
+    assessment_keys = list(cert_svc.ASSESSMENT_KEYS.get(module_id, ()))
+    assessment_questions = assessment.get("questions", [])
+    assessment_mode = "legacy_reflection" if assessment_keys else "legacy_practical"
+    required_outcomes = []
+    selected_completion = False
+    operation = cert_svc.current_operation()
+    if operation and 'outcomes.json' in operation.package.manifest.artifacts:
+        from app.services.certification_versions.outcomes import package_outcomes
+        from app.services.certification_versions.grading import selected_outcome_completion_available
+        contract = package_outcomes(operation.package)
+        required = next(module for module in contract.modules if module.module_id == module_id)
+        assessment_mode = "selected_saved_outcomes"
+        assessment_keys, assessment_questions = [], []
+        required_outcomes = [{'outcome_id': outcome.id, 'statement': outcome.statement,
+                              'method': outcome.method} for outcome in required.outcomes]
+        selected_completion = selected_outcome_completion_available(operation.package)
     return {
+        **cert_svc.course_identity(),
         "module_id": module_id,
-        "title": cert_svc.MODULE_TITLES.get(module_id, module_id),
-        "xp": cert_svc.MODULE_XP[module_id],
-        "completed": bool(data.get("completed")),
+        "title": cert_svc.course_module_titles().get(module_id, module_id),
+        "xp": cert_svc.course_module_xp()[module_id],
+        "completed": completed,
         "stars": data.get("stars", 0),
         "overview": exercise.get("overview", ""),
-        # Chat-native steps; the panel keeps its own tab-oriented wording.
-        "instructions": exercise.get("chat_instructions")
-        or exercise.get("instructions", []),
+        # New-course cards show the learner's procedure, not assistant directives.
+        # Original courses retain their established chat-native wording.
+        "instructions": (exercise.get("instructions", []) if assessment_mode == "selected_saved_outcomes"
+                         else exercise.get("chat_instructions") or exercise.get("instructions", [])),
+        "agent_guidance": exercise.get("chat_instructions", []) if assessment_mode == "selected_saved_outcomes" else [],
         "lesson_titles": [les["title"] for les in lessons.get("lessons", [])],
         "expected_fields": exercise.get("expected_fields", []),
         "star_criteria": exercise.get("star_criteria", {}),
         "sample_documents": exercise.get("documents", []),
         "provisioned_docs": data.get("provisioned_docs", []),
-        # Reflective modules are completed by answering these questions via
-        # submit_certification_assessment; empty for hands-on modules. Ask
-        # the exact questions with their options — only after the lessons.
-        "assessment_keys": list(cert_svc.ASSESSMENT_KEYS.get(module_id, ())),
-        "assessment_questions": assessment.get("questions", []),
+        # Old reflection keys must never redirect a competency enrollment
+        # into the legacy participation route, even in a mixed package.
+        "assessment_mode": assessment_mode,
+        "required_outcomes": required_outcomes,
+        "selected_outcome_completion": selected_completion,
+        "assessment_keys": assessment_keys,
+        "assessment_questions": assessment_questions,
     }
 
 
+@course_operation(tool=True)
+@certification_result(LessonResult)
 async def get_certification_lesson(
     context: RunContext[AgenticChatDeps],
     module_id: str,
-    lesson_number: int,
+    lesson_number: int | None = None,
+    lesson_id: str | None = None,
+    enrollment_id: str | None = None,
 ) -> dict:
     """Get one lesson of a certification module — the same content the panel teaches.
 
     Each module's challenge assumes the user has been taught its lessons, so
     walk through them one at a time before the exercise or self-assessment.
     The lesson content renders as a card the user reads directly — don't
-    repeat it verbatim; add a short framing sentence, then engage: when the
-    lesson has a knowledge_check, ask its question (with the options) and
-    react to the user's answer before moving to the next lesson.
+    repeat it verbatim. Knowledge checks render as interactive practice in the
+    card; invite the learner to try them and ask for help if needed. Do not
+    duplicate the question or claim to have seen their local answer. Practice
+    checks do not award module credit.
 
     Args:
         context: The call context.
         module_id: The certification module the lesson belongs to.
         lesson_number: 1-based lesson number (lesson_titles in
             get_certification_module lists them in order).
+        lesson_id: Stable identity from a saved position; use instead of lesson_number when resuming.
+        enrollment_id: Enrollment returned by progress; pins the requested teaching.
     """
     from app.services import certification_service as cert_svc
 
-    if module_id not in cert_svc.MODULE_XP:
+    if module_id not in cert_svc.course_module_xp():
         return _err(
             f"Unknown module '{module_id}'.",
-            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+            hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
     lessons = (cert_svc.get_lessons(module_id) or {}).get("lessons", [])
     if not lessons:
         return _err(f"Module '{module_id}' has no lessons.")
+    if lesson_id is not None:
+        matching = next((index for index, row in enumerate(lessons, 1) if row.get('id') == lesson_id), None)
+        if matching is None or (lesson_number is not None and lesson_number != matching):
+            return _err('The lesson identity does not match this course position. Reload progress before continuing.')
+        lesson_number = matching
     if not isinstance(lesson_number, int) or not 1 <= lesson_number <= len(lessons):
         return _err(
             f"lesson_number must be 1..{len(lessons)} for '{module_id}'.",
         )
     lesson = lessons[lesson_number - 1]
     return {
+        **cert_svc.course_identity(),
         "module_id": module_id,
-        "module_title": cert_svc.MODULE_TITLES.get(module_id, module_id),
+        "module_title": cert_svc.course_module_titles().get(module_id, module_id),
         "lesson_number": lesson_number,
         "lesson_count": len(lessons),
+        "lesson_id": lesson.get("id"),
+        "lesson_revision": lesson.get("revision"),
         "title": lesson["title"],
         "objective": lesson.get("objective", ""),
         "variant": lesson.get("variant", "concept"),
         "content": lesson["content"],
         "knowledge_check": lesson.get("knowledge_check"),
+        "diagram": lesson.get("diagram"),
         "is_last": lesson_number == len(lessons),
     }
 
 
+@course_operation(write=True, tool=True)
+async def save_certification_position(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+    lesson_id: str,
+    expected_revision: int,
+    enrollment_id: str,
+) -> dict:
+    """Save the lesson being viewed for resume in chat or the learning panel.
+
+    This stores navigation only; it never awards credit or records an answer.
+    Use the lesson_id returned by the lesson tool and enrollment_id plus
+    position_revision from progress. If another session changed the position,
+    reload and explain the conflict rather than overwriting it automatically.
+
+    Args:
+        context: The call context.
+        module_id: Module of the lesson being viewed.
+        lesson_id: Exact stable identity returned by get_certification_lesson.
+        expected_revision: Most recently read or saved position_revision.
+        enrollment_id: Exact enrollment returned by get_certification_progress.
+    """
+    from app.services import certification_service as cert_svc
+    if type(expected_revision) is not int or expected_revision < 0:
+        return _err('expected_revision must be a nonnegative integer from saved progress.')
+    return await cert_svc.save_learning_position(context.deps.user_id, module_id, lesson_id, expected_revision)
+
+
+@course_operation(write=True, tool=True)
+@certification_result(ProvisionResult)
 async def provision_certification_lab(
     context: RunContext[AgenticChatDeps],
     module_id: str,
+    enrollment_id: str | None = None,
 ) -> dict:
     """Set up a module's sample documents in the user's Certification Lab folder.
 
     Uploads the module's practice PDFs into a "Certification Lab" folder in the
-    user's workspace (created if needed; already-uploaded documents are reused,
-    so calling again is safe). Call this before a hands-on module's challenge
-    so the user has real documents to work against. Reflective modules have no
-    documents — this returns an empty list for them.
+    user's workspace (created if needed; existing owned copies are reused).
+    Follow the pinned module instructions for setup. Selected-outcome courses
+    use their panel's assessment preparation controls and learner decisions.
+    This only supplies documents; it does not approve scope, run an assessment
+    or earn credit. Modules without assigned documents return an empty list.
 
     Args:
         context: The call context.
         module_id: The certification module to provision documents for.
+        enrollment_id: Enrollment returned by get_certification_progress; use it to pin this action to the learner's chosen course.
     """
     from app.config import Settings
     from app.services import certification_service as cert_svc
 
-    if module_id not in cert_svc.MODULE_XP:
+    if module_id not in cert_svc.course_module_xp():
         return _err(
             f"Unknown module '{module_id}'.",
-            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+            hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
     result = await cert_svc.provision_module_documents(
         context.deps.user, module_id, Settings(),
     )
     if "error" in result:
         return _err(result["error"])
-    provisioned = result.get("provisioned_docs", [])
+    provisioned = result["provisioned_docs"]
     exercise = cert_svc.get_exercise(module_id) or {}
+    folder_name = result.get('folder_name', cert_svc.CERT_FOLDER_TITLE)
     return {
+        **cert_svc.course_identity(),
         "module_id": module_id,
         "provisioned_docs": provisioned,
         "document_names": exercise.get("documents", []),
-        "folder": cert_svc.CERT_FOLDER_TITLE,
+        "folder": folder_name,
         "message": (
             f"{len(provisioned)} sample document(s) are in the "
-            f'"{cert_svc.CERT_FOLDER_TITLE}" folder (Files tab).'
+            f'"{folder_name}" folder (Files tab).'
             if provisioned
             else "This module has no sample documents — nothing to provision."
         ),
     }
 
 
+@course_operation(tool=True)
+@certification_result(CheckResult)
 async def check_certification_module(
     context: RunContext[AgenticChatDeps],
     module_id: str,
+    enrollment_id: str | None = None,
 ) -> dict:
-    """Grade a certification module against the user's REAL workspace artifacts.
+    """Read a supported legacy module's pinned validation result.
 
-    Runs the module's deterministic validator (the same one the Certification
-    panel uses) over what actually exists — extraction templates, workflows,
-    runs, test cases — and returns each check with pass/fail and detail. This
-    is read-only: it never marks the module complete. Relay the results
-    honestly; if a check failed, explain concretely what to do next (and offer
-    to do it in chat when a tool can). When everything passes, offer
-    complete_certification_module to bank the XP.
+    Use only after get_certification_module identifies a legacy assessment
+    mode. This read-only check does not complete a module. Relay saved checks
+    faithfully and distinguish unavailable grading from a learner failure.
+    A passing legacy check permits offering complete_certification_module.
+    For selected_saved_outcomes, direct the learner to Open module assessment:
+    this tool cannot select saved evidence or replace that assessment path.
 
     Args:
         context: The call context.
         module_id: The certification module to check.
+        enrollment_id: Enrollment returned by get_certification_progress, when available.
     """
     from app.services import certification_service as cert_svc
 
-    if module_id not in cert_svc.MODULE_XP:
+    if module_id not in cert_svc.course_module_xp():
         return _err(
             f"Unknown module '{module_id}'.",
-            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+            hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
     result = await cert_svc.validate_module(context.deps.user_id, module_id)
     return {
+        **cert_svc.course_identity(),
         "module_id": module_id,
-        "title": cert_svc.MODULE_TITLES.get(module_id, module_id),
-        "passed": result.get("passed", False),
-        "stars": result.get("stars", 0),
-        "checks": result.get("checks", []),
+        "title": cert_svc.course_module_titles().get(module_id, module_id),
+        "passed": result["passed"],
+        "stars": result["stars"],
+        "checks": result["checks"],
     }
 
 
+@course_operation(write=True, tool=True)
+@certification_result(CompletionResult)
 async def complete_certification_module(
     context: RunContext[AgenticChatDeps],
     module_id: str,
+    enrollment_id: str | None = None,
+    request_id: str | None = None,
 ) -> dict:
-    """Mark a certification module complete and award its XP.
+    """Complete a supported legacy module under its pinned rubric and XP rules.
 
     Re-runs the module's validator first — if it doesn't pass, nothing is
     awarded and the failing checks are returned. On success, returns XP
     earned, stars, new total/level, and whether the user just became fully
-    certified. Only call after check_certification_module shows passed=true
-    (or the user asks to complete and you've verified). Completing an
-    already-completed module is safe: it only awards bonus XP for star
-    upgrades.
+    certified. Use only for a returned legacy assessment mode, after a passing
+    check and the learner's request. Base XP is awarded once; star upgrades
+    follow that course's rules. After uncertainty inspect the original result
+    before retrying with the same request identity. For selected_saved_outcomes,
+    use the panel: this tool cannot select receipts or bypass required evidence.
+    Live calls automatically retain a reference from their conversation turn
+    and tool-call identity when request_id is omitted.
 
     Args:
         context: The call context.
         module_id: The certification module to complete.
+        enrollment_id: Enrollment returned by get_certification_progress; required for a versioned course.
+        request_id: Optional 32-character lowercase hexadecimal retry identity. Reuse it after an uncertain response; use a new identity for a new assessed submission.
     """
     from app.services import certification_service as cert_svc
 
-    if module_id not in cert_svc.MODULE_XP:
+    if module_id not in cert_svc.course_module_xp():
         return _err(
             f"Unknown module '{module_id}'.",
-            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+            hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
-    result = await cert_svc.complete_module(context.deps.user_id, module_id)
+    if request_id is None:
+        conversation = getattr(context.deps, 'conversation', None)
+        conversation_id = getattr(conversation, 'uuid', None)
+        call_id = getattr(context, 'tool_call_id', None)
+        marker = getattr(context.deps, 'turn_marker', None)
+        if isinstance(conversation_id, str) and conversation_id and isinstance(call_id, str) and call_id and type(marker) is int and marker >= 0:
+            # Transport retries of this live tool call retain their original
+            # completion identity without asking the model to invent one.
+            request_id = hashlib.sha256(json.dumps(['certification-completion', context.deps.user_id,
+                conversation_id, marker, call_id, module_id, enrollment_id], separators=(',', ':')).encode()).hexdigest()[:32]
+    result = await cert_svc.complete_module(context.deps.user_id, module_id, request_id=request_id)
     if "error" in result:
         return {
+            **cert_svc.course_identity(),
             "error": result["error"],
             "module_id": module_id,
             "validation": result.get("validation"),
+            **({'attempt_id': result['attempt_id']} if result.get('attempt_id') else {}),
+            **({'failure_kind': result['failure_kind']} if result.get('failure_kind') else {}),
         }
-    result["title"] = cert_svc.MODULE_TITLES.get(module_id, module_id)
+    result["title"] = cert_svc.course_module_titles().get(module_id, module_id)
     return result
 
 
+@course_operation(write=True, tool=True)
+@certification_result(ReflectionResult)
 async def submit_certification_assessment(
     context: RunContext[AgenticChatDeps],
     module_id: str,
     answers: dict,
+    enrollment_id: str | None = None,
 ) -> dict:
-    """Store a reflective module's self-assessment answers.
+    """Store the learner's supplied answers for a legacy_reflection module.
 
-    The reflective modules (ai_literacy, process_mapping, workflow_design) are
-    completed by answering reflection questions, not by building artifacts.
-    Ask the user the questions conversationally — one at a time, in your own
-    words — then submit their answers here keyed by the module's
-    assessment_keys (from get_certification_module). Every key needs a
-    non-empty answer in the user's own words; never invent or pad answers the
-    user didn't give.
+    Use only when get_certification_module returns assessment_mode
+    legacy_reflection and its assessment_keys/questions. A module title never
+    determines this route. Ask its questions one at a time, retaining the
+    supplied options when present, and submit only the learner's own answers.
+    Never invent or pad answers. Saving is not completion. Courses with
+    selected_saved_outcomes reject this route; use Open module assessment
+    for the learner's decisions and saved evidence instead.
 
     Args:
         context: The call context.
-        module_id: A reflective module id (ai_literacy, process_mapping,
-            or workflow_design).
+        module_id: A module returned with the legacy_reflection assessment mode.
         answers: The user's answers, keyed by the module's assessment_keys.
+        enrollment_id: Enrollment returned by get_certification_progress; required for a versioned course.
     """
     from app.services import certification_service as cert_svc
 
@@ -5579,9 +5702,8 @@ async def submit_certification_assessment(
         return _err(
             f"Module '{module_id}' has no self-assessment.",
             hint=(
-                "Only ai_literacy, process_mapping, and workflow_design use "
-                "assessments; hands-on modules are graded with "
-                "check_certification_module."
+                "Read get_certification_module for this course's assessment_mode. "
+                "Selected-outcome courses use Open module assessment in the Certification panel."
             ),
         )
     if not isinstance(answers, dict):
@@ -5597,6 +5719,7 @@ async def submit_certification_assessment(
         context.deps.user_id, module_id, {k: cleaned[k] for k in required},
     )
     return {
+        **cert_svc.course_identity(),
         "stored": True,
         "module_id": module_id,
         "message": (
@@ -5668,6 +5791,7 @@ TOOLS = [
     get_certification_progress,
     get_certification_module,
     get_certification_lesson,
+    save_certification_position,
     provision_certification_lab,
     check_certification_module,
     complete_certification_module,

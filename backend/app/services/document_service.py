@@ -3,6 +3,7 @@ from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.services import access_control
+from app.services.extraction_restarts import claim_extraction_restart
 
 
 #: Human-readable text for each stored ingestion-warning code. Kept beside the
@@ -373,19 +374,14 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
     missed_pages = "unread_pages" in (doc.ingestion_warnings or [])
     force_ocr = is_pdf and (doc.task_status == "error" or low_quality or missed_pages)
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
-    if ocr_required:
-        doc.text_layer_rejected = True
-
-    doc.task_status = "extracting"
-    doc.processing = True
-    doc.updated_at = _datetime.datetime.now()
-    doc.error_message = None
-    doc.raw_text = ""
-    doc.token_count = 0
-    doc.text_markers = []
-    doc.extraction_nonletter_ratio = None
-    doc.ingestion_warnings = []
-    await doc.save()
+    await claim_extraction_restart(doc, {
+        'task_status': 'extracting', 'processing': True,
+        'validating': True, '_validation_heartbeat_at': _datetime.datetime.now(),
+        'updated_at': _datetime.datetime.now(), 'error_message': None,
+        'raw_text': '', 'token_count': 0, 'text_markers': [],
+        'extraction_nonletter_ratio': None, 'ingestion_warnings': [],
+        **({'text_layer_rejected': True} if ocr_required else {}),
+    })
 
     task_id = dispatch_upload_tasks(
         document_uuid=doc.uuid,
@@ -394,6 +390,7 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
         user_id=user_id,
         force_ocr=force_ocr,
         ocr_required=ocr_required,
+        extraction_revision=doc._extraction_restart_revision,
     )
     return {
         "task_id": task_id,

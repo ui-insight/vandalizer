@@ -46,7 +46,7 @@ async def get_pending_prompt(user: User = Depends(get_current_user)):
     from app.models.automation import Automation
     from app.models.knowledge import KnowledgeBase
     from app.models.chat import ChatConversation
-    from app.models.certification import CertificationProgress
+    from app.services.certification_versions.readers import has_earned_certification
 
     uid = user.user_id
     (
@@ -58,7 +58,7 @@ async def get_pending_prompt(user: User = Depends(get_current_user)):
         automations,
         knowledge_bases,
         doc_chat_count,
-        cert_progress,
+        is_certified,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
         Workflow.find(Workflow.user_id == uid).to_list(),
@@ -75,7 +75,7 @@ async def get_pending_prompt(user: User = Depends(get_current_user)):
                 {"url_attachments": {"$ne": []}},
             ],
         }).count(),
-        CertificationProgress.find_one(CertificationProgress.user_id == uid),
+        has_earned_certification(uid),
     )
 
     onboarding = {
@@ -92,7 +92,7 @@ async def get_pending_prompt(user: User = Depends(get_current_user)):
         "has_knowledge_base": len(knowledge_bases) > 0,
         "has_ready_knowledge_base": any(getattr(kb, "status", "") == "ready" for kb in knowledge_bases),
         "has_chatted_with_docs": doc_chat_count > 0,
-        "is_certified": bool(cert_progress and cert_progress.certified),
+        "is_certified": is_certified,
     }
 
     prompt = await svc.evaluate_eligible_prompt(user, onboarding)

@@ -46,7 +46,7 @@ from app.models.verification_session import VerificationSession
 from app.models.regression_suite_run import RegressionSuiteRun
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
-from app.models.certification import CertificationProgress
+from app.models.certification import CertificationProgress, CertificationEnrollment, CertificationEnrollmentSelection, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery
 from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
@@ -119,6 +119,23 @@ ALL_MODELS = [
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,
+    CertificationEnrollment,
+    CertificationEnrollmentSelection,
+    CertificationCredential,
+    CertificationAttempt,
+    CertificationRecoveryRecord,
+    CertificationLabInput,
+    CertificationScenarioAttempt,
+    CertificationLabExecution,
+    CertificationReviewAttempt,
+    CertificationLearnerDecision,
+    CertificationProcessSubmission,
+    CertificationWorkflowDesignSubmission,
+    CertificationUpgradeDecision,
+    CertificationCompletionNotice,
+    CertificationUpgradeActivation,
+    CertificationSavedCourseSelection,
+    CertificationSelectionPreparationRecovery,
     Organization,
     AuditLog,
     AdminAuditLog,

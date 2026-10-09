@@ -1,8 +1,9 @@
 import datetime
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr, model_validator
 from beanie import Document
+from pymongo import IndexModel
 
 
 class SmartDocument(Document):
@@ -82,6 +83,11 @@ class SmartDocument(Document):
     # Onboarding
     is_onboarding_sample: bool = False
 
+    # Internal course sample identity. Ordinary uploads leave this unset.
+    # Active samples arbitrate insertion before dispatching background work.
+    # Explicit rename/move releases the binding; it is not immutable evidence.
+    certification_provisioning_key: Optional[str] = None
+
     # Data retention
     retention_hold: bool = False
     retention_hold_reason: Optional[str] = None
@@ -95,9 +101,32 @@ class SmartDocument(Document):
     origin_workflow_run_id: Optional[str] = None
     origin_run_at: Optional[datetime.datetime] = None
 
+    # The restart CAS owns this raw database field. Ordinary worker save()
+    # calls must not serialize an older copy back over the current revision.
+    _extraction_restart_revision: int = PrivateAttr(default=0)
+
+    @model_validator(mode='wrap')
+    @classmethod
+    def remember_restart_revision(cls, value, handler):
+        document = handler(value)
+        if isinstance(value, dict):
+            revision = value.get('_extraction_restart_revision', 0)
+            if type(revision) is not int or revision < 0:
+                raise ValueError('Invalid extraction restart revision')
+            document._extraction_restart_revision = revision
+        return document
+
     class Settings:
         name = "smart_document"
+        # Include the private restart counter when reading full documents;
+        # it is consumed by the validator and never serialized by model saves.
+        projection = None
         indexes = [
+            IndexModel(
+                [('certification_provisioning_key', 1), ('user_id', 1), ('folder', 1), ('title', 1)],
+                name='unique_active_certification_sample', unique=True,
+                partialFilterExpression={'certification_provisioning_key': {'$type': 'string'}, 'soft_deleted': False},
+            ),
             "uuid",
             "user_id",
             "team_id",

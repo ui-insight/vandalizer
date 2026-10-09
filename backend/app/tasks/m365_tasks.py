@@ -85,6 +85,7 @@ def _save_attachment_as_document(
         "folder": "",
         "raw_text": "",
         "processing": False,
+        "validating": True,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }

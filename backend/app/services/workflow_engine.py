@@ -417,7 +417,8 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
                           usage_acc: UsageAccumulator | None = None,
                           field_metadata: list[dict] | None = None,
                           capture_sources: bool = False,
-                          doc_metadata: list[dict] | None = None):
+                          doc_metadata: list[dict] | None = None,
+                          require_complete: bool = False):
     """Run extraction and return {raw, formatted}. Sync context.
 
     ``capture_sources`` attaches the verified supporting passage and page for
@@ -436,6 +437,9 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
     )
     if usage_acc:
         usage_acc.add(engine.tokens_in, engine.tokens_out)
+    if require_complete and (engine.skipped_doc_indices or not isinstance(output, list)
+            or any(not isinstance(entity, dict) for entity in output)):
+        raise ValueError('The assessed extraction did not complete the assigned source')
     formatted_output = format_extraction_results(output)
     return {"raw": output, "formatted": formatted_output}
 
@@ -738,6 +742,8 @@ class ExtractionNode(Node):
         # that most needs each value to carry the passage it came from.
         kwargs["capture_sources"] = True
         kwargs["doc_metadata"] = [meta for _, meta in pairs]
+        if self.data.get("require_complete_extraction") is True:
+            kwargs["require_complete"] = True
 
         # Carry per-field validation / optional designations resolved from the
         # saved set (see workflow_tasks resolution) so enum and optional rules

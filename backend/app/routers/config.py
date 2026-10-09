@@ -9,7 +9,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.activity import ActivityEvent
 from app.models.automation import Automation
-from app.models.certification import CertificationProgress
+from app.services.certification_versions.readers import has_earned_certification
 from app.models.chat import ChatConversation
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase
@@ -488,7 +488,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         knowledge_bases,
         doc_chat_count,
         conversation_count,
-        cert_progress,
+        is_certified,
         recent_activities,
         extraction_run_count,
     ) = await asyncio.gather(
@@ -514,7 +514,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         }).count(),
         # Any conversations at all
         ChatConversation.find(ChatConversation.user_id == uid).count(),
-        CertificationProgress.find_one(CertificationProgress.user_id == uid),
+        has_earned_certification(uid),
         # Recent activities for workspace briefing + "continue where you left off" pill
         ActivityEvent.find(
             {"user_id": uid, "status": {"$in": ["completed", "failed", "running"]}}
@@ -545,7 +545,6 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
             if vr.item_id not in quality_map and vr.accuracy is not None:
                 quality_map[vr.item_id] = round(vr.accuracy * 100)
 
-    is_certified = bool(cert_progress and cert_progress.certified)
     has_enabled_automation = any(getattr(a, "enabled", False) for a in automations)
 
     maturity_stage = _compute_maturity_stage(

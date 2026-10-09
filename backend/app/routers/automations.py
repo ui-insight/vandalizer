@@ -30,6 +30,7 @@ from app.schemas.automations import (
     TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
@@ -808,6 +809,7 @@ async def trigger_automation(
             doc = SmartDocument(
                 title=upload.filename,
                 processing=True,
+                validating=True,
                 valid=True,
                 raw_text="",
                 downloadpath=str(relative_path),
@@ -824,8 +826,7 @@ async def trigger_automation(
                 document_uuid=uid, extension=ext, document_path=str(file_path),
                 user_id=user.user_id,
             )
-            doc.task_id = task_id
-            await doc.save()
+            await record_extraction_dispatch(doc, task_id)
             all_doc_uuids.append(uid)
     except HTTPException:
         raise

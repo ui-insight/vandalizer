@@ -21,6 +21,7 @@ from app.dependencies import get_api_key_user, get_current_user
 from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, activity_service, audit_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
@@ -1292,6 +1293,7 @@ async def run_extraction_integrated(
         doc = SmartDocument(
             title=upload.filename,
             processing=True,
+            validating=True,
             valid=True,
             raw_text="",
             downloadpath=str(relative_path),
@@ -1307,8 +1309,7 @@ async def run_extraction_integrated(
             document_uuid=uid, extension=ext, document_path=str(file_path),
             user_id=user.user_id,
         )
-        doc.task_id = task_id
-        await doc.save()
+        await record_extraction_dispatch(doc, task_id)
         all_doc_uuids.append(uid)
         created_doc_uuids.append(uid)
 

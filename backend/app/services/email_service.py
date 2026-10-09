@@ -3,6 +3,7 @@
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 
 import aiosmtplib
 import httpx
@@ -964,7 +965,7 @@ def onboarding_drip_email(
       <h1>{module_title}</h1>
       <p>Hi {name}, {module_description}</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/certification">Open Certification</a></p>
-      <p style="font-size:13px;color:#6b7280;margin-top:16px">Each module is a short, hands-on step toward the Vandal Workflow Architect certification.</p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Open your selected course to see its lessons, assessment requirements and saved progress.</p>
       {_prefs_footer(frontend_url)}
     </div></div></body></html>"""
     return subject, html
@@ -1057,9 +1058,9 @@ def v5_launch_announcement_email(name: str, frontend_url: str) -> tuple[str, str
         <li style="margin-bottom:8px">Dispatch workflows and watch each step execute live</li>
         <li style="margin-bottom:8px">Build new knowledge bases and test cases from the conversation</li>
       </ul>
-      <p>Every tool result shows its sources and its accuracy. That's the part generic AI chat can't give you.</p>
+      <p>Tool results can include source references and quality signals. Check important claims against the source; a score does not guarantee accuracy.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/">Try the new chat</a></p>
-      <p style="font-size:13px;color:#6b7280;margin-top:16px">Want a tour? Open the Certification panel — Module 1 walks through the agentic chat in about 10 minutes.</p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Want guided practice? Open the Certification panel to see the lessons and assessment requirements for your selected course. Available course versions may teach different capabilities.</p>
       <div class="footer">Vandalizer 5.0 &middot; Fully Agentic</div>
     </div></div></body></html>"""
     return subject, html
@@ -1215,17 +1216,20 @@ def powerup_milestone_email(name: str, workflow_count: int, frontend_url: str) -
 
 
 def certification_complete_email(name: str, frontend_url: str) -> tuple[str, str]:
-    """Celebration email sent when a user finishes all 11 certification modules."""
+    """Legacy completion message; versioned issuance uses its preserved record."""
     subject = "You're a Certified Vandal Workflow Architect"
-    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
-    <div class="container"><div class="card">
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{subject}</title>{_BASE_STYLE}
+    <style>.card {{ overflow-wrap: anywhere; }} .btn {{ max-width: 100%; box-sizing: border-box; }}
+    .footer {{ color: #9ca3af; }}</style></head><body>
+    <div class="container" role="main"><div class="card">
       <div class="logo">Vandalizer</div>
-      <h1>Certified. Nice work, {name}.</h1>
-      <p>You finished all 11 modules of the Vandal Workflow Architect certification. That's 1,600 XP across AI literacy, workflow design, extraction, validation, and governance.</p>
-      <p>Your <strong style="color:#fff">Certified</strong> badge is now visible on every workflow you publish, so your team knows those pipelines were built by someone who understands the full trust stack.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/certification">View Your Certification</a></p>
-      <p style="font-size:13px;color:#6b7280;margin-top:16px">
-        Want to help a colleague get certified? Invite them to your team and they can start the journey with the same verified modules you did.
+      <h1>Certified. Nice work, {escape(name)}.</h1>
+      <p>You completed the requirements for your Vandal Workflow Architect course.</p>
+      <p>Your certificate records that completed course. It does not establish completion of later course versions, replace institutional review or guarantee the accuracy of future outputs.</p>
+      <p style="margin-top:24px"><a class="btn" href="{escape(frontend_url.rstrip('/'), quote=True)}/certification">View Your Certification</a></p>
+      <p style="font-size:13px;color:#9ca3af;margin-top:16px">
+        You can revisit your course and earned certificate in Certification. An optional course upgrade keeps your original credential and history.
       </p>
       <div class="footer">Vandalizer &middot; Certified Workflow Architect</div>
     </div></div></body></html>"""

@@ -4,7 +4,9 @@ import datetime
 import logging
 
 from app.config import Settings
-from app.models.certification import CertificationProgress
+from app.services.certification_versions.readers import existing_active_progress
+from app.services.certification_versions.catalog import CourseCatalogError
+from app.services.certification_versions.enrollments import EnrollmentConflict
 from app.models.user import User
 from app.services.email_service import (
     send_email,
@@ -117,9 +119,16 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
         module = _DRIP_MODULES[step]
 
         # Skip if user already completed this module in certification
-        cert = await CertificationProgress.find_one(
-            CertificationProgress.user_id == user.user_id
-        )
+        try:
+            cert = await existing_active_progress(user.user_id)
+        except (CourseCatalogError, EnrollmentConflict):
+            logger.warning('Skipping certification drip for unresolved course selection')
+            continue
+        # This old sequence has fixed module titles and a once-per-user cursor.
+        # Versioned courses need their own reviewed notification sequence;
+        # leave the old cursor untouched until that rollout is implemented.
+        if cert and cert.enrollment_id:
+            continue
         if cert:
             module_data = cert.modules.get(module["id"], {})
             if module_data.get("completed"):
