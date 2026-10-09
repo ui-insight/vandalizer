@@ -173,7 +173,7 @@
     },
     {
       "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
-      "revision": 2,
+      "revision": 3,
       "title": "Supervising agentic chat: scope, evidence and approval",
       "variant": "walkthrough",
       "objective": "Inspect the intended scope, reject unsupported claims and distinguish source text from authorization.",
