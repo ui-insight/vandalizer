@@ -58,12 +58,18 @@ def test_seed_workflow_prompts_state_current_thresholds(where, prompt):
     assert _stale_rule_statements(prompt) == [], where
 
 
-def test_the_mtdc_workflows_name_the_current_figures():
+def test_the_mtdc_workflows_take_the_thresholds_from_the_regulation_text():
+    """Since #1009 the figures come from the bundled 2 CFR 200 passages the
+    workflow retrieves, not from the prompt: a figure written into a prompt is
+    how $5,000 / $25,000 outlived the 2024 revision."""
     prompts = dict(_budget_prompts())
-    fa = next(p for w, p in prompts.items() if w.startswith("financial_fa_rate_validator/"))
-    budget = next(p for w, p in prompts.items() if w.startswith("pre_award_budget_analyzer/"))
-    for text in (fa, budget):
-        assert "$10,000" in text and "$50,000" in text
+    for prefix in ("financial_fa_rate_validator/", "pre_award_budget_analyzer/"):
+        text = next(p for w, p in prompts.items() if w.startswith(prefix))
+        assert "2 CFR 200.1" in text
+        assert "$10,000" not in text and "$50,000" not in text
+        seed = json.loads((SEEDS / "workflows" / f"{prefix[:-1]}.json").read_text())
+        kb_tasks = [t for s in seed["items"][0]["steps"] for t in s["tasks"] if t["name"] == "KnowledgeBaseQuery"]
+        assert [t["data"]["kb_seed_id"] for t in kb_tasks] == ["kb-2cfr200"]
 
 
 def test_demo_pappg_text_and_domain_prompt_state_current_thresholds():

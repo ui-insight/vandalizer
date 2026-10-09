@@ -12,7 +12,8 @@
       "financial"
     ],
     "superseded_prompt_sha256": [
-      "86f7373d5bc332c6ad5100d865e2c96ac6599aa11277d7e33eb7db6f159acf02"
+      "86f7373d5bc332c6ad5100d865e2c96ac6599aa11277d7e33eb7db6f159acf02",
+      "bf3f3a1b102195258a80631458478c9a1b5e4cb8cf2564a47500ed296ef6c525"
     ]
   },
   "items": [
@@ -30,6 +31,15 @@
               "data": {
                 "searchphrases": "Award Number, Sponsor Agency, F&A Rate Applied, F&A Rate Base, MTDC Calculation, Rate Agreement Date, Rate Type, On-Campus vs Off-Campus, F&A Rate Cap, Excluded Costs from MTDC, Subaward Amounts, Equipment Costs, Participant Support Costs, Total Direct Costs, Indirect Costs Charged"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-2cfr200",
+                "query": "Modified Total Direct Cost (MTDC) means; MTDC excludes equipment, capital expenditures, patient care, rental costs, tuition remission, participant support costs, portion of each subaward; Equipment means; indirect cost rate negotiated; de minimis rate",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -41,11 +51,19 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are an indirect cost rate specialist. Validate the F&A rate application:\n\n## Rate Verification\n- Is the correct rate being applied per the institution's negotiated rate agreement?\n- Is the rate type correct (provisional, predetermined, fixed, final)?\n- Is the on-campus vs off-campus designation appropriate?\n\n## MTDC Base Calculation\nVerify the Modified Total Direct Cost base (2 CFR 200.1) excludes:\n- Equipment (per-unit cost at or above the lesser of the institution's capitalization level or $10,000)\n- Capital expenditures\n- Patient care costs\n- Rental costs\n- Tuition remission\n- Scholarships and fellowships\n- Participant support costs\n- The portion of each subaward in excess of $50,000\n\nThese are the thresholds in the 2024 revision of 2 CFR 200, which applies to awards and amendments made on or after October 1, 2024. An award made before then may still carry the earlier thresholds ($5,000 equipment; first $25,000 of each subaward) in its terms, so check the award date.\n\n## Sponsor Cap\n- Does the sponsor impose an F&A rate cap?\n- If capped, is the correct (lower) rate being applied?\n- What is the revenue impact of any cap (difference between negotiated and capped rate)?\n\n## Validation Results\nFor each element:\n- **Correct** - rate/base matches expected value\n- **Incorrect** - expected vs actual values shown\n- **Unable to Verify** - insufficient information\n\nInclude the financial impact of any errors found.",
+                "prompt": "You are an indirect cost rate specialist. Validate the F&A rate application:\n\nYour input has two parts: the fields extracted from the document, and passages from the Uniform Guidance (2 CFR 200) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 2 CFR 200.1, definition of Modified Total Direct Cost). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Rate Verification\n- Is the correct rate being applied per the institution's negotiated rate agreement?\n- Is the rate type correct (provisional, predetermined, fixed, final)?\n- Is the on-campus vs off-campus designation appropriate?\n\n## MTDC Base Calculation\nVerify the Modified Total Direct Cost base excludes everything the 2 CFR 200.1 definition of MTDC in the passages excludes, including equipment as 2 CFR 200.1 defines it and the portion of each subaward above the amount the definition sets. Quote the definition you applied. If the passages don't include it, say the base couldn't be checked against the regulation text.\n\nAn award made before October 1, 2024 may carry the earlier Uniform Guidance thresholds in its terms; check the award date.\n\n## Sponsor Cap\n- Does the sponsor impose an F&A rate cap?\n- If capped, is the correct (lower) rate being applied?\n- What is the revenue impact of any cap (difference between negotiated and capped rate)?\n\n## Validation Results\nFor each element:\n- **Correct** - rate/base matches expected value\n- **Incorrect** - expected vs actual values shown\n- **Unable to Verify** - insufficient information\n\nInclude the financial impact of any errors found.",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000001",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.1, definition of Modified Total Direct Cost), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
         }
       ]
     }

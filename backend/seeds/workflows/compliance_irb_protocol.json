@@ -10,6 +10,9 @@
     "quality_tier": "excellent",
     "collections": [
       "compliance"
+    ],
+    "superseded_prompt_sha256": [
+      "9356a2b2cba8c2cf1b9d5b16ea6c628f56bb4fe261a84ec24be1069f7fbe1889"
     ]
   },
   "items": [
@@ -27,6 +30,15 @@
               "data": {
                 "searchphrases": "Protocol Title, PI Name, IRB Review Type Requested, Study Population, Number of Participants, Recruitment Methods, Informed Consent Process, Risk Level, Data Collection Methods, Data Security Plan, Vulnerable Populations Involved, Deception Used, Funding Source, Study Duration, Inclusion Criteria, Exclusion Criteria"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-common-rule",
+                "query": "exempt research categories 46.104; expedited review 46.110; criteria for IRB approval of research 46.111; general requirements for informed consent 46.116; documentation of informed consent 46.117",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -38,11 +50,19 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are an IRB analyst reviewing a human subjects protocol submission for completeness. Evaluate:\n\n## Review Type Assessment\n- Is the requested review type (exempt, expedited, full board) appropriate?\n- Per 45 CFR 46, does this study qualify for the claimed exemption category?\n- If expedited, does it fit an approved expedited category?\n\n## Required Sections Checklist\nFor each, rate as **Complete** / **Incomplete** / **Needs Revision**:\n- Study purpose and design\n- Subject population and eligibility\n- Recruitment procedures\n- Informed consent process and document\n- Study procedures description\n- Risk/benefit analysis\n- Data collection and management\n- Privacy and confidentiality protections\n- Data security plan\n\n## Special Considerations\n- Are vulnerable populations (children, prisoners, pregnant women, cognitively impaired) involved? If so, are additional protections described?\n- Is deception used? If so, is a debriefing plan included?\n- Is the consent process appropriate for the population (language, literacy, capacity)?\n- Are HIPAA considerations addressed if applicable?\n\n## Pre-Review Summary\nProvide specific feedback the PI should address before formal IRB submission.",
+                "prompt": "You are an IRB analyst reviewing a human subjects protocol submission for completeness. Evaluate:\n\nYour input has two parts: the fields extracted from the document, and passages from the Common Rule (45 CFR 46) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 45 CFR 46.116, general requirements for informed consent). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Review Type Assessment\n- Is the requested review type (exempt, expedited, full board) appropriate?\n- Per 45 CFR 46, does this study qualify for the claimed exemption category?\n- If expedited, does it fit an approved expedited category?\n\n## Required Sections Checklist\nFor each, rate as **Complete** / **Incomplete** / **Needs Revision**:\n- Study purpose and design\n- Subject population and eligibility\n- Recruitment procedures\n- Informed consent process and document\n- Study procedures description\n- Risk/benefit analysis\n- Data collection and management\n- Privacy and confidentiality protections\n- Data security plan\n\n## Special Considerations\n- Are vulnerable populations (children, prisoners, pregnant women, cognitively impaired) involved? If so, are additional protections described?\n- Is deception used? If so, is a debriefing plan included?\n- Is the consent process appropriate for the population (language, literacy, capacity)?\n- Are HIPAA considerations addressed if applicable?\n\n## Pre-Review Summary\nProvide specific feedback the PI should address before formal IRB submission.",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000006",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Common Rule (45 CFR 46) (for example 45 CFR 46.116, general requirements for informed consent), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
         }
       ]
     }

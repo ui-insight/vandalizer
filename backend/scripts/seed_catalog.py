@@ -406,6 +406,79 @@ async def _patch_superseded_prompts(wf: Workflow, seed_item: dict, meta: dict) -
     return patched
 
 
+def _is_catalog_kb_query(task_data: dict) -> bool:
+    """A seed task that queries a catalog KB, named by its seed id (#1009)."""
+    return (
+        task_data.get("name") == "KnowledgeBaseQuery"
+        and bool((task_data.get("data") or {}).get("kb_seed_id"))
+    )
+
+
+async def attach_catalog_kb_queries(wf_dir: pathlib.Path) -> int:
+    """Give catalog workflows the knowledge-base lookups their seeds declare (#1009).
+
+    A seed names the catalog KB a ``KnowledgeBaseQuery`` task reads by its
+    seed id (``kb_seed_id``), because each install gives the KB its own uuid.
+    Workflows are seeded before KBs, so the task is not created with the
+    workflow; this pass runs after the KB phase and, for each catalog-owned
+    workflow, adds the task to the step the seed puts it in, or points an
+    existing one at the KB's current uuid. It reaches existing installs the
+    same way: the step graph gains one task and keeps the rest. A KB that is
+    not installed leaves the workflow as it was: a task with no KB would stop
+    every run. Users' copies are never touched. Returns tasks added or relinked.
+    """
+    changed = 0
+    for wf_file in sorted(wf_dir.glob("*.json")):
+        data = json.loads(wf_file.read_text())
+        meta = data.get("_seed_meta", {})
+        item = (data.get("items") or [{}])[0]
+        wanted = [
+            (step.get("name"), task)
+            for step in item.get("steps", [])
+            for task in step.get("tasks", [])
+            if _is_catalog_kb_query(task)
+        ]
+        if not wanted or not meta.get("seed_id"):
+            continue
+        wf = await Workflow.find_one({"resource_config.seed_id": meta["seed_id"], "user_id": SYSTEM_USER})
+        if not wf:
+            continue
+        steps_by_name: dict[str, WorkflowStep] = {}
+        for step_id in wf.steps:
+            step = await WorkflowStep.get(step_id)
+            if step:
+                steps_by_name.setdefault(step.name, step)
+        for step_name, task_seed in wanted:
+            seed_data = task_seed.get("data") or {}
+            kb_seed_id = seed_data["kb_seed_id"]
+            step = steps_by_name.get(step_name)
+            if step is None:
+                print(f"    ! {meta['seed_id']}: no step named {step_name!r}; KB lookup not added")
+                continue
+            kb = await KnowledgeBase.find_one({"resource_config.seed_id": kb_seed_id})
+            if kb is None:
+                print(f"    ! {meta['seed_id']}: knowledge base {kb_seed_id} is not installed; workflow left as is")
+                continue
+            existing = None
+            for task_id in step.tasks:
+                task = await WorkflowStepTask.get(task_id)
+                if task and task.name == "KnowledgeBaseQuery" and (task.data or {}).get("kb_seed_id") == kb_seed_id:
+                    existing = task
+                    break
+            if existing is not None:
+                if existing.data.get("kb_uuid") != kb.uuid:
+                    existing.data = {**existing.data, "kb_uuid": kb.uuid}
+                    await existing.save()
+                    changed += 1
+                continue
+            task = WorkflowStepTask(name="KnowledgeBaseQuery", data={**seed_data, "kb_uuid": kb.uuid})
+            await task.insert()
+            step.tasks.append(task.id)
+            await step.save()
+            changed += 1
+            print(f"    + {meta['seed_id']}: {step_name} now reads {kb_seed_id}")
+    return changed
+
 async def seed_workflow(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
 ) -> SeedResult:
@@ -474,6 +547,8 @@ async def seed_workflow(
     for step_data in item.get("steps", []):
         task_ids: list[PydanticObjectId] = []
         for task_data in step_data.get("tasks", []):
+            if _is_catalog_kb_query(task_data):
+                continue  # attached by attach_catalog_kb_queries once KBs are seeded
             td = dict(task_data.get("data", {}))
 
             # Materialise a SearchSet for Extraction tasks with inline searchphrases
@@ -1454,6 +1529,12 @@ async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False
             f"{kb_counts.get('skipped', 0)} skipped"
         )
         counts_by_type[TYPE_KNOWLEDGE_BASES] = kb_counts
+
+    # --- Link catalog workflows to the catalog KBs they read (#1009) ---
+    if TYPE_WORKFLOWS in selected or TYPE_KNOWLEDGE_BASES in selected:
+        linked = await attach_catalog_kb_queries(SEEDS_DIR / "workflows")
+        if linked:
+            print(f"\nLinked {linked} workflow knowledge-base lookup(s).")
 
     # --- Save verified library ---
     await verified_lib.save()

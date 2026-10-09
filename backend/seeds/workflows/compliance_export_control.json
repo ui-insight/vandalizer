@@ -10,6 +10,9 @@
     "quality_tier": "excellent",
     "collections": [
       "compliance"
+    ],
+    "superseded_prompt_sha256": [
+      "62ea2413b3a4920a02eb2283db6bc35447bc567240ad95433112d9483f3407a4"
     ]
   },
   "items": [
@@ -27,6 +30,15 @@
               "data": {
                 "searchphrases": "Project Title, Sponsor Agency, Foreign Collaborators, Countries Involved, Technology Areas, Equipment and Materials, Software Used, Publication Restrictions, Access Restrictions, Fundamental Research Statement, ITAR/EAR References, Controlled Unclassified Information, Foreign National Participation"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-export-control",
+                "query": "fundamental research published results not subject to the EAR 734.8; deemed export release to foreign person 734.13; Commerce Control List ECCN EAR99; license requirements country chart",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -38,11 +50,19 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are an export control compliance officer at a university. Screen this project for potential export control issues:\n\n## Fundamental Research Exclusion\n- Does this qualify as fundamental research (published without restriction)?\n- Are there any publication or dissemination restrictions?\n- Are there access restrictions that would remove the fundamental research exclusion?\n\n## Country & Party Screening\n- Are any countries involved on the sanctioned/embargoed list (OFAC)?\n- Are there foreign nationals who may need a Technology Control Plan?\n- Are any foreign collaborators or institutions of concern?\n\n## Technology Assessment\n- Could any technology, equipment, or software be controlled under EAR (Commerce Control List)?\n- Could any items fall under ITAR (US Munitions List)?\n- Are there dual-use technology concerns?\n\n## CUI Assessment\n- Does the project involve Controlled Unclassified Information?\n- Are there DFARS/NIST 800-171 cybersecurity requirements?\n\n## Risk Rating\nRate export control risk as **Low** / **Medium** / **High** and specify:\n- Which regulations may apply (EAR, ITAR, OFAC)\n- Recommended next steps (Technology Control Plan, license application, restricted party screening)\n- Whether an Empowered Official review is needed",
+                "prompt": "You are an export control compliance officer at a university. Screen this project for potential export control issues:\n\nYour input has two parts: the fields extracted from the document, and passages from the Export Administration Regulations (15 CFR 730-774) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 15 CFR 734.8, fundamental research). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Fundamental Research Exclusion\n- Does this qualify as fundamental research (published without restriction)?\n- Are there any publication or dissemination restrictions?\n- Are there access restrictions that would remove the fundamental research exclusion?\n\n## Country & Party Screening\n- Are any countries involved on the sanctioned/embargoed list (OFAC)?\n- Are there foreign nationals who may need a Technology Control Plan?\n- Are any foreign collaborators or institutions of concern?\n\n## Technology Assessment\n- Could any technology, equipment, or software be controlled under EAR (Commerce Control List)?\n- Could any items fall under ITAR (US Munitions List)?\n- Are there dual-use technology concerns?\n\n## CUI Assessment\n- Does the project involve Controlled Unclassified Information?\n- Are there DFARS/NIST 800-171 cybersecurity requirements?\n\n## Risk Rating\nRate export control risk as **Low** / **Medium** / **High** and specify:\n- Which regulations may apply (EAR, ITAR, OFAC)\n- Recommended next steps (Technology Control Plan, license application, restricted party screening)\n- Whether an Empowered Official review is needed",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000005",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Export Administration Regulations (15 CFR 730-774) (for example 15 CFR 734.8, fundamental research), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
         }
       ]
     }

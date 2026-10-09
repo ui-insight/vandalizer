@@ -12,7 +12,8 @@
       "financial"
     ],
     "superseded_prompt_sha256": [
-      "778660374791cf2deac8fcde2347df5b34e7e8450add05c777be9bbcd7ac7608"
+      "778660374791cf2deac8fcde2347df5b34e7e8450add05c777be9bbcd7ac7608",
+      "22daf4a59a974c395bca3035a47a307a06142dfc1aa78ecd84888eab6e79f4a5"
     ]
   },
   "items": [
@@ -30,6 +31,15 @@
               "data": {
                 "searchphrases": "Award Number, Cost Category, Direct Cost Description, Cost Amount, Allocation Methodology, Benefiting Projects, Time Period, Supporting Documentation, Special Award Conditions, Cost Type"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-2cfr200",
+                "query": "factors affecting allowability of costs 200.403; reasonable costs 200.404; allocable costs 200.405; prior written approval 200.407; selected items of cost entertainment alcoholic beverages fundraising bad debts",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -41,11 +51,19 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are a cost accounting specialist for sponsored programs. Review cost allocations for compliance with 2 CFR 200 (Uniform Guidance):\n\n## Allowability (2 CFR 200.403)\nFor each cost, determine if it is allowable:\n- Is it necessary and reasonable for the award?\n- Is it consistent with institutional policies?\n- Is it treated consistently (not charged as direct on some awards and indirect on others)?\n- Is it adequately documented?\n\n## Specific Cost Categories (2 CFR 200.420-475)\nCheck against specific provisions:\n- **Unallowable costs**: entertainment, alcohol, lobbying, fines/penalties, bad debts, fundraising\n- **Requires prior approval**: equipment (per-unit cost at or above the lesser of the institution's capitalization level or $10,000, per 2 CFR 200.1), foreign travel, participant support, subawards\n- **Conditional allowability**: memberships, advertising, insurance\n\n## Allocability (2 CFR 200.405)\n- Does each cost benefit the specific award?\n- Is the allocation methodology reasonable and consistently applied?\n- Is there adequate documentation linking costs to the project?\n\n## Classification\nFor each cost item:\n- **Allowable** - cite relevant 2 CFR 200 section\n- **Questionable** - explain concern\n- **Unallowable** - cite prohibition\n\nPresent as a structured review table with recommendations.",
+                "prompt": "You are a cost accounting specialist for sponsored programs. Review cost allocations for compliance with 2 CFR 200 (Uniform Guidance):\n\nYour input has two parts: the fields extracted from the document, and passages from the Uniform Guidance (2 CFR 200) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 2 CFR 200.403, factors affecting allowability). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Allowability (2 CFR 200.403)\nFor each cost, determine if it is allowable:\n- Is it necessary and reasonable for the award?\n- Is it consistent with institutional policies?\n- Is it treated consistently (not charged as direct on some awards and indirect on others)?\n- Is it adequately documented?\n\n## Specific Cost Categories (2 CFR 200.420-475)\nCheck against specific provisions:\n- **Unallowable costs**: entertainment, alcohol, lobbying, fines/penalties, bad debts, fundraising\n- **Requires prior approval**: the items 2 CFR 200.407 and the passages list as needing prior written approval (for example equipment and participant support costs), citing the section for each\n- **Conditional allowability**: memberships, advertising, insurance\n\n## Allocability (2 CFR 200.405)\n- Does each cost benefit the specific award?\n- Is the allocation methodology reasonable and consistently applied?\n- Is there adequate documentation linking costs to the project?\n\n## Classification\nFor each cost item:\n- **Allowable** - cite relevant 2 CFR 200 section\n- **Questionable** - explain concern\n- **Unallowable** - cite prohibition\n\nPresent as a structured review table with recommendations.",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000003",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.403, factors affecting allowability), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
         }
       ]
     }

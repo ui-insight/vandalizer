@@ -10,6 +10,9 @@
     "quality_tier": "excellent",
     "collections": [
       "compliance"
+    ],
+    "superseded_prompt_sha256": [
+      "06386dede0b3bf4e92d83c930df4814ebf3042a6e20d40c27a05786d0e48848a"
     ]
   },
   "items": [
@@ -27,6 +30,15 @@
               "data": {
                 "searchphrases": "PI Name, Co-Investigators, Sponsor/Funder, External Entity Relationships, Financial Interests Disclosed, Equity Holdings, Consulting Arrangements, IP/Licensing Relationships, Travel Sponsored by External Entities, Management/Board Positions, Significant Financial Interest Threshold"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-fcoi",
+                "query": "significant financial interest means remuneration equity interest exceeds; investigator disclosure; management of financial conflicts of interest; institutional responsibilities 50.604 50.605",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -38,11 +50,19 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are a research compliance officer specializing in conflict of interest (per 42 CFR Part 50 / 2 CFR 200.112). Based on the extracted disclosure information, assess:\n\n## Financial Conflict Screening\n- Are any disclosed financial interests related to the proposed research?\n- Do any financial interests exceed the $5,000/5% significant financial interest threshold?\n- Are there any equity holdings in entities that could benefit from research outcomes?\n\n## Relationship Analysis\n- Do any relationships with the sponsor create a real or apparent conflict?\n- Are consulting arrangements with interested entities disclosed?\n- Are there management or board positions that could influence research design or outcomes?\n\n## Risk Assessment\nRate overall COI risk as **Low**, **Medium**, or **High** with explanation.\n\n## Recommended Actions\nIf Medium or High risk:\n- Disclosure to research team and IRB\n- Independent monitoring of research\n- Modification of research plan\n- Divestiture of financial interest\n- Severance of conflicting relationship\n\nPresent as a structured COI review memo.",
+                "prompt": "You are a research compliance officer specializing in conflict of interest (per 42 CFR Part 50 / 2 CFR 200.112). Based on the extracted disclosure information, assess:\n\nYour input has two parts: the fields extracted from the document, and passages from the PHS financial conflict of interest regulation (42 CFR 50 Subpart F) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 42 CFR 50.603, definition of significant financial interest). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Financial Conflict Screening\n- Are any disclosed financial interests related to the proposed research?\n- Does any disclosed interest meet the definition of a significant financial interest in 42 CFR 50.603, as the passages state it? Quote the threshold you applied.\n- Are there any equity holdings in entities that could benefit from research outcomes?\n\n## Relationship Analysis\n- Do any relationships with the sponsor create a real or apparent conflict?\n- Are consulting arrangements with interested entities disclosed?\n- Are there management or board positions that could influence research design or outcomes?\n\n## Risk Assessment\nRate overall COI risk as **Low**, **Medium**, or **High** with explanation.\n\n## Recommended Actions\nIf Medium or High risk:\n- Disclosure to research team and IRB\n- Independent monitoring of research\n- Modification of research plan\n- Divestiture of financial interest\n- Severance of conflicting relationship\n\nPresent as a structured COI review memo.",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000004",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the PHS financial conflict of interest regulation (42 CFR 50 Subpart F) (for example 42 CFR 50.603, definition of significant financial interest), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
         }
       ]
     }
