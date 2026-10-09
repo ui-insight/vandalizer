@@ -1,0 +1,1312 @@
+{
+  "schema_version": 1,
+  "contract_id": "vandalizer-5.0-outcomes-draft.1",
+  "rubric_id": "v5.0-competency-draft.1",
+  "state": "design_draft",
+  "credential_promise": "A graduate can supervise a bounded research-administration document task: select intended data and workspace, review actions, run appropriate extraction or workflow operations, verify important outputs against sources, recover failures without duplicating completed actions, and deliver the reviewed result to the intended destination.",
+  "agent_assistance": "Agent explanation, proposals, configuration and execution are permitted. Required learner decisions must come from authenticated learner interactions. Automatic graders may assess those saved records but cannot manufacture a decision from agent-authored assertions. Certification grading has no routine staff queue.",
+  "exclusions": [
+    "Institutional approval authority or legal/compliance certification.",
+    "A guarantee of correctness for future outputs or changed artifact revisions.",
+    "Evidence of competence from reading, reflection, XP or prior module titles alone."
+  ],
+  "credit_policy": "all_required_outcomes",
+  "legacy_equivalence": "no_automatic_transfer_without_assessed_evidence",
+  "evidence_policy": [
+    "Pin enrollment, course manifest, exercise, rubric and assigned input identities before beginning assessed work.",
+    "Capture artifact configuration, source content identity, execution inputs and results as immutable snapshots or immutable revision references.",
+    "Only authenticated server evidence producers may bind run results; client assertions and agent prose cannot supply trusted execution receipts.",
+    "Scope every evidence read by learner authorization and attempt identity; guessed or inaccessible IDs fail closed.",
+    "Require explicit learner decisions for scope, correction, source checking, recovery and release; record actor, prompt revision and selected evidence.",
+    "Preserve failed and superseded attempts. A correction creates a new result or auditable adjustment; it does not rewrite the original receipt.",
+    "All listed outcomes are required. Enrichment and stars never offset a required failure.",
+    "Structured review uses an explicit versioned automatic rubric with calibration before credit. LLM judgment is permitted; unclear evidence returns to the learner for revision without a staff queue. Prose presence, keyword matching and a model claim alone never award credit.",
+    "These are authored calibration examples, not executed test results. Teaching references identify existing lessons to revise, not claims that those lessons already satisfy the outcome."
+  ],
+  "modules": [
+    {
+      "module_id": "ai_literacy",
+      "outcomes": [
+        {
+          "id": "ai_literacy.source_support",
+          "statement": "Distinguish a source-supported answer from a confident unsupported assertion.",
+          "lesson_ids": [
+            "ai_literacy.from-generic-chat-to-validated-agentic-chat"
+          ],
+          "practice": "Compare two answers to the same sample passage; identify which claim lacks support.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Distinguish a source-supported answer from a confident unsupported assertion.",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Select the unsupported claim and the source-checking action before relying on it."
+          ],
+          "critical_failures": [
+            "Accept confidence, fluent wording or a quality badge as proof of the current answer."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A confident answer adds an eligibility rule absent from the passage; the learner marks it unsupported.",
+              "expected": "pass",
+              "reason": "Select the unsupported claim and the source-checking action before relying on it."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner accepts the extra rule because the agent says it is certain.",
+              "expected": "fail",
+              "reason": "Accept confidence, fluent wording or a quality badge as proof of the current answer."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "ai_literacy.scope_and_authority",
+          "statement": "Recognize that a document or agent suggestion cannot authorize a change in task scope.",
+          "lesson_ids": [
+            "ai_literacy.from-generic-chat-to-validated-agentic-chat"
+          ],
+          "practice": "Find an instruction embedded in a sample document that asks for an unrelated disclosure.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Recognize that a document or agent suggestion cannot authorize a change in task scope.",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Reject the embedded instruction and retain the learner-approved documents and destination."
+          ],
+          "critical_failures": [
+            "Treat source text as permission to send, share or switch the target workspace."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A proposal says to email its contents externally; the learner refuses that instruction.",
+              "expected": "pass",
+              "reason": "Reject the embedded instruction and retain the learner-approved documents and destination."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner approves the email solely because the document requested it.",
+              "expected": "fail",
+              "reason": "Treat source text as permission to send, share or switch the target workspace."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "ai_literacy.human_decision",
+          "statement": "Identify institutional judgments that require an authorized human decision.",
+          "lesson_ids": [
+            "ai_literacy.ai-for-research-administration"
+          ],
+          "practice": "Classify extraction, comparison and final institutional approval in a sample review.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Identify institutional judgments that require an authorized human decision.",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Assign preparation to the agent and final institutional judgment to the authorized reviewer."
+          ],
+          "critical_failures": [
+            "Treat certification or agent output as institutional approval authority."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner asks the agent to prepare a checklist and reserves the funding decision for the reviewer.",
+              "expected": "pass",
+              "reason": "Assign preparation to the agent and final institutional judgment to the authorized reviewer."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner delegates final institutional approval to the agent.",
+              "expected": "fail",
+              "reason": "Treat certification or agent output as institutional approval authority."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "foundations",
+      "outcomes": [
+        {
+          "id": "foundations.scoped_proposal",
+          "statement": "Inspect and correct the selected document, workspace and extraction proposal before execution.",
+          "lesson_ids": [
+            "foundations.build-your-first-workflow"
+          ],
+          "practice": "Compare the intended NSF task with a proposal that selects an unrelated document.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Inspect and correct the selected document, workspace and extraction proposal before execution.",
+          "evidence": [
+            "learner_decision",
+            "assigned_document_snapshot",
+            "artifact_revision",
+            "proposal_snapshot"
+          ],
+          "passing_conditions": [
+            "Record the correct assigned source and target workspace; correct the intentional mismatch before the linked run."
+          ],
+          "critical_failures": [
+            "Approve a run on a different document or record approval only after execution."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner notices an unrelated document in the proposal and corrects the selection before running.",
+              "expected": "pass",
+              "reason": "Record the correct assigned source and target workspace; correct the intentional mismatch before the linked run."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner runs the unrelated document and later claims the intended source was selected.",
+              "expected": "fail",
+              "reason": "Approve a run on a different document or record approval only after execution."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "foundations.executed_extraction",
+          "statement": "Run the reviewed reusable extraction against the assigned source using a supported route.",
+          "lesson_ids": [
+            "foundations.build-your-first-workflow"
+          ],
+          "practice": "Create the extraction from chat or the editor, inspect it, and execute the selected revision.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Run the reviewed reusable extraction against the assigned source using a supported route.",
+          "evidence": [
+            "artifact_revision",
+            "assigned_document_snapshot",
+            "execution_receipt"
+          ],
+          "passing_conditions": [
+            "A completed run binds the approved extraction revision and exact assigned input IDs."
+          ],
+          "critical_failures": [
+            "Use configuration alone, an unrelated run or a successful job on the wrong source as evidence."
+          ],
+          "method": "deterministic",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "One completed run names the assigned source and the exact reviewed extraction revision.",
+              "expected": "pass",
+              "reason": "A completed run binds the approved extraction revision and exact assigned input IDs."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "A historical completed run names a different source while the new extraction has never run.",
+              "expected": "fail",
+              "reason": "Use configuration alone, an unrelated run or a successful job on the wrong source as evidence."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "foundations.verified_values",
+          "statement": "Verify required extracted values against the assigned source before accepting the result.",
+          "lesson_ids": [
+            "foundations.why-structured-extraction-matters"
+          ],
+          "practice": "Compare the required NSF values with cited passages and repair one unsupported value.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Verify required extracted values against the assigned source before accepting the result.",
+          "evidence": [
+            "execution_receipt",
+            "output_snapshot",
+            "source_reference",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "All required values match the assigned source; each required source check records the learner decision on the same run."
+          ],
+          "critical_failures": [
+            "Count correct field names or an agent assertion of review as proof of correct values."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner compares each required value with its source and corrects an unsupported value before acceptance.",
+              "expected": "pass",
+              "reason": "All required values match the assigned source; each required source check records the learner decision on the same run."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The field names are correct but one required value is absent from the source.",
+              "expected": "fail",
+              "reason": "Count correct field names or an agent assertion of review as proof of correct values."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "process_mapping",
+      "outcomes": [
+        {
+          "id": "process_mapping.method_choice",
+          "statement": "Choose chat, a reusable extraction or a workflow according to repetition, data and judgment.",
+          "lesson_ids": [
+            "process_mapping.the-ai-suitability-test"
+          ],
+          "practice": "Compare a one-off question, repeated structured intake and a multi-stage review.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Choose chat, a reusable extraction or a workflow according to repetition, data and judgment.",
+          "evidence": [
+            "learner_decision",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "The selected method and rationale address input consistency, repetition, required output and human judgment."
+          ],
+          "critical_failures": [
+            "Choose a workflow only because it has more steps or omit the actual output requirement."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A repeated fixed-field intake uses a reusable extraction with an identified reviewer.",
+              "expected": "pass",
+              "reason": "The selected method and rationale address input consistency, repetition, required output and human judgment."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner adds a workflow wrapper but cannot identify what output the process needs.",
+              "expected": "fail",
+              "reason": "Choose a workflow only because it has more steps or omit the actual output requirement."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "process_mapping.human_checkpoint",
+          "statement": "Place a human checkpoint before a consequential judgment or release.",
+          "lesson_ids": [
+            "process_mapping.walkthrough-mapping-a-real-process"
+          ],
+          "practice": "Map a progress-report review and mark where institutional judgment occurs.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Place a human checkpoint before a consequential judgment or release.",
+          "evidence": [
+            "learner_decision",
+            "process_map_snapshot"
+          ],
+          "passing_conditions": [
+            "The map identifies who reviews, what evidence they inspect and what must wait for their decision."
+          ],
+          "critical_failures": [
+            "Place approval after an irreversible action or omit the accountable reviewer."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A reviewer checks discrepancies before the result is released to the recipient.",
+              "expected": "pass",
+              "reason": "The map identifies who reviews, what evidence they inspect and what must wait for their decision."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The report is released first and approval is recorded afterward.",
+              "expected": "fail",
+              "reason": "Place approval after an irreversible action or omit the accountable reviewer."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "process_mapping.bounded_scope",
+          "statement": "Define the task inputs, stopping condition and intended result before delegating work.",
+          "lesson_ids": [
+            "process_mapping.finding-the-repetition"
+          ],
+          "practice": "Rewrite a broad request into a bounded intake task with a clear exception path.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Define the task inputs, stopping condition and intended result before delegating work.",
+          "evidence": [
+            "learner_decision",
+            "process_map_snapshot"
+          ],
+          "passing_conditions": [
+            "Scope names the input set, intended output, exclusions and when the agent must stop and ask."
+          ],
+          "critical_failures": [
+            "Allow the agent to expand documents, recipients or authority without review."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The task names three assigned proposals, an internal comparison and a stop on missing source text.",
+              "expected": "pass",
+              "reason": "Scope names the input set, intended output, exclusions and when the agent must stop and ask."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The task permits any document and any recipient that the agent considers useful.",
+              "expected": "fail",
+              "reason": "Allow the agent to expand documents, recipients or authority without review."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "workflow_design",
+      "outcomes": [
+        {
+          "id": "workflow_design.data_flow",
+          "statement": "Design connected extract, reason and deliver stages with explicit input and output boundaries.",
+          "lesson_ids": [
+            "workflow_design.the-extract-reason-deliver-pattern"
+          ],
+          "practice": "Trace one required fact from source extraction through analysis to the final artifact.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Design connected extract, reason and deliver stages with explicit input and output boundaries.",
+          "evidence": [
+            "artifact_revision",
+            "design_snapshot",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "Each stage has a defined input/output and the final artifact derives from the intended upstream result."
+          ],
+          "critical_failures": [
+            "Combine unrelated artifacts or rely on undefined prior context for a required stage."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The analysis consumes the extraction result from the same design and feeds the intended report.",
+              "expected": "pass",
+              "reason": "Each stage has a defined input/output and the final artifact derives from the intended upstream result."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The analysis uses unrelated saved text while the extraction output is never connected.",
+              "expected": "fail",
+              "reason": "Combine unrelated artifacts or rely on undefined prior context for a required stage."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "workflow_design.approval_boundary",
+          "statement": "Correct a proposed external action or destination before executing the workflow.",
+          "lesson_ids": [
+            "workflow_design.chat-driven-workflow-design-v5-0"
+          ],
+          "practice": "Review a design containing an intentional unintended destination and repair it.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Correct a proposed external action or destination before executing the workflow.",
+          "evidence": [
+            "proposal_snapshot",
+            "artifact_revision",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The learner identifies the boundary error and saves a corrected design before approval."
+          ],
+          "critical_failures": [
+            "Execute a proposed send or share before reviewing its target and scope."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "An external recipient is replaced with the intended internal destination before execution.",
+              "expected": "pass",
+              "reason": "The learner identifies the boundary error and saves a corrected design before approval."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The workflow sends to the proposed external recipient before the learner checks it.",
+              "expected": "fail",
+              "reason": "Execute a proposed send or share before reviewing its target and scope."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "workflow_design.reviewable_design",
+          "statement": "Explain how a reviewer can inspect intermediate evidence and stop on an unresolved issue.",
+          "lesson_ids": [
+            "workflow_design.designing-for-your-reviewer"
+          ],
+          "practice": "Add a review point and exception path to a compliance-review design.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Explain how a reviewer can inspect intermediate evidence and stop on an unresolved issue.",
+          "evidence": [
+            "design_snapshot",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The design retains source/intermediate references and defines a stop or review path for unsupported results."
+          ],
+          "critical_failures": [
+            "Hide intermediate evidence or proceed automatically after a critical evidence gap."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The reviewer can inspect the cited source and the workflow stops if a required value is unsupported.",
+              "expected": "pass",
+              "reason": "The design retains source/intermediate references and defines a stop or review path for unsupported results."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The workflow generates the final report despite a missing required source value.",
+              "expected": "fail",
+              "reason": "Hide intermediate evidence or proceed automatically after a critical evidence gap."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "extraction_engine",
+      "outcomes": [
+        {
+          "id": "extraction_engine.field_semantics",
+          "statement": "Author precise fields that distinguish missing values, optional values and constrained categories.",
+          "lesson_ids": [
+            "extraction_engine.configuring-fields-for-accuracy"
+          ],
+          "practice": "Repair ambiguous fields in the assigned NIH extraction; specify how missing data is represented.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Author precise fields that distinguish missing values, optional values and constrained categories.",
+          "evidence": [
+            "artifact_revision",
+            "learner_decision",
+            "repair_baseline",
+            "assigned_document_snapshot"
+          ],
+          "passing_conditions": [
+            "Required field definitions are unambiguous; optionality and categories match the task and do not force invented values."
+          ],
+          "critical_failures": [
+            "Use many vague fields or a mandatory fabricated fallback as a substitute for useful definitions."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A missing optional value remains absent and a constrained category rejects an unsupported label.",
+              "expected": "pass",
+              "reason": "Required field definitions are unambiguous; optionality and categories match the task and do not force invented values."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "An absent value is filled with a plausible guess because the field was mandatory.",
+              "expected": "fail",
+              "reason": "Use many vague fields or a mandatory fabricated fallback as a substitute for useful definitions."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "extraction_engine.assigned_run",
+          "statement": "Execute the intended field revision on the assigned NIH source and preserve the result.",
+          "lesson_ids": [
+            "extraction_engine.build-a-comprehensive-extraction"
+          ],
+          "practice": "Inspect the saved extraction revision and run it on the assigned lab document.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Execute the intended field revision on the assigned NIH source and preserve the result.",
+          "evidence": [
+            "artifact_revision",
+            "assigned_document_snapshot",
+            "execution_receipt",
+            "output_snapshot"
+          ],
+          "passing_conditions": [
+            "One execution receipt binds the assigned document, exact field/config revision and complete result."
+          ],
+          "critical_failures": [
+            "Aggregate field counts or results across unrelated extractions to satisfy the requirement."
+          ],
+          "method": "deterministic",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The completed run contains the required fields from one pinned extraction and the assigned source.",
+              "expected": "pass",
+              "reason": "One execution receipt binds the assigned document, exact field/config revision and complete result."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "Fields from three unrelated saved extractions are counted despite no qualifying run.",
+              "expected": "fail",
+              "reason": "Aggregate field counts or results across unrelated extractions to satisfy the requirement."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "extraction_engine.quality_repair",
+          "statement": "Correct an extraction error through field or configuration repair followed by source-checked re-execution.",
+          "lesson_ids": [
+            "extraction_engine.worked-example-fixing-a-weak-field-list"
+          ],
+          "practice": "Inspect a weak output, repair the relevant field and compare the new result against the source.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Correct an extraction error through field or configuration repair followed by source-checked re-execution.",
+          "evidence": [
+            "artifact_revision",
+            "execution_receipt",
+            "source_reference",
+            "learner_decision",
+            "repair_baseline",
+            "output_snapshot",
+            "assigned_document_snapshot"
+          ],
+          "passing_conditions": [
+            "The repair decision identifies the error; the revised run resolves it and required values are checked against sources."
+          ],
+          "critical_failures": [
+            "Claim improvement from a setting change or rerun count without checking the resulting values."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A clarified field produces the source-supported value on the new linked run.",
+              "expected": "pass",
+              "reason": "The repair decision identifies the error; the revised run resolves it and required values are checked against sources."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner changes a setting but submits the same incorrect output.",
+              "expected": "fail",
+              "reason": "Claim improvement from a setting change or rerun count without checking the resulting values."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "multi_step",
+      "outcomes": [
+        {
+          "id": "multi_step.connected_execution",
+          "statement": "Execute one connected multi-step workflow with traceable intermediate and final results.",
+          "lesson_ids": [
+            "multi_step.build-a-3-step-analysis-workflow"
+          ],
+          "practice": "Run the extraction-analysis-delivery chain and inspect each step output.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Execute one connected multi-step workflow with traceable intermediate and final results.",
+          "evidence": [
+            "artifact_revision",
+            "execution_receipt",
+            "intermediate_snapshot",
+            "output_snapshot"
+          ],
+          "passing_conditions": [
+            "The same workflow execution contains the required connected stages and terminal outputs."
+          ],
+          "critical_failures": [
+            "Use unrelated single-step runs to simulate a complete evidence chain."
+          ],
+          "method": "deterministic",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "One run links extraction output to analysis and the intended deliverable.",
+              "expected": "pass",
+              "reason": "The same workflow execution contains the required connected stages and terminal outputs."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "Three unrelated historical runs are combined to claim a single chain.",
+              "expected": "fail",
+              "reason": "Use unrelated single-step runs to simulate a complete evidence chain."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "multi_step.intermediate_review",
+          "statement": "Find and correct a downstream result that relies on the wrong intermediate input.",
+          "lesson_ids": [
+            "multi_step.worked-example-watching-data-flow-through-three-steps"
+          ],
+          "practice": "Inspect a Formatter intentionally reading Workflow Documents instead of the incoming reasoning result.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Find and correct a downstream result that relies on the wrong intermediate input.",
+          "evidence": [
+            "intermediate_snapshot",
+            "artifact_revision",
+            "learner_decision",
+            "execution_receipt"
+          ],
+          "passing_conditions": [
+            "The learner identifies the wrong input, repairs the connection and verifies the rerun at both stages."
+          ],
+          "critical_failures": [
+            "Accept a plausible final answer without checking its required upstream evidence."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner corrects a misconnected analysis input and checks the corrected intermediate and final outputs.",
+              "expected": "pass",
+              "reason": "The learner identifies the wrong input, repairs the connection and verifies the rerun at both stages."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The final wording looks plausible so the learner ignores the unrelated intermediate data.",
+              "expected": "fail",
+              "reason": "Accept a plausible final answer without checking its required upstream evidence."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "multi_step.bounded_reasoning",
+          "statement": "Keep generated reasoning separate from extracted facts and preserve source traceability.",
+          "lesson_ids": [
+            "multi_step.the-prompt-node-reasoning-over-data"
+          ],
+          "practice": "Mark which report statements are sourced facts, derived calculations and interpretation.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Keep generated reasoning separate from extracted facts and preserve source traceability.",
+          "evidence": [
+            "output_snapshot",
+            "source_reference",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "Required factual claims remain traceable; interpretation is labeled and unsupported claims are removed or escalated."
+          ],
+          "critical_failures": [
+            "Present an invented analytical claim as an extracted source fact."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A report labels its inference and links its factual inputs to the source.",
+              "expected": "pass",
+              "reason": "Required factual claims remain traceable; interpretation is labeled and unsupported claims are removed or escalated."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The report presents an unsupported inference as a quoted source requirement.",
+              "expected": "fail",
+              "reason": "Present an invented analytical claim as an extracted source fact."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "advanced_nodes",
+      "outcomes": [
+        {
+          "id": "advanced_nodes.appropriate_method",
+          "statement": "Choose a supported operation for analysis and a verifiable method for arithmetic.",
+          "lesson_ids": [
+            "advanced_nodes.code-execution-custom-logic-in-your-pipeline"
+          ],
+          "practice": "Decide how to check a sample budget total without relying on fluent generated arithmetic.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Choose a supported operation for analysis and a verifiable method for arithmetic.",
+          "evidence": [
+            "learner_decision",
+            "design_snapshot"
+          ],
+          "passing_conditions": [
+            "The chosen method is available and identifies deterministic or explicit human arithmetic verification."
+          ],
+          "critical_failures": [
+            "Claim that an LLM analysis node alone proves numerical correctness or require unavailable code execution."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner uses the supported analysis operation and independently checks the total with explicit arithmetic.",
+              "expected": "pass",
+              "reason": "The chosen method is available and identifies deterministic or explicit human arithmetic verification."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner accepts the generated total because the model explains it confidently.",
+              "expected": "fail",
+              "reason": "Claim that an LLM analysis node alone proves numerical correctness or require unavailable code execution."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "advanced_nodes.checked_computation",
+          "statement": "Verify a computation using the exact inputs and retain the calculation evidence.",
+          "lesson_ids": [
+            "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks"
+          ],
+          "practice": "Calculate a budget subtotal from assigned line items, then compare it with the generated result.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Verify a computation using the exact inputs and retain the calculation evidence.",
+          "evidence": [
+            "assigned_document_snapshot",
+            "intermediate_snapshot",
+            "calculation_record",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "Inputs match the source and the stored calculation supports the accepted numerical result."
+          ],
+          "critical_failures": [
+            "Verify the wrong inputs or supply only a final number without reproducible calculation evidence."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "For a fictional practice case, 120 plus 80 is documented as 200 and compared with the output.",
+              "expected": "pass",
+              "reason": "Inputs match the source and the stored calculation supports the accepted numerical result."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "For the same practice case, the learner accepts 220 without showing a calculation.",
+              "expected": "fail",
+              "reason": "Verify the wrong inputs or supply only a final number without reproducible calculation evidence."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "advanced_nodes.parallel_safety",
+          "statement": "Distinguish independent parallel work from dependent work that must remain ordered.",
+          "lesson_ids": [
+            "advanced_nodes.running-tasks-in-parallel"
+          ],
+          "practice": "Review a plan that parallelizes analysis before its required extraction is available.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Distinguish independent parallel work from dependent work that must remain ordered.",
+          "evidence": [
+            "artifact_revision",
+            "design_snapshot",
+            "execution_receipt",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "Independent tasks may run together; required dependencies remain ordered and outputs are reconciled before delivery."
+          ],
+          "critical_failures": [
+            "Parallelize a dependent task or accept missing branch results as complete."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "Independent checks run together and analysis waits for its required extraction output.",
+              "expected": "pass",
+              "reason": "Independent tasks may run together; required dependencies remain ordered and outputs are reconciled before delivery."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "Analysis starts before extraction and the absent branch is treated as completed.",
+              "expected": "fail",
+              "reason": "Parallelize a dependent task or accept missing branch results as complete."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "output_delivery",
+      "outcomes": [
+        {
+          "id": "output_delivery.usable_artifact",
+          "statement": "Inspect a generated deliverable for readability, completeness and consistency with reviewed output.",
+          "lesson_ids": [
+            "output_delivery.from-analysis-to-deliverables"
+          ],
+          "practice": "Open the actual generated report and inspect headings, required fields and source references.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Inspect a generated deliverable for readability, completeness and consistency with reviewed output.",
+          "evidence": [
+            "execution_receipt",
+            "artifact_file_snapshot",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The generated file opens and contains the required reviewed content in a usable format."
+          ],
+          "critical_failures": [
+            "Treat a download link, completed job or claimed file generation as proof of usable content."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The generated file is opened and its required content is checked against the reviewed result.",
+              "expected": "pass",
+              "reason": "The generated file opens and contains the required reviewed content in a usable format."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "A file exists but is empty or omits a required section.",
+              "expected": "fail",
+              "reason": "Treat a download link, completed job or claimed file generation as proof of usable content."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "output_delivery.release_decision",
+          "statement": "Review the exact destination, audience and data scope before releasing an artifact.",
+          "lesson_ids": [
+            "output_delivery.designing-end-to-end-deliverable-workflows"
+          ],
+          "practice": "Compare an intended internal handoff with a proposed broader sharing target.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Review the exact destination, audience and data scope before releasing an artifact.",
+          "evidence": [
+            "artifact_file_snapshot",
+            "destination_snapshot",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The learner explicitly approves the intended audience and data scope before the associated release."
+          ],
+          "critical_failures": [
+            "Infer authorization from agent text, prior unrelated approval or the mere existence of a recipient."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner checks the selected internal destination and approves the specific reviewed artifact.",
+              "expected": "pass",
+              "reason": "The learner explicitly approves the intended audience and data scope before the associated release."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "A previous approval for another report is reused to send this artifact elsewhere.",
+              "expected": "fail",
+              "reason": "Infer authorization from agent text, prior unrelated approval or the mere existence of a recipient."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "output_delivery.delivery_outcome",
+          "statement": "Distinguish successful generation from successful delivery and handle a delivery failure.",
+          "lesson_ids": [
+            "output_delivery.worked-example-one-report-in-two-deliverables-out"
+          ],
+          "practice": "Inspect a run where the report exists but the destination write failed; choose a targeted next action.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Distinguish successful generation from successful delivery and handle a delivery failure.",
+          "evidence": [
+            "execution_receipt",
+            "delivery_receipt",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The learner recognizes the failed delivery and retries only the authorized failed action or records a supported alternative."
+          ],
+          "critical_failures": [
+            "Claim the handoff succeeded because generation finished or blindly rerun completed sends."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The report is preserved and only its failed authorized delivery is retried.",
+              "expected": "pass",
+              "reason": "The learner recognizes the failed delivery and retries only the authorized failed action or records a supported alternative."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner claims delivery succeeded from the completed generation status alone.",
+              "expected": "fail",
+              "reason": "Claim the handoff succeeded because generation finished or blindly rerun completed sends."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "validation_qa",
+      "outcomes": [
+        {
+          "id": "validation_qa.quality_meaning",
+          "statement": "Distinguish unscored, measured, stale and current evidence from successful execution or examiner acceptance.",
+          "lesson_ids": [
+            "validation_qa.trust-signals-quality-tiers-v5-0"
+          ],
+          "practice": "Classify quality signals for an untested extraction, changed revision and failed current case.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Distinguish unscored, measured, stale and current evidence from successful execution or examiner acceptance.",
+          "evidence": [
+            "scenario_revision",
+            "learner_choice"
+          ],
+          "passing_conditions": [
+            "Each signal is interpreted within its tested revision and coverage; no signal substitutes for checking the current answer."
+          ],
+          "critical_failures": [
+            "Call unscored or stale evidence a passed current assessment."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "An older high score is identified as stale after a relevant extraction change.",
+              "expected": "pass",
+              "reason": "Each signal is interpreted within its tested revision and coverage; no signal substitutes for checking the current answer."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The older high score is used to certify the changed extraction without a retest.",
+              "expected": "fail",
+              "reason": "Call unscored or stale evidence a passed current assessment."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "validation_qa.representative_tests",
+          "statement": "Define test cases with known expected results that exercise the assigned artifact revision.",
+          "lesson_ids": [
+            "validation_qa.building-effective-validation-plans"
+          ],
+          "practice": "Add a representative case and an absence case, with source-supported expected values.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Define test cases with known expected results that exercise the assigned artifact revision.",
+          "evidence": [
+            "artifact_revision",
+            "test_case_snapshot",
+            "source_reference",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "Required cases contain meaningful expected results and run against the exact assessed revision."
+          ],
+          "critical_failures": [
+            "Use empty expectations, unrelated cases or a cherry-picked subset as comprehensive quality proof."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The suite includes a typical source and a missing-value case with explicit expected results.",
+              "expected": "pass",
+              "reason": "Required cases contain meaningful expected results and run against the exact assessed revision."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The suite has no expected values but its successful execution is reported as validated accuracy.",
+              "expected": "fail",
+              "reason": "Use empty expectations, unrelated cases or a cherry-picked subset as comprehensive quality proof."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "validation_qa.repair_and_retest",
+          "statement": "Respond to an observed validation failure with a justified correction and a complete required retest.",
+          "lesson_ids": [
+            "validation_qa.worked-example-five-checks-and-a-failing-run"
+          ],
+          "practice": "Introduce a failing assigned case, diagnose it, repair the artifact and rerun the required suite.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Respond to an observed validation failure with a justified correction and a complete required retest.",
+          "evidence": [
+            "artifact_revision",
+            "test_case_snapshot",
+            "validation_receipt",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The failed case is preserved, the correction is explained, and the required suite passes on the corrected revision."
+          ],
+          "critical_failures": [
+            "Delete the failing case or compare unrelated revisions to claim repair."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The failing case remains in the suite and passes after the documented correction.",
+              "expected": "pass",
+              "reason": "The failed case is preserved, the correction is explained, and the required suite passes on the corrected revision."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner removes the failing case so the score rises without repairing the problem.",
+              "expected": "fail",
+              "reason": "Delete the failing case or compare unrelated revisions to claim repair."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "batch_processing",
+      "outcomes": [
+        {
+          "id": "batch_processing.assigned_coverage",
+          "statement": "Reconcile every assigned document with its terminal per-document result in the intended batch.",
+          "lesson_ids": [
+            "batch_processing.run-your-first-batch"
+          ],
+          "practice": "Run the assigned three-document batch and compare its input IDs with the result inventory.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Reconcile every assigned document with its terminal per-document result in the intended batch.",
+          "evidence": [
+            "assigned_document_snapshot",
+            "artifact_revision",
+            "execution_receipt",
+            "batch_result_snapshot"
+          ],
+          "passing_conditions": [
+            "The intended batch accounts for every assigned input ID and each terminal result; counts alone do not establish coverage."
+          ],
+          "critical_failures": [
+            "Use an unrelated historical batch, repeated input or documents-touched count as proof."
+          ],
+          "method": "deterministic",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "Three distinct assigned inputs each have a terminal result in the same batch.",
+              "expected": "pass",
+              "reason": "The intended batch accounts for every assigned input ID and each terminal result; counts alone do not establish coverage."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "A count of three hides a duplicate input and one missing assigned document.",
+              "expected": "fail",
+              "reason": "Use an unrelated historical batch, repeated input or documents-touched count as proof."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "batch_processing.targeted_recovery",
+          "statement": "Recover a failed batch item without repeating completed actions for successful items.",
+          "lesson_ids": [
+            "batch_processing.worked-example-thirty-proposals-one-bad-scan"
+          ],
+          "practice": "Inspect a mixed batch result and choose only the failed item for a justified retry.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Recover a failed batch item without repeating completed actions for successful items.",
+          "evidence": [
+            "batch_result_snapshot",
+            "retry_receipt",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The retry is tied to the failed input and original run; successful outputs and completed side effects are preserved."
+          ],
+          "critical_failures": [
+            "Blindly retry the entire batch or hide unresolved failures behind an overall success label."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "Two completed items remain untouched while the failed item is corrected and retried.",
+              "expected": "pass",
+              "reason": "The retry is tied to the failed input and original run; successful outputs and completed side effects are preserved."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "All items are rerun and already completed deliveries are duplicated.",
+              "expected": "fail",
+              "reason": "Blindly retry the entire batch or hide unresolved failures behind an overall success label."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "batch_processing.resource_choice",
+          "statement": "Choose a model and batch scope appropriate to the task and verify the resulting quality.",
+          "lesson_ids": [
+            "batch_processing.choosing-the-right-model-for-batch-work"
+          ],
+          "practice": "Compare a small representative pilot with an immediate large run; identify the tradeoff.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Choose a model and batch scope appropriate to the task and verify the resulting quality.",
+          "evidence": [
+            "learner_decision",
+            "pilot_result_snapshot",
+            "execution_receipt"
+          ],
+          "passing_conditions": [
+            "The learner uses representative pilot evidence and records the quality/resource tradeoff before scaling."
+          ],
+          "critical_failures": [
+            "Treat the cheapest or fastest execution as sufficient regardless of missing or wrong results."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "A representative pilot exposes a weak field that is repaired before the larger batch.",
+              "expected": "pass",
+              "reason": "The learner uses representative pilot evidence and records the quality/resource tradeoff before scaling."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner scales immediately because the fast pilot completed despite incorrect required values.",
+              "expected": "fail",
+              "reason": "Treat the cheapest or fastest execution as sufficient regardless of missing or wrong results."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "governance",
+      "outcomes": [
+        {
+          "id": "governance.accountable_handoff",
+          "statement": "Document intended use, limitations, ownership and validation evidence for a reusable artifact.",
+          "lesson_ids": [
+            "governance.sharing-workflows-across-teams"
+          ],
+          "practice": "Prepare an internal handoff that explains what the artifact does and what still needs review.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Document intended use, limitations, ownership and validation evidence for a reusable artifact.",
+          "evidence": [
+            "artifact_revision",
+            "handoff_snapshot",
+            "validation_receipt",
+            "learner_decision"
+          ],
+          "passing_conditions": [
+            "The handoff names the owner, intended use, limitations, evidence revision and appropriate review route."
+          ],
+          "critical_failures": [
+            "Equate sharing with everyone or examiner availability with demonstrated governance."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The handoff states its supported inputs, known limits and exact validation evidence for review.",
+              "expected": "pass",
+              "reason": "The handoff names the owner, intended use, limitations, evidence revision and appropriate review route."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The artifact is broadly shared with no owner, limits or validation context.",
+              "expected": "fail",
+              "reason": "Equate sharing with everyone or examiner availability with demonstrated governance."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "governance.capstone_supervision",
+          "statement": "Supervise a bounded task through scope, approval, source checking, recovery and release decisions.",
+          "lesson_ids": [
+            "governance.worked-example-one-workflow-two-offices"
+          ],
+          "practice": "Complete a capstone containing a scope mismatch, unsupported value and recoverable delivery failure.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Supervise a bounded task through scope, approval, source checking, recovery and release decisions.",
+          "evidence": [
+            "capstone_attempt",
+            "learner_decision",
+            "source_reference",
+            "execution_receipt",
+            "delivery_receipt"
+          ],
+          "passing_conditions": [
+            "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains."
+          ],
+          "critical_failures": [
+            "Accept an agent-written assertion that the learner reviewed or approved the required decisions."
+          ],
+          "method": "structured_review",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner corrects the scope, verifies the value and approves targeted delivery recovery.",
+              "expected": "pass",
+              "reason": "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The agent claims all reviews were done but no learner decisions or source checks are recorded.",
+              "expected": "fail",
+              "reason": "Accept an agent-written assertion that the learner reviewed or approved the required decisions."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "governance.review_and_revision",
+          "statement": "Distinguish earned completion, examiner review and later artifact changes without rewriting history.",
+          "lesson_ids": [
+            "governance.building-a-culture-of-reuse"
+          ],
+          "practice": "Inspect a completed artifact that later changes and an examiner review still pending.",
+          "assessment": "Demonstrate this outcome on the assigned assessment case: Distinguish earned completion, examiner review and later artifact changes without rewriting history.",
+          "evidence": [
+            "scenario_revision",
+            "learner_choice"
+          ],
+          "passing_conditions": [
+            "Recognize that the original assessed revision retains its record, later changes need new evidence, and examiner review is separate."
+          ],
+          "critical_failures": [
+            "Claim examiner approval from completion or silently apply an old credential to changed behavior."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "qualifying_case",
+              "situation": "The learner keeps the assessed revision and requests new evidence for the changed artifact.",
+              "expected": "pass",
+              "reason": "Recognize that the original assessed revision retains its record, later changes need new evidence, and examiner review is separate."
+            },
+            {
+              "id": "critical_failure",
+              "situation": "The learner treats pending examiner review as approved and transfers the old evidence to new content.",
+              "expected": "fail",
+              "reason": "Claim examiner approval from completion or silently apply an old credential to changed behavior."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    }
+  ]
+}

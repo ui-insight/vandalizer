@@ -1,0 +1,191 @@
+{
+  "state": "design_draft",
+  "module_id": "extraction_engine",
+  "purpose": "Unpublished replacements for a separately versioned course. Real assigned runs, source checks, repair evidence and calibrated assessment remain required.",
+  "module_patch": {
+    "subtitle": "Define fields, execute and verify the result",
+    "description": "Repair ambiguous extraction fields, inspect effective settings and source-check an actual run on the assigned NIH proposal.",
+    "objectives": [
+      "Define required field meanings, units, missing values and allowed categories",
+      "Inspect and execute one saved revision on the assigned NIH source",
+      "Repair an observed error and verify the new run against source evidence"
+    ],
+    "tips": [
+      "A completed job or schema-valid response does not establish correct values.",
+      "Required fields still need source support; do not guess to fill a missing value.",
+      "Repetition measures consistency and can repeat the same error.",
+      "Keep the original and revised run evidence when demonstrating a repair."
+    ],
+    "estimatedMinutes": 24
+  },
+  "replacements": [
+    {
+      "id": "extraction_engine.one-pass-vs-two-pass-extraction",
+      "revision": 2,
+      "title": "Choose and inspect the extraction strategy",
+      "variant": "concept",
+      "objective": "Compare the configured passes and their actual output instead of assuming a mode guarantees accuracy.",
+      "content": "An extraction strategy controls how the engine attempts the task. It does not establish that the returned values are true. Start with the source, field meanings and a small set of checked examples; then compare the available configurations against those examples.\n\nOne-pass mode uses a configured extraction pass for each document and field group. Two-pass mode first produces a draft, then attempts refinement. Each pass can use its own configured model and reasoning settings. Do not assume both passes use the same model, or that a mode label describes every setting in the saved extraction.\n\nA second pass can help, but it can also retain or introduce an error. In the current engine, refinement failure can return the first-pass draft. A completed result therefore does not prove that two successful passes independently verified each value. Inspect the output and any available run information; source-check consequential values regardless of mode.\n\nField grouping, repetition, image handling and retries can affect the number of calls and resource use. Compare observed accuracy, unresolved values, time and usage on the same representative examples. Avoid promising a fixed cost ratio or choosing the most elaborate configuration without evidence.\n\n**Practice:** Two configurations return the same budget. Both selected the annual amount when the task requires the total project amount. Explain why changing the number of passes alone does not resolve the field-definition error.",
+      "knowledge_check": {
+        "question": "Both extraction modes return the wrong annual budget. What should you check first?",
+        "options": [
+          {
+            "text": "Use more passes until the answers agree.",
+            "correct": false,
+            "explanation": "Agreement can preserve the same misunderstanding. Check the task and source before adding calls."
+          },
+          {
+            "text": "Clarify the requested budget scope, then rerun and compare the result with the source.",
+            "correct": true,
+            "explanation": "The field definition must identify the intended amount. A new result needs its own source check."
+          },
+          {
+            "text": "Accept the two-pass answer because refinement guarantees correctness.",
+            "correct": false,
+            "explanation": "Refinement can fail or repeat an error; the returned value still needs evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "extraction_engine.configuring-fields-for-accuracy",
+      "revision": 2,
+      "title": "Define fields and missing values precisely",
+      "variant": "concept",
+      "objective": "Distinguish a useful field definition, an allowed category and an unsupported or absent value.",
+      "content": "A field needs a meaning that a reviewer can check. “Budget” could mean annual direct costs, total direct costs or total project costs including indirect costs. Name the intended amount, period and unit. “PI Name” distinguishes the investigator from a grants officer named elsewhere in the proposal.\n\nAllowed values constrain a category to an authored set. They help control output shape; they do not prove that the selected label matches the source. A model can choose an allowed but incorrect value. Inspect the underlying statement as well as the returned label, and check behavior on the actual configured route.\n\nOptionality describes whether the task permits a value to be absent. It is not a guarantee against invented answers. Conversely, a required field can still be missing or unsupported in the source. Keep that absence visible as a problem to resolve; do not force a plausible value merely to fill every cell. The structured extraction schema can represent null values, so a well-formed response can still be incomplete.\n\nFor a Yes/No question, missing evidence is not automatically No. Decide what counts as support for each category and how an absent statement will be represented. If the task permits an explicit unknown category, define its meaning. Otherwise preserve the unresolved value and explain the gap rather than silently changing the required categories.\n\n**Practice:** Rewrite “Animals” as a question about the assigned proposal’s vertebrate-animal use. Name the source statement that would establish Yes or No, and describe what you would record if neither is supported.",
+      "knowledge_check": {
+        "question": "A required compliance statement is absent. Which response preserves the evidence?",
+        "options": [
+          {
+            "text": "Return No because the document did not say Yes.",
+            "correct": false,
+            "explanation": "Absence of a statement does not necessarily establish the negative category."
+          },
+          {
+            "text": "Keep the value unresolved and identify the missing source support.",
+            "correct": true,
+            "explanation": "A required answer still needs evidence. Required does not authorize guessing."
+          },
+          {
+            "text": "Mark the field optional and assume any returned answer is safe.",
+            "correct": false,
+            "explanation": "Optionality concerns permitted absence; it does not validate the model’s answer."
+          }
+        ]
+      }
+    },
+    {
+      "id": "extraction_engine.build-a-comprehensive-extraction",
+      "revision": 2,
+      "title": "Build, inspect and run one assigned extraction",
+      "variant": "walkthrough",
+      "objective": "Preserve the source, saved field revision and result for one reviewable execution.",
+      "content": "Use the assigned NIH proposal and the extraction requirements for this course version. A large field count is not a substitute for useful definitions, and fields scattered across unrelated extractions do not establish one complete run.\n\n1. Confirm the assigned document and lab workspace. Check that the document is readable and ingestion has completed before relying on its text.\n2. Ask chat to propose a reusable extraction, or start in the editor. Give the intended field meanings, units, categories and rules for missing values. Treat the proposal as a draft you must inspect.\n3. Open the saved extraction. Verify the actual fields and configuration, including optionality and Allowed values. A chat description does not prove those settings were saved.\n4. Correct ambiguous or missing definitions before execution. Record which saved revision you intend to run and why its source and output scope fit the task.\n5. Confirm the exact assigned source and run that revision. Preserve the returned run reference, output and any reported failures or incomplete coverage. A creation confirmation is not execution evidence.\n6. Compare each required value with the assigned source. Keep missing and unsupported values visible. A completed job, correct field names or well-formed JSON alone does not establish a pass.\n7. If a repair is needed, save the new revision and execute it again. Keep the earlier result available so the change and its effect can be assessed.\n\n**Practice:** The workspace contains a completed run from another document. Identify the evidence still needed for the newly saved NIH extraction.",
+      "knowledge_check": {
+        "question": "What demonstrates execution of the intended revision?",
+        "options": [
+          {
+            "text": "A count of fields across the workspace.",
+            "correct": false,
+            "explanation": "Workspace totals do not link the assigned source to one saved extraction revision."
+          },
+          {
+            "text": "A completed run linking the assigned source, reviewed revision and preserved output.",
+            "correct": true,
+            "explanation": "The linked receipt makes the execution reviewable; value correctness still requires source checks."
+          },
+          {
+            "text": "An assistant message saying the extraction is ready.",
+            "correct": false,
+            "explanation": "Readiness or creation text is not a completed run."
+          }
+        ]
+      }
+    },
+    {
+      "id": "extraction_engine.when-to-use-consensus-repetition",
+      "revision": 2,
+      "title": "Use repetition as a testable tradeoff",
+      "variant": "insight",
+      "objective": "Distinguish model agreement from source-supported correctness and observe actual resource use.",
+      "content": "Repetition compares multiple attempts at the same extraction. In the current engine, consensus starts with two attempts. If their normalized answers agree, it can return that result without a third attempt. A disagreement can trigger another attempt and field-level voting. Failure handling can also affect how many usable attempts remain.\n\nThis is not a promise of exactly three calls or a fixed three-times cost. Each attempt can itself use multiple passes and field groups. Inspect the effective configuration and observed usage when deciding whether the additional work is justified.\n\nAgreement is a signal about consistency, not independent confirmation of the source. Repeated attempts can share the same ambiguous instruction, miss the same paragraph or choose the same unsupported value. A voted answer still needs comparison with the document. For a consequential amount or compliance category, identify the supporting passage and resolve any conflict before accepting it.\n\nStart by fixing the source and field definition. Then compare repetition with a simpler configuration on representative examples, including missing information and conflicting amounts. Record which errors improved, which remained and what the extra work cost. Retain the option to leave a result unresolved rather than treating consensus as permission to release it.\n\n**Practice:** Two attempts agree on a plausible date that appears nowhere in the assigned source. Decide what evidence would be needed before accepting it.",
+      "knowledge_check": {
+        "question": "Two repeated attempts agree on an unsupported date. What does their agreement establish?",
+        "options": [
+          {
+            "text": "The date is correct because independent calls agreed.",
+            "correct": false,
+            "explanation": "The attempts can repeat the same error; agreement does not supply missing source evidence."
+          },
+          {
+            "text": "The output is consistent across those attempts, but the date still needs source support.",
+            "correct": true,
+            "explanation": "Consistency and correctness are separate checks."
+          },
+          {
+            "text": "A third attempt will necessarily reveal the correct date.",
+            "correct": false,
+            "explanation": "Another attempt may repeat the same unsupported answer."
+          }
+        ]
+      }
+    },
+    {
+      "id": "extraction_engine.worked-example-fixing-a-weak-field-list",
+      "revision": 2,
+      "title": "Repair an error and verify the new run",
+      "variant": "walkthrough",
+      "objective": "Link an observed error to a field repair, new execution and source-checked result.",
+      "content": "Consider a practice case where “Budget” returns Year 1 direct costs, while the task requires the total for the full project including indirect costs. First inspect the source and establish what the returned amount actually represents. Do not treat a neat number or a matching currency symbol as proof of the requested meaning.\n\nRepair the definition to state the period and included cost categories. If the source does not explicitly provide the required total, do not describe an inferred sum as an extracted quotation. Record that limitation and use a separately checked calculation only when the task permits it. Keep the original field revision and result so the reason for the change remains visible.\n\nSave the revised extraction, inspect it, and run that revision on the same assigned source. Compare the new amount, unit and period with the source. Check the other required fields as well; a narrow repair does not establish that the rest of the output remains correct. Record remaining disagreements or missing values explicitly.\n\nThe useful evidence is the error you identified, the actual saved change, the linked new run and your source-based acceptance or further-repair decision. A setting change, an increased field count or a claim that quality improved is insufficient without that comparison. Do not invent a successful result for an illustrative repair.\n\n**Practice:** A new field returns a different budget after your edit. Describe the check that distinguishes a genuine correction from merely a different answer.",
+      "knowledge_check": {
+        "question": "A field edit changes the returned budget. When is the repair established?",
+        "options": [
+          {
+            "text": "As soon as the new result differs from the old one.",
+            "correct": false,
+            "explanation": "A different answer can still be wrong."
+          },
+          {
+            "text": "When the linked new run matches the intended amount, period and unit in the source, with required checks recorded.",
+            "correct": true,
+            "explanation": "The repair needs evidence from the revised execution and the source."
+          },
+          {
+            "text": "When the assistant describes the revised field as more precise.",
+            "correct": false,
+            "explanation": "A more precise description is a proposal; the saved revision and its result still need verification."
+          }
+        ]
+      }
+    },
+    {
+      "id": "extraction_engine.glossary-review",
+      "revision": 2,
+      "title": "Review configuration, evidence and verification terms",
+      "variant": "key-terms",
+      "objective": "Use accurate terms without mistaking a technical setting or badge for a learner decision.",
+      "content": "**Structured output:** A response constrained to an expected shape or set of categories. It can still contain null, incomplete or incorrect values. Validate meaning against the source after checking shape.\n\n**Reasoning settings:** Model and pass configuration that can affect how an extraction is attempted. Effective behavior depends on the selected model and route. Do not treat a thinking label as an accuracy score or as evidence that a person reviewed the output.\n\n**Field grouping:** The extraction engine can divide requested keys into groups when its chunking setting is enabled with a positive group size. It is not automatically triggered by every long field list, and it is different from splitting document text into retrieval chunks. Inspect the active setting and test interactions between related fields.\n\n**Consensus:** Comparison and voting across repeated attempts. Agreement does not replace source support. Observe actual call and usage behavior instead of assuming a fixed number of attempts.\n\n**Source reference:** A passage or location associated with a value. Check both that the passage belongs to the assigned source and that it supports the exact value and interpretation. The presence of a citation is not enough.\n\n**Verified test case:** In the chat verification flow, proposing a test case runs an extraction and opens a guided verification session. The test case is created after the learner finalizes that review. Opening a session or an assistant saying “looks right” does not itself establish verified expected values or certification credit.\n\n**Practice:** Explain the difference between an extraction result, a completed verification session and evidence that a certification outcome has been met.",
+      "knowledge_check": {
+        "question": "Chat opens a guided verification session for an extracted result. What remains necessary?",
+        "options": [
+          {
+            "text": "Nothing; opening the session certifies every value.",
+            "correct": false,
+            "explanation": "Opening the session starts review. It does not finalize verified expected values or award certification credit."
+          },
+          {
+            "text": "Inspect and approve or correct values against the source, then finalize the review; certification requirements remain separate.",
+            "correct": true,
+            "explanation": "Verification requires the learner’s actual review, and course credit needs its own assessed evidence."
+          },
+          {
+            "text": "Add enough fields to make the result comprehensive.",
+            "correct": false,
+            "explanation": "More fields do not replace source checking or finalizing the verification session."
+          }
+        ]
+      }
+    }
+  ]
+}

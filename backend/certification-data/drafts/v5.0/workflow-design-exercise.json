@@ -1,0 +1,27 @@
+{
+  "overview": "Build and critique one saved workflow design for the supplied monthly-review case. Nonempty reflections or step counts do not establish competence.",
+  "documents": [],
+  "instructions": [
+    "Choose an owned saved process submission from this course or the supplied map. Retain its original identity and content; selecting it approves its use for this design attempt, not its competence or a workflow run.",
+    "Create or edit one workflow through supported chat/editor controls. Return to the same artifact; inspect its saved tasks, input-source settings, attached inputs and output settings rather than relying on the agent description.",
+    "For each necessary operation, name the input, transformation and output. Keep required narrative context available; a prompt over relevant short source text can be valid without a separate extraction. Do not add steps merely to reach a count.",
+    "Remove the unapproved destination. End the automated portion at the internal draft, with no send, share or scheduling action. A reviewer responsibility in this exercise does not require a real staff account or an Approval request.",
+    "Retain source/intermediate references, unresolved issues and a defined review or stop path. Explain what the design intends; do not claim its runtime behavior has been tested.",
+    "Save corrections before explicitly approving the inspected revision for assessment. A later edit requires a new captured revision and decision; preserve the original. Do not run this design for this module."
+  ],
+  "chat_instructions": [
+    "Help draft and configure; the authenticated learner must inspect, correct and approve the exact saved revision. Do not supply learner approval or claim execution, transfer credit or completion.",
+    "Choose an owned saved process submission from this course or the supplied map. Retain its original identity and content; selecting it approves its use for this design attempt, not its competence or a workflow run.",
+    "Create or edit one workflow through supported chat/editor controls. Return to the same artifact; inspect its saved tasks, input-source settings, attached inputs and output settings rather than relying on the agent description.",
+    "For each necessary operation, name the input, transformation and output. Keep required narrative context available; a prompt over relevant short source text can be valid without a separate extraction. Do not add steps merely to reach a count.",
+    "Remove the unapproved destination. End the automated portion at the internal draft, with no send, share or scheduling action. A reviewer responsibility in this exercise does not require a real staff account or an Approval request.",
+    "Retain source/intermediate references, unresolved issues and a defined review or stop path. Explain what the design intends; do not claim its runtime behavior has been tested.",
+    "Save corrections before explicitly approving the inspected revision for assessment. A later edit requires a new captured revision and decision; preserve the original. Do not run this design for this module."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "monthly-report-workflow-design",
+  "design_case_sha256": "0a9589003ca1bd2bc837ed9ac6ab4c6fdba89322a22d96594e852a8d50db52df",
+  "assessment_method": "authenticated_saved_workflow_design_review"
+}

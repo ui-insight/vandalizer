@@ -1,0 +1,34 @@
+{
+  "overview": "Repair an extraction using source evidence. Field counts, setting changes and repeated runs alone do not demonstrate a successful repair.",
+  "documents": [
+    "nih-r01-neuroscience.pdf"
+  ],
+  "instructions": [
+    "Read the assigned NIH proposal and compare it with the deliberately flawed example. The example is authored teaching material, not your execution history.",
+    "Ask the agent to help revise the four field definitions, then inspect the saved extraction. Use the editor to set optionality and allowed categories when chat does not expose those settings. Do not force a guessed name.",
+    "Choose your revised extraction in Prepare a practical run. Review the captured fields, original example and exact assigned source, and explain the repair before approving this saved scope.",
+    "Execute the approved saved revision once. If execution is uncertain, inspect the saved status rather than starting a duplicate run.",
+    "Check all four resulting values against the saved source. Record an empty value when the output is absent and cite why the source supports that absence. Explain what changed from the flawed example and which errors the new result resolves.",
+    "If a value remains wrong or unresolved, repair the extraction and prepare a new run. Keep earlier work in its original history. Request automatic assessment only after saving your source checks."
+  ],
+  "chat_instructions": [
+    "Use the agent to help author and revise the extraction. The learner records their own scope decision, source checks and assessment request in the certification panel.",
+    "Read the assigned NIH proposal and compare it with the deliberately flawed example. The example is authored teaching material, not your execution history.",
+    "Ask the agent to help revise the four field definitions, then inspect the saved extraction. Use the editor to set optionality and allowed categories when chat does not expose those settings. Do not force a guessed name.",
+    "Choose your revised extraction in Prepare a practical run. Review the captured fields, original example and exact assigned source, and explain the repair before approving this saved scope.",
+    "Execute the approved saved revision once. If execution is uncertain, inspect the saved status rather than starting a duplicate run.",
+    "Check all four resulting values against the saved source. Record an empty value when the output is absent and cite why the source supports that absence. Explain what changed from the flawed example and which errors the new result resolves.",
+    "If a value remains wrong or unresolved, repair the extraction and prepare a new run. Keep earlier work in its original history. Request automatic assessment only after saving your source checks."
+  ],
+  "expected_fields": [
+    "Total Budget",
+    "Postdoctoral Fellow Name",
+    "Human Subjects",
+    "Vertebrate Animals"
+  ],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "nih-field-and-output-repair",
+  "repair_case_sha256": "76c7b068b1ef0c492824a91d83f73181f3a91f5662b19452c075aad198e827ef",
+  "assessment_method": "owned_nih_repair"
+}

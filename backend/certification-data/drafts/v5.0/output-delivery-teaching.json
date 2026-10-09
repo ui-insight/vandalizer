@@ -1,0 +1,163 @@
+{
+  "state": "design_draft",
+  "module_id": "output_delivery",
+  "purpose": "Unpublished replacements; actual artifact opening, exact release decisions and delivery-outcome evidence remain required.",
+  "module_patch": {
+    "subtitle": "Inspect files and authorize the exact handoff",
+    "description": "Generate the assigned progress-report deliverables, inspect their real contents and distinguish file creation from authorized delivery.",
+    "objectives": [
+      "Choose a supported format and inspect the actual generated artifact",
+      "Review the exact audience, destination and data scope before release",
+      "Preserve the run, inspected files and actual delivery outcome"
+    ],
+    "tips": [
+      "A download link or filename is not proof of usable content.",
+      "CSV needs tabular input; inspect warnings and the actual file type.",
+      "Open every file in a deliverable bundle.",
+      "Generation, release approval and confirmed handoff are separate evidence."
+    ],
+    "estimatedMinutes": 22
+  },
+  "replacements": [
+    {
+      "id": "output_delivery.from-analysis-to-deliverables",
+      "revision": 2,
+      "title": "Inspect the actual deliverable",
+      "variant": "concept",
+      "objective": "Choose a usable format and verify the generated file rather than trusting its link or filename.",
+      "content": "An output becomes a useful deliverable only when the actual file opens and contains the reviewed content in a form its intended reader or system can use. A completed job, download link or plausible filename does not establish those facts.\n\nDocument Renderer currently offers PDF, Word, Markdown and plain text. It renders supplied content; it does not establish that the content is correct. Open the produced file and inspect headings, tables, required sections, source references and page or line breaks. Check that long labels and values remain readable and that qualifications were not lost.\n\nThe Data Export step offers JSON and CSV. CSV needs tabular input, such as a record or list of records. If the input is prose instead, the current step can return a text file with a warning. Check the actual filename, format, rows and columns; do not assume a CSV was produced merely because CSV was selected. A JSON filename likewise does not replace checking that the content is usable by its intended consumer.\n\nForm Filler can use a text template with explicit placeholders or a supported fillable PDF template. Inspect filled, missing and unsupported values and the actual output. A value found in the input still needs a semantic check that it belongs in that field.\n\n**Practice:** A download succeeds, but a required section is empty. Record the deliverable as needing repair and identify the missing content before considering release.",
+      "knowledge_check": {
+        "question": "Which evidence establishes that a generated report is usable?",
+        "options": [
+          {
+            "text": "The run completed and a download link appeared.",
+            "correct": false,
+            "explanation": "The link does not establish that the file opens or contains the required content."
+          },
+          {
+            "text": "The actual file opens and its required reviewed content, references and layout have been checked.",
+            "correct": true,
+            "explanation": "Usability requires inspecting the artifact itself against the task."
+          },
+          {
+            "text": "Its filename ends in PDF.",
+            "correct": false,
+            "explanation": "An extension is not proof of usable content or correct rendering."
+          }
+        ]
+      }
+    },
+    {
+      "id": "output_delivery.designing-end-to-end-deliverable-workflows",
+      "revision": 2,
+      "title": "Define the audience and release boundary",
+      "variant": "concept",
+      "objective": "Separate generating a file from permission to share it with a specific destination.",
+      "content": "Begin with the intended audience, destination and data scope. An internal working summary, a sponsor submission and a dataset for another system can require different content and authorization. A request to prepare one does not silently authorize all three.\n\nSpecify which source and reviewed result the artifact should represent, which details it should include or exclude, and who is allowed to receive it. Review those choices after inspecting the actual file. A proposed sharing target broader than the assigned destination needs correction before release, even if the analysis is accurate.\n\nA workflow may gather source content, interpret it and generate files, but file generation is not an approval decision. If a later operation sends or updates something, its dependency on review must be implemented and tested. A written instruction to obtain approval is not by itself a pause. For a download-only lab, inspect and retain the file; do not invent an external delivery step.\n\nUse an explicit release decision: accept the exact artifact for the named destination, revise it, or leave it unreleased. Preserve unresolved values and limitations in the artifact when they matter to the recipient. Do not treat an assistant’s message that a file is “ready” as your decision.\n\n**Practice:** The task requests an internal award-file summary, but the proposed next action targets a broad mailing list. Identify the scope change and the decision needed before any send.",
+      "knowledge_check": {
+        "question": "The file is correct, but the proposed destination is broader than the assigned internal handoff. What should happen?",
+        "options": [
+          {
+            "text": "Release it because content correctness implies sharing permission.",
+            "correct": false,
+            "explanation": "Correct content does not establish authority for a broader audience."
+          },
+          {
+            "text": "Correct the destination and explicitly review the artifact, audience and data scope before release.",
+            "correct": true,
+            "explanation": "The release decision applies to the exact artifact and intended destination."
+          },
+          {
+            "text": "Let the assistant infer the appropriate recipients.",
+            "correct": false,
+            "explanation": "The assigned scope and an explicit decision must determine release authority."
+          }
+        ]
+      }
+    },
+    {
+      "id": "output_delivery.build-a-deliverable-workflow",
+      "revision": 2,
+      "title": "Generate, open and verify the assigned files",
+      "variant": "walkthrough",
+      "objective": "Preserve a linked run, inspected artifacts and the actual delivery outcome.",
+      "content": "Use the assigned progress report and the deliverable requirements for this course version. The evidence should link the saved workflow revision, source, reviewed result, generated files and your release decision.\n\n1. Define the required sections or data fields and the intended internal destination. Identify unresolved content that must remain visible.\n2. Inspect the saved workflow and its input sources. Supply structured rows to Data Export when a CSV is required and the reviewed text or data to Document Renderer.\n3. Choose an actual supported format and a clear filename. Configure Include in deliverables on the intended output steps; keep intermediate or unintended content out of the handoff.\n4. Run the reviewed revision on the assigned source. Inspect step results and warnings before downloading. A request for one format can still produce a different actual artifact when the input is unsuitable.\n5. Open each downloaded file. Check required content, values, units, source references and layout. For a bundle, inspect every member and confirm that the set is complete without extra unintended material.\n6. If anything is missing, unreadable or inconsistent, repair the relevant input or configuration and generate a new result. Preserve which run produced the inspected version.\n7. Record your decision for the exact files and destination. If the lab includes an authorized delivery action, inspect its receipt or destination state. If it only requires a local download, record that narrower outcome accurately.\n\n**Practice:** Explain the difference between a generated file, an inspected file and a confirmed delivery to the assigned destination.",
+      "knowledge_check": {
+        "question": "CSV was selected, but the result contains a text file and a non-tabular-input warning. What is the useful repair?",
+        "options": [
+          {
+            "text": "Rename the text file with a CSV extension.",
+            "correct": false,
+            "explanation": "Renaming does not create structured rows or correct the input."
+          },
+          {
+            "text": "Provide the required tabular input, rerun and inspect the actual exported rows and columns.",
+            "correct": true,
+            "explanation": "The repair must address the data shape and verify the new artifact."
+          },
+          {
+            "text": "Accept it because the export task completed.",
+            "correct": false,
+            "explanation": "Completion does not establish that the required format was produced."
+          }
+        ]
+      }
+    },
+    {
+      "id": "output_delivery.worked-example-one-report-in-two-deliverables-out",
+      "revision": 2,
+      "title": "Design two outputs without losing their inputs",
+      "variant": "walkthrough",
+      "objective": "Give a narrative report and a data export the evidence each actually needs.",
+      "content": "Consider an illustrative progress-report handoff with two outputs: an internal narrative summary and a table of expenditures. The narrative serves a reader; the table serves reconciliation or later processing. Those purposes determine the required content and format.\n\nTrace the input to each output. A narrative paragraph is not automatically a structured expenditure table. If the workflow turns extracted rows into prose and passes only that prose forward, adding a Data Export task afterward does not recover the original rows. Preserve or supply the reviewed tabular data through a supported design and test that the export receives it. Do not assume sibling tasks receive different inputs merely because their output formats differ.\n\nOne concrete design is to extract the required rows, export those rows as CSV, then use a later Prompt explicitly configured to read the assigned Workflow Documents for the narrative. Render that narrative in a following step. The Prompt must not treat the preceding file-download payload as its source text. Inspect the saved source choice, and compare the narrative with the reviewed rows because it reads the document separately.\n\nMark the intended output steps for inclusion in the deliverables. The result-download path can bundle multiple marked step outputs into a ZIP. Package Builder is not offered in the standard palette; do not rely on that unavailable node to prove that the required files exist. Open the actual bundle and inspect its members.\n\nCheck the report and table against the same assigned source and run. Make sure their amounts, periods and uncertainty agree. Do not invent publication counts, progress delays or spending percentages to make the example appear complete. If the source lacks a comparison target, preserve that limitation.\n\n**Practice:** A polished report and a one-cell text export are downloaded together. Explain why the bundle is not yet the required two-deliverable result.",
+      "knowledge_check": {
+        "question": "A narrative step receives structured rows and emits prose. Can a later CSV export assume it still has the original rows?",
+        "options": [
+          {
+            "text": "Yes, because all earlier workflow data remains available automatically.",
+            "correct": false,
+            "explanation": "The export receives configured input; the original table may no longer be supplied."
+          },
+          {
+            "text": "No; inspect and preserve the needed tabular input, then verify the actual export.",
+            "correct": true,
+            "explanation": "Each deliverable needs the correct data shape and evidence from its own output."
+          },
+          {
+            "text": "Yes, because ZIP packaging converts prose into rows.",
+            "correct": false,
+            "explanation": "Packaging groups files; it does not reconstruct missing data structure."
+          }
+        ]
+      }
+    },
+    {
+      "id": "output_delivery.glossary-review",
+      "revision": 2,
+      "title": "Review artifact and delivery evidence",
+      "variant": "key-terms",
+      "objective": "Distinguish rendering, filling, packaging, release and confirmed handoff.",
+      "content": "**Rendered artifact:** A file produced from supplied content. Inspect it in the intended reader, including long values, tables, page breaks and source references. A preview or job status is not the same as checking the downloaded file.\n\n**Data export:** A representation of data for another tool or system. Verify actual format, structure, units and completeness. Choosing CSV does not make prose tabular, and a file extension does not establish that a consumer can parse the contents.\n\n**Filled form:** A template populated from supplied context. Explicit placeholders enable field-level reporting; a freeform template does not provide the same checks. A fillable PDF needs actual form fields. Review missing, unsupported and unwritten fields and confirm that the visible artifact matches the fill report.\n\n**Include in deliverables:** A saved output-step choice used by the result download. Multiple included step outputs can be bundled into a ZIP. Inspect the exact members rather than assuming every intermediate output belongs in the handoff.\n\n**Release decision:** Explicit acceptance of the inspected artifact for the assigned audience and destination. Creating, downloading or packaging a file does not grant broader sharing authority.\n\n**Delivery outcome:** Evidence of what reached the intended destination or was made available through the permitted route. An uncertain send response does not establish either success or failure; inspect actual status before retrying an action that may already have completed.\n\n**Practice:** State the evidence you would preserve if generation succeeded but the destination confirmation remained uncertain.",
+      "knowledge_check": {
+        "question": "A delivery request returns an uncertain response. What should be recorded and checked?",
+        "options": [
+          {
+            "text": "Record uncertainty and inspect the destination or delivery receipt before any retry.",
+            "correct": true,
+            "explanation": "The action may already have completed; reconcile its actual status first."
+          },
+          {
+            "text": "Mark the handoff complete because the file was generated.",
+            "correct": false,
+            "explanation": "Generation and delivery are separate outcomes."
+          },
+          {
+            "text": "Immediately repeat the send to guarantee delivery.",
+            "correct": false,
+            "explanation": "An unverified retry can duplicate an action that already succeeded."
+          }
+        ]
+      }
+    }
+  ]
+}

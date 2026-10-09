@@ -1,0 +1,191 @@
+{
+  "state": "design_draft",
+  "module_id": "batch_processing",
+  "purpose": "Unpublished replacements; actual assigned batch coverage, pilot evidence and targeted recovery assessment remain required.",
+  "module_patch": {
+    "subtitle": "Reconcile inputs and recover only affected work",
+    "description": "Process the assigned three proposals with source-checked per-document results, justified resource choices and traceable targeted recovery.",
+    "objectives": [
+      "Reconcile each assigned input with its actual result in the intended batch",
+      "Recover failed items while preserving completed work and checking uncertain effects",
+      "Choose model and batch scope using representative pilot evidence"
+    ],
+    "tips": [
+      "A terminal batch can contain failed items.",
+      "Counts alone do not prove assigned input coverage.",
+      "Check failed or uncertain actions before retrying.",
+      "A download may omit failed and unfinished results."
+    ],
+    "estimatedMinutes": 25
+  },
+  "replacements": [
+    {
+      "id": "batch_processing.single-vs-batch-execution",
+      "revision": 2,
+      "title": "Account for every selected document",
+      "variant": "concept",
+      "objective": "Distinguish batch coverage from a completed count or a plausible aggregate status.",
+      "content": "Batch mode queues a separate workflow execution for each selected document. Each execution has its own result and session identity, and the related results share a batch identity. Workers process queued jobs according to available capacity; do not assume documents finish sequentially or in selection order.\n\nBefore starting, record the intended document identities and inspect the workflow and source scope. Three results do not establish coverage of three assigned documents if one input was repeated and another omitted. A matching title is also weaker evidence than the identity of the actual input.\n\nAfter execution, reconcile the selected input list with the per-document results. Account for completed, failed, canceled and still-running items. The current aggregate status can be \"completed\" when all items are terminal even though some failed. Read the item inventory and counts together.\n\nA completed execution means processing reached its completion state; it does not establish that its values are correct or that the output is usable. Inspect required fields and relevant source evidence for each assigned certification document. Preserve missing or ambiguous values explicitly.\n\nBatch mode also does not automatically combine every result into one correct dataset or guarantee that a validation plan was applied. Inspect the actual exported files and validation evidence separately.\n\n**Practice:** A batch shows three terminal results, but two belong to the same source. Explain why the assigned three-document task is incomplete.",
+      "knowledge_check": {
+        "question": "A batch has three completed result rows. What establishes assigned coverage?",
+        "options": [
+          {
+            "text": "The number three alone.",
+            "correct": false,
+            "explanation": "Counts can hide repeated inputs or missing assigned documents."
+          },
+          {
+            "text": "Each distinct assigned input is linked to its actual per-document result in the intended batch.",
+            "correct": true,
+            "explanation": "Coverage depends on identities and results, not just counts."
+          },
+          {
+            "text": "The assistant says the batch looks complete.",
+            "correct": false,
+            "explanation": "A summary cannot replace the input/result inventory."
+          }
+        ]
+      }
+    },
+    {
+      "id": "batch_processing.monitoring-and-debugging-batch-runs",
+      "revision": 2,
+      "title": "Inspect mixed results before retrying",
+      "variant": "concept",
+      "objective": "Identify failed and uncertain items without repeating completed work.",
+      "content": "Start with the per-document inventory, then investigate exceptions. A failure may come from unreadable source text, an unavailable model, workflow configuration or an external service. Empty values in an otherwise completed result can also be a substantive quality problem.\n\nOpen the failed item's result and inspect the error, intermediate outputs and actual source text. A scanned PDF may need a usable text source or an appropriate ingestion repair. Uploading the same unreadable bytes again does not guarantee better text. Verify the repaired input before paying for another execution.\n\nKeep successful items and their outputs intact. For an identified recoverable failure, select only the intended item for a new run and preserve the link to the original failure, changed input or workflow and new result. Do not report the original failed run as though it succeeded.\n\nAn uncertain response is different from a confirmed failed action. Check existing run status before launching a duplicate. If a workflow sends or updates anything externally, a later failure or stop request does not prove the earlier action was undone. Establish its actual status before retrying that action.\n\nA batch download includes completed results and can omit failed or unfinished items. Compare the downloaded inventory with the expected inputs and retain an exception list. A usable partial export is still partial coverage.\n\n**Practice:** Two assigned proposals completed and the third has unreadable text. Describe what to preserve, what to repair and which input to select for the next run.",
+      "knowledge_check": {
+        "question": "Two items completed and one failed after an uncertain external response. What comes next?",
+        "options": [
+          {
+            "text": "Rerun all three to obtain a clean batch label.",
+            "correct": false,
+            "explanation": "That can repeat completed work and duplicate external effects."
+          },
+          {
+            "text": "Preserve completed results, inspect the failed item and external status, then retry only justified work.",
+            "correct": true,
+            "explanation": "Recovery must account for both input scope and any actions already performed."
+          },
+          {
+            "text": "Treat the failed item as completed because the batch is terminal.",
+            "correct": false,
+            "explanation": "Terminal status does not establish successful output."
+          }
+        ]
+      }
+    },
+    {
+      "id": "batch_processing.choosing-the-right-model-for-batch-work",
+      "revision": 2,
+      "title": "Choose resources using a representative pilot",
+      "variant": "insight",
+      "objective": "Justify model and batch scope with measured quality, time and resource needs.",
+      "content": "Model choice and workflow design affect cost, latency and output quality. Batch execution multiplies these tradeoffs across documents and repeated model stages. The cheapest or fastest pilot is not sufficient if it misses required fields or confuses source meaning.\n\nUse a small representative pilot before scaling. Include the document layouts and difficult fields that matter, inspect source-supported correctness and record execution time and available usage measurements. An easy single document can expose basic configuration errors but cannot establish reliable behavior across a diverse collection.\n\nInspect the model actually selected for the run and any saved task or step overrides. The workflow default and user default can influence execution when no explicit model is chosen; an override may use a different model for part of the workflow. Keep those settings consistent when comparing pilots, or explain exactly what changed.\n\nUse models and data routes permitted for the task. Check the source scope and destination before processing more documents. A speed or quality claim does not authorize a new provider or wider data access. Select from available configured options rather than assuming chat can enable one.\n\nChoose a batch size that permits useful review and recovery. If a pilot exposes a weak field, repair and retest it before scaling. State the measured tradeoff and remaining uncertainty rather than claiming an unmeasured percentage saving or universal best model.\n\n**Practice:** Compare a fast pilot with a wrong project period against a slower source-correct result. Name the evidence needed to choose or repair the configuration.",
+      "knowledge_check": {
+        "question": "Which pilot supports scaling a batch?",
+        "options": [
+          {
+            "text": "The fastest completed run, even though a required value is wrong.",
+            "correct": false,
+            "explanation": "Completion and speed do not establish acceptable quality."
+          },
+          {
+            "text": "Representative source-checked results with recorded configuration, resource tradeoffs and unresolved limits.",
+            "correct": true,
+            "explanation": "Scale based on relevant evidence about quality and resource use."
+          },
+          {
+            "text": "An untested claim that a larger model is always better.",
+            "correct": false,
+            "explanation": "The task and actual results determine whether the model is suitable."
+          }
+        ]
+      }
+    },
+    {
+      "id": "batch_processing.run-your-first-batch",
+      "revision": 2,
+      "title": "Run and reconcile the assigned three-document batch",
+      "variant": "walkthrough",
+      "objective": "Preserve exact input coverage, per-item review and targeted recovery evidence.",
+      "content": "Use the three assigned NSF batch proposals for this course version. The practical result must account for those distinct inputs and the intended saved workflow, not an unrelated historical batch or a count of documents touched.\n\n1. Inspect the assigned documents, their identities and readable source text. Check the saved workflow, model settings, intended fields and input scope.\n2. Execute a representative pilot and review its required values against the source. Repair and retest any meaningful failure before expanding the run.\n3. Select exactly the assigned input set and start Batch mode. Preserve the batch identity and per-document result identities returned by the system.\n4. Monitor item statuses until each has a terminal result or a clearly recorded unresolved condition. Inspect failures, cancellations and warnings rather than relying on the aggregate label.\n5. For each assigned document, compare the required PI and other assigned fields with its own source. A name from another proposal or a repeated result is not valid coverage.\n6. Reconcile the input identities with the result inventory. Keep successful results. Diagnose and retry only the justified failed item, preserving the original failure and the new run link.\n7. Inspect any downloaded outputs and record omitted or unresolved items. Report coverage and correctness separately, including remaining limitations.\n\n**Practice:** Make a three-row reconciliation record containing each assigned input, original result, review outcome and any targeted retry. Do not invent a successful run or hide an unresolved item.",
+      "knowledge_check": {
+        "question": "What should the certification batch evidence contain?",
+        "options": [
+          {
+            "text": "Any three historical runs from the workspace.",
+            "correct": false,
+            "explanation": "The evidence must use the assigned input set and intended batch."
+          },
+          {
+            "text": "The exact assigned inputs, linked per-item results, source checks and any justified retry lineage.",
+            "correct": true,
+            "explanation": "This accounts for coverage, meaning and recovery."
+          },
+          {
+            "text": "Only the aggregate completion notification.",
+            "correct": false,
+            "explanation": "The notification does not prove each assigned item produced correct output."
+          }
+        ]
+      }
+    },
+    {
+      "id": "batch_processing.worked-example-thirty-proposals-one-bad-scan",
+      "revision": 2,
+      "title": "Recover one bad source without repeating the batch",
+      "variant": "walkthrough",
+      "objective": "Explain a bounded recovery and preserve uncertainty about source quality and side effects.",
+      "content": "Consider an illustrative thirty-proposal batch with twenty-nine completed executions and one failed item. The failed source is an image scan whose ingested text does not preserve the needed values. This is a teaching scenario, not a measured production run or a promised success rate.\n\nFirst preserve the twenty-nine results and review the required source-backed values. A completed status does not make them accurate. An export can include those completed outputs, but the inventory should clearly identify the omitted failed proposal and any other unresolved quality issue.\n\nFor the failed source, inspect the actual text available to the workflow. Obtain a suitable readable version or perform an allowed ingestion repair, then confirm the needed content is present. Re-uploading the same poor scan is only an attempted repair until the resulting text is checked. Preserve the relationship between the original and replacement source.\n\nSelect the repaired item alone for a new execution. Link the new result to the original failure and explain what changed. If the workflow had external effects, establish whether any already completed before deciding which action may safely repeat.\n\nIf the recovered output uses the submission date as the project period, that is another substantive failure even if the run completed. Correct the field definition, execute again and use the failure as a representative validation case. A small random spot check cannot establish every assigned output is correct.\n\n**Practice:** Describe the minimum evidence needed to say the omitted proposal has been recovered, and what remains outside that claim.",
+      "knowledge_check": {
+        "question": "The poor scan was uploaded again. Has recovery been established?",
+        "options": [
+          {
+            "text": "Yes; a new upload guarantees readable text.",
+            "correct": false,
+            "explanation": "The replacement must actually provide the content needed by the workflow."
+          },
+          {
+            "text": "Only after checking usable input, the targeted new result and the required source-supported values.",
+            "correct": true,
+            "explanation": "Recovery requires evidence that the repair changed the failed behavior."
+          },
+          {
+            "text": "Yes; the other twenty-nine items completed.",
+            "correct": false,
+            "explanation": "Other successful items do not resolve the failed source."
+          }
+        ]
+      }
+    },
+    {
+      "id": "batch_processing.glossary-review",
+      "revision": 2,
+      "title": "Review coverage, quality and recovery",
+      "variant": "key-terms",
+      "objective": "Explain batch evidence without confusing aggregate status with complete, correct delivery.",
+      "content": "**Batch identity:** the link grouping a submitted set of per-document workflow executions. Preserve the intended input list as well as that identity; the label alone does not prove correct scope.\n\n**Per-document result:** the actual execution record for an input. Inspect its status, source identity, intermediate output and required values. Queued jobs need not finish in document order.\n\n**Coverage:** reconciliation of every assigned distinct input with its intended result. Counts, similar titles and repeated input rows cannot substitute for that mapping.\n\n**Terminal status:** an item has finished, failed or been canceled. A terminal batch can contain failures. A completed execution can still contain incorrect or unusable output.\n\n**Representative pilot:** a bounded trial that measures the quality and resource tradeoffs relevant to the larger task. Its usefulness depends on coverage of meaningful variations, not merely being the first document tried.\n\n**Targeted recovery:** a justified new execution for the affected input, linked to the original failure and checked repair. Preserve successful outputs and verify uncertain external actions before repeating them.\n\n**Review task:** Show the assigned input inventory, per-item source checks, unresolved exceptions and any recovery links. Explain the model and scope choice using pilot evidence. Formative practice does not award assessed batch credit.",
+      "knowledge_check": {
+        "question": "Which statement accurately describes a partial batch export?",
+        "options": [
+          {
+            "text": "The downloaded bundle proves all assigned inputs succeeded.",
+            "correct": false,
+            "explanation": "Failed or unfinished runs may be omitted from the bundle."
+          },
+          {
+            "text": "It contains available completed outputs; compare its members with the full input and exception inventory.",
+            "correct": true,
+            "explanation": "A usable partial export still needs honest coverage accounting."
+          },
+          {
+            "text": "Missing outputs can be replaced with another successful item.",
+            "correct": false,
+            "explanation": "Each assigned source needs its own appropriate result."
+          }
+        ]
+      }
+    }
+  ]
+}

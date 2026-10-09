@@ -1,0 +1,196 @@
+{
+  "state": "design_draft",
+  "module_id": "multi_step",
+  "purpose": "Unpublished teaching replacements; actual connected lab execution, intermediate review and calibrated assessment remain required.",
+  "module_patch": {
+    "subtitle": "Trace inputs, inspect intermediate results and bound interpretation",
+    "description": "Review a proposed subaward analysis, run the intended revision and trace the final summary through its intermediate evidence.",
+    "objectives": [
+      "Inspect the configured inputs and intended output at each step",
+      "Execute the assigned chain and check its intermediate results",
+      "Distinguish supported terms from inferences and unresolved questions"
+    ],
+    "tips": [
+      "A later step sees configured context, not every earlier file or result.",
+      "Supply the rule or policy needed for a comparison; do not invent it.",
+      "Check that formatting preserves meaning and uncertainty.",
+      "A diagrammed checkpoint is not an implemented approval pause."
+    ],
+    "estimatedMinutes": 24
+  },
+  "replacements": [
+    {
+      "id": "multi_step.how-steps-chain-together",
+      "revision": 3,
+      "title": "Trace configured inputs between steps",
+      "variant": "concept",
+      "objective": "Establish which source data each step actually receives before interpreting the final result.",
+      "content": "A workflow connects operations, but the diagram alone does not establish their input data. Inspect the saved input-source settings and the outputs of an actual run. A later step cannot safely rely on a clause that was omitted from the material it received.\n\nThe available source choices include Step Input (the immediately preceding output), Workflow Documents and Selected Document. The engine can combine configured sources into labeled sections; it does not automatically combine every earlier result or supply all files in your workspace. A simple chain commonly passes the previous output forward, while the document trigger supplies the workflow documents. Verify the saved choices instead of assuming that every workflow uses those defaults.\n\nInput normally belongs to the step. Tasks within that step receive the step’s payload, with advanced task overrides available for cases that need a different source. Keep those distinctions visible when tracing a design. An operation’s name is not proof of its configured input.\n\nFor each step, identify the source, the requested transformation and the output the next step needs. Then inspect those same boundaries in the saved run. Check document identity as well as the content: a plausible result from an unrelated source does not establish correct chaining.\n\n**Practice:** A deadline-analysis step receives only a terms table, but the reporting exception is in a paragraph omitted from that table. Identify the missing input before running the analysis.",
+      "knowledge_check": {
+        "question": "A deadline step needs a clause absent from its received table. What should you do?",
+        "options": [
+          {
+            "text": "Assume the step can see every document uploaded to the workspace.",
+            "correct": false,
+            "explanation": "Workspace presence does not establish that the step received the source."
+          },
+          {
+            "text": "Inspect and correct the configured inputs so the required clause is available, then verify the run.",
+            "correct": true,
+            "explanation": "Data must be supplied through the configured source choices and checked in execution."
+          },
+          {
+            "text": "Rename the step to include the clause title.",
+            "correct": false,
+            "explanation": "A name does not change the data supplied to the step."
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi_step.the-prompt-node-reasoning-over-data",
+      "revision": 2,
+      "title": "Write bounded instructions for interpretation",
+      "variant": "concept",
+      "objective": "Separate supported facts, inferences and unresolved questions in a Prompt step.",
+      "content": "A Prompt step interprets the context supplied to it. It can summarize terms, compare a value with a supplied rule or explain a discrepancy. It cannot establish an institutional policy, missing clause or authorization merely because its instruction asks for a confident answer.\n\nDescribe the task, relevant inputs, expected output and limits. For the subaward exercise, request an obligation list with the responsible party, triggering condition, deadline wording and supporting passage. Require uncertain dates or ambiguous responsibility to remain unresolved. If an exact date must be calculated, supply the applicable rule and starting event and check that calculation separately.\n\nA useful instruction distinguishes source statements from interpretations. For example: “Use only the supplied agreement and reference rule. Quote the term supporting each obligation. Label an inference, identify missing information, and do not invent our institution’s standard policy.” A citation must still be checked for both source identity and actual support.\n\nA Prompt can receive document context directly when that suits the task. Extraction is useful when defined fields preserve what the interpretation needs, but it is not mandatory before every prompt. Choose the route that keeps necessary context reviewable, and test a case where omitted context would change the answer.\n\n**Practice:** Replace “tell me if this agreement complies” with a bounded question and the exact evidence needed to answer it.",
+      "knowledge_check": {
+        "question": "The agreement states quarterly reporting but supplies no institutional comparison policy. What should the analysis say?",
+        "options": [
+          {
+            "text": "Quarterly reporting is stricter than the institution’s normal schedule.",
+            "correct": false,
+            "explanation": "That comparison requires a supplied policy or other authorized reference."
+          },
+          {
+            "text": "Report the supported obligation and identify that the comparison policy is missing.",
+            "correct": true,
+            "explanation": "The step can distinguish a source fact from a comparison it cannot establish."
+          },
+          {
+            "text": "Choose a likely institutional standard from general knowledge.",
+            "correct": false,
+            "explanation": "A plausible policy is not evidence for this task."
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi_step.build-a-3-step-analysis-workflow",
+      "revision": 2,
+      "title": "Run and inspect the assigned three-step analysis",
+      "variant": "walkthrough",
+      "objective": "Verify one saved Extraction, Prompt and Formatter chain on the assigned subaward.",
+      "content": "The lab uses an Extraction, a Prompt and a Formatter to practice connected execution. The required evidence is a linked run and checked intermediate results, not three task names in a saved diagram.\n\n1. Confirm the assigned subaward document and the lab workspace. Identify the intended internal summary and any decisions it must leave unresolved.\n2. Use chat to propose the chain or create it in the editor. Inspect the saved extraction fields, Prompt instructions and Formatter template before running.\n3. Check the input-source choices at each step. Confirm that the analysis receives the terms and supporting context it needs and that the Formatter receives the analysis intended for the summary.\n4. Correct missing context, ambiguous field definitions or an out-of-scope action. Record the configuration you reviewed and the exact source you will use.\n5. Run the saved revision on that assigned source. Preserve its reference and inspect each step’s output. A creation response or an old run from another document is not evidence for this revision.\n6. Compare extracted terms with the source, then inspect whether the analysis follows from those terms. Confirm that the formatted output preserves the checked meaning, qualifications and unresolved items.\n7. If a boundary is wrong, repair the saved configuration and run again. Keep both results so the change can be traced. Do not release the summary simply because every step returned an output.\n\n**Practice:** Identify the first point you would inspect when the final summary lists an unsupported obligation.",
+      "knowledge_check": {
+        "question": "The final summary contains an unsupported obligation. Which investigation is useful?",
+        "options": [
+          {
+            "text": "Inspect the source, extracted terms, analysis and formatted output to locate where it appeared.",
+            "correct": true,
+            "explanation": "Following the evidence through the boundaries distinguishes an input omission from an interpretation or formatting error."
+          },
+          {
+            "text": "Add another Formatter without checking the intermediate results.",
+            "correct": false,
+            "explanation": "More formatting does not establish the source of the error."
+          },
+          {
+            "text": "Accept the summary because three steps completed.",
+            "correct": false,
+            "explanation": "Completion does not establish semantic correctness."
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi_step.design-principle-separate-reading-from-reasoning",
+      "revision": 2,
+      "title": "Separate concerns when it improves review",
+      "variant": "insight",
+      "objective": "Choose reviewable boundaries without assuming more steps always improve quality.",
+      "content": "Separating source reading, interpretation and presentation can make an error easier to locate. It does not guarantee a better answer than a simpler route. Each extra boundary can lose context, change meaning or add resource use.\n\nUse a separate extraction when fixed fields are useful and preserve the evidence needed downstream. A short or context-dependent task may be better served by a focused Prompt over the relevant document. The important question is whether the chosen design makes its inputs, assumptions and results inspectable. Do not add steps only to match a diagram from another use case.\n\nDecide where a substantive check belongs. An intermediate table might need source verification before it becomes the basis for analysis. A recommendation might need a reviewer decision before an external action. A lesson telling you to inspect the table is not an implemented runtime pause; configure and test an approval boundary when continued execution must wait.\n\nCompare designs using representative cases, including missing context and conflicting terms. Record observed differences in accuracy, unresolved issues and resource use. If a simple route preserves the required evidence and meets the task, extra stages need a specific justification.\n\n**Practice:** Name one boundary that would help diagnose an error in your subaward task and one extra step that would add no useful check.",
+      "knowledge_check": {
+        "question": "When is an extra step justified?",
+        "options": [
+          {
+            "text": "Whenever a workflow with more steps looks more advanced.",
+            "correct": false,
+            "explanation": "Step count is not evidence of better quality."
+          },
+          {
+            "text": "When it adds a needed transformation or reviewable boundary and its behavior is verified.",
+            "correct": true,
+            "explanation": "Each stage should have a purpose and evidence that it performs that purpose."
+          },
+          {
+            "text": "When it lets the final result appear more polished.",
+            "correct": false,
+            "explanation": "Presentation alone does not justify a new reasoning boundary or establish correctness."
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi_step.worked-example-watching-data-flow-through-three-steps",
+      "revision": 2,
+      "title": "Find an unsupported inference in the chain",
+      "variant": "walkthrough",
+      "objective": "Trace a deadline claim back to its actual inputs and repair the missing evidence.",
+      "content": "Consider an illustrative subaward chain. The extraction returns parties, project period and the phrase “quarterly reports.” The Prompt then states a precise first-report date and says that the schedule is stricter than the institution’s standard. The Formatter presents both claims in a polished obligations table.\n\nTrace those claims backward. A reporting frequency alone may not establish a deadline without the starting event, due-date convention and applicable exception. The comparison with an institutional standard requires that reference policy. If those inputs were not supplied, the Prompt has gone beyond the available evidence. Formatting the claims does not make them better supported.\n\nRepair the relevant boundary. Preserve the exact reporting clause and any exception, supply an authorized reference rule when comparison is part of the task, and constrain the Prompt to distinguish supported terms from unresolved questions. Do not invent a missing rule just to complete the example. Inspect the saved change and rerun the assigned document.\n\nCompare the new intermediate analysis with the source before inspecting the final summary. Then verify that the Formatter retained the uncertainty and supporting context instead of turning a qualified statement into a definitive date or compliance conclusion. Record your decision to accept, revise or leave the result unresolved.\n\n**Practice:** Write the evidence you would need to establish the first reporting deadline, without calculating or inventing it from the frequency alone.",
+      "knowledge_check": {
+        "question": "An exact date and a policy comparison appear in the final table without supporting inputs. What is established?",
+        "options": [
+          {
+            "text": "The Formatter verified the claims by presenting them clearly.",
+            "correct": false,
+            "explanation": "Presentation does not supply missing evidence."
+          },
+          {
+            "text": "The chain contains unsupported inferences that need corrected inputs or explicit uncertainty.",
+            "correct": true,
+            "explanation": "Trace the claims to their inputs, repair the gap and check the new run."
+          },
+          {
+            "text": "The extracted frequency is enough to establish both claims.",
+            "correct": false,
+            "explanation": "A deadline rule and a comparison policy require their own support."
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi_step.glossary-review",
+      "revision": 4,
+      "title": "Review evidence and recover from a stopped run",
+      "variant": "key-terms",
+      "objective": "Identify incomplete stages, preserve successful results and choose a supported recovery route.",
+      "content": "**Input source:** The saved context supplied to a step. Step Input means the immediately preceding output; Workflow Documents rereads the source. Inspect task overrides as well as the step configuration.\n\n**Intermediate output:** A saved result at a workflow boundary. It helps locate an omission or unsupported claim. An intact connection does not establish that the interpretation is correct.\n\n**Prompt and Formatter:** Model transformations of supplied context. Check facts, citations and uncertainty after each transformation, including any post-process prompt. A polished result is not independent source verification.\n\n**Connected execution:** One approved revision, assigned source, intermediate results and final output. A diagram or collection of unrelated runs cannot replace that evidence.\n\n### Controlled practice: the reasoning stage stopped\n\nThis is an authored training example, not your execution history or proof of a completed assessment. The example uses only the assigned synthetic subaward and produces an internal draft. It has no send, share, approval or other external action.\n\nThe saved record shows:\n\n- Extraction: completed; its original result and source references are saved.\n- Reasoning: a failed stage result is saved.\n- Formatter: not started; no final output exists.\n- Run: stopped; no completion or credit was awarded.\n\nThe first incomplete stage is Reasoning. Open its saved input and result, compare the input with the preserved extraction result, and inspect the relevant configuration. Preserve the original run reference and successful output before making a correction. Do not delete the failed history, present the extraction alone as a completed chain, or ask the Formatter to invent the missing analysis.\n\nThe current certification screen does not resume an incomplete stage in place. After resolving the cause, capture the corrected configuration, prepare a separate bounded run, inspect its source and scope, and explicitly approve it. This new run computes the chain again; it does not overwrite or resume the original. That is appropriate here only because the exercise is an internal draft with no external actions. Never assume repeating a production workflow's completed writes is safe.\n\n### A lost reply is a different situation\n\nIf the screen loses a reply, first use **Check pending request** and inspect the saved state. A started stage without a saved result means its outcome is unknown, not proof that nothing happened. A read does not rerun the provider. If every successful stage result exists but the final receipt is missing, **Finalize saved results** can seal those results without repeating execution. Otherwise preserve the incomplete evidence; do not claim success or automatically retry. Canceling a chat reply does not undo work already performed.\n\n**Practice:** For the stopped-run example, identify the first incomplete stage, name the evidence to preserve, and select the supported next step below. For a lost reply instead, explain what you would read before deciding whether any new run is needed.",
+      "knowledge_check": {
+        "question": "The authored example has a saved extraction result, failed Reasoning and no Formatter result. What is the supported recovery route in this certification screen?",
+        "options": [
+          {
+            "text": "Preserve the original evidence, inspect and correct Reasoning, then capture and explicitly approve a separate bounded internal run.",
+            "correct": true,
+            "explanation": "Reasoning is the first incomplete stage. The current screen has no in-place stage resume. A separately approved internal run preserves the old evidence and makes the repeated computation explicit; it grants no permission to repeat external writes."
+          },
+          {
+            "text": "Delete the old run and restart immediately so only a clean result remains.",
+            "correct": false,
+            "explanation": "Deleting the original loses the successful extraction and failure evidence. Inspect first, preserve the original, and require approval of the corrected run."
+          },
+          {
+            "text": "Use the completed extraction as proof that the whole chain finished.",
+            "correct": false,
+            "explanation": "Reasoning failed and Formatter never started. A successful prefix cannot stand in for the missing connected results or earn completion."
+          },
+          {
+            "text": "Cancel the chat reply, then assume all completed actions have been undone.",
+            "correct": false,
+            "explanation": "Canceling a reply does not roll back persisted work. Read the saved state before choosing a recovery action, especially when an outcome is uncertain."
+          }
+        ]
+      }
+    }
+  ]
+}

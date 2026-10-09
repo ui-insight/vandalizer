@@ -1,0 +1,191 @@
+{
+  "state": "design_draft",
+  "module_id": "advanced_nodes",
+  "purpose": "Unpublished replacements; real calculation evidence, parallel-dependency review and calibrated practical assessment remain required.",
+  "module_patch": {
+    "subtitle": "Choose methods and verify task dependencies",
+    "description": "Use the assigned budget source to distinguish interpretation from checked computation and justify safe parallel work.",
+    "objectives": [
+      "Choose an available operation according to the evidence the task needs",
+      "Preserve source inputs, units, formula and a verified calculation result",
+      "Separate independent tasks from actions that depend on a result or approval"
+    ],
+    "tips": [
+      "Deep Analysis is model judgment, not a deterministic calculator.",
+      "A task cannot rely on a sibling result that has not been produced.",
+      "A failed parallel step may leave completed external effects.",
+      "Use permitted capabilities and preserve unresolved limitations."
+    ],
+    "estimatedMinutes": 24
+  },
+  "replacements": [
+    {
+      "id": "advanced_nodes.beyond-extraction-and-prompts",
+      "revision": 3,
+      "title": "Choose an operation for the evidence you need",
+      "variant": "concept",
+      "objective": "Match an advanced operation to a bounded task without treating its name as a quality guarantee.",
+      "content": "Choose an operation by what it needs to establish, which inputs it receives and how you will verify its result. A workflow does not become more capable or reliable simply by including a node labeled advanced.\n\nDeep Analysis performs model-based analysis followed by synthesis. It can help organize findings from supplied context, but it is not a deterministic calculator or an independent source verifier. Its current implementation skips analysis when there is no input and can report that it found nothing relevant. Inspect warnings and the actual evidence; do not convert an empty or unsupported analysis into a confident conclusion.\n\nAn API operation communicates with an external service. A crawler or website operation fetches external content. These can be appropriate when the task genuinely needs that source or interaction, but they introduce destination, authorization and result-verification questions. A document-reading exercise does not require an external service merely to demonstrate an advanced node.\n\nTreat credentials as secrets, not teaching evidence. Do not paste API keys, passwords or tokens into chat, task prompts, lesson answers, screenshots or exported memos. Use only an existing authorized connection when an external operation is actually required. If the connection or permission is unavailable, stop that operation rather than borrowing credentials or claiming it succeeded.\n\nFor this assessed budget exercise, use the supported internal route: one or two Prompt tasks review the assigned source, followed by one Prompt or Formatter task for the internal memo. Record arithmetic separately in the challenge. You do not need to supply an API key, enable the Code Node or request staff access. Deep Analysis, API and crawler operations are broader workspace concepts; the bounded certification runner does not execute them.\n\nAdditional document or knowledge-base context can help only when it is relevant, accessible and intentionally supplied. Review the source selection and retained citations. Use the operations available in the current editor and permitted for your account; a chat suggestion does not enable an unavailable capability.\n\n**Practice:** For a budget task, distinguish interpreting an ambiguous cost description from calculating an exact total. Name the evidence and operation each task needs. If an optional API connection is unavailable, explain the supported internal alternative and where its credentials must never be copied.",
+      "knowledge_check": {
+        "question": "The budget exercise can use its assigned document, but an optional API connection is unavailable. Which route is appropriate?",
+        "options": [
+          {
+            "text": "Use the supported Prompt-based internal review and recorded arithmetic; keep secrets out of chat and submitted evidence.",
+            "correct": true,
+            "explanation": "The same source, calculation and dependency evidence can be established without broader permissions or learner-supplied external credentials."
+          },
+          {
+            "text": "Ask another person to paste their API key into the task prompt.",
+            "correct": false,
+            "explanation": "Another person’s secret is not permission to use it, and prompts or course evidence are not a credential store. Choose the supported internal route."
+          },
+          {
+            "text": "Tell chat to enable the restricted Code Node so the assessment can proceed.",
+            "correct": false,
+            "explanation": "A chat request does not grant a restricted capability. This exercise already supports ordinary Prompt tasks and recorded arithmetic without staff enablement."
+          }
+        ]
+      }
+    },
+    {
+      "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+      "revision": 2,
+      "title": "Check calculations with explicit inputs and rules",
+      "variant": "concept",
+      "objective": "Record the formula, units and result instead of accepting model assurance about arithmetic.",
+      "content": "A calculation needs more than a plausible number. Identify each input, its source, unit, period and meaning. Specify the formula and any rounding or inclusion rule before accepting the result. Adding annual direct costs to a full-project total can produce exact arithmetic with the wrong meaning.\n\nUse an available, permitted deterministic calculation route for the arithmetic, such as a checked calculator or calculation tool. Preserve the inputs, formula and result and verify them against the task. A model can help propose the calculation or explain a discrepancy, but a statement that it “checked the math” is not the calculation evidence itself.\n\nVandalizer’s Code Node is a restricted, administrator-controlled capability and is not offered in the standard palette. This lesson does not require learners to enable it or obtain broader permissions. Where code execution is already authorized, inspect the actual code and permitted inputs and test its behavior. Runtime restrictions and a timeout do not establish that the code is correct or appropriate.\n\nIf the assigned workflow cannot perform the needed calculation through an authorized route, record that limitation and keep the claimed check unresolved. Do not replace the missing calculation with a Deep Analysis opinion or fabricate a successful run. Interpretation and calculation can work together, but their evidence is different.\n\n**Practice:** Write a checkable expression for a total using named source amounts. State how you would handle a missing amount or a conflicting period before computing it.",
+      "knowledge_check": {
+        "question": "A model says the total is correct, but no inputs or formula are preserved. What is missing?",
+        "options": [
+          {
+            "text": "Only a more confident explanation.",
+            "correct": false,
+            "explanation": "Confidence does not establish which amounts or rule were used."
+          },
+          {
+            "text": "The source-linked inputs, units, formula and verified calculation result.",
+            "correct": true,
+            "explanation": "Those details make the calculation independently checkable."
+          },
+          {
+            "text": "An extra Deep Analysis pass to certify the first answer.",
+            "correct": false,
+            "explanation": "More model analysis does not substitute for deterministic calculation evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "advanced_nodes.running-tasks-in-parallel",
+      "revision": 2,
+      "title": "Parallelize only independent work",
+      "variant": "concept",
+      "objective": "Distinguish independent tasks from decisions that must wait for another result.",
+      "content": "Tasks within a step can run concurrently. They normally receive the same step input; an explicit task override can select a different source. They do not automatically receive a sibling task’s newly produced answer. Inspect the configuration and combined output rather than assuming a dependency because tasks appear next to one another.\n\nParallel work fits independent operations. For example, a source-based narrative draft and a separate list of unresolved source questions may both use the same document. If the narrative must incorporate a completed calculation, however, it depends on that calculation and belongs after it or after a separate reconciliation step.\n\nThe current engine collects task results in their listed order and combines their outputs for the next step. Output shape can vary with what each task returns. Preserve clear labels and inspect that each downstream value, warning and citation is associated with the intended task. Position alone is a weak substitute for meaning.\n\nConsider effects as well as data. If one task sends or updates something while a sibling fails, the completed external effect may already exist. A failed step is not a guarantee that every sibling’s work was undone. Review what actually happened before retrying an operation with effects.\n\n**Practice:** One task checks a budget and another sends a memo stating the budget passed. Explain the dependency and where an actual approval boundary belongs.",
+      "knowledge_check": {
+        "question": "Can a send task run in parallel with the check whose successful result must authorize the send?",
+        "options": [
+          {
+            "text": "Yes, because tasks in one step exchange their new answers automatically.",
+            "correct": false,
+            "explanation": "Sibling tasks receive their configured inputs and do not establish that dependency automatically."
+          },
+          {
+            "text": "No; the send must wait for the required result and any applicable approval.",
+            "correct": true,
+            "explanation": "An action depending on a check needs a verified sequential boundary."
+          },
+          {
+            "text": "Yes, because a sibling failure always undoes external actions.",
+            "correct": false,
+            "explanation": "A completed external effect may remain after another task fails."
+          }
+        ]
+      }
+    },
+    {
+      "id": "advanced_nodes.build-a-workflow-with-advanced-nodes",
+      "revision": 3,
+      "title": "Build and inspect a bounded advanced workflow",
+      "variant": "walkthrough",
+      "objective": "Demonstrate a justified operation and safe task dependencies on the assigned budget source.",
+      "content": "Use the assigned budget justification and a bounded internal review objective. The purpose is to demonstrate appropriate method choice, checked calculation and safe dependencies; adding node types or increasing step count is not sufficient evidence.\n\n1. Identify which questions require source reading, interpretation or exact arithmetic. Write the inputs and expected evidence for each one.\n2. Ask chat to propose the supported two-step design or configure it in the editor. The first step contains one or two Prompt tasks for source review. The later memo step contains one Prompt or Formatter task. Use an available model and inspect the saved settings before approval.\n3. Set the source-review tasks to use Workflow documents and ask bounded questions about the assigned budget. The memo must use both the preceding step’s results and Workflow documents. The challenge supplies your recorded calculation evidence with the assigned source; do not replace it with a model assurance.\n4. Record a calculation through a permitted route with source-linked inputs, units and an explicit formula. Keep missing or ambiguous inputs unresolved until their meaning is established.\n5. Use two source-review Prompt tasks only when their questions are independent. If parallel work is unavailable, one Prompt task may review both source purposes and inconsistencies. Keep the dependent memo in the later step. Review the challenge’s exact scope approval before starting; this run ends at an internal draft.\n6. Run the saved revision on the assigned source and inspect each task’s input, output, warning and combined result. Preserve which version produced the evidence.\n7. Check the final memo against the source and any verified calculation. Keep the review internal until the task’s release conditions are met; a completed run is not a release decision.\n\n**Practice:** Explain why each parallel task is independent, and identify what must happen before a dependent conclusion can be made.",
+      "knowledge_check": {
+        "question": "What makes the advanced workflow reviewable?",
+        "options": [
+          {
+            "text": "A justified method for each question, explicit dependencies and saved evidence from the assigned run.",
+            "correct": true,
+            "explanation": "The evidence must show why the operations fit and how their results support the conclusion."
+          },
+          {
+            "text": "Using as many available node types as possible.",
+            "correct": false,
+            "explanation": "Variety alone does not establish method choice or correctness."
+          },
+          {
+            "text": "A successful creation message with no execution evidence.",
+            "correct": false,
+            "explanation": "A proposed or saved design still needs a verified run and checked results."
+          }
+        ]
+      }
+    },
+    {
+      "id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+      "revision": 3,
+      "title": "Separate a budget check from its narrative",
+      "variant": "walkthrough",
+      "objective": "Keep interpretation, calculation and downstream acceptance distinct in a worked example.",
+      "content": "Consider an illustrative budget review with two independent drafts. One task identifies the cost categories and unresolved source questions. Another summarizes the stated purpose of the costs. Both use the assigned document. Their parallel placement is appropriate only while neither claims to rely on the other’s new result.\n\nA calculation is a separate evidence step. Use this fully fictional source excerpt for practice; it is not the assessed budget. All amounts are USD for the same one-month equipment purchase:\n\n- Laptop: 1,200.00\n- Monitor: 600.00\n- Accessories: 200.00\n- Printed total: 2,150.00\n\nThe rule is to add the three listed line items, without inventing tax, fees or missing categories. A calculator gives **1,200.00 + 600.00 + 200.00 = 2,000.00 USD**. The printed total exceeds that sum by **150.00 USD**. Preserve the inputs, addition rule, result and discrepancy. The arithmetic establishes a mismatch; it does not tell you whether the source omitted a charge or printed the wrong total. Keep that source question unresolved instead of silently changing a row. Do not substitute these teaching values for the actual assigned budget.\n\nDeep Analysis can first organize findings from the supplied context and then synthesize them into a report. Those are two model passes, not an independent arithmetic check. A second pass repeating 2,150.00 does not override the recorded calculation.\n\nAfter the source inputs and calculation are checked, a later synthesis can compare the checked total with the stated total and explain discrepancies. It should distinguish an arithmetic mismatch from an ambiguous cost category or missing amount. If the calculation is unresolved, the memo must preserve that uncertainty.\n\nInspect the combined output and the final memo. A narrative written before the check cannot honestly say that the check passed merely because it ran alongside the checking task. A release or update depending on the result must wait for that result and any required approval. Keep the original evidence when a repair or rerun is necessary.\n\n**Practice:** Identify the earliest point at which a memo could truthfully include “the checked total matches,” and list the evidence required at that point.",
+      "knowledge_check": {
+        "question": "The narrative task finishes before a required calculation. Can it already say the total was verified?",
+        "options": [
+          {
+            "text": "Yes, if the narrative and calculation started together.",
+            "correct": false,
+            "explanation": "Starting together does not supply the calculation’s result."
+          },
+          {
+            "text": "No; a later step must use the completed, checked calculation and preserve unresolved issues.",
+            "correct": true,
+            "explanation": "The verification claim depends on evidence that must exist before the claim is accepted."
+          },
+          {
+            "text": "Yes, if the stated total looks plausible.",
+            "correct": false,
+            "explanation": "Plausibility is not calculation or source evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "advanced_nodes.glossary-review",
+      "revision": 2,
+      "title": "Review method and parallel-safety terms",
+      "variant": "key-terms",
+      "objective": "Use operation labels without confusing them with verified results or authority.",
+      "content": "**Deep Analysis:** Model-based finding and synthesis over supplied context. It does not establish exact arithmetic merely by reasoning about numbers. Inspect source support and warnings, including missing input or no relevant findings.\n\n**Deterministic calculation:** Application of an explicit rule to specified inputs. Preserve units, period, formula and result. Correct arithmetic can still use the wrong inputs or rule, so those need independent checks.\n\n**Code Node:** A restricted code-execution capability with controlled availability. Standard learners do not need to enable it for this module. Authorized use still requires code and result review; a timeout or runtime restriction is not a correctness guarantee.\n\n**Parallel tasks:** Operations that can proceed without each other’s new outputs. Review input overrides, result labels and combined output shape. A task that depends on a sibling’s result needs a later boundary.\n\n**External effect:** An action that sends, changes or creates something outside the current analysis. Inspect destination, scope, authorization and actual status. A failed sibling or uncertain response does not establish that the effect did not happen, so a blind retry may duplicate it.\n\n**Acceptance decision:** The learner’s explicit conclusion based on the assigned source, checked computation and observed run. An operation name, a success badge or an assistant’s assurance cannot stand in for that decision.\n\n**Practice:** Explain why independent reads and a dependent external action belong at different points in the design.",
+      "knowledge_check": {
+        "question": "An external update may have succeeded before a parallel task failed. What should precede a retry?",
+        "options": [
+          {
+            "text": "Inspect the actual action status and reconcile any completed effect.",
+            "correct": true,
+            "explanation": "The failed step does not prove the external action was undone or never occurred."
+          },
+          {
+            "text": "Repeat every task immediately because failures roll back the whole step.",
+            "correct": false,
+            "explanation": "An external effect can survive another task’s failure."
+          },
+          {
+            "text": "Assume the update failed if its confirmation was not visible.",
+            "correct": false,
+            "explanation": "An uncertain response does not establish the action’s final status."
+          }
+        ]
+      }
+    }
+  ]
+}

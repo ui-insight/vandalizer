@@ -1,0 +1,36 @@
+[
+  {
+    "id": "repair_scope",
+    "revision": 1,
+    "module_id": "extraction_engine",
+    "outcome_id": "extraction_engine.field_semantics",
+    "phase": "before_execution",
+    "question": "Compare the deliberately flawed teaching example with this saved extraction and the assigned NIH source. Explain what you changed in the field meanings, missing-value behavior and categories. Confirm that the saved revision and document match the task before authorizing this run. Saving this choice does not start execution.",
+    "choices": {
+      "approve": "This revised scope is ready to run",
+      "revise": "I need to repair this scope before running",
+      "decline": "I will not run this scope"
+    },
+    "required_fields": [],
+    "execution_choice": "approve"
+  },
+  {
+    "id": "repair_values",
+    "revision": 1,
+    "module_id": "extraction_engine",
+    "outcome_id": "extraction_engine.quality_repair",
+    "phase": "after_execution",
+    "question": "Compare all four values from this saved revised run with the assigned NIH source and the authored flawed example. For each value record its source passage and your check. Use an empty checked value for an absent name and cite the TBD personnel row. Explain which original errors the field changes resolved; leave anything you cannot verify unresolved. A setting change or run count alone does not prove improvement.",
+    "choices": {
+      "accept": "I verified the repaired values against the source",
+      "repair": "The revised result still needs repair",
+      "unresolved": "I cannot verify the revised result yet"
+    },
+    "required_fields": [
+      "Total Budget",
+      "Postdoctoral Fellow Name",
+      "Human Subjects",
+      "Vertebrate Animals"
+    ]
+  }
+]

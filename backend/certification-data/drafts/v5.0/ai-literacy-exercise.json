@@ -1,0 +1,23 @@
+{
+  "overview": "Recognize unsupported claims, scope changes and decisions that require authorized human judgment. Use the fictional cases provided; this module needs no uploaded documents or existing workspace artifacts.",
+  "documents": [],
+  "instructions": [
+    "Read each fictional scenario and its supplied source. Identify the claim, selected target or proposed action that needs a decision.",
+    "Choose your own answer for every case. Distinguish source support from confident wording, keep the task within its authorized scope and leave institutional judgments to the authorized person.",
+    "Submit your recorded choices explicitly. The assistant may explain the teaching, but it must not invent or submit your assessment answers on your behalf.",
+    "Read the saved feedback and revisit the relevant lessons before another submission. Your original choices remain in history. These recognition cases prepare you for later practical work; draft feedback does not award module credit."
+  ],
+  "chat_instructions": [
+    "Open the certification panel to record your own scenario answers after reading the lessons.",
+    "Read each fictional scenario and its supplied source. Identify the claim, selected target or proposed action that needs a decision.",
+    "Choose your own answer for every case. Distinguish source support from confident wording, keep the task within its authorized scope and leave institutional judgments to the authorized person.",
+    "Submit your recorded choices explicitly. The assistant may explain the teaching, but it must not invent or submit your assessment answers on your behalf.",
+    "Read the saved feedback and revisit the relevant lessons before another submission. Your original choices remain in history. These recognition cases prepare you for later practical work; draft feedback does not award module credit."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_method": "authenticated_scenario_recognition",
+  "scenario_bank_id": "v5.0.ai_literacy.scenarios",
+  "scenario_bank_sha256": "a23e247725108465f8ea94c2de804e811e822e991ddab507a7767193250f92b0"
+}

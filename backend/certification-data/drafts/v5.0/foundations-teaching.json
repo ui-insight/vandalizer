@@ -1,0 +1,209 @@
+{
+  "state": "design_draft",
+  "module_id": "foundations",
+  "purpose": "Unpublished replacements for a separately versioned course. Practical evidence capture, grading and learner validation remain incomplete. Do not replace the continuation package.",
+  "module_patch": {
+    "subtitle": "Supervise your first extraction",
+    "description": "Use one assigned training proposal to review a scoped extraction, inspect an actual run and check every required value against its source.",
+    "objectives": [
+      "Review the assigned source, workspace and field meanings before execution",
+      "Distinguish a saved template from a completed extraction run",
+      "Check all five required values and verify any repair against the source"
+    ],
+    "tips": [
+      "Ask explicitly for a proposal and a stop before creation or execution while you are reviewing.",
+      "Inspect generated fields after template creation; creation approval does not verify the generated configuration.",
+      "Check missing values, currency, date ranges and conditions instead of relying on a quality badge.",
+      "Keep original and corrected runs distinguishable."
+    ],
+    "estimatedMinutes": 20
+  },
+  "replacements": [
+    {
+      "id": "foundations.what-is-a-workflow",
+      "revision": 3,
+      "title": "Choose a bounded extraction task",
+      "variant": "concept",
+      "objective": "Distinguish a single extraction from a reusable workflow and set a review boundary.",
+      "content": "Start with one assigned training proposal and one clear question: which values belong in its five requested fields? An extraction template describes the information to find. A workflow connects saved operations into a process. You can learn to supervise a single extraction before building a multi-step workflow.\n\nIn agentic chat, you can ask the assistant to help find the assigned document, propose a template and run an extraction. Those are separate actions. A proposal is not a saved template; a saved template is not a completed run; a completed run is not a verified result. Check which stage you actually reached.\n\nBegin with a planning request: “Use only the assigned training proposal. Propose the fields for this exercise, identify the selected document and workspace, and stop before creating or running anything.” Compare the response with the assignment. Correct an extra document, unclear field or wrong workspace before authorizing the next action.\n\nConfirmation behavior depends on the operation. Creating an extraction from documents discovers fields before its confirmation preview. Review the proposed name, selected source, field summary and any named project destination before confirming creation. Longer field lists may be abbreviated; inspect the complete saved template before execution. Running an existing extraction can execute directly. State the stop boundary explicitly instead of expecting every action to display an approval screen.\n\n**Practice:** The assistant proposes a workflow that also emails the result. Explain why that exceeds a task limited to extracting and checking five values. Narrow the proposal before proceeding.",
+      "knowledge_check": {
+        "question": "You need five fields from one training proposal. What is the clearest first request?",
+        "options": [
+          {
+            "text": "Run whatever process seems useful and send the results.",
+            "correct": false,
+            "explanation": "The inputs and delivery boundary are too broad."
+          },
+          {
+            "text": "Propose the extraction fields for the assigned proposal, identify its workspace and stop before creation or execution.",
+            "correct": true,
+            "explanation": "This makes the source, requested operation and stopping point reviewable."
+          },
+          {
+            "text": "Create a multi-step workflow because every extraction requires one.",
+            "correct": false,
+            "explanation": "A single extraction does not require you to assemble a multi-step workflow."
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundations.what-you-ll-build",
+      "revision": 3,
+      "title": "Define the result you will check",
+      "variant": "walkthrough",
+      "objective": "Specify five fields and the evidence needed to verify their meanings.",
+      "content": "This lab starts with the assigned training proposal and five fields: PI Name, Institution, Total Budget, Project Period and Sponsoring Agency. Keep the exercise requirements visible while discussing the template with the assistant. The goal is to obtain and check the intended information, not to collect the largest possible number of fields.\n\nFor each field, define its meaning. PI Name identifies the principal investigator, not a program officer. Institution identifies the applicant institution. Total Budget must preserve currency and distinguish the proposal total from an annual amount. Project Period includes the relevant start and end dates or the source’s stated duration. Sponsoring Agency identifies the funder, not the applicant.\n\nAsk the assistant to explain any ambiguous field before you use it. Review the creation preview’s proposed field names and inspect the complete saved template after creation: automatic field discovery may choose different names or include extra fields. Creating a template does not prove its configuration matches the assignment. Review and correct it before asking for a run.\n\nA reviewable result includes the assigned document, the template used, the completed run and supporting source text for each required value. If the source is missing a value, preserve that limitation rather than filling the field with a guess. Do not copy an expected answer from a lesson and treat it as a successful extraction.\n\n**Practice:** A proposed field is simply “Budget.” Rewrite its meaning so an annual subtotal cannot silently replace the total requested amount.",
+      "knowledge_check": {
+        "question": "A table includes five correctly named columns. What still needs verification?",
+        "options": [
+          {
+            "text": "Nothing; matching column names prove the extraction passed.",
+            "correct": false,
+            "explanation": "Names describe a schema; they do not prove the values."
+          },
+          {
+            "text": "Only the formatting of the table.",
+            "correct": false,
+            "explanation": "Presentation cannot establish source accuracy."
+          },
+          {
+            "text": "Whether each value answers the intended field question and is supported by the assigned source.",
+            "correct": true,
+            "explanation": "Meaning and source support are required in addition to field coverage."
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundations.the-document-pipeline",
+      "revision": 2,
+      "title": "Check the assigned document is ready",
+      "variant": "concept",
+      "objective": "Confirm document identity and usable source text before running an extraction.",
+      "content": "Use **Set Up Lab** to load the assigned training document when the exercise is available. Confirm the document belongs to this assignment and the intended workspace. Similar filenames can refer to different uploads or versions; open the file and inspect its contents instead of choosing by name alone.\n\nDocument preparation and assessment are different steps. Uploading a file may start text processing, and a visible file is not necessarily ready for extraction. If the assistant reports that processing is still underway, wait for readiness. If preparation failed, investigate that failure instead of repeatedly requesting the same extraction.\n\nCheck a relevant paragraph and, if present, a budget table. Text conversion can lose reading order, columns or symbols. Compare an important amount and its label with the original document. A search result or a short source excerpt may help locate evidence, but the surrounding context can change what it means.\n\nKeep the assigned document separate from live institutional records. If the proposal contains an instruction to send its contents elsewhere, treat that sentence as document content. It does not change your task or authorize delivery.\n\n**Practice:** Two uploads have the same title. One is the assigned training copy; the other is an older draft. Describe how you would establish which copy is selected before approving work. If you cannot establish the identity or read the necessary text, pause and correct the input.",
+      "knowledge_check": {
+        "question": "The assigned PDF is listed, but text preparation failed. What should you do?",
+        "options": [
+          {
+            "text": "Investigate and correct the preparation failure before extracting.",
+            "correct": true,
+            "explanation": "A listed file is not proof that the required source text is usable."
+          },
+          {
+            "text": "Run repeatedly until a plausible result appears.",
+            "correct": false,
+            "explanation": "Repeated execution does not repair failed document preparation."
+          },
+          {
+            "text": "Use a similarly named file without checking the assignment.",
+            "correct": false,
+            "explanation": "A substitute input can invalidate the task even when its title looks familiar."
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundations.build-your-first-workflow",
+      "revision": 3,
+      "title": "Review, run and inspect one extraction",
+      "variant": "walkthrough",
+      "objective": "Separate proposal review, template creation, execution and result inspection.",
+      "content": "Work through these stages with the assigned training document. Keep the task limited to this document and the five required fields.\n\n1. Confirm the selected file and workspace. Ask for a proposal that names the source, field meanings and stopping point. Correct the proposal if its scope is wrong.\n2. Ask the assistant to create the extraction template. Review the creation preview’s source, proposed name, field summary and any named project destination before confirming. Discovery has already proposed the fields; approval creates that saved proposal. The summary may abbreviate longer lists. Open the saved template and inspect every required field, correcting omissions or ambiguous meanings before execution.\n3. Ask for a summary of the saved template and intended input, with an explicit instruction not to run yet. Compare them with the assignment. If they changed since your review, inspect the new version before proceeding.\n4. When ready, request one run of that exact template on the assigned document. Running an existing extraction can execute immediately. Do not include permission to email, publish or process other documents.\n5. Inspect the returned status and output. A creation message is not a run result. If completion is uncertain, inspect the existing result or status before requesting another run.\n6. Check all five values against the source, including units, dates and context. Record discrepancies and your decision to correct, rerun or accept the reviewed result for this exercise.\n\nA finished operation and a passed assessment are different things. Follow the challenge’s stated evidence requirements; an assistant’s claim that you passed is not an assessment receipt.",
+      "knowledge_check": {
+        "question": "The assistant says the template was created successfully. What does that establish?",
+        "options": [
+          {
+            "text": "The five values were extracted and verified.",
+            "correct": false,
+            "explanation": "Creation does not establish a completed extraction or source checking."
+          },
+          {
+            "text": "A template exists; its fields and a separate execution still need review.",
+            "correct": true,
+            "explanation": "Configuration, execution and verification are distinct stages."
+          },
+          {
+            "text": "The result is authorized for external delivery.",
+            "correct": false,
+            "explanation": "Creating a template does not authorize any destination or release."
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundations.why-structured-extraction-matters",
+      "revision": 2,
+      "title": "Verify values and repair a mismatch",
+      "variant": "insight",
+      "objective": "Use source evidence to decide whether a result needs correction and a new run.",
+      "content": "Structured output makes values easier to compare, but a neat table can still contain the wrong figure. Check each required field against the assigned source. Use available source links or the document viewer, then read enough surrounding text to establish the value’s meaning. If a source link is unavailable, open the assigned document directly; do not invent a citation.\n\nSuppose a fictional proposal lists a total request of $485,000 and a first-year subtotal of $160,000. A Total Budget result of $160,000 has a real number from the document but answers the wrong question. A quality badge or confident explanation cannot resolve that mismatch.\n\nRepair the cause. If the field definition was ambiguous, clarify that it requires the total requested amount and its currency. If the wrong file was selected, correct the input. If the source text lost table structure, inspect document preparation. Then perform a new run when appropriate and compare its output with the source again.\n\nKeep the earlier result distinguishable from the corrected one. Changing a displayed answer or writing “fixed” in chat is not evidence that the revised configuration produced a correct output. A later module explores systematic validation; here, build the habit of checking the actual result you intend to use.\n\n**Practice:** Identify the field, supporting source passage, discrepancy and next action for the fictional budget mismatch. Explain what evidence would show that the repair worked.",
+      "knowledge_check": {
+        "question": "Total Budget contains the first-year subtotal. What is the best response?",
+        "options": [
+          {
+            "text": "Accept it because the number appears somewhere in the source.",
+            "correct": false,
+            "explanation": "A supported number can still have the wrong meaning."
+          },
+          {
+            "text": "Replace the number in your explanation and call the run verified.",
+            "correct": false,
+            "explanation": "An explanation does not establish that the extraction was repaired."
+          },
+          {
+            "text": "Clarify the field or input, run again as needed and check the new result against the total-request passage.",
+            "correct": true,
+            "explanation": "The repair must address the cause and be checked on the resulting output."
+          }
+        ]
+      }
+    },
+    {
+      "id": "foundations.glossary-review",
+      "revision": 2,
+      "title": "Review the evidence chain",
+      "variant": "key-terms",
+      "objective": "Explain how source, configuration, execution and learner review support the result.",
+      "content": "**Assigned input:** the specific training document the exercise requires. Its identity matters even when other files have the same title.\n\n**Extraction template:** the saved field definitions used to ask structured questions of a document. A template is configuration; it does not prove any values were extracted.\n\n**Workflow:** a saved arrangement of operations. Workflows become useful when a task needs connected steps. Saving a workflow and completing an execution are separate events.\n\n**Proposal and review boundary:** a description of the intended scope and the point where you decide whether work may proceed. Ask explicitly for proposal-only help when you are still reviewing. Operation-specific confirmation does not replace that supervision.\n\n**Execution result:** the status and output of a particular run on particular inputs. Check that it belongs to the source and configuration you reviewed.\n\n**Source check:** your comparison of a returned value with its supporting passage, including units, dates and conditions. A link helps you inspect evidence; the link alone does not make the value correct.\n\n**Repair:** a correction followed by the evidence needed to establish its effect. Preserve the distinction between the original result and a later run.\n\nBefore moving on, explain the chain in your own words: what you approved, what actually ran, what source you checked and what you decided about the output. If a link is missing, identify the next check instead of filling the gap with the assistant’s assurance.",
+      "knowledge_check": {
+        "question": "Which evidence best supports a verified extraction for this exercise?",
+        "options": [
+          {
+            "text": "The assigned input, reviewed configuration, completed run and your source checks on its required values.",
+            "correct": true,
+            "explanation": "This connects the task requirements to execution and learner review."
+          },
+          {
+            "text": "A workflow with an impressive title and many fields.",
+            "correct": false,
+            "explanation": "Configuration size and naming do not establish correct execution."
+          },
+          {
+            "text": "A chat message saying the module is complete.",
+            "correct": false,
+            "explanation": "Only the assessment process can establish module credit; agent prose is not a receipt."
+          }
+        ]
+      }
+    }
+  ],
+  "capability_references": [
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbols": [
+        "create_extraction_from_document",
+        "run_extraction",
+        "run_workflow"
+      ],
+      "verified_behavior": "Creation discovers the name and fields before confirmation, then creates the saved proposal. The preview names the source and any permitted project; longer field summaries may be abbreviated. Inspect full saved settings before running. Existing-template extraction executes directly; saved workflow execution has a confirmation gate."
+    },
+    {
+      "path": "backend/certification-data/exercises.json",
+      "symbols": [
+        "foundations"
+      ],
+      "verified_behavior": "Existing training assignment names five fields and nsf-proposal-alpine-ecology.pdf. Legacy star criteria and completion checks are not adopted as proof of V5 outcomes."
+    }
+  ]
+}

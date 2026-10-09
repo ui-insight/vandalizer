@@ -1,0 +1,230 @@
+{
+  "state": "design_draft",
+  "module_id": "process_mapping",
+  "purpose": "Unpublished teaching replacements for a separately versioned course. Process-map submission and calibrated structured review remain incomplete.",
+  "module_patch": {
+    "subtitle": "Choose a method and define the review points",
+    "description": "Map a bounded task, choose suitable chat or saved operations, and place accountable review before consequential decisions and release.",
+    "objectives": [
+      "Choose chat, reusable extraction or workflow for the actual input and output",
+      "Define source scope, exclusions, stopping conditions and exception paths",
+      "Name the reviewer and evidence before each consequential decision or release"
+    ],
+    "tips": [
+      "A longer workflow is not automatically a better method.",
+      "Make the intended output explicit before selecting tools.",
+      "A diagrammed review point must be implemented as an actual stop or a separate action.",
+      "Estimate benefits from observed preparation, review and correction effort."
+    ],
+    "estimatedMinutes": 20
+  },
+  "replacements": [
+    {
+      "id": "process_mapping.from-one-workflow-to-many",
+      "revision": 2,
+      "title": "Choose the simplest suitable method",
+      "variant": "concept",
+      "objective": "Choose between a bounded chat task, reusable extraction and a connected workflow.",
+      "content": "A task does not become better because it has more steps. Start with the result you need and the evidence that would make it usable. Then choose a method that fits the input, repetition and decisions involved.\n\nFor a one-off question about one document, a bounded chat request with source checking may be enough. If you repeatedly need the same fields from similar documents, a reusable extraction can make the field definitions explicit. If the result requires connected operations with defined inputs and outputs, a saved workflow may be useful.\n\nThese are choices to justify, not a ladder where the largest workflow wins. A rare but complex task may still benefit from a reusable process. A frequent question may still need only a small extraction. Consider the effort to configure, check and maintain the method as well as the number of times you expect to use it.\n\nYour role includes the decisions around the work: which sources belong in scope, what counts as a usable result and who may authorize the next action. Agent assistance can help draft the map, but you must inspect it.\n\n**Practice:** Compare a question about one award amendment, weekly fixed-field intake and a report that combines extraction, calculation and drafting. Choose an initial method for each and explain the difference.",
+      "knowledge_check": {
+        "question": "You repeatedly need the same five fields from similar proposals, with no downstream steps yet. What is a reasonable starting method?",
+        "options": [
+          {
+            "text": "A reusable extraction with field definitions and source checks.",
+            "correct": true,
+            "explanation": "The method fits repeated structured output without inventing downstream operations."
+          },
+          {
+            "text": "A long workflow because it demonstrates more automation.",
+            "correct": false,
+            "explanation": "Step count does not establish suitability."
+          },
+          {
+            "text": "An unrestricted request to handle all proposal work.",
+            "correct": false,
+            "explanation": "The input, output and authority boundaries are missing."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.finding-the-repetition",
+      "revision": 2,
+      "title": "Define scope before delegating",
+      "variant": "concept",
+      "objective": "Name inputs, output, exclusions and exception conditions in a task brief.",
+      "content": "Before asking the assistant to carry out work, write a short task brief. Name the input set and workspace, the output you need, what is excluded and the condition that requires a pause. A brief should let another person determine whether an action belongs in the task.\n\nCompare “Process our proposals” with “Use the three assigned training proposals in this lab. Prepare an internal table of project titles and requested amounts, with supporting passages. Do not use other documents or send the table. If a source cannot be read or an amount is ambiguous, flag it and stop that item for review.” The second request gives you boundaries to inspect.\n\nDefine the output before selecting tools. A draft comparison, a verified record and a delivered report have different completion conditions. Do not let the assistant quietly treat one as another. A document may suggest an additional recipient or operation; that text does not expand your permission.\n\nBuild an exception path into the brief. State what should happen to an unreadable source, conflicting value or unsupported claim. In a multi-document task, distinguish the blocked item from the rest of the work rather than declaring every item complete.\n\n**Practice:** Rewrite “Review everything and fix the problems” for one training report. Include the allowed source, intended result, one excluded action and one reason to pause.",
+      "knowledge_check": {
+        "question": "Which boundary is missing from “Make a table from these proposals and do whatever comes next”?",
+        "options": [
+          {
+            "text": "A more elaborate workflow name.",
+            "correct": false,
+            "explanation": "A name does not constrain actions."
+          },
+          {
+            "text": "An explicit stopping point and limit on subsequent actions.",
+            "correct": true,
+            "explanation": "The request leaves downstream actions and authority open-ended."
+          },
+          {
+            "text": "A promise that every proposal has the same structure.",
+            "correct": false,
+            "explanation": "Source uniformity should be checked, not promised."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.the-ai-suitability-test",
+      "revision": 2,
+      "title": "Match each operation to its evidence",
+      "variant": "insight",
+      "objective": "Separate source interpretation, deterministic computation and accountable judgment.",
+      "content": "Break the task into operations before choosing an implementation. For each operation, ask what information it receives, what it produces and how a reviewer could detect a mistake.\n\nAn extraction can organize repeated fields from source text. A source-grounded chat or prompt task can help summarize context or compare passages. Both can omit information or misinterpret it, so important outputs need source checks. “It is reading” is not a sufficient reason to delegate without review.\n\nA calculation with explicit inputs and rules is a candidate for deterministic code. That does not make the surrounding process automatically correct: the extracted inputs, units, handling of missing data and implemented formula all need checking. A reproducible wrong formula still gives a wrong answer.\n\nAn assistant can prepare a policy comparison or flag a discrepancy. Whether the evidence is sufficient for an institutional decision, and who is authorized to make that decision, must be explicit in the process. Do not turn an uncertain interpretation into an automatic approval because it appears in a table.\n\n**Practice:** For a budget review, separate finding amounts, summing approved categories, explaining a variance and authorizing release. Name the evidence and reviewer needed at each stage. If a proposed tool cannot produce a reviewable result, change the method or keep that operation manual.",
+      "knowledge_check": {
+        "question": "A calculation ran successfully. What else must be checked before using its total?",
+        "options": [
+          {
+            "text": "Nothing; deterministic code guarantees a correct business result.",
+            "correct": false,
+            "explanation": "Successful execution does not validate inputs or the implemented rule."
+          },
+          {
+            "text": "Only whether the assistant sounds confident.",
+            "correct": false,
+            "explanation": "Confidence is not calculation evidence."
+          },
+          {
+            "text": "The source values, units, missing-data handling and intended formula.",
+            "correct": true,
+            "explanation": "A valid calculation depends on both the rule and the inputs."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.walkthrough-mapping-a-real-process",
+      "revision": 2,
+      "title": "Map an intake task with a real stop point",
+      "variant": "walkthrough",
+      "objective": "Place review before the decision or release that depends on it.",
+      "content": "Use a training proposal to map an intake task before building it. A useful map identifies the source, operations, evidence, reviewer and next action. It also shows where work stops.\n\n1. **Input:** the assigned proposal in the training workspace. Check that its relevant text is readable.\n2. **Prepare:** extract the requested fields and identify potentially missing sections. Preserve source references and uncertainty instead of labeling the proposal compliant.\n3. **Check:** compare required values with their supporting passages. If a calculation is needed, verify the input values and rule as well as the total.\n4. **Review:** the designated reviewer inspects the evidence and discrepancies. An incomplete section or ambiguous requirement takes an exception path; the assistant must not invent missing information.\n5. **Decide:** the authorized person determines the next step. Preparing an internal summary does not authorize submission or contact with a recipient.\n6. **Release, if authorized:** inspect the exact artifact and destination before any separate delivery action. Record whether that delivery actually succeeded.\n\nA box labeled “human review” is not enough. Put it before the action that depends on it, identify who reviews and specify the evidence they receive. If the implementation cannot pause at that point, end the automated portion there and perform the next action separately.\n\n**Practice:** Move a review box that currently appears after external delivery to the correct place, and name the information the reviewer needs.",
+      "knowledge_check": {
+        "question": "Where should the release review sit in this process?",
+        "options": [
+          {
+            "text": "After sending, so the reviewer can inspect what the recipient received.",
+            "correct": false,
+            "explanation": "Review after release cannot prevent the release it was supposed to authorize."
+          },
+          {
+            "text": "Before sending, with the proposed artifact, destination and unresolved issues available.",
+            "correct": true,
+            "explanation": "The reviewer needs evidence before the dependent action occurs."
+          },
+          {
+            "text": "Anywhere, provided the diagram contains a human-review box.",
+            "correct": false,
+            "explanation": "The ordering and evidence requirements give the checkpoint its meaning."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.common-processes-that-become-workflows",
+      "revision": 2,
+      "title": "Compare candidates without assuming automation",
+      "variant": "concept",
+      "objective": "Evaluate potential tasks by output, evidence, review effort and maintenance.",
+      "content": "Use common office tasks as candidates for analysis, not automatic recipes. The same task name can hide very different sources, outputs and authority requirements.\n\nFor proposal intake, repeated fixed fields may suit an extraction; an unusual amendment may need a bounded question with close source review. A progress-report comparison may need structured facts and a narrative explanation, with an identified reviewer for interpretation. A budget summary may add deterministic arithmetic, but its figures still need source support.\n\nFor each candidate, record the expected benefit and the cost of checking it. Include setup, exceptions and maintenance when a document format or requirement changes. Do not invent a percentage of work saved before observing actual runs. A process that produces fast drafts but expensive corrections may not improve the work overall.\n\nChoose one small candidate to test. Specify a representative source, a difficult case and a missing-information case. Decide what evidence would justify extending the process and what failure would stop the trial. A successful example supports that example; it does not prove that every future input will work.\n\n**Practice:** Compare two candidates from a fictional office: weekly extraction of five intake fields and a one-time interpretation of an unusual sponsor clause. Explain how their evidence and review needs differ. Use training examples without copying sensitive workplace documents into the exercise.",
+      "knowledge_check": {
+        "question": "What supports a claim that a mapped process saves time?",
+        "options": [
+          {
+            "text": "The number of steps drawn in its diagram.",
+            "correct": false,
+            "explanation": "A diagram describes structure, not measured performance."
+          },
+          {
+            "text": "A generic estimate that AI handles most reading.",
+            "correct": false,
+            "explanation": "An unsupported general percentage is not evidence for this task."
+          },
+          {
+            "text": "Observed preparation, review and correction effort on representative cases.",
+            "correct": true,
+            "explanation": "The total effort includes checking and repairing the output."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.worked-example-mapping-progress-report-review",
+      "revision": 2,
+      "title": "Worked example: an internal progress-report review",
+      "variant": "walkthrough",
+      "objective": "Create a bounded map with evidence, an exception path and an accountable handoff.",
+      "content": "Consider a fictional annual progress report. The task is to prepare an internal review brief, not submit a sponsor report. The allowed sources are the assigned report and the approved milestone list. The intended reviewer is the responsible program administrator.\n\n**Prepare:** identify reported accomplishments, publications and expenditures. Compare the claims with the stated milestones, retaining supporting passages and gaps. If arithmetic is useful, define its inputs and rule separately from any narrative interpretation.\n\n**Pause on exceptions:** an unreadable table, absent milestone or conflicting period remains unresolved. Do not import a value from another report because its title looks similar. The reviewer receives the discrepancy and the specific source that needs attention.\n\n**Review:** the program administrator checks important claims and decides which questions require follow-up with the investigator or fiscal reviewer. The assistant can draft questions; the map does not give it permission to send them.\n\n**Output:** an internal brief with source references, unresolved issues and a clear review status. A later decision may authorize a different artifact or delivery, but that is outside this task’s stopping point.\n\n**Practice:** Draft this map in your own words. Then critique an assistant proposal that ends with “submit to the sponsor portal.” Explain the scope change and revise the ending before any execution. Do not assume a drawn checkpoint is an implemented pause; verify the actual action sequence before using the design.",
+      "knowledge_check": {
+        "question": "The agreed task ends with an internal brief. The assistant adds sponsor-portal submission. What should you do?",
+        "options": [
+          {
+            "text": "Remove or separately review the added action before execution; it exceeds the agreed output.",
+            "correct": true,
+            "explanation": "A useful-looking next step still requires its own scope and authority decision."
+          },
+          {
+            "text": "Accept it because it is the next logical step.",
+            "correct": false,
+            "explanation": "Logical sequence does not grant permission."
+          },
+          {
+            "text": "Let it submit and ask the reviewer afterward.",
+            "correct": false,
+            "explanation": "After-the-fact review cannot authorize a prior release."
+          }
+        ]
+      }
+    },
+    {
+      "id": "process_mapping.glossary-review",
+      "revision": 2,
+      "title": "Review a process map before building",
+      "variant": "key-terms",
+      "objective": "Check that a map connects inputs, operations, evidence, decisions and exceptions.",
+      "content": "**Input boundary:** the named documents, versions and workspace the task may use. A broad topic such as “all grants” is not a precise input set.\n\n**Operation:** a bounded action with an identifiable result, such as extracting a value, calculating a total or drafting a summary. Choose its implementation according to the information and checks it needs.\n\n**Evidence:** the source passages, configuration, intermediate results or execution status a reviewer uses to assess the output. A polished diagram is not execution evidence.\n\n**Checkpoint:** a decision placed before the action that depends on it. State the reviewer, evidence and permitted next step. If the product cannot enforce a pause there, separate the actions rather than assuming the diagram enforces it.\n\n**Exception path:** what happens when a required input or check is unavailable. Identify the blocked item, preserve useful completed work and name the decision needed to continue.\n\n**Handoff:** work passed to a named role with enough context to act. Preparing a handoff and actually sending it are different actions.\n\n**Stopping condition:** the point where the requested result is ready for its stated use, or where an unresolved issue prevents further work.\n\nBefore building, explain why your chosen method fits the repetition and output. Walk through a normal case and a failure case. Ask whether either can reach a consequential action without the required review. Revise that path before you create the workflow.",
+      "knowledge_check": {
+        "question": "An assistant produces a polished map. What shows that you have reviewed it adequately?",
+        "options": [
+          {
+            "text": "Counting its nodes and accepting it if there are enough.",
+            "correct": false,
+            "explanation": "Node count is not a measure of fit or accountability."
+          },
+          {
+            "text": "Explaining the method, evidence, reviewer, stop point and exception path for the assigned task.",
+            "correct": true,
+            "explanation": "These checks connect the design to the actual task and its decisions."
+          },
+          {
+            "text": "Treating the diagram as proof that the process has already run.",
+            "correct": false,
+            "explanation": "A proposed design is not an execution result."
+          }
+        ]
+      }
+    }
+  ],
+  "capability_references": [
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbols": [
+        "run_extraction",
+        "run_workflow",
+        "create_workflow"
+      ],
+      "verified_behavior": "Single extraction and saved multi-operation workflow are distinct operations; teaching does not claim arbitrary mid-workflow human gates or automatic external delivery."
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "id": "monthly-report-workflow-design",
+  "revision": 1,
+  "module_id": "workflow_design",
+  "provenance": "authored_workflow_design_case_not_execution",
+  "notice": "This is a fictional design assignment. Save and inspect a workflow configuration; do not execute it, send a report, contact a reviewer or use personal documents. Authored examples are not learner work or execution evidence.",
+  "task": "Turn the monthly-review process into one saved, reviewable workflow design. Explicitly choose your original saved process submission or the supplied example. Preserve the chosen map as the input to this attempt; do not silently substitute a newer map or treat it as transferred credit. Critique the flawed proposal, use chat or the editor to configure a corrected workflow, then inspect the same saved revision and record your decisions. Trace the source information through the design, explain the corrected boundary and show how the fictional reviewer could inspect unresolved issues. A reflection or step count does not substitute for the saved configuration.",
+  "source_process_case_id": "monthly-report-review-map",
+  "source_process_case_sha256": "25bdff6ca4c49b24e000b2d954d24bac319db1bf87da1dbb1d6dfce3aefbc3fb",
+  "assigned_inputs": [
+    {
+      "id": "report-alpine",
+      "description": "Fictional monthly report A: narrative milestones, reported spending and a list of incomplete activities. The form is similar each month; the narrative varies."
+    },
+    {
+      "id": "report-neural",
+      "description": "Fictional monthly report B: narrative milestones and spending. A required supporting passage may be missing or unreadable; the process must explain how that is handled."
+    },
+    {
+      "id": "report-water",
+      "description": "Fictional monthly report C: narrative milestones and spending. Two passages may disagree about an activity; the process must preserve the conflict for review."
+    }
+  ],
+  "intended_output": "An internal draft comparison of reported milestones, spending and unresolved issues, with source/intermediate references that the grants reviewer can inspect. No institutional compliance conclusion or release is authorized by this assignment.",
+  "exclusions": [
+    "Other documents or personal work not named in the assignment.",
+    "External sending, sharing, scheduling and automatic institutional approval.",
+    "Treating missing evidence as zero, agreement or completed work."
+  ],
+  "handoff_choices": [
+    "owned_saved_process_submission",
+    "supplied_example"
+  ],
+  "handoff_policy": "explicit_choice_freeze_original_no_credit_transfer",
+  "supplied_map": {
+    "id": "monthly-review-supplied-map",
+    "provenance": "authored_example_not_learner_work",
+    "method_and_rationale": "Use a bounded workflow to prepare a recurring internal comparison. Recurring fields may use extraction, while narrative interpretation needs relevant source context. The grants reviewer retains institutional judgment and any later release decision. A project can organize the work but adds no permission to search extra files or run a schedule.",
+    "ordered_process_map": "1. Accept only report-alpine, report-neural and report-water for the assigned month. 2. Organize reported milestones and spending with document and passage references; preserve missing or conflicting information. 3. Compare the organized facts together with the source context needed for interpretation, retaining intermediate references. 4. Format an internal draft with facts, interpretations, unresolved issues and the evidence needed for review. 5. End the automated portion at that draft. The grants reviewer would inspect important sources and unresolved issues before making any institutional conclusion or separately authorizing release. An unreadable source or unsupported required fact blocks the affected conclusion. This is an authored map, not an executed workflow.",
+    "bounded_task_brief": "Prepare an internal monthly comparison using only the three named fictional reports. Show reported milestones and spending, source/intermediate references and unresolved issues. Do not guess missing facts or infer institutional approval. Do not search other files, schedule a run, send or share anything. End with a draft for the designated grants reviewer. Stop the affected conclusion when required evidence is missing, unreadable or conflicting, and make that condition visible."
+  },
+  "flawed_proposal": "Authored flawed proposal, not an actual artifact or execution: Extract five fields from the three assigned reports. Configure the comparison prompt to read unrelated saved text from last month instead of this extraction or the relevant narrative passages. Discard source and intermediate references so the output looks clean. Format the result as institutionally approved even when an input is unreadable. Send the report to an unapproved external partner, then add an Approval step afterward with automatic approval on timeout. The agent says the diagram is enough proof that the design is safe.",
+  "configuration_instructions": [
+    "Choose an owned saved process submission from this course or the supplied map. Retain its original identity and content; selecting it approves its use for this design attempt, not its competence or a workflow run.",
+    "Create or edit one workflow through supported chat/editor controls. Return to the same artifact; inspect its saved tasks, input-source settings, attached inputs and output settings rather than relying on the agent description.",
+    "For each necessary operation, name the input, transformation and output. Keep required narrative context available; a prompt over relevant short source text can be valid without a separate extraction. Do not add steps merely to reach a count.",
+    "Remove the unapproved destination. End the automated portion at the internal draft, with no send, share or scheduling action. A reviewer responsibility in this exercise does not require a real staff account or an Approval request.",
+    "Retain source/intermediate references, unresolved issues and a defined review or stop path. Explain what the design intends; do not claim its runtime behavior has been tested.",
+    "Save corrections before explicitly approving the inspected revision for assessment. A later edit requires a new captured revision and decision; preserve the original. Do not run this design for this module."
+  ],
+  "questions": [
+    {
+      "id": "data_flow",
+      "outcome_id": "workflow_design.data_flow",
+      "response_kind": "trace_saved_configuration",
+      "prompt": "Using the selected saved workflow revision, trace one reported milestone or spending fact from its assigned source through the configured operations to the internal draft. Identify actual input-source settings and necessary narrative context. Justify your task choices, including any simpler route, and identify the map you chose."
+    },
+    {
+      "id": "approval_boundary",
+      "outcome_id": "workflow_design.approval_boundary",
+      "response_kind": "correct_then_approve_design",
+      "prompt": "Identify the destination and approval errors in the supplied flawed proposal. Explain the correction visible in this saved workflow revision and confirm that your approval is only for this inspected design. What must remain outside the automated portion and what would need a separate later authorization?"
+    },
+    {
+      "id": "reviewable_design",
+      "outcome_id": "workflow_design.reviewable_design",
+      "response_kind": "explain_review_and_stop_path",
+      "prompt": "Explain where this saved design retains source and intermediate evidence, how unresolved issues stay visible, and what stops or waits when a required report or fact is missing or conflicting. Name the fictional reviewer decision and distinguish intended design behavior from a tested execution."
+    }
+  ],
+  "artifact_policy": "owned_saved_workflow_snapshot_not_reflection_or_step_count",
+  "assistance_policy": "agent_may_draft_learner_must_inspect_correct_and_approve_saved_revision",
+  "execution_policy": "design_only_no_run_send_share_or_staff_request",
+  "assessment_policy": "automatic_structured_review_no_staff_queue_no_presence_credit",
+  "review_guidance": [
+    {
+      "outcome_id": "workflow_design.data_flow",
+      "passing_conditions": [
+        "Each stage has a defined input/output and the final artifact derives from the intended upstream result."
+      ],
+      "critical_failures": [
+        "Combine unrelated artifacts or rely on undefined prior context for a required stage."
+      ],
+      "case_application": "Inspect the captured configuration of one owned workflow, including ordered steps/tasks, configured input sources, pinned inputs and output settings. Require the learner to trace a fact and its supporting context into the intended internal draft. Step names, counts, client-authored diagrams and unrelated workflows cannot establish connections. A focused prompt using source context is a valid alternative to a separate extraction if the same boundaries and traceability are satisfied. This is design evidence, not evidence of a successful run."
+    },
+    {
+      "outcome_id": "workflow_design.approval_boundary",
+      "passing_conditions": [
+        "The learner identifies the boundary error and saves a corrected design before approval."
+      ],
+      "critical_failures": [
+        "Execute a proposed send or share before reviewing its target and scope."
+      ],
+      "case_application": "Compare the authored flawed proposal with the saved corrected revision and authenticated decision. The learner must identify the unintended external destination and save a design that ends with the internal draft before approval. No actual sending, sharing or execution is required or authorized. A diagrammed Approval step alone does not prove a pause; stopping the automated portion before a consequential action is valid. Distinguish approval to save this revision from authorization to run or release it. Never infer that an external action occurred from authored proposal text."
+    },
+    {
+      "outcome_id": "workflow_design.reviewable_design",
+      "passing_conditions": [
+        "The design retains source/intermediate references and defines a stop or review path for unsupported results."
+      ],
+      "critical_failures": [
+        "Hide intermediate evidence or proceed automatically after a critical evidence gap."
+      ],
+      "case_application": "Inspect whether the saved prompts/output settings preserve document identity, supporting source references, intermediate evidence and unresolved issues. Require a named reviewer decision and a stop or review path for missing, conflicting or unsupported required evidence. Do not accept a general promise to check later if the saved design hides the evidence or automatically releases an unsupported conclusion. Describing the fictional reviewer creates no staff assignment. No unsupported claim of tested runtime stopping is credited from design alone."
+    }
+  ]
+}

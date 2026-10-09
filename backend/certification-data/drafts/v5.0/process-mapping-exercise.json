@@ -1,0 +1,27 @@
+{
+  "overview": "Choose and bound a process before building it. A saved reflection alone does not establish method choice, a corrected checkpoint or a reviewable process map.",
+  "documents": [],
+  "instructions": [
+    "Use the supplied fictional monthly-review case; no personal example or real source document is required.",
+    "Compare working methods and explain the choice for the assigned task. The number of steps and amount of prose do not establish competence.",
+    "Ask the agent for help drafting if useful, then inspect the proposal and save your own corrected process map, rationale and bounded task brief.",
+    "Explain the intentional boundary errors and the evidence, reviewer and ordering in your correction. Do not execute or send anything for this design task.",
+    "Submit your saved design for automatic structured review when this assessment is available. Unclear evidence returns for learner revision; there is no staff grading queue.",
+    "Keep the approved map and original feedback for Workflow Design, or choose its provided example. Do not silently replace earlier work when the course changes."
+  ],
+  "chat_instructions": [
+    "The agent may help draft; the learner must inspect, correct and submit their own decisions. Do not claim that tool prose, nonempty answers or an execution in another module completes this assessment.",
+    "Use the supplied fictional monthly-review case; no personal example or real source document is required.",
+    "Compare working methods and explain the choice for the assigned task. The number of steps and amount of prose do not establish competence.",
+    "Ask the agent for help drafting if useful, then inspect the proposal and save your own corrected process map, rationale and bounded task brief.",
+    "Explain the intentional boundary errors and the evidence, reviewer and ordering in your correction. Do not execute or send anything for this design task.",
+    "Submit your saved design for automatic structured review when this assessment is available. Unclear evidence returns for learner revision; there is no staff grading queue.",
+    "Keep the approved map and original feedback for Workflow Design, or choose its provided example. Do not silently replace earlier work when the course changes."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "monthly-report-review-map",
+  "process_case_sha256": "25bdff6ca4c49b24e000b2d954d24bac319db1bf87da1dbb1d6dfce3aefbc3fb",
+  "assessment_method": "authenticated_process_map_review"
+}

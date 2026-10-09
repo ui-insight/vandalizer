@@ -1,0 +1,36 @@
+{
+  "overview": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results.",
+  "documents": [
+    "nsf-proposal-alpine-ecology.pdf",
+    "nih-r01-neuroscience.pdf"
+  ],
+  "instructions": [
+    "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+    "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+    "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+    "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+    "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+    "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+    "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+  ],
+  "chat_instructions": [
+    "Help create and inspect the extraction and explain the case; authenticated learner expectations and approvals must come from the learner. Never invent a run, validation receipt or passing grade.",
+    "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+    "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+    "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+    "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+    "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+    "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+    "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+  ],
+  "expected_fields": [
+    "Principal Investigator",
+    "Total Project Budget",
+    "Named Co-PI"
+  ],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "source-checked-suite-and-preserved-repair",
+  "validation_case_sha256": "8f74f346ebf319263531888be6d510988d152187441a4fccdc262a1ea5947658",
+  "assessment_method": "authenticated_representative_suite_repair_retest"
+}

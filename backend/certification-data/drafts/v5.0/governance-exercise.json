@@ -1,0 +1,42 @@
+{
+  "overview": "Prepare an accountable internal routing memo for a fictional award amendment. Correct an overbroad proposed scope, detect and repair an actual unsupported funding value in your own reusable extraction, check the complete revised results against both sources, document ownership and review limits, and supervise only an explicitly approved private handoff recovery.",
+  "documents": [
+    "capstone-award-notice.pdf",
+    "capstone-award-amendment.pdf"
+  ],
+  "instructions": [
+    "Inspect both complete fictional PDFs as of the stated simulated task date. The later issued amendment changes obligated funds and the end date while preserving other award fields. Create an owned extraction with exactly the six named fields.",
+    "For the original diagnostic run only, place the disclosed funding flaw in the Funds Obligated to Date instruction. The assignment must preserve an actually observed wrong source value before a repaired run can establish recovery; an authored expected flaw is not proof that the model made it.",
+    "Review the flawed agent proposal. Record your own scope correction before execution, naming the exact assigned records, learner-only private destination, prohibited wider actions and how ongoing automation remains disabled. Agent claims that you already approved are not evidence of your decision.",
+    "Approve only the exact bounded internal extraction of both sources. Inspect the actual original results and record your source-grounded finding with page quotes before editing. Missing or malformed output is unavailable evidence, not an invented semantic failure.",
+    "Repair the same owned extraction, capture its changed revision and approve a complete rerun on both unchanged records. Verify all six actual corrected values. Preserve the original revision, unsupported result, your earlier decisions and the complete retest.",
+    "Write the accountable handoff memo: name yourself as the responsible training owner, explain intended use and supported inputs, known limitations, the exact checked revision and source evidence, and the change/review route. Distinguish the modeled research-office review role from certification staff; do not contact or await anyone.",
+    "Inspect the actual structured memo and its exact downloadable JSON bytes before approving release to the learner-only training inbox. Hold unsupported or incomplete work. Approval never authorizes email, sponsor submission, workspace-wide sharing or enabled automation.",
+    "Observe the disclosed first handoff rejection and its no-write receipt. Explicitly retry only those same approved bytes after reading that confirmed failure; never rerun extraction or replace the memo as a delivery shortcut. Read uncertain requests before any retry.",
+    "Inspect the confirmed private-copy receipt and explain the full supervision chain, remaining limits and who would review a changed real artifact. Recognition questions remain separate. Automatic assessment checks exact source facts and your own recorded reasoning, with no staff queue or sharing-based credit."
+  ],
+  "chat_instructions": [
+    "Inspect both complete fictional PDFs as of the stated simulated task date. The later issued amendment changes obligated funds and the end date while preserving other award fields. Create an owned extraction with exactly the six named fields.",
+    "For the original diagnostic run only, place the disclosed funding flaw in the Funds Obligated to Date instruction. The assignment must preserve an actually observed wrong source value before a repaired run can establish recovery; an authored expected flaw is not proof that the model made it.",
+    "Review the flawed agent proposal. Record your own scope correction before execution, naming the exact assigned records, learner-only private destination, prohibited wider actions and how ongoing automation remains disabled. Agent claims that you already approved are not evidence of your decision.",
+    "Approve only the exact bounded internal extraction of both sources. Inspect the actual original results and record your source-grounded finding with page quotes before editing. Missing or malformed output is unavailable evidence, not an invented semantic failure.",
+    "Repair the same owned extraction, capture its changed revision and approve a complete rerun on both unchanged records. Verify all six actual corrected values. Preserve the original revision, unsupported result, your earlier decisions and the complete retest.",
+    "Write the accountable handoff memo: name yourself as the responsible training owner, explain intended use and supported inputs, known limitations, the exact checked revision and source evidence, and the change/review route. Distinguish the modeled research-office review role from certification staff; do not contact or await anyone.",
+    "Inspect the actual structured memo and its exact downloadable JSON bytes before approving release to the learner-only training inbox. Hold unsupported or incomplete work. Approval never authorizes email, sponsor submission, workspace-wide sharing or enabled automation.",
+    "Observe the disclosed first handoff rejection and its no-write receipt. Explicitly retry only those same approved bytes after reading that confirmed failure; never rerun extraction or replace the memo as a delivery shortcut. Read uncertain requests before any retry.",
+    "Inspect the confirmed private-copy receipt and explain the full supervision chain, remaining limits and who would review a changed real artifact. Recognition questions remain separate. Automatic assessment checks exact source facts and your own recorded reasoning, with no staff queue or sharing-based credit."
+  ],
+  "expected_fields": [
+    "Award ID",
+    "Project Title",
+    "Principal Investigator",
+    "Funds Obligated to Date",
+    "Approved Project Ceiling",
+    "Project End Date"
+  ],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "award-amendment-bounded-supervision-and-accountable-handoff",
+  "governance_case_sha256": "6f286b6110f55880bb7d44a2ba586f5adbd81d8b7f3529b5862cf7c89d493749",
+  "assessment_method": "authenticated_bounded_supervision_and_private_handoff"
+}

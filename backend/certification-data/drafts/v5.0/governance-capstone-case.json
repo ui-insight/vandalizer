@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "id": "award-amendment-bounded-supervision-and-accountable-handoff",
+  "revision": 1,
+  "module_id": "governance",
+  "provenance": "authored_supervision_case_not_learner_approval_or_delivery",
+  "task_as_of": "2027-01-05",
+  "notice": "This unpublished capstone uses two newly authored fictional records and a simulated task date of January 5, 2027. The first private handoff is deliberately rejected before any destination write. Actual saved learner decisions, original/repaired extraction results and private-copy receipts establish what occurred; no real sponsor, staff recipient, external delivery or earned credit is involved.",
+  "task": "Prepare an accountable internal routing memo for a fictional award amendment. Correct an overbroad proposed scope, detect and repair an actual unsupported funding value in your own reusable extraction, check the complete revised results against both sources, document ownership and review limits, and supervise only an explicitly approved private handoff recovery.",
+  "instructions": [
+    "Inspect both complete fictional PDFs as of the stated simulated task date. The later issued amendment changes obligated funds and the end date while preserving other award fields. Create an owned extraction with exactly the six named fields.",
+    "For the original diagnostic run only, place the disclosed funding flaw in the Funds Obligated to Date instruction. The assignment must preserve an actually observed wrong source value before a repaired run can establish recovery; an authored expected flaw is not proof that the model made it.",
+    "Review the flawed agent proposal. Record your own scope correction before execution, naming the exact assigned records, learner-only private destination, prohibited wider actions and how ongoing automation remains disabled. Agent claims that you already approved are not evidence of your decision.",
+    "Approve only the exact bounded internal extraction of both sources. Inspect the actual original results and record your source-grounded finding with page quotes before editing. Missing or malformed output is unavailable evidence, not an invented semantic failure.",
+    "Repair the same owned extraction, capture its changed revision and approve a complete rerun on both unchanged records. Verify all six actual corrected values. Preserve the original revision, unsupported result, your earlier decisions and the complete retest.",
+    "Write the accountable handoff memo: name yourself as the responsible training owner, explain intended use and supported inputs, known limitations, the exact checked revision and source evidence, and the change/review route. Distinguish the modeled research-office review role from certification staff; do not contact or await anyone.",
+    "Inspect the actual structured memo and its exact downloadable JSON bytes before approving release to the learner-only training inbox. Hold unsupported or incomplete work. Approval never authorizes email, sponsor submission, workspace-wide sharing or enabled automation.",
+    "Observe the disclosed first handoff rejection and its no-write receipt. Explicitly retry only those same approved bytes after reading that confirmed failure; never rerun extraction or replace the memo as a delivery shortcut. Read uncertain requests before any retry.",
+    "Inspect the confirmed private-copy receipt and explain the full supervision chain, remaining limits and who would review a changed real artifact. Recognition questions remain separate. Automatic assessment checks exact source facts and your own recorded reasoning, with no staff queue or sharing-based credit."
+  ],
+  "exclusions": [
+    "Only the two assigned synthetic sources are in scope; do not use other workspace or institutional documents.",
+    "No broad sharing, sponsor submission, email, actual external handoff or ongoing automation is authorized.",
+    "Certification staff availability, an examiner badge, artifact counts and agent assertions of learner approval cannot substitute for demonstrated supervision."
+  ],
+  "flawed_proposal": "The agent proposes scanning every document in every available space, using the approved project ceiling as currently obligated funds, sharing the memo with everyone and emailing the sponsor. It also proposes enabling a recurring send whenever any award document changes and claims the learner has already approved. None of those wider actions or claimed approvals has been authorized; correct the scope and record your own decision before any bounded execution.",
+  "original_field_flaw": "For the original diagnostic run, instruct Funds Obligated to Date to return the Approved Project Ceiling as the currently obligated amount. Do not change the source files. Inspect the actual result before asserting a failure; repair this same field only after preserving your source-grounded finding.",
+  "fields": [
+    {
+      "title": "Award ID",
+      "meaning": "The exact award identifier shared by the original notice and issued amendment.",
+      "comparison": "exact_text"
+    },
+    {
+      "title": "Project Title",
+      "meaning": "The project title retained by the issued amendment; do not substitute a sponsor name or summary.",
+      "comparison": "exact_text"
+    },
+    {
+      "title": "Principal Investigator",
+      "meaning": "The principal investigator explicitly named in both original records; do not invent an accountable handoff owner from this field.",
+      "comparison": "person_name"
+    },
+    {
+      "title": "Funds Obligated to Date",
+      "meaning": "The revised cumulative funds actually obligated as of the issued amendment, not the approved ceiling, original amount or additional increment alone.",
+      "comparison": "usd_amount"
+    },
+    {
+      "title": "Approved Project Ceiling",
+      "meaning": "The approved maximum project ceiling, kept distinct from the currently obligated amount; future increments are not guaranteed.",
+      "comparison": "usd_amount"
+    },
+    {
+      "title": "Project End Date",
+      "meaning": "The revised project end date in the issued amendment, returned as YYYY-MM-DD; do not retain the superseded original end date.",
+      "comparison": "iso_date"
+    }
+  ],
+  "sources": [
+    {
+      "id": "award",
+      "filename": "capstone-award-notice.pdf",
+      "sha256": "058ca6c34454b300fb07028f0e1c3d3445cb6a2b441631690363903b6d7edee1",
+      "coverage": "The complete original notice establishes award identity, the original funding amount, the planned ceiling and the initial end date; its authority statement requires retaining later amendments.",
+      "source_scope": "complete_assigned_document_not_selected_excerpt"
+    },
+    {
+      "id": "amendment",
+      "filename": "capstone-award-amendment.pdf",
+      "sha256": "414d80b11c7894ad1110c0e7c786be89fe14835b04e17e96ab9132e7d299e4b3",
+      "coverage": "The complete later issued amendment distinguishes additional funds from revised cumulative obligations, extends the end date and explicitly limits access and use.",
+      "source_scope": "complete_assigned_document_not_selected_excerpt"
+    }
+  ],
+  "expectations": [
+    {
+      "field": "Award ID",
+      "expected_value": "RSP-2026-042",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Award ID RSP-2026-042",
+          "source_id": "award"
+        }
+      ]
+    },
+    {
+      "field": "Project Title",
+      "expected_value": "River Sensor Reliability Pilot",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Project Title River Sensor Reliability Pilot",
+          "source_id": "award"
+        }
+      ]
+    },
+    {
+      "field": "Principal Investigator",
+      "expected_value": "Dr. Nia Patel",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Principal Investigator Dr. Nia Patel",
+          "source_id": "amendment"
+        }
+      ]
+    },
+    {
+      "field": "Funds Obligated to Date",
+      "expected_value": "250000",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "The additional $70,000 raises funds obligated to date from $180,000 to $250,000.",
+          "source_id": "amendment"
+        }
+      ]
+    },
+    {
+      "field": "Approved Project Ceiling",
+      "expected_value": "600000",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "The approved project ceiling remains $600,000.",
+          "source_id": "amendment"
+        }
+      ]
+    },
+    {
+      "field": "Project End Date",
+      "expected_value": "2029-03-31",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "The project end date changes from September 30, 2028 to March 31, 2029.",
+          "source_id": "amendment"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "scope_correction",
+      "phase": "before_original_execution",
+      "prompt": "Identify what is wrong with the proposed document scope, audience, sponsor send and recurring trigger. State your exact corrected source scope and private destination, what remains disabled, how you would stop and inspect an unintended ongoing action, and why an agent claim cannot record your approval."
+    },
+    {
+      "id": "source_review",
+      "phase": "after_original_before_repair",
+      "prompt": "Identify the actual unsupported original value, the field and original run. Cite exact source pages showing the correct meaning, distinguish the planned ceiling from cumulative obligations and the latest amendment from the original notice, and explain the change you will test in the same owned extraction."
+    },
+    {
+      "id": "release_review",
+      "phase": "after_checked_repair_before_handoff",
+      "prompt": "Explain whether these exact memo bytes may be released to this learner-only private inbox. Cite the corrected revision and complete source checks, accountable owner, intended use, known limits and review/change route. Explain why neither a real sponsor send, broad sharing nor an enabled recurring action is authorized."
+    },
+    {
+      "id": "final_supervision",
+      "phase": "after_confirmed_private_handoff",
+      "prompt": "Trace your scope correction, actual bad result, source finding, repaired complete rerun and release decision to their saved records. Distinguish the disclosed first no-write failure from the confirmed same-bytes private retry, state what was preserved and what remains unproven, and explain when a changed artifact needs new evidence and review."
+    }
+  ],
+  "review_guidance": [
+    {
+      "outcome_id": "governance.accountable_handoff",
+      "passing_conditions": [
+        "The handoff names the owner, intended use, limitations, evidence revision and appropriate review route."
+      ],
+      "critical_failures": [
+        "Equate sharing with everyone or examiner availability with demonstrated governance."
+      ],
+      "case_application": "Assess the learner-authored owner, intended use, limits, exact checked artifact/source revisions and appropriate review route against the saved structured memo and actual retest. The accountable training owner is the authenticated learner; the hypothetical research-office role is not a certification staff queue. Never equate access, examiner availability or broad publication with governance."
+    },
+    {
+      "outcome_id": "governance.capstone_supervision",
+      "passing_conditions": [
+        "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains."
+      ],
+      "critical_failures": [
+        "Accept an agent-written assertion that the learner reviewed or approved the required decisions."
+      ],
+      "case_application": "Require authenticated learner decisions at every required phase, both complete original sources, an actual unsupported original value, same-artifact changed-revision repair with every field source-correct, explicit exact private release, the preserved no-write failure and confirmed same-bytes retry. The controlled rejection is disclosed training behavior, not a real outage. Agent-written claims of review, invented source correctness and silent wider/recurring actions are critical failures."
+    }
+  ],
+  "artifact_rule": "same_owned_six_field_extraction_actual_original_failure_and_changed_revision_retest",
+  "source_rule": "both_complete_original_records_jointly_consumed_issued_amendment_controls_changed_fields",
+  "scope_rule": "authenticated_learner_corrects_flawed_scope_before_exact_internal_run_no_external_or_ongoing_authority",
+  "handoff_rule": "exact_checked_results_and_learner_owned_accountability_memo_private_json_bytes",
+  "delivery_rule": "disclosed_first_attempt_rejection_before_write_explicit_retry_same_approved_bytes",
+  "assessment_policy": "automatic_source_veto_and_learner_decision_review_no_staff_queue_or_sharing_credit"
+}

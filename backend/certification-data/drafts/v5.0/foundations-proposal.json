@@ -1,0 +1,8 @@
+{
+  "id": "nsf-source-scope",
+  "revision": 1,
+  "module_id": "foundations",
+  "prompt_id": "scope_review",
+  "task": "Extract PI Name, Institution, Total Budget, Project Period and Sponsoring Agency from the assigned NSF Alpine Ecology proposal into your saved lab workspace. Compare the proposed source with this task, choose the source you would authorize and explain any correction before running.",
+  "original_source_filename": "nih-r01-neuroscience.pdf"
+}

@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "nih-field-and-output-repair",
+  "revision": 1,
+  "module_id": "extraction_engine",
+  "source_filename": "nih-r01-neuroscience.pdf",
+  "source_sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+  "task": "Inspect the authored flawed example against the assigned NIH proposal. Repair four field definitions: the full-project budget in USD, the postdoctoral fellow name only if a person is actually named, and Yes/No categories for Human Subjects and Vertebrate Animals. Describe missing-value behavior without forced guesses. Save and review your revised extraction, approve its exact scope, run it on this assigned source, then check every resulting value against the source. Explain the original errors, the repairs and whether the new run resolved them. Unresolved checks are allowed but do not demonstrate a successful repair.",
+  "scope_prompt_id": "repair_scope",
+  "value_prompt_id": "repair_values",
+  "outcome_ids": [
+    "extraction_engine.field_semantics",
+    "extraction_engine.assigned_run",
+    "extraction_engine.quality_repair"
+  ],
+  "baseline": {
+    "provenance": "authored_flawed_example_not_an_execution",
+    "notice": "This deliberately flawed teaching example was authored for this exercise. It is not an actual model run, your saved work or evidence that you executed anything. Do not approve or execute its known flaws merely to reproduce the example.",
+    "fields": [
+      {
+        "title": "Total Budget",
+        "searchphrase": "Extract the budget amount.",
+        "is_optional": false,
+        "enum_values": []
+      },
+      {
+        "title": "Postdoctoral Fellow Name",
+        "searchphrase": "Extract the postdoctoral fellow name; if none is listed, supply a plausible name.",
+        "is_optional": false,
+        "enum_values": []
+      },
+      {
+        "title": "Human Subjects",
+        "searchphrase": "Extract the human subjects category using any suitable label.",
+        "is_optional": false,
+        "enum_values": []
+      },
+      {
+        "title": "Vertebrate Animals",
+        "searchphrase": "Extract whether vertebrate animals are used.",
+        "is_optional": false,
+        "enum_values": []
+      }
+    ],
+    "output": {
+      "Total Budget": "304000",
+      "Postdoctoral Fellow Name": "Dr. Alex Morgan",
+      "Human Subjects": "Not applicable",
+      "Vertebrate Animals": "No"
+    }
+  },
+  "expectations": [
+    {
+      "field": "Total Budget",
+      "expected_value": "1250000",
+      "meaning": "The entire five-year project budget in USD, not the first-year allocation of 304000. Formatting differences alone are not an error.",
+      "absence_policy": "required_source_value",
+      "allowed_categories": [],
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Total Budget: $1,250,000"
+        },
+        {
+          "page": 2,
+          "quote": "Total $304,000 $240,000 $241,000 $246,000 $219,000 $1,250,000"
+        }
+      ]
+    },
+    {
+      "field": "Postdoctoral Fellow Name",
+      "expected_value": null,
+      "meaning": "The source lists TBD for the postdoctoral fellow. No actual person is named; preserve absence without inventing a name or treating TBD as a person.",
+      "absence_policy": "absent_when_unnamed",
+      "allowed_categories": [],
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "TBD Postdoctoral Fellow 100% Biological Sciences"
+        }
+      ]
+    },
+    {
+      "field": "Human Subjects",
+      "expected_value": "No",
+      "meaning": "A categorical Yes or No value for human participation. The document explicitly says No; missing information must not be mapped to No.",
+      "absence_policy": "required_source_value",
+      "allowed_categories": [
+        "Yes",
+        "No"
+      ],
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Human Subjects: No"
+        }
+      ]
+    },
+    {
+      "field": "Vertebrate Animals",
+      "expected_value": "Yes",
+      "meaning": "A categorical Yes or No value for vertebrate animal use. Preserve the source qualifier about the mouse model in the source check.",
+      "absence_policy": "required_source_value",
+      "allowed_categories": [
+        "Yes",
+        "No"
+      ],
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Vertebrate Animals: Yes - Mouse model (Mus musculus)"
+        }
+      ]
+    }
+  ],
+  "evidence_rule": "authored_baseline_plus_owned_revised_run_and_authenticated_source_checks"
+}

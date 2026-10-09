@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "monthly-report-review-map",
+  "revision": 1,
+  "module_id": "process_mapping",
+  "provenance": "authored_fictional_design_case_not_execution",
+  "notice": "This is a supplied fictional process-design case. No real reports, recipients, institutional decisions or executions are involved. You do not need to disclose your own work.",
+  "task": "Design a bounded process for a grants reviewer who compares three project progress reports each month. Choose a working method and explain its fit. Critique the deliberately flawed proposal, save a corrected process map, and write the task brief you would give an agent. Identify the work an agent can help prepare and the decision that remains with the authorized reviewer. This assignment asks for a reviewable design; do not execute a workflow, contact anyone or invent evidence of a completed run.",
+  "assigned_inputs": [
+    {
+      "id": "report-alpine",
+      "description": "Fictional monthly report A: narrative milestones, reported spending and a list of incomplete activities. The form is similar each month; the narrative varies."
+    },
+    {
+      "id": "report-neural",
+      "description": "Fictional monthly report B: narrative milestones and spending. A required supporting passage may be missing or unreadable; the process must explain how that is handled."
+    },
+    {
+      "id": "report-water",
+      "description": "Fictional monthly report C: narrative milestones and spending. Two passages may disagree about an activity; the process must preserve the conflict for review."
+    }
+  ],
+  "intended_output": "An internal draft comparison of reported milestones, spending and unresolved issues, with source/intermediate references that the grants reviewer can inspect. No institutional compliance conclusion or release is authorized by this assignment.",
+  "repetition": "The reviewer repeats this comparison monthly with three explicitly assigned reports; the fields recur but narrative content and exceptions vary.",
+  "authority": "The agent may help organize and summarize the assigned reports. The designated grants reviewer is responsible for institutional interpretation and any later release authorization. In this fictional design, describe that responsibility; do not ask a staff member to grade your work or take any real action.",
+  "exclusions": [
+    "Other documents or personal work not named in the assignment.",
+    "External sending, sharing, scheduling and automatic institutional approval.",
+    "Treating missing evidence as zero, agreement or completed work."
+  ],
+  "exception_conditions": [
+    "An assigned report or required passage is unreadable or missing.",
+    "Source passages conflict or fail to support a required comparison claim.",
+    "A proposed action changes the input set, recipient, authority or intended output."
+  ],
+  "flawed_proposal": "Authored flawed proposal: Create an automation that searches every available project file each month. Let the assistant decide which projects need attention and mark their reports approved whenever its summary sounds consistent. Email the comparison to an external partner automatically, then ask the grants reviewer to look for errors afterward. If a passage is missing, infer the most likely milestone status so the table always looks complete. Do not retain intermediate references because the final summary is enough.",
+  "method_comparisons": [
+    {
+      "id": "one-off-question",
+      "situation": "A learner asks one source-grounded question about a single assigned report and needs no recurring output or downstream action. Explain what a fitting method gains and what an unnecessary saved process would add."
+    },
+    {
+      "id": "repeated-fixed-fields",
+      "situation": "Every week the same five fields must be extracted from explicitly assigned intake forms, followed by source checks. There is no analysis, delivery or scheduling requirement. Compare a reusable extraction with a larger workflow."
+    },
+    {
+      "id": "multi-stage-review",
+      "situation": "The assigned monthly task compares recurring fields and variable narrative evidence, retains exceptions and pauses for accountable human judgment before any later release. Explain your selected method and its boundaries."
+    }
+  ],
+  "method_options": [
+    "chat",
+    "project",
+    "reusable_extraction",
+    "workflow",
+    "automation"
+  ],
+  "questions": [
+    {
+      "id": "method_choice",
+      "outcome_id": "process_mapping.method_choice",
+      "prompt": "Compare a fitting method for each of the three situations, then justify the method or bounded combination you select for the monthly review. Address input consistency, repetition, required output and human judgment. Explain what a project or automation would add if you use one.",
+      "response_kind": "method_and_rationale"
+    },
+    {
+      "id": "human_checkpoint",
+      "outcome_id": "process_mapping.human_checkpoint",
+      "prompt": "Save an ordered map naming each operation, its inputs and outputs, the responsible agent or human, and evidence available for inspection. Identify and correct the flawed proposal. Show what must wait for the reviewer, what the reviewer examines, and how unresolved items stop or return for correction. Describe the correction in your own decision.",
+      "response_kind": "ordered_process_map"
+    },
+    {
+      "id": "bounded_scope",
+      "outcome_id": "process_mapping.bounded_scope",
+      "prompt": "Write the bounded task brief: name the exact fictional inputs, intended result, excluded actions, stopping condition and exception path. State what the agent may prepare and what it may not decide or release. Do not submit real private documents or claim this design has executed.",
+      "response_kind": "bounded_task_brief"
+    }
+  ],
+  "assistance_policy": "agent_may_draft_learner_must_review_correct_and_submit",
+  "assessment_policy": "automatic_structured_review_no_staff_queue_no_presence_credit",
+  "handoff_policy": "preserve_original_approved_map_or_choose_provided_example",
+  "review_guidance": [
+    {
+      "outcome_id": "process_mapping.method_choice",
+      "passing_conditions": [
+        "The selected method and rationale address input consistency, repetition, required output and human judgment."
+      ],
+      "critical_failures": [
+        "Choose a workflow only because it has more steps or omit the actual output requirement."
+      ],
+      "case_application": "Assess the rationale against monthly repeated inputs, variable narrative sections, a comparison output and accountable judgment. A workflow or another bounded combination can be appropriate if justified; do not require one method label or an arbitrary number of steps. A project organizes context but does not itself implement the process. Automation needs a defined trigger and authority, neither of which this assignment requests. Compare the three contrasting situations without treating a selected label as sufficient evidence."
+    },
+    {
+      "outcome_id": "process_mapping.human_checkpoint",
+      "passing_conditions": [
+        "The map identifies who reviews, what evidence they inspect and what must wait for their decision."
+      ],
+      "critical_failures": [
+        "Place approval after an irreversible action or omit the accountable reviewer."
+      ],
+      "case_application": "The learner must correct the proposal that releases first and reviews afterward. The process map should locate source/intermediate evidence, identify the authorized grants reviewer and hold any institutional conclusion or release for that decision. The learning task has no real recipient and performs no send. Merely saying human in the loop without evidence, responsibility and ordering is insufficient. Do not infer a learner correction from an agent draft."
+    },
+    {
+      "outcome_id": "process_mapping.bounded_scope",
+      "passing_conditions": [
+        "Scope names the input set, intended output, exclusions and when the agent must stop and ask."
+      ],
+      "critical_failures": [
+        "Allow the agent to expand documents, recipients or authority without review."
+      ],
+      "case_application": "The brief must identify the three assigned fictional reports, an internal comparison draft, the prohibited external release and unrelated-source expansion, and a stop/flag path for unreadable, missing or conflicting evidence. Preserving unresolved items is appropriate; guessing completion or inventing institutional approval is not. This is a process design, so no actual extraction or execution receipt is expected."
+    }
+  ]
+}

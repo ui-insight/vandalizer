@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "course_id": "vandal-workflow-architect",
+  "release_id": "legacy-2026-10-02.1",
+  "title": "Vandal Workflow Architect — current course",
+  "description": "Continuation baseline for the existing program. Historical learner version is unknown; this package preserves current requirements and does not establish new 5.0 competencies.",
+  "historical_provenance": "continuation-baseline",
+  "rubric_id": "legacy-2026-10-02",
+  "star_bonus_xp": 25,
+  "maximum_stars": 3,
+  "modules": [
+    {
+      "id": "ai_literacy",
+      "title": "AI Literacy",
+      "base_xp": 50,
+      "lesson_ids": [
+        "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+        "ai_literacy.structured-vs-unstructured-data",
+        "ai_literacy.what-is-an-llm-really",
+        "ai_literacy.what-ai-is-genuinely-good-at",
+        "ai_literacy.what-ai-is-genuinely-bad-at",
+        "ai_literacy.ai-for-research-administration",
+        "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+        "ai_literacy.worked-example-monday-morning-12-proposals",
+        "ai_literacy.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "base_xp": 100,
+      "lesson_ids": [
+        "foundations.what-is-a-workflow",
+        "foundations.what-you-ll-build",
+        "foundations.the-document-pipeline",
+        "foundations.build-your-first-workflow",
+        "foundations.why-structured-extraction-matters",
+        "foundations.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "process_mapping",
+      "title": "Thinking in Workflows",
+      "base_xp": 100,
+      "lesson_ids": [
+        "process_mapping.from-one-workflow-to-many",
+        "process_mapping.finding-the-repetition",
+        "process_mapping.the-ai-suitability-test",
+        "process_mapping.walkthrough-mapping-a-real-process",
+        "process_mapping.common-processes-that-become-workflows",
+        "process_mapping.worked-example-mapping-progress-report-review",
+        "process_mapping.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "workflow_design",
+      "title": "Workflow Design",
+      "base_xp": 100,
+      "lesson_ids": [
+        "workflow_design.from-process-map-to-workflow-architecture",
+        "workflow_design.the-extract-reason-deliver-pattern",
+        "workflow_design.designing-for-your-reviewer",
+        "workflow_design.walkthrough-designing-a-compliance-review-pipeline",
+        "workflow_design.when-to-split-when-to-combine",
+        "workflow_design.worked-example-designing-subaward-intake",
+        "workflow_design.chat-driven-workflow-design-v5-0",
+        "workflow_design.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "extraction_engine",
+      "title": "Extraction Engine",
+      "base_xp": 150,
+      "lesson_ids": [
+        "extraction_engine.one-pass-vs-two-pass-extraction",
+        "extraction_engine.configuring-fields-for-accuracy",
+        "extraction_engine.build-a-comprehensive-extraction",
+        "extraction_engine.when-to-use-consensus-repetition",
+        "extraction_engine.worked-example-fixing-a-weak-field-list",
+        "extraction_engine.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "multi_step",
+      "title": "Multi-Step Workflows",
+      "base_xp": 150,
+      "lesson_ids": [
+        "multi_step.how-steps-chain-together",
+        "multi_step.the-prompt-node-reasoning-over-data",
+        "multi_step.build-a-3-step-analysis-workflow",
+        "multi_step.design-principle-separate-reading-from-reasoning",
+        "multi_step.worked-example-watching-data-flow-through-three-steps",
+        "multi_step.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "advanced_nodes",
+      "title": "Advanced Nodes",
+      "base_xp": 200,
+      "lesson_ids": [
+        "advanced_nodes.beyond-extraction-and-prompts",
+        "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+        "advanced_nodes.running-tasks-in-parallel",
+        "advanced_nodes.build-a-workflow-with-advanced-nodes",
+        "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+        "advanced_nodes.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "output_delivery",
+      "title": "Output & Delivery",
+      "base_xp": 200,
+      "lesson_ids": [
+        "output_delivery.from-analysis-to-deliverables",
+        "output_delivery.designing-end-to-end-deliverable-workflows",
+        "output_delivery.build-a-deliverable-workflow",
+        "output_delivery.worked-example-one-report-in-two-deliverables-out",
+        "output_delivery.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "validation_qa",
+      "title": "Validation & QA",
+      "base_xp": 250,
+      "lesson_ids": [
+        "validation_qa.why-validation-matters",
+        "validation_qa.building-effective-validation-plans",
+        "validation_qa.set-up-validation-for-your-workflow",
+        "validation_qa.validation-as-a-safety-net",
+        "validation_qa.worked-example-five-checks-and-a-failing-run",
+        "validation_qa.trust-signals-quality-tiers-v5-0",
+        "validation_qa.guided-verification-v5-0",
+        "validation_qa.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "batch_processing",
+      "title": "Batch Processing",
+      "base_xp": 250,
+      "lesson_ids": [
+        "batch_processing.single-vs-batch-execution",
+        "batch_processing.monitoring-and-debugging-batch-runs",
+        "batch_processing.choosing-the-right-model-for-batch-work",
+        "batch_processing.run-your-first-batch",
+        "batch_processing.worked-example-thirty-proposals-one-bad-scan",
+        "batch_processing.glossary-review"
+      ],
+      "prerequisites": []
+    },
+    {
+      "id": "governance",
+      "title": "Collaboration & Governance",
+      "base_xp": 300,
+      "lesson_ids": [
+        "governance.organizing-for-reuse",
+        "governance.sharing-with-everyone",
+        "governance.sharing-workflows-across-teams",
+        "governance.establish-your-workflow-governance",
+        "governance.building-a-culture-of-reuse",
+        "governance.worked-example-one-workflow-two-offices",
+        "governance.glossary-review"
+      ],
+      "prerequisites": []
+    }
+  ],
+  "artifacts": {
+    "documents/budget-justification.pdf": "0599cd3b4d286300f5e3f3bb16c1a2b204e5ce4e3f8f756d5830142027218ea0",
+    "documents/nih-r01-neuroscience.pdf": "b1ba1edcbd4a0ead1a857c64cab8ce3621a8852e1711e77cf6e452bc885e1874",
+    "documents/nsf-proposal-alpine-ecology.pdf": "eed235f9fdcf7ae37a548dd34ca677a98d437ace2c1814da4ee37dafb9f33821",
+    "documents/progress-report-year2.pdf": "08fbc619b12653288f435c0f7dd42e9427609961affa830445b7709c100632fa",
+    "documents/proposal-batch-1.pdf": "dc9725bac8f41ba4d233341cfa50a20ef2e3c0092316acbd5d9088e143bc31c0",
+    "documents/proposal-batch-2.pdf": "7a06e6bf6840983c1c9089b96b5fd50790b8f1bc62fb6a62d8b7a652f1792876",
+    "documents/proposal-batch-3.pdf": "2676b264fb236116658097efb99d8d114f7e1f8acb35abf751ec43f2e08cc5b9",
+    "documents/subaward-agreement.pdf": "a2083e8515fb0004290483248b437cf6ee55627a69b9dcc9f084560a6e7c8110",
+    "exercises.json": "e50dfab91417595f7f98b787070578224a35a991c44c346e5bcd39b9c9b92114",
+    "lessons.json": "84b7833c4896fb0869f0ea443f6300476c22450d271da3c9d6c6726f3a63d184",
+    "panel-modules.json": "7b21d514506faa63efa41b9373419961c8d00c37f991f005a6e5150ff713b354",
+    "rubric.py": "068c24fee471c6f5ebca16c52581d249c129381d7e89301670dc3b35f5efe113",
+    "course-structure.json": "3302df7bc94a79d47ef96a5a6608649e76b917b12d8ba8854d65365a3b2be2b8"
+  }
+}

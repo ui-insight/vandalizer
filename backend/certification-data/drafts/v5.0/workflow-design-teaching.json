@@ -1,0 +1,272 @@
+{
+  "state": "design_draft",
+  "module_id": "workflow_design",
+  "purpose": "Unpublished replacements for a separately versioned course. Actual workflow execution, approval decisions and calibrated assessment remain required.",
+  "module_patch": {
+    "subtitle": "Connect the right data and review decisions",
+    "description": "Inspect a proposed workflow’s inputs, intermediate evidence, approval boundary and intended output before execution.",
+    "objectives": [
+      "Trace configured source data through each operation to the intended output",
+      "Distinguish creation/run confirmation from an actual workflow approval pause",
+      "Inspect the saved configuration and test the review boundary before relying on the design"
+    ],
+    "tips": [
+      "A short creation preview does not show every prompt, source or reviewer setting.",
+      "Later steps receive configured inputs; they do not automatically see all source context.",
+      "Verify that downstream actions wait for the required decision.",
+      "A changed design needs evidence from that revision."
+    ],
+    "estimatedMinutes": 22
+  },
+  "replacements": [
+    {
+      "id": "workflow_design.from-process-map-to-workflow-architecture",
+      "revision": 2,
+      "title": "Turn the process map into a reviewable design",
+      "variant": "concept",
+      "objective": "Define each operation’s input, output and evidence before choosing task types.",
+      "content": "A process map describes the work and its decisions. A workflow design specifies how supported operations connect. Begin with the bounded task you mapped: its source set, intended output, reviewer and stopping condition.\n\nFor each operation, write four things: the input it needs, the transformation it performs, the output it produces and the check that would reveal an error. “Analyze the proposal” is too broad to establish a data connection. “Compare the extracted project dates with the supplied period requirement and retain unresolved differences” is more reviewable.\n\nChoose task types according to that purpose. Extraction can organize fixed fields; a prompt can interpret supplied context; a formatter can shape an existing result. Deterministic calculations need an explicit rule and checked inputs. Select supported operations in the current builder; do not assume a type mentioned in a chat proposal has actually been configured.\n\nThe chat workflow builder supports a defined set of operations and creates a linear sequence. More complex configuration may require the editor. A design can also end before an operation that needs a separate human decision or unsupported integration.\n\n**Practice:** Replace a proposed “do everything” step with a short input–operation–output description. Name one intermediate result you would need to inspect before trusting the final artifact.",
+      "knowledge_check": {
+        "question": "What makes a proposed step reviewable?",
+        "options": [
+          {
+            "text": "A technical-sounding title.",
+            "correct": false,
+            "explanation": "The title alone does not describe a usable data connection."
+          },
+          {
+            "text": "Its input, operation, expected output and an explicit way to check the result.",
+            "correct": true,
+            "explanation": "These details let a reviewer inspect the design and later compare it with execution."
+          },
+          {
+            "text": "A promise that the assistant selected the best tool.",
+            "correct": false,
+            "explanation": "A proposal still needs independent inspection."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.the-extract-reason-deliver-pattern",
+      "revision": 3,
+      "title": "Trace what each step actually receives",
+      "variant": "concept",
+      "objective": "Inspect input-source choices and avoid assuming later steps see every document.",
+      "content": "Follow the data through the design before you run it. If a step receives only an extracted table, it cannot reliably interpret a clause omitted from that table. A final report cannot recover evidence that no earlier step retained or supplied.\n\nThe current chat builder wires the first document-consuming step to workflow documents and later document-consuming steps to the previous step’s output. In the editor, input-source choices include Step Input (the immediately preceding output), Workflow Documents and Selected Document. Inspect the configured source for each step; do not infer it from the step’s name.\n\nChoose extraction when defined fields serve the task. A focused prompt over relevant source text may fit a context-dependent question without a separate extraction. Neither route is inherently more accurate for every document. Test the chosen input and output on representative cases, including a case where the omitted context matters.\n\nInspect pinned documents as well as documents selected for the current run. A workflow can include fixed inputs, so “run on this file” does not necessarily describe the complete input set. Remove unintended sources or explain why a required reference belongs in scope.\n\n**Practice:** A comparison step receives only five extracted values, but its question depends on an amendment paragraph. Identify the missing input and propose a reviewable configuration change before running.",
+      "knowledge_check": {
+        "question": "A later step must interpret a clause omitted from the extracted table it receives. What should change?",
+        "options": [
+          {
+            "text": "Its input must include the relevant source context, or the task must be narrowed.",
+            "correct": true,
+            "explanation": "The needed evidence must reach the operation that uses it."
+          },
+          {
+            "text": "Nothing; later steps automatically know all original documents.",
+            "correct": false,
+            "explanation": "Configured inputs determine available context; the step name does not."
+          },
+          {
+            "text": "Only the report’s font size.",
+            "correct": false,
+            "explanation": "Presentation cannot supply missing evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.designing-for-your-reviewer",
+      "revision": 2,
+      "title": "Design the output for the reviewer’s decision",
+      "variant": "insight",
+      "objective": "Separate source facts, interpretation, uncertainty and review status.",
+      "content": "A useful output helps the reviewer make a specific decision. State that decision before choosing the layout. An internal discrepancy brief, a draft report and a release-ready artifact require different evidence and status labels.\n\nKeep source facts distinguishable from interpretation. A value table should retain the document identity, field meaning and supporting passage or location when available. A narrative conclusion should explain which facts support it and identify unresolved gaps. A source link is an invitation to check the evidence, not proof that the conclusion is correct.\n\nShow missing information and conflicting values clearly. Avoid turning “not found in the supplied source” into “does not exist,” or changing an unresolved result into a pass because the final document looks complete. Include the run or version reference that lets the reviewer identify the actual result under review.\n\nName the next decision and what must wait for it. A formatted artifact is not automatically approved for external delivery. The reviewer needs to see the intended destination and any conditions that affect release.\n\n**Practice:** Sketch an internal review brief with facts, source references, unresolved issues and a decision section. Explain how a reviewer would trace one important conclusion back to its source. Do not promise a fixed review time before observing the real task.",
+      "knowledge_check": {
+        "question": "Which output best supports review?",
+        "options": [
+          {
+            "text": "A polished report that hides missing fields.",
+            "correct": false,
+            "explanation": "Hidden gaps prevent an informed decision."
+          },
+          {
+            "text": "A confidence score without the underlying evidence.",
+            "correct": false,
+            "explanation": "A score does not replace the source and result under review."
+          },
+          {
+            "text": "A result that separates supported facts, interpretation, unresolved issues and the pending decision.",
+            "correct": true,
+            "explanation": "The reviewer can inspect both the evidence and its limitations."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.walkthrough-designing-a-compliance-review-pipeline",
+      "revision": 2,
+      "title": "Place and verify an approval boundary",
+      "variant": "walkthrough",
+      "objective": "Distinguish creation confirmation, run confirmation and a configured workflow approval step.",
+      "content": "There are different approval moments. Confirming creation permits the proposed workspace artifact to be created. Confirming a workflow run permits execution to start. A configured Approval step can pause an executing workflow for review before later steps continue. One does not substitute for the others.\n\nPlace the Approval step before the operation whose consequences require a decision. Configure the intended reviewer and clear instructions: what evidence to inspect, which discrepancies prevent approval and what the next step will do. Review timeout behavior too; a timeout action that approves automatically does not represent an explicit human decision.\n\nTest the boundary on training data. Confirm that the run reports a pending approval, the reviewer receives the relevant intermediate output and downstream work has not already occurred. Inspect what happens after approval and rejection. A gate drawn in a diagram or mentioned in a prompt is not proof of these behaviors.\n\nIf the required pause is not supported or cannot be verified for the design, end the automated portion before the consequential action and handle the next action separately. Preserve unresolved work instead of describing it as completed.\n\n**Practice:** A design formats a report, sends it and then asks for approval. Move the review before sending and specify the artifact, recipient and unresolved issues the reviewer must inspect.",
+      "knowledge_check": {
+        "question": "A workflow requires a person to review before release. Which setup violates that requirement?",
+        "options": [
+          {
+            "text": "A verified pause before release with an assigned reviewer.",
+            "correct": false,
+            "explanation": "This can support the requirement when the evidence and actual pause are verified."
+          },
+          {
+            "text": "A timeout configured to approve automatically without the person’s decision.",
+            "correct": true,
+            "explanation": "Automatic timeout approval is not evidence of the required human decision."
+          },
+          {
+            "text": "A separate release action performed only after the required review.",
+            "correct": false,
+            "explanation": "Separating the action can preserve the review boundary."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.when-to-split-when-to-combine",
+      "revision": 2,
+      "title": "Split steps where inspection or decisions need it",
+      "variant": "insight",
+      "objective": "Balance useful intermediate evidence with configuration and maintenance effort.",
+      "content": "Choose step boundaries for a reason. Split operations when an intermediate result needs inspection, a different kind of processing is required or a decision must occur before the next action. A separate step can make a mistake easier to locate, but more steps also add configuration and data connections to check.\n\nA small focused operation may belong in one step when its input, output and evidence remain clear. Do not automatically prepend extraction to a context-dependent question, and do not automatically combine extraction, interpretation and release into one prompt. Evaluate whether the chosen boundary makes the result easier to test and supervise.\n\nEach new connection has a contract: which fields or text are passed, what happens to missing values and how the next operation recognizes failure. If a formatter turns an error message into a polished report, the design has hidden a failure rather than handled it.\n\nTest one normal input and one failure case at the proposed boundary. Check that the failure remains visible and prevents any dependent action that requires success. Reusing an earlier intermediate result after editing its producing step needs a fresh check of compatibility.\n\n**Practice:** Explain whether extraction and arithmetic should be separate in a budget-summary design. Name the intermediate evidence you need and how missing input should affect the calculation.",
+      "knowledge_check": {
+        "question": "What is the strongest reason to add a separate step?",
+        "options": [
+          {
+            "text": "The design needs an inspectable intermediate result or a decision before the next action.",
+            "correct": true,
+            "explanation": "The boundary has a concrete review or execution purpose."
+          },
+          {
+            "text": "The course rewards the largest number of steps.",
+            "correct": false,
+            "explanation": "Step count does not establish competence."
+          },
+          {
+            "text": "A longer chain always improves model accuracy.",
+            "correct": false,
+            "explanation": "Extra connections can introduce errors as well as useful structure."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.worked-example-designing-subaward-intake",
+      "revision": 2,
+      "title": "Worked example: a subaward review brief",
+      "variant": "walkthrough",
+      "objective": "Design a bounded comparison that preserves source context and waits for release review.",
+      "content": "Consider a fictional subaward review. The assigned sources are a training agreement and the specified reference terms. The requested output is an internal deviation brief for the subaward officer. Updating a tracking system or contacting another institution is outside this design.\n\nFirst, identify the parties, amount, period and relevant terms with source support. Choose structured extraction for repeated fields, but retain the context needed to interpret exceptions. Do not assume a long agreement becomes safer to analyze simply because it was reduced to a few values.\n\nNext, compare the supplied terms with the specified reference. Make sure that comparison step actually receives both the agreement evidence and reference terms. Mark ambiguity as unresolved; the task is to prepare a comparison, not issue an institutional approval.\n\nThen format a brief that separates the source facts, possible deviations and questions for the reviewer. End before any external release. If the design later includes a release operation, add and verify the required approval boundary before it.\n\n**Practice:** Critique a proposal that compares extracted terms without supplying the reference document, then sends a “compliant” report automatically. Identify the missing data connection and the missing decision. Revise both before creation or execution.",
+      "knowledge_check": {
+        "question": "The comparison step receives agreement fields but no reference terms. What is missing?",
+        "options": [
+          {
+            "text": "A more confident conclusion.",
+            "correct": false,
+            "explanation": "Confidence cannot replace the comparison source."
+          },
+          {
+            "text": "The evidence needed for the comparison; it must be supplied and checked.",
+            "correct": true,
+            "explanation": "A comparison requires both the observed terms and the intended reference."
+          },
+          {
+            "text": "An automatic delivery step.",
+            "correct": false,
+            "explanation": "Delivery does not repair missing input or establish approval."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.chat-driven-workflow-design-v5-0",
+      "revision": 2,
+      "title": "Use chat to propose, then inspect the saved workflow",
+      "variant": "insight",
+      "objective": "Review the limits of a creation preview and inspect saved settings before execution.",
+      "content": "Use chat as a design partner with an explicit stopping point. For example: “Propose a workflow for this training comparison. Name each step’s input and output, include a reviewer before release, and stop before creating or running anything.” Correct the proposal’s sources, operations or boundaries before moving on.\n\nWhen you ask the assistant to create the workflow, the current creation preview summarizes its name and step names/types. It does not present every prompt, input setting or reviewer configuration. Inspect the saved workflow in the editor after creation and before running. Check the trigger, fixed documents, field definitions, prompts, input sources, output markings and any Approval step settings.\n\nThe chat builder supports specific operation types and linear wiring. If your design needs an operation or connection it cannot configure, use a supported editor route or revise the design. A sentence in the assistant’s response is not proof that the requested node exists.\n\nA newly created workflow is unverified. Ask to run the named saved workflow on the intended training input only after inspecting it. Review the run confirmation, then use its actual status and results to inspect execution. Creation, dispatch, pending approval and completion are different states.\n\n**Practice:** List three saved settings that a short creation preview does not establish. Explain how you would inspect them before starting the run.",
+      "knowledge_check": {
+        "question": "The creation preview lists the expected step names. What should you do before running?",
+        "options": [
+          {
+            "text": "Assume every prompt, source and reviewer setting matches your request.",
+            "correct": false,
+            "explanation": "A summary of names and types does not expose every configuration detail."
+          },
+          {
+            "text": "Treat the workflow as validated because it was created.",
+            "correct": false,
+            "explanation": "Creation is not validation or successful execution."
+          },
+          {
+            "text": "Inspect the saved configuration, including inputs, prompts and approval settings.",
+            "correct": true,
+            "explanation": "Inspecting the actual artifact closes gaps left by the brief preview."
+          }
+        ]
+      }
+    },
+    {
+      "id": "workflow_design.glossary-review",
+      "revision": 2,
+      "title": "Review the design and its evidence",
+      "variant": "key-terms",
+      "objective": "Explain the data path, implemented review boundary and output requirements.",
+      "content": "**Input source:** the configured content a step receives. Inspect it explicitly; previous output, workflow documents and a selected document are distinct choices.\n\n**Data connection:** the information passed from one operation to another. Check that the receiving operation gets the facts and context it needs, including the intended reference material.\n\n**Intermediate output:** a result you can inspect before relying on downstream work. Preserve errors and missing information instead of formatting them into an apparent success.\n\n**Approval boundary:** a verified pause or separately controlled action placed before its dependent consequence. Creation confirmation, run confirmation and a workflow Approval step have different purposes.\n\n**Review configuration:** who reviews, what evidence they inspect, what their decision permits and what happens if they do not respond. A configured automatic approval cannot prove an explicit human decision.\n\n**Deliverable:** the artifact intended for a specific use. Formatting or marking a step as output does not establish accuracy, approval or successful delivery.\n\n**Design revision:** a changed configuration that may invalidate earlier test evidence. Inspect the relevant connections and rerun the necessary checks before relying on the changed design.\n\nBefore proceeding, explain your design without relying on the assistant’s assurances: trace the source to the final output, name the reviewer and stopping point, and show how a missing input prevents an unsupported conclusion or release.",
+      "knowledge_check": {
+        "question": "After changing a step’s input source, which evidence applies?",
+        "options": [
+          {
+            "text": "Earlier successful tests automatically prove the new configuration.",
+            "correct": false,
+            "explanation": "A prior result describes the earlier configuration."
+          },
+          {
+            "text": "The changed connections and relevant outputs need fresh inspection and testing.",
+            "correct": true,
+            "explanation": "The evidence must correspond to the design being used."
+          },
+          {
+            "text": "The unchanged workflow title proves continuity.",
+            "correct": false,
+            "explanation": "Names do not identify or validate configuration revisions."
+          }
+        ]
+      }
+    }
+  ],
+  "capability_references": [
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbols": [
+        "create_workflow",
+        "run_workflow"
+      ],
+      "verified_behavior": "Creation supports a specified operation set with linear input wiring; preview lists names/types, creation remains unverified and run confirmation is separate."
+    },
+    {
+      "path": "backend/app/services/workflow_engine.py",
+      "symbols": [
+        "INPUT_SOURCE_LABELS",
+        "ApprovalNode"
+      ],
+      "verified_behavior": "Configured input sources include previous output, workflow documents and selected document. Approval nodes emit pause signals and carry reviewer/timeout settings."
+    },
+    {
+      "path": "backend/app/tasks/workflow_tasks.py",
+      "symbols": [
+        "_pause_for_approval"
+      ],
+      "verified_behavior": "A workflow approval pause records a request and pending_approval state. Teaching requires actual pause/resume/rejection verification, not merely a diagram."
+    }
+  ]
+}

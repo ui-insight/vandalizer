@@ -1,0 +1,39 @@
+{
+  "overview": "Use one owned extraction and all three assigned proposals. Inspect a two-document pilot, justify the model and bounded scale-up from its source-checked results, account for every input in the actual batch, then recover only the confirmed failed item while preserving the original successful results.",
+  "documents": [
+    "proposal-batch-1.pdf",
+    "proposal-batch-2.pdf",
+    "proposal-batch-3.pdf"
+  ],
+  "instructions": [
+    "Create or select your own extraction with exactly the five named fields. Capture its exact instructions and all three complete assigned PDFs; matching filenames or a count of three cannot substitute for owned assigned identities.",
+    "Inspect the saved model configuration and complete sources. Explain why proposals 1 and 3 provide a useful bounded pilot, and why their shared layout does not establish general reliability on other sponsors, formats or scans. Explicitly approve only this pilot before running it.",
+    "Inspect all ten actual pilot values against the original sources. A completed run or consistency badge does not establish source correctness. If values are wrong, repair the extraction and run a new pilot before considering the complete batch; retain earlier results.",
+    "After a complete source-supported pilot, record your quality/resource tradeoff and approve the exact same revision and model for all three assigned proposals. Use actual elapsed time and available measurements; leave token usage, price and wider generalizations unknown when not measured.",
+    "Run the complete approved batch. The second item is deliberately rejected before model dispatch on this first full-batch attempt. Inspect each actual terminal receipt and its assigned document ID, including failures. Terminal inventory coverage is distinct from usable successful coverage.",
+    "Inspect the saved confirmed failure and verify its source, original batch and unchanged extraction settings. The training gate permits one explicitly approved attempt of that failed item. Preserve every successful original item; never launch the entire batch again as a recovery shortcut. Unknown or in-flight outcomes require reading the original receipt first.",
+    "After the targeted retry, reconcile the three assigned input IDs with their original or linked retry receipts and inspect all fifteen source-supported values. Retain the original failure. Explain actual recovery, remaining exceptions and the pilot limitations without claiming a larger production rollout or external delivery."
+  ],
+  "chat_instructions": [
+    "Help build and inspect the owned extraction, sources and actual results. Authenticated pilot, scaling and retry approvals must be submitted by the learner; never invent their decisions, receipts or grades.",
+    "Create or select your own extraction with exactly the five named fields. Capture its exact instructions and all three complete assigned PDFs; matching filenames or a count of three cannot substitute for owned assigned identities.",
+    "Inspect the saved model configuration and complete sources. Explain why proposals 1 and 3 provide a useful bounded pilot, and why their shared layout does not establish general reliability on other sponsors, formats or scans. Explicitly approve only this pilot before running it.",
+    "Inspect all ten actual pilot values against the original sources. A completed run or consistency badge does not establish source correctness. If values are wrong, repair the extraction and run a new pilot before considering the complete batch; retain earlier results.",
+    "After a complete source-supported pilot, record your quality/resource tradeoff and approve the exact same revision and model for all three assigned proposals. Use actual elapsed time and available measurements; leave token usage, price and wider generalizations unknown when not measured.",
+    "Run the complete approved batch. The second item is deliberately rejected before model dispatch on this first full-batch attempt. Inspect each actual terminal receipt and its assigned document ID, including failures. Terminal inventory coverage is distinct from usable successful coverage.",
+    "Inspect the saved confirmed failure and verify its source, original batch and unchanged extraction settings. The training gate permits one explicitly approved attempt of that failed item. Preserve every successful original item; never launch the entire batch again as a recovery shortcut. Unknown or in-flight outcomes require reading the original receipt first.",
+    "After the targeted retry, reconcile the three assigned input IDs with their original or linked retry receipts and inspect all fifteen source-supported values. Retain the original failure. Explain actual recovery, remaining exceptions and the pilot limitations without claiming a larger production rollout or external delivery."
+  ],
+  "expected_fields": [
+    "PI Name",
+    "Institution",
+    "Total Budget",
+    "Research Area",
+    "Sponsoring Agency"
+  ],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "checked-pilot-exact-batch-and-targeted-recovery",
+  "batch_case_sha256": "8583fc07f4f74bf1fb04a548ccd1a48937daf01e3c946bdd83af7b85ff835931",
+  "assessment_method": "authenticated_pilot_batch_inventory_and_targeted_recovery"
+}

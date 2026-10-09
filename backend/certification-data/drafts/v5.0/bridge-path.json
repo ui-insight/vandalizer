@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "path_id": "v5-experienced-learner-path.1",
+  "title": "Already familiar with Vandalizer?",
+  "description": "Use this assessment-first path to demonstrate what you know. Open the relevant lessons when you need an explanation or when feedback identifies something to practise.",
+  "credential_policy": "same_course_same_required_outcomes",
+  "duration_minutes": null,
+  "stages": [
+    {
+      "id": "scope",
+      "title": "Scope and approve the work",
+      "purpose": "Recognize agent limits, inspect the intended source and choose a workflow with the right human checkpoints.",
+      "module_ids": ["ai_literacy", "foundations", "process_mapping", "workflow_design"]
+    },
+    {
+      "id": "verify",
+      "title": "Verify sources and results",
+      "purpose": "Check extracted values, connected task outputs, arithmetic and the limits of measured quality.",
+      "module_ids": ["extraction_engine", "multi_step", "advanced_nodes", "validation_qa"]
+    },
+    {
+      "id": "recover_deliver",
+      "title": "Recover and deliver",
+      "purpose": "Reconcile partial failures without repeating successful work, then inspect the actual deliverable and its intended destination.",
+      "module_ids": ["batch_processing", "output_delivery"]
+    },
+    {
+      "id": "capstone",
+      "title": "Supervise the complete task",
+      "purpose": "Use the governance capstone to review scope, repair flawed work, verify evidence and justify the final handoff.",
+      "module_ids": ["governance"]
+    }
+  ]
+}

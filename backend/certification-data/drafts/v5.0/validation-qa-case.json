@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "id": "source-checked-suite-and-preserved-repair",
+  "revision": 1,
+  "module_id": "validation_qa",
+  "provenance": "authored_validation_assignment_not_observed_failure_or_retest",
+  "notice": "This is an unpublished synthetic validation assignment. You will save checked expectations, observe an actual failure and retest a corrected owned extraction. Authored examples and quality badges are not execution evidence or credit.",
+  "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results.",
+  "instructions": [
+    "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
+    "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+    "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
+    "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
+    "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
+    "Explicitly approve the corrected revision and rerun every required case, including those that passed originally. Compare original and corrected values against the unchanged expectations and original sources. Optional-field metric skipping cannot make an untested absence a pass.",
+    "Explain the causal repair, complete regression results and remaining coverage limits. Automatic feedback may request revision or report unavailable evidence. Source correctness, structure and repeatability are distinct; this two-document suite does not guarantee future accuracy."
+  ],
+  "exclusions": [
+    "No real participant, sponsor or institutional decision is involved; use only the assigned synthetic sources.",
+    "No external write, batch delivery, workspace sharing or staff review is required.",
+    "Test counts, optional-field skipping, model assurances and historical quality badges do not award this practical assessment."
+  ],
+  "fields": [
+    {
+      "title": "Principal Investigator",
+      "meaning": "The single person explicitly named Principal Investigator for the project, not a Co-PI or Co-Investigator.",
+      "comparison": "person_name"
+    },
+    {
+      "title": "Total Project Budget",
+      "meaning": "The entire requested or total project budget in USD across all project years, not an annual amount or category subtotal.",
+      "comparison": "usd_amount"
+    },
+    {
+      "title": "Named Co-PI",
+      "meaning": "The person explicitly labeled Co-PI. A Co-Investigator is not a Co-PI. Return an explicit absence when this exact role is unnamed.",
+      "comparison": "person_name_or_explicit_absence"
+    }
+  ],
+  "sources": [
+    {
+      "id": "nsf",
+      "filename": "nsf-proposal-alpine-ecology.pdf",
+      "sha256": "1217a6f5247a34aadb250553ea6581309aefc86274553993c4f500f01fbc089f",
+      "coverage": "A three-year project with a named Co-PI and annual budget columns that can be confused with the full requested amount.",
+      "source_scope": "complete_assigned_document_not_selected_excerpt"
+    },
+    {
+      "id": "nih",
+      "filename": "nih-r01-neuroscience.pdf",
+      "sha256": "156fa8753647c32778f65a7945cb70e6af6fa4985581b5bf896a1c2626c6bd55",
+      "coverage": "A five-year project with multiple named Co-Investigators but no explicitly named Co-PI; annual and whole-project budgets must remain distinct.",
+      "source_scope": "complete_assigned_document_not_selected_excerpt"
+    }
+  ],
+  "flawed_proposal": "For Total Project Budget, extract the Year 1 total from the budget table. Test only the NSF proposal and copy its extraction into expected values without source checking. Treat a high consistency score as accuracy. If the NIH case fails, remove it rather than repairing the field. This is a deliberately flawed authored proposal, not a saved learner artifact or observed execution.",
+  "questions": [
+    {
+      "id": "suite_design",
+      "outcome_id": "validation_qa.representative_tests",
+      "phase": "before_original_run",
+      "prompt": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish."
+    },
+    {
+      "id": "repair_review",
+      "outcome_id": "validation_qa.repair_and_retest",
+      "phase": "after_complete_retest",
+      "prompt": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations."
+    }
+  ],
+  "expectations": [
+    {
+      "source_id": "nsf",
+      "field": "Principal Investigator",
+      "expected_value": "Dr. Sarah Chen",
+      "meaning": "The lead PI is explicitly named; the Co-PI is a different person.",
+      "absence_policy": "required_source_value",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Principal Investigator: Dr. Sarah Chen"
+        }
+      ]
+    },
+    {
+      "source_id": "nsf",
+      "field": "Total Project Budget",
+      "expected_value": "485000",
+      "meaning": "The full three-year request is USD 485000, not Year 1 expenditure of USD 177000.",
+      "absence_policy": "required_source_value",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Requested Amount: $485,000"
+        },
+        {
+          "page": 1,
+          "quote": "Total $177,000 $152,000 $156,000 $485,000"
+        }
+      ]
+    },
+    {
+      "source_id": "nsf",
+      "field": "Named Co-PI",
+      "expected_value": "Dr. Michael Torres",
+      "meaning": "The source explicitly labels Michael Torres as Co-PI; preserve that specific role.",
+      "absence_policy": "required_source_value",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Co-PI: Dr. Michael Torres"
+        }
+      ]
+    },
+    {
+      "source_id": "nih",
+      "field": "Principal Investigator",
+      "expected_value": "Dr. James Park",
+      "meaning": "James Park is the PI; neither named Co-Investigator replaces him.",
+      "absence_policy": "required_source_value",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Principal Investigator: Dr. James Park"
+        }
+      ]
+    },
+    {
+      "source_id": "nih",
+      "field": "Total Project Budget",
+      "expected_value": "1250000",
+      "meaning": "The full five-year budget is USD 1250000, not the USD 304000 first-year total.",
+      "absence_policy": "required_source_value",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Total Budget: $1,250,000"
+        },
+        {
+          "page": 2,
+          "quote": "Total $304,000 $240,000 $241,000 $246,000 $219,000 $1,250,000"
+        }
+      ]
+    },
+    {
+      "source_id": "nih",
+      "field": "Named Co-PI",
+      "expected_value": null,
+      "meaning": "The complete assigned source names Co-Investigators, not a Co-PI. Do not promote another role or invent a person. This absence must be tested explicitly.",
+      "absence_policy": "absent_when_role_not_explicitly_named",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Dr. Lisa Yamamoto Co-Investigator 15% Psychology"
+        },
+        {
+          "page": 1,
+          "quote": "Dr. Raj Patel Co-Investigator 10% Computer Science"
+        }
+      ]
+    }
+  ],
+  "review_guidance": [
+    {
+      "outcome_id": "validation_qa.representative_tests",
+      "passing_conditions": [
+        "Required cases contain meaningful expected results and run against the exact assessed revision."
+      ],
+      "critical_failures": [
+        "Use empty expectations, unrelated cases or a cherry-picked subset as comprehensive quality proof."
+      ],
+      "case_application": "Require authenticated learner expectations and source reasons for all six pairs, meaningful distinction of both complete sources, actual execution on the bound artifact revision and honest coverage limits. Authored answer keys, counts and optional-field skipping are not learner evidence."
+    },
+    {
+      "outcome_id": "validation_qa.repair_and_retest",
+      "passing_conditions": [
+        "The failed case is preserved, the correction is explained, and the required suite passes on the corrected revision."
+      ],
+      "critical_failures": [
+        "Delete the failing case or compare unrelated revisions to claim repair."
+      ],
+      "case_application": "Require a real original semantic mismatch, same owned artifact with a changed field revision, preserved sources and expectations, explicit learner explanation and all six passing corrected comparisons. A failed provider call is unavailable evidence; deleted cases, changed answers and unrelated successful runs cannot prove repair."
+    }
+  ],
+  "suite_rule": "learner_checked_expectations_for_every_field_and_source_preserved_across_revisions",
+  "execution_rule": "actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge",
+  "failure_rule": "observed_value_mismatch_required_technical_failure_is_unavailable_not_learning_failure",
+  "repair_rule": "same_owned_artifact_changed_revision_same_complete_suite_explicit_approval_no_deleted_failures",
+  "absence_rule": "explicit_absence_is_tested_even_if_the_product_quality_metric_skips_optional_fields",
+  "assessment_policy": "automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit"
+}

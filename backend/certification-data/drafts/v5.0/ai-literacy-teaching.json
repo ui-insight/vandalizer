@@ -1,0 +1,302 @@
+{
+  "state": "design_draft",
+  "module_id": "ai_literacy",
+  "purpose": "Lesson replacements for a future separately versioned course. Do not edit the continuation package. These drafts have not been validated with learners.",
+  "replacements": [
+    {
+      "id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+      "revision": 2,
+      "title": "Start with a task, a source and a decision",
+      "variant": "concept",
+      "objective": "Describe a bounded task and name the evidence and human decision it requires.",
+      "content": "Vandalizer’s assistant can help read documents, prepare structured information and carry out supported workspace operations. You supervise that work by naming what should happen, checking the proposed scope and inspecting the evidence it returns. You do not need to write code to begin.\n\nStart with one small task: “Use this training proposal to identify the project title and requested amount. Show the supporting text. If either is missing, say it was not found. Do not send or publish anything.” This names the input, the requested output and the boundary of the task.\n\nBefore an action, check the selected source and workspace. During the task, inspect relevant intermediate results. Afterward, compare important claims with their sources and decide whether the output is ready for its intended use. If a required check is unresolved, pause at that decision instead of treating a completed run as approval.\n\nThis first module uses fictional scenarios that need no files or previous artifacts. Later labs use assigned training documents. Keep those exercises separate from live institutional records; a familiar filename is not proof that the right document is selected.\n\n**Practice:** For a document summary, name one source, one question and one action that should wait for a separate decision. The aim is a clear boundary you can inspect, not a long or technical prompt.",
+      "knowledge_check": {
+        "question": "Which request gives you the clearest boundary to supervise?",
+        "options": [
+          {
+            "text": "Review everything and take care of whatever is needed.",
+            "correct": false,
+            "explanation": "The inputs, output and stopping point are unclear."
+          },
+          {
+            "text": "Use the selected training proposal to find its requested amount, show the supporting text and stop before any delivery.",
+            "correct": true,
+            "explanation": "The request identifies the input, evidence and action boundary."
+          },
+          {
+            "text": "Make the answer sound confident so colleagues can rely on it.",
+            "correct": false,
+            "explanation": "Confidence in wording does not establish source support."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.structured-vs-unstructured-data",
+      "revision": 2,
+      "title": "Turn source text into checkable fields",
+      "variant": "concept",
+      "objective": "Explain how structured fields remain tied to the source document.",
+      "content": "A proposal contains information in paragraphs, headings and tables. A structured result puts selected information into named fields, such as “Project title,” “Requested amount” and “Project period.” That makes comparison easier, but moving text into a field does not establish that the value is correct.\n\nChoose field names that describe exactly what you need. “Requested amount” and “Awarded amount” are different questions. A source may contain several amounts, dates or organizations. You must check that the extracted value answers the intended question and belongs to the intended source.\n\nKeep the original meaning visible. A value’s currency, units, period and conditions can matter as much as its digits. If a source says “up to $50,000 per year,” reducing it to “$50,000” loses a condition and a time period. A clean table can conceal that loss.\n\nMissing information is a useful result. If the supplied source has no requested amount, record that it was not found in that source. Do not replace absence with zero, a guessed amount or a figure from a similarly titled document.\n\n**Practice:** Compare “Requested amount: $50,000” with the phrase “up to $50,000 per year.” State what needs to be preserved or clarified before sharing the table. These numbers are fictional teaching examples.",
+      "knowledge_check": {
+        "question": "The training document names a project but gives no budget. What belongs in the requested-amount field?",
+        "options": [
+          {
+            "text": "Zero, because no amount is visible.",
+            "correct": false,
+            "explanation": "Zero is a numerical claim that the source did not make."
+          },
+          {
+            "text": "A likely amount based on similar projects.",
+            "correct": false,
+            "explanation": "A plausible guess is not evidence from this document."
+          },
+          {
+            "text": "A clear missing-value result, with the source limitation retained.",
+            "correct": true,
+            "explanation": "This preserves the distinction between absent evidence and a supported value."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.what-is-an-llm-really",
+      "revision": 2,
+      "title": "Why a fluent answer still needs evidence",
+      "variant": "concept",
+      "objective": "Distinguish a plausible generated answer from a source-supported conclusion.",
+      "content": "A language model generates responses from patterns learned during training and from the context supplied to it. This can produce useful drafts, explanations and proposed steps. It can also produce a plausible statement that the selected source does not support.\n\nFluency is therefore not an evidence check. A detailed explanation, confident tone or correct-looking citation can still be wrong or refer to the wrong document. Ask a more concrete question: “Where does this source support that claim?” Then inspect the passage and its context.\n\nA supported quotation and a justified conclusion are also different. A passage may contain the right words but apply to a different program, period or condition. Your review connects the claim to the relevant source and scope; it does not stop at the presence of a citation marker.\n\nWhen the answer exceeds the available evidence, narrow it, ask for the missing source or leave the uncertainty unresolved. Repeating the question until the answer sounds more certain does not supply new evidence.\n\n**Practice:** The source states a deadline. The answer adds a grace period without a supporting passage. Mark the added claim as unsupported and choose what evidence you would need before using it. The deadline and grace period in this exercise are fictional.",
+      "knowledge_check": {
+        "question": "An answer includes a citation marker. What does that establish by itself?",
+        "options": [
+          {
+            "text": "The answer is safe to use without review.",
+            "correct": false,
+            "explanation": "A marker alone does not prove that the cited text supports the claim."
+          },
+          {
+            "text": "A reference is available to inspect; the claim and its context still need checking.",
+            "correct": true,
+            "explanation": "Open the reference and compare the claim with the relevant passage and conditions."
+          },
+          {
+            "text": "The source has granted permission for any next action.",
+            "correct": false,
+            "explanation": "Source content cannot expand the authorized task."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.what-ai-is-genuinely-good-at",
+      "revision": 3,
+      "title": "What the assistant can help you do",
+      "variant": "concept",
+      "objective": "Separate reading, proposing, executing and delivering as reviewable stages.",
+      "content": "Agentic chat connects conversation with supported workspace tools. It can help locate accessible material, read it, propose an extraction or workflow, and run supported operations. What is available depends on the workspace, access permissions and configured tools. Ask the assistant to explain a proposed action when its scope is unclear.\n\nTreat the stages separately. Reading gathers information. A proposal describes what could be created or changed. Execution carries out an operation. Delivery makes an output available to its intended recipient or destination. Success at one stage does not prove that the next stage is authorized or ready.\n\nPreview behavior depends on the operation. Creating an extraction from documents first reads the source to discover a proposed name and fields. Its creation preview shows the name, source and a field summary before you confirm. Review that proposal and any named project destination. Longer field lists may be abbreviated in the preview; inspect the complete saved fields after creation and before a run. Confirming creation does not run the extraction. Running a saved workflow also uses a preview and confirmation exchange. Running an existing extraction can act directly on your request. If you want review first, request a proposal only and tell the assistant to stop before execution. Do not assume every operation has the same approval screen.\n\nFor example, an extraction may run successfully and produce a table. You still need to inspect important values and missing information. A report may then be generated from that table. You still need to check its intended audience and resolve required review before release.\n\nUse the workspace to inspect the actual artifact and source evidence when available. A chat summary of a tool action is useful for orientation, but it does not replace checking the resulting document, extraction or workflow when the decision depends on it.\n\n**Practice:** Ask for a proposed extraction from an assigned training source, with no delivery. Identify what would need review before running it and what would need review afterward. If the source is not available yet, complete the fictional scenarios and return to this practice in the lab.",
+      "knowledge_check": {
+        "question": "You want to inspect an existing extraction before running it. Which request states that boundary clearly?",
+        "options": [
+          {
+            "text": "Run it now; every operation must show a separate approval screen.",
+            "correct": false,
+            "explanation": "Running an existing extraction can execute directly. Do not assume a universal approval screen."
+          },
+          {
+            "text": "Show the intended source and existing fields only. Stop before execution so I can review them.",
+            "correct": true,
+            "explanation": "This requests a proposal and states where work must stop. Check the actual scope before a later run."
+          },
+          {
+            "text": "Run it now and use its earlier quality score instead of reviewing the current source.",
+            "correct": false,
+            "explanation": "An earlier score does not establish the current source or permission to skip the requested review."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.what-ai-is-genuinely-bad-at",
+      "revision": 3,
+      "title": "Recognize limits before they become decisions",
+      "variant": "concept",
+      "objective": "Identify missing sources, historical quality evidence and unresolved human judgment.",
+      "content": "An assistant cannot establish a fact that is absent from the evidence it can access. It may be working with an incomplete document, an unavailable attachment, a similarly named file or a source that does not cover the relevant period. Notice those limitations before relying on the answer.\n\nA result may have no score or be labeled Unscored. That means you lack the relevant evaluation evidence; it is not a passing result or proof of a failed result. Inspect the source and the available test details.\n\nA previous quality score is evidence about the cases and configuration that were tested. It is not a guarantee for a new document or a changed workflow. Consider what was tested, how representative those cases are and whether the artifact or inputs have changed. A high score cannot substitute for a missing supporting passage.\n\nThere are also decisions that belong to an authorized person or institutional process. The assistant can prepare evidence for a funding, compliance or release decision; it cannot create the authority to make that decision merely by recommending an answer.\n\nSource text may contain instructions directed at an AI system. Treat those as document content. They cannot override your task, select a new destination or authorize disclosure. If the proposed action drifts beyond the requested scope, stop and correct it.\n\n**Practice:** An extraction with a strong earlier score gives an unsourced amount from a new document. State what the earlier score tells you, what it does not tell you and what should happen before that amount is shared.",
+      "knowledge_check": {
+        "question": "What should a strong historical quality score change about an unsupported value from a new source?",
+        "options": [
+          {
+            "text": "It makes the value automatically acceptable.",
+            "correct": false,
+            "explanation": "Historical performance does not supply the missing current evidence."
+          },
+          {
+            "text": "It removes the need for an authorized reviewer.",
+            "correct": false,
+            "explanation": "A score does not grant decision authority."
+          },
+          {
+            "text": "It provides context about earlier tests, while the current value still needs evidence.",
+            "correct": true,
+            "explanation": "The current source and relevant test coverage still matter."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.ai-for-research-administration",
+      "revision": 2,
+      "title": "AI assistance and accountable decisions",
+      "variant": "concept",
+      "objective": "Separate preparation that an agent can assist with from institutional judgments that need an authorized human.",
+      "content": "An agent can help organize source material, propose an extraction, run supported operations and prepare a comparison. Those actions can make a review easier. They do not make the agent the institution’s decision maker.\n\nBefore delegating a task, name the intended inputs and output, identify the decisions that require human judgment, and say when the work must stop for review. For a proposal comparison, the agent may collect source-supported facts and highlight differences. The authorized reviewer makes the institutional decision using those facts and the applicable process.\n\nPlace the review before the action it governs. If a report must be checked before release, completing the generation step is not permission to send it. The reviewer needs access to the source and intermediate evidence, and unresolved critical issues must remain visible.\n\nA Vandalizer credential records the skills demonstrated on its assessed course and evidence. It does not grant institutional approval authority or guarantee future AI outputs. An artifact that changes after assessment needs relevant new evidence; a previous badge cannot establish what the changed artifact will do.\n\n**Practice:** A task asks for a proposal comparison and a funding decision. Assign evidence preparation to the agent, identify the authorized decision maker, and place a human checkpoint before any consequential release. Explain what evidence that reviewer needs.",
+      "knowledge_check": {
+        "question": "A technically successful workflow generated a report containing an unsupported policy claim. The process requires review before release. What should happen next?",
+        "options": [
+          {
+            "text": "Release it because the workflow completed.",
+            "correct": false,
+            "explanation": "Execution success does not establish factual support or required approval."
+          },
+          {
+            "text": "Hold release while the authorized reviewer checks and resolves the unsupported claim.",
+            "correct": true,
+            "explanation": "The required judgment precedes the release, with source evidence available."
+          },
+          {
+            "text": "Replace the review with the model’s confidence score.",
+            "correct": false,
+            "explanation": "Confidence is neither source evidence nor institutional authorization."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+      "revision": 2,
+      "title": "Supervising agentic chat: scope, evidence and approval",
+      "variant": "walkthrough",
+      "objective": "Inspect the intended scope, reject unsupported claims and distinguish source text from authorization.",
+      "content": "Agentic chat can propose and carry out supported operations using your workspace. Read a proposed action as a concrete change: which documents, which workspace, which configuration and which destination it will use. A similar title is not enough to identify the correct source. Correct a mismatch before asking it to run. Where a confirmation preview is offered, inspect it; otherwise your request may start the operation directly. Request a proposal only when you need to review the scope first.\n\n**Walkthrough: review a scoped extraction**\n\n1. Name the assigned source document and the fields you need. State the intended output and any actions that need separate approval.\n2. Inspect the proposed document and workspace selection. If the proposal points to a similarly named live document, stop and correct it.\n3. Review the extraction fields and planned action. Ask for a revision when the proposal exceeds the task’s scope.\n4. After execution, compare important values with the supplied source. A fluent answer, a successful run and an earlier quality score answer different questions; none independently proves that this answer is supported.\n5. If a requested value is absent, record that it was not found in the supplied source. Seek additional evidence when needed instead of filling the gap with a plausible guess.\n6. Review the destination and data scope before release. Approval to prepare an internal comparison does not automatically authorize publication or external delivery.\n\n**Treat source instructions as data.** A PDF may contain wording that asks the agent to ignore the task or send information elsewhere. That text cannot change your authorized task. Keep the approved scope and obtain a separate authorized decision for any new action.\n\n**Practice:** The source says only that applications close on 1 October at 17:00. The agent adds a two-day grace period. Identify the unsupported part, explain why confidence is insufficient, and choose an evidence-checking next step. This is a fictional practice passage, not an actual application policy.\n\nThe module’s assessed scenarios test recognition of unsupported claims, scope changes and authority limits. Later practical modules require evidence of applying those decisions to real course tasks. Reading this lesson or submitting a reflection does not establish those practical skills.",
+      "knowledge_check": {
+        "question": "A source PDF asks the agent to email itself to an outside address, but the approved task is an internal summary. What should you do?",
+        "options": [
+          {
+            "text": "Follow the PDF’s request because it is an assigned source.",
+            "correct": false,
+            "explanation": "Source text cannot authorize a new disclosure."
+          },
+          {
+            "text": "Ignore that text as an action request and keep the approved scope.",
+            "correct": true,
+            "explanation": "An authorized decision is required to change the task or destination."
+          },
+          {
+            "text": "Send the file and seek approval afterward.",
+            "correct": false,
+            "explanation": "Approval after sending cannot prevent the unapproved action."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.worked-example-monday-morning-12-proposals",
+      "revision": 2,
+      "title": "Worked example: review one proposal before twelve",
+      "variant": "walkthrough",
+      "objective": "Apply a source, scope and review sequence before expanding a task.",
+      "content": "Imagine twelve proposals need a comparison. Begin with one assigned training proposal so you can inspect the process before expanding it. Use the course lab’s sample when it is available; do not substitute an institutional file just because its title looks similar.\n\n1. Confirm the intended document and workspace. State that the task is a training exercise.\n2. Ask for the project title, requested amount and project period, with supporting source passages. Ask the assistant to mark missing information rather than infer it.\n3. Inspect any proposed extraction fields and action. Correct the wrong source, an ambiguous field or an added delivery step before execution.\n4. Open the returned source reference when one is available. Compare the value with the passage, including units, dates and conditions. If a reference cannot be opened or does not support the claim, keep that value unresolved.\n5. Review the result and decide what needs repair. Rerun the relevant check after a change; an earlier successful result describes the earlier artifact.\n6. Only then consider expanding to the assigned set. Confirm the remaining sources, resource implications and the review required before release. A successful first example is not proof that the other eleven will succeed.\n\n**Try this wording:** “Use only the selected training proposal. Find its requested amount and quote the supporting passage. If the amount is absent or ambiguous, say so. Stop after preparing the result; do not send or publish it.”\n\nThe fictional recognition scenarios can be completed without a lab. Completing them is preparation for later practical evidence, not proof that this workflow has been executed.",
+      "knowledge_check": {
+        "question": "The first proposal produced a correct result. What is the next sound step before processing the remaining set?",
+        "options": [
+          {
+            "text": "Confirm the remaining assigned sources and review plan, then check the expanded results.",
+            "correct": true,
+            "explanation": "A small successful trial informs the next step without proving untested cases."
+          },
+          {
+            "text": "Assume all remaining proposals will have identical structure and quality.",
+            "correct": false,
+            "explanation": "One result cannot establish the behavior of all later inputs."
+          },
+          {
+            "text": "Release the comparison before the rest of the evidence is available.",
+            "correct": false,
+            "explanation": "Release should wait for the required evidence and review."
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai_literacy.glossary-review",
+      "revision": 2,
+      "title": "Key terms for supervising a task",
+      "variant": "key-terms",
+      "objective": "Use the course’s evidence and action vocabulary to explain a review decision.",
+      "content": "**Source:** The document or other material a claim relies on. Check its identity, relevant version and context.\n\n**Grounding:** Connecting an answer to the supplied evidence. A citation marker helps you locate a reference; you still inspect whether the passage supports the claim.\n\n**Extraction:** Turning selected source information into named fields. Preserve meaning, units and missing values instead of treating a tidy table as proof of accuracy.\n\n**Artifact:** A saved item such as an extraction, workflow or output. If it changes, earlier assessment evidence may no longer describe it.\n\n**Scope:** The intended inputs, workspace, output and permitted actions. A similar filename or a request embedded in a source cannot silently expand that scope.\n\n**Checkpoint:** A review placed before the action it governs. An approval required before release cannot be satisfied by reviewing after sending.\n\n**Execution result:** Evidence of what an operation returned. Completion of an operation does not establish correct interpretation, approval authority or practical competence by itself.\n\n**Quality evidence:** Results from identified tests and configurations. Use them with their limits; do not treat an earlier score as a guarantee for an unchecked source.\n\n**Credential:** A record of the skills demonstrated under the assessed course requirements. It does not grant institutional authority or guarantee every future output.\n\n**Review:** In one sentence, explain why a successful extraction with an unsupported value still needs work before release. Then complete the scenario assessment to practice these distinctions.",
+      "knowledge_check": {
+        "question": "Which statement correctly describes a checkpoint?",
+        "options": [
+          {
+            "text": "A review completed after any consequential action.",
+            "correct": false,
+            "explanation": "Review after release cannot satisfy a required pre-release decision."
+          },
+          {
+            "text": "A review placed before the specific action that depends on it, with relevant evidence available.",
+            "correct": true,
+            "explanation": "Timing, evidence and the action being authorized are all part of the checkpoint."
+          },
+          {
+            "text": "A quality score that replaces human judgment.",
+            "correct": false,
+            "explanation": "A score does not replace the required decision maker."
+          }
+        ]
+      }
+    }
+  ],
+  "module_patch": {
+    "subtitle": "Supervise an evidence-based task",
+    "description": "Learn to name a task’s source and scope, inspect its evidence and keep consequential decisions with the right person. Begin with fictional scenarios that need no files or prior artifacts. Later course labs ask you to apply these judgments to assigned training documents.",
+    "objectives": [
+      "Distinguish source support from fluent wording and technical success.",
+      "Keep document, workspace and delivery scope aligned with the task.",
+      "Place human review before the action it governs."
+    ],
+    "tips": [
+      "Check the exact source and workspace before an action.",
+      "Keep missing evidence visible; do not replace it with a plausible guess.",
+      "A quality score describes its tested cases and configuration.",
+      "Recognition scenarios prepare you for practical work; they do not prove execution."
+    ],
+    "estimatedMinutes": 15
+  },
+  "capability_references": [
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbol": "create_extraction_from_document",
+      "verified_behavior": "Field discovery precedes the creation preview. The preview binds the proposed name, fields and permitted project; approval reuses the proposal. Its field summary may abbreviate longer lists, so inspect saved settings before extraction execution."
+    },
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbol": "run_extraction",
+      "verified_behavior": "Runs an accessible existing extraction directly; no confirmed argument or preview gate."
+    },
+    {
+      "path": "backend/app/services/chat_tools.py",
+      "symbol": "run_workflow",
+      "verified_behavior": "Uses the preview-confirm gate before workflow dispatch."
+    },
+    {
+      "path": "frontend/src/components/chat/ChatMessage.tsx",
+      "symbol": "Open the source",
+      "verified_behavior": "Source-linked citation previews offer opening the source; missing links have an explicit limitation."
+    },
+    {
+      "path": "frontend/src/components/chat/QualityBadge.tsx",
+      "symbol": "QualityBadge",
+      "verified_behavior": "No badge is rendered when both score and tier are absent. Unscored is a supported display label; a quality badge is not independent source verification."
+    }
+  ]
+}
