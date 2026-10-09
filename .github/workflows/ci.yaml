@@ -41,6 +41,22 @@ jobs:
       - name: Run backend release checks
         run: make backend-static
 
+      - name: Record product changes requiring course compatibility review
+        if: always()
+        env:
+          COURSE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          mkdir -p artifacts/certification
+          python scripts/inspect_certification_product_changes.py --base-ref "$COURSE_BASE_REF" > artifacts/certification/product-change-review.json
+
+      - name: Preserve course compatibility review scope
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: certification-product-change-review
+          path: artifacts/certification/product-change-review.json
+          if-no-files-found: warn
+
       - name: Verify certification outcome and teaching traceability
         working-directory: backend
         run: |

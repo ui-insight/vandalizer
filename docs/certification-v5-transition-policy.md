@@ -2,6 +2,18 @@
 
 Status: optional upgrade selected by the user on October 2, 2026. The detailed outcome and rollout design below remains the implementation specification; its acceptance gates are not yet complete. No enrollment, grade, credential or production course has been changed. The current course is preserved in the [baseline package](../backend/certification-releases/legacy-snapshot-2026-10-02/README.md).
 
+## Maintenance responsibility and compatibility triggers
+
+The product release owner is accountable for the course compatibility claim made with that release. The certification maintainer for the release owns the affected teaching, lab and rubric corrections. These are release responsibilities, not a learner assessment queue. Automated grading and technical recovery remain the normal learner path; this policy does not assign routine grading to staff. The actual release record must name the responsible person; role labels in a generated report do not establish that someone performed a review.
+
+CI runs `scripts/inspect_certification_product_changes.py --base-ref <base-commit>` and retains `certification-product-change-review`. It records the exact committed product comparison, course manifests and affected paths. Changed agent tools/approval behavior, lab execution, sources/models, course assets, runtime dependencies and learner controls/visuals trigger compatibility review. Additions, removals and renames count. New backend capabilities are conservatively included. Missing Git or registry evidence fails the inspection instead of reporting no changes. Uncommitted code is outside this comparison and cannot support a release claim.
+
+A broken lab, removed deployment capability, changed provider/model configuration, obsolete teaching screenshot or rubric regression also triggers review even without a repository change. The release owner records that deployment change beside the generated comparison. The read-only admin course-health report helps locate saved failed/unavailable/uncertain operation states by exact course package; it does not diagnose every failure or infer abandonment from inactivity.
+
+Before advertising an affected course as current, record the product commit, course manifest, deployed tool/model configuration, affected lessons/outcomes, actual compatibility checks and evidence references, reviewer, observation date, result and unresolved limits. Re-run affected labs and grading rejection cases, inspect changed controls/teaching visuals, and verify original enrollment/credential preservation. Fixes to a published course use a new immutable release and optional learner selection; a product release does not reset an existing enrollment.
+
+The generated report is a review trigger, not an approval. Existing publication impact, live compatibility/calibration, preservation and rollout gates remain required. The draft course is not advertised as current merely because CI records a report or local tests pass. Deployment-change collection and a completed release-specific compatibility review remain outstanding acceptance evidence.
+
 ## Selected learner behavior
 
 An existing learner continues the supported course they enrolled in. A new 5.0 course is offered as a separate enrollment, with a preview showing retained credit, new requirements and any work still in flight. Saving the preservation choice does not switch courses. A separate explicit switch activates the new enrollment only after drafts and attempts have been reconciled. Declining leaves the current enrollment selected. Do not impose a finish deadline without cohort evidence and an explicit published policy.

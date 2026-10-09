@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
+  "working_head_at_inventory": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 716256,
-    "sha256": "6f3d616f6f1150db62c85a998bbc98a217a11bd048ca50cc107177fe345f87b3"
+    "bytes": 720221,
+    "sha256": "d91ffd11007cc404afb11dc31bcf2329ad689c5ea0823aea753b45c674212b1e"
   },
   "counts": {
     "accepted": 62,
     "open": 100,
     "items": 162,
-    "checkpoints": 300,
-    "browser_runs": 434,
-    "recorded_captures_including_diagnostics_and_repeats": 5926,
+    "checkpoints": 301,
+    "browser_runs": 438,
+    "recorded_captures_including_diagnostics_and_repeats": 5950,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3103,6 +3103,13 @@
       "evidence_directories": [
         "certification-credit-application-2026-10-09"
       ]
+    },
+    {
+      "number": 301,
+      "title": "Course-health reporting and compatibility review triggers on October 9 2026",
+      "evidence_directories": [
+        "certification-course-health-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3573,6 +3580,12 @@
       "available": true,
       "bytes": 261,
       "sha256": "24be9c50cdafb572be0240e4e93bc0f4387dbd1699bd7f7d40d5ca17b0258c48"
+    },
+    {
+      "path": "artifacts/visual-review/certification-course-health-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 455,
+      "sha256": "0313cca2d061d58aaad3bf4ab19212935a63faad2162a8566706e0295e626bb0"
     },
     {
       "path": "artifacts/visual-review/certification-course-history-2026-10-06/checkpoint.json",
@@ -62710,6 +62723,882 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-course-denominators-2026-10-08/browser-native/expanded-active-panel-native.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 5578,
+        "sha256": "bae62fa2601644b8f33cbd9eefc9f05d48e8dab96a8b37423dd5c3a64aa12e2a"
+      },
+      "checkpoints": [
+        301
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T20:39:03.002Z",
+      "reported_commit": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
+      "reported_source_fingerprint": "88d24064f46cb7c777de4e79b392316a1c4ce6b79c710fbe99fa50f5a42ba43d",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic course-health delivery on an isolated production build. Actual aggregate/privacy/HTTP behavior separately verified with disposable MongoDB. No learner writes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "healthReads": 6,
+          "writes": [],
+          "loadedOnlyOnRequest": true,
+          "packageSeparation": true,
+          "unknownHistoryRetained": true,
+          "unavailableNotZero": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "health-records-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-320.png",
+              "available": true,
+              "bytes": 92361
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-320.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-320.png",
+              "available": true,
+              "bytes": 92361
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-320.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-320.png",
+              "available": true,
+              "bytes": 70346
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-320.txt",
+              "available": true,
+              "bytes": 2081
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-320.png",
+              "available": true,
+              "bytes": 90657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-320.txt",
+              "available": true,
+              "bytes": 2757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-records-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-1440.png",
+              "available": true,
+              "bytes": 178657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-1440.txt",
+              "available": true,
+              "bytes": 4636
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-records-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-1440.png",
+              "available": true,
+              "bytes": 178657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-1440.txt",
+              "available": true,
+              "bytes": 4636
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-unknown-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-1440.png",
+              "available": true,
+              "bytes": 136702
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-1440.txt",
+              "available": true,
+              "bytes": 2167
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-1440.png",
+              "available": true,
+              "bytes": 178039
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-1440.txt",
+              "available": true,
+              "bytes": 2843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser/health-empty-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/manifest.json",
+        "available": true,
+        "bytes": 5578,
+        "sha256": "14754f378c421514f72adc32284c454efae06f24e5a06321f8aa3526eaa3bf0d"
+      },
+      "checkpoints": [
+        301
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T20:46:40.465Z",
+      "reported_commit": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
+      "reported_source_fingerprint": "d30d53d42b45d531df4bcc8971be0d6ff6251ebdccf51ffaae9221149a1a0e0f",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic course-health delivery on an isolated production build. Actual aggregate/privacy/HTTP behavior separately verified with disposable MongoDB. No learner writes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "healthReads": 6,
+          "writes": [],
+          "loadedOnlyOnRequest": true,
+          "packageSeparation": true,
+          "unknownHistoryRetained": true,
+          "unavailableNotZero": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "health-records-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-320.png",
+              "available": true,
+              "bytes": 92372
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-320.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-320.png",
+              "available": true,
+              "bytes": 92372
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-320.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-320.png",
+              "available": true,
+              "bytes": 70346
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-320.txt",
+              "available": true,
+              "bytes": 2081
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-320.png",
+              "available": true,
+              "bytes": 90657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-320.txt",
+              "available": true,
+              "bytes": 2757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-records-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-1440.png",
+              "available": true,
+              "bytes": 178657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-1440.txt",
+              "available": true,
+              "bytes": 4636
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-records-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-1440.png",
+              "available": true,
+              "bytes": 178657
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-1440.txt",
+              "available": true,
+              "bytes": 4636
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-unknown-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-1440.png",
+              "available": true,
+              "bytes": 136702
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-1440.txt",
+              "available": true,
+              "bytes": 2167
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-1440.png",
+              "available": true,
+              "bytes": 178039
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-1440.txt",
+              "available": true,
+              "bytes": 2843
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-complete/health-empty-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 3774,
+        "sha256": "6819ac600bdc8eec70290dc97716ac015be73e1a5ea5735664cec624ea3b9559"
+      },
+      "checkpoints": [
+        301
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T20:39:56.955Z",
+      "reported_commit": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
+      "reported_source_fingerprint": "88d24064f46cb7c777de4e79b392316a1c4ce6b79c710fbe99fa50f5a42ba43d",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic course-health delivery on an isolated production build. Actual aggregate/privacy/HTTP behavior separately verified with disposable MongoDB. No learner writes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "healthReads": 3,
+          "writes": [],
+          "loadedOnlyOnRequest": true,
+          "packageSeparation": true,
+          "unknownHistoryRetained": true,
+          "unavailableNotZero": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "health-records-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-records-780.png",
+              "available": true,
+              "bytes": 229639
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-records-780.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-records-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-unknown-780.png",
+              "available": true,
+              "bytes": 229639
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-unknown-780.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-unknown-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-error-780.png",
+              "available": true,
+              "bytes": 169943
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-error-780.txt",
+              "available": true,
+              "bytes": 2081
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-error-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-empty-780.png",
+              "available": true,
+              "bytes": 244846
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-empty-780.txt",
+              "available": true,
+              "bytes": 2757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native/health-empty-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/manifest.json",
+        "available": true,
+        "bytes": 3922,
+        "sha256": "8731a9a39919409065720deaec135904a2d6c849c88928a7ab3e5cdf01c22a2a"
+      },
+      "checkpoints": [
+        301
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T20:48:07.012Z",
+      "reported_commit": "a43a06f041b194b1d6e18cc3d3e17b6897572c04",
+      "reported_source_fingerprint": "d30d53d42b45d531df4bcc8971be0d6ff6251ebdccf51ffaae9221149a1a0e0f",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic course-health delivery on an isolated production build. Actual aggregate/privacy/HTTP behavior separately verified with disposable MongoDB. No learner writes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "healthReads": 3,
+          "writes": [],
+          "loadedOnlyOnRequest": true,
+          "packageSeparation": true,
+          "unknownHistoryRetained": true,
+          "unavailableNotZero": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "health-records-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-records-780.png",
+              "available": true,
+              "bytes": 229639
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-records-780.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-records-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-unknown-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-unknown-780.png",
+              "available": true,
+              "bytes": 229639
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-unknown-780.txt",
+              "available": true,
+              "bytes": 4550
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-unknown-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-error-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-error-780.png",
+              "available": true,
+              "bytes": 169943
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-error-780.txt",
+              "available": true,
+              "bytes": 2081
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-error-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "health-empty-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 850
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-empty-780.png",
+              "available": true,
+              "bytes": 244846
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-empty-780.txt",
+              "available": true,
+              "bytes": 2757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-course-health-2026-10-09/browser-native-complete/health-empty-780.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -230327,7 +231216,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1075,
+    "1440x1000": 1083,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -230338,7 +231227,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 362,
+    "320x1000": 370,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -230362,7 +231251,7 @@
     "390x700": 28,
     "390x800": 16,
     "390x844": 862,
-    "390x850": 264,
+    "390x850": 272,
     "390x900": 192,
     "720x250": 2,
     "720x500": 188,

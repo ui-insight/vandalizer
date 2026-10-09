@@ -3,6 +3,7 @@ import { useAdminViewState } from './shared/AdminViewState'
 import { CertificationRecoveryReview } from './CertificationRecoveryReview'
 import { CertificationLearnerSummary } from './CertificationLearnerSummary'
 import { CertificationAccessChange } from './CertificationAccessChange'
+import { CertificationCourseHealth } from './CertificationCourseHealth'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
@@ -92,6 +93,8 @@ export function CertificationsTab() {
           Certification enrollments and preserved history. Only the selected course can be changed.
         </p>
       </div>
+
+      <CertificationCourseHealth />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <form onSubmit={event => { event.preventDefault(); setOffset(0); setQuery(search.trim()); }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

@@ -3679,6 +3679,19 @@ async def list_certification_progress(
     return CertificationProgressListResponse(items=items[offset:offset + limit], total=total, capped=capped)
 
 
+@router.get("/certifications/health")
+async def get_certification_health(user: User = Depends(get_current_user)):
+    """Global admin metadata census; no course or assessment writes."""
+    await _require_admin(user)
+    from app.services.certification_versions.course_health import course_health, HealthUnavailable
+    from pymongo.errors import PyMongoError
+    try:
+        return await course_health()
+    except (HealthUnavailable, PyMongoError):
+        # A failed/partial read must never look like zero failures or no learners.
+        raise HTTPException(status_code=503, detail="Course health is unavailable. Retry the report.") from None
+
+
 @router.get("/certifications/{user_id}", response_model=CertificationProgressDetail)
 async def get_certification_progress_detail(
     user_id: str,
