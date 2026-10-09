@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "9cc91de690d897912793b41282b955fb7a4188a8",
+  "working_head_at_inventory": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 714172,
-    "sha256": "e6bcc02987b92b75f93ab6b1e98b54109ae421c23d6e754df07ea0f5152d1f48"
+    "bytes": 716256,
+    "sha256": "6f3d616f6f1150db62c85a998bbc98a217a11bd048ca50cc107177fe345f87b3"
   },
   "counts": {
     "accepted": 62,
     "open": 100,
     "items": 162,
-    "checkpoints": 299,
-    "browser_runs": 430,
-    "recorded_captures_including_diagnostics_and_repeats": 5906,
+    "checkpoints": 300,
+    "browser_runs": 434,
+    "recorded_captures_including_diagnostics_and_repeats": 5926,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3096,6 +3096,13 @@
       "number": 299,
       "title": "Local commit checkpoints on October 9 2026",
       "evidence_directories": []
+    },
+    {
+      "number": 300,
+      "title": "Visual transfer verification and prompt commit follow-up on October 9 2026",
+      "evidence_directories": [
+        "certification-credit-application-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3612,8 +3619,8 @@
     {
       "path": "artifacts/visual-review/certification-credit-application-2026-10-09/checkpoint.json",
       "available": true,
-      "bytes": 1035,
-      "sha256": "129ea2b5199062c8786208b51a10d145ac4a2549c63428806ad91f93a439ec5c"
+      "bytes": 1264,
+      "sha256": "66fd89b31f2cb4b5ae2fb05fdf4a8aebeba74e7d25add691a3b8d93a44544bb8"
     },
     {
       "path": "artifacts/visual-review/certification-credit-equivalence-2026-10-09/checkpoint.json",
@@ -75019,6 +75026,785 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-credentials-2026-10-05-ui-attempt2/versioned-reflection-saved.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 3326,
+        "sha256": "6551642eb7450bf105562574923acf228b6091922ee1e60678f6173d4639befa"
+      },
+      "checkpoints": [
+        298,
+        300
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T18:43:59.462Z",
+      "reported_commit": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
+      "reported_source_fingerprint": "45b235e428704be6660b8e3c810f8b16df78308410e3347ce290a5d8dbb9550c",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Committed frontend; real disposable-persistence transfer payloads with synthetic API delivery and a lost POST response. No actual learner changes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "transfer-review-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-review-320.png",
+              "available": true,
+              "bytes": 82160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-review-320.txt",
+              "available": true,
+              "bytes": 10887
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-review-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-uncertain-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-uncertain-320.png",
+              "available": true,
+              "bytes": 79379
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-uncertain-320.txt",
+              "available": true,
+              "bytes": 10538
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/transfer-uncertain-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "TimeoutError: locator.selectOption: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-cert-panel]').getByRole('combobox', { name: 'Learning panel position', exact: true })\u001b[22m\n",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/blocked.png",
+              "available": true,
+              "bytes": 60927
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/blocked.txt",
+              "available": true,
+              "bytes": 1630
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/manifest.json",
+        "available": true,
+        "bytes": 6595,
+        "sha256": "9eb21c2aff26d622e20e4a85a6ca2d92a4ed22181eeae006445a45348a418086"
+      },
+      "checkpoints": [
+        298,
+        300
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T18:45:47.544Z",
+      "reported_commit": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
+      "reported_source_fingerprint": "b60528f7b319cd90c3035d17ec4ef74d1bf3e66b1a8be7e1e58b94a7038060a4",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Committed frontend; real disposable-persistence transfer payloads with synthetic API delivery and a lost POST response. No actual learner changes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "writes": [
+            {
+              "path": "/api/certification/credit-transfers",
+              "body": {
+                "request_id": "e685fa8ec4885bc189a69c2e5b6cf797",
+                "source_enrollment_id": "642379d7d63c43b49a4a43bec0f9ccd4",
+                "target_enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+                "module_id": "ai_literacy",
+                "preview_sha256": "ff9df69cdc930e222ce25ef1c79c934a4ff6206d4988d25a0b383cac714133c1",
+                "consent": "transfer_reviewed_module_credit_preserve_original_no_new_xp_reward"
+              }
+            },
+            {
+              "path": "/api/certification/credit-transfers",
+              "body": {
+                "request_id": "e685fa8ec4885bc189a69c2e5b6cf797",
+                "source_enrollment_id": "642379d7d63c43b49a4a43bec0f9ccd4",
+                "target_enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+                "module_id": "ai_literacy",
+                "preview_sha256": "ff9df69cdc930e222ce25ef1c79c934a4ff6206d4988d25a0b383cac714133c1",
+                "consent": "transfer_reviewed_module_credit_preserve_original_no_new_xp_reward"
+              }
+            }
+          ],
+          "savedReceiptReads": 2,
+          "consentRequired": true,
+          "recoveredAcrossReload": true,
+          "duplicateWrites": 0,
+          "xpCarried": 50,
+          "newXpEarned": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "transfer-review-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-320.png",
+              "available": true,
+              "bytes": 82160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-320.txt",
+              "available": true,
+              "bytes": 10887
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-uncertain-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-320.png",
+              "available": true,
+              "bytes": 79379
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-320.txt",
+              "available": true,
+              "bytes": 10538
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-recovered-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-320.png",
+              "available": true,
+              "bytes": 84763
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-320.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-course-progress-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-320.png",
+              "available": true,
+              "bytes": 83132
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-320.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-review-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-1440.png",
+              "available": true,
+              "bytes": 117547
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-1440.txt",
+              "available": true,
+              "bytes": 10953
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-review-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-uncertain-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-1440.png",
+              "available": true,
+              "bytes": 114697
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-1440.txt",
+              "available": true,
+              "bytes": 10604
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-uncertain-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-recovered-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-1440.png",
+              "available": true,
+              "bytes": 114092
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-1440.txt",
+              "available": true,
+              "bytes": 10787
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-recovered-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-course-progress-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-1440.png",
+              "available": true,
+              "bytes": 122516
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-1440.txt",
+              "available": true,
+              "bytes": 10787
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-complete/transfer-course-progress-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/manifest.json",
+        "available": true,
+        "bytes": 6227,
+        "sha256": "67683d063d80812515d069b77655d3d51b13a7a48a97f3807f09aebb2d59ee0f"
+      },
+      "checkpoints": [
+        298,
+        300
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T18:45:11.267Z",
+      "reported_commit": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
+      "reported_source_fingerprint": "8495268acaef31cfd74467b1fb9eecb56114581a2d7035bbe61481a95359c466",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Committed frontend; real disposable-persistence transfer payloads with synthetic API delivery and a lost POST response. No actual learner changes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "transfer-review-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-review-320.png",
+              "available": true,
+              "bytes": 82160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-review-320.txt",
+              "available": true,
+              "bytes": 10887
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-review-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-uncertain-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-uncertain-320.png",
+              "available": true,
+              "bytes": 79379
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-uncertain-320.txt",
+              "available": true,
+              "bytes": 10538
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-uncertain-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-recovered-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-recovered-320.png",
+              "available": true,
+              "bytes": 84763
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-recovered-320.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-recovered-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-course-progress-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-course-progress-320.png",
+              "available": true,
+              "bytes": 83132
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-course-progress-320.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/transfer-course-progress-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Open course without chat', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"home-learning-link\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button disabled class=\"relative flex flex-col items-start p-5 text-left border-2 transition-all duration-300 group w-full cursor-not-allowed hover:shadow-none bg-gray-50\">…</button> from <div class=\"workspace-portal\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button disabled class=\"relative flex flex-col items-start p-5 text-left border-2 transition-all duration-300 group w-full cursor-not-allowed hover:shadow-none bg-gray-50\">…</button> from <div class=\"workspace-portal\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    57 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <button disabled class=\"relative flex flex-col items-start p-5 text-left border-2 transition-all duration-300 group w-full cursor-not-allowed hover:shadow-none bg-gray-50\">…</button> from <div class=\"workspace-portal\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/blocked.png",
+              "available": true,
+              "bytes": 108815
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/blocked.txt",
+              "available": true,
+              "bytes": 8513
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-final/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 4318,
+        "sha256": "dcc002cd2513329871faa54afe95290659c8c3962a283ea1268d81985ad0e3c2"
+      },
+      "checkpoints": [
+        298,
+        300
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T18:46:25.542Z",
+      "reported_commit": "82673dc8b8a29f81c57c2ad5ace8ffbba935e1b4",
+      "reported_source_fingerprint": "b60528f7b319cd90c3035d17ec4ef74d1bf3e66b1a8be7e1e58b94a7038060a4",
+      "reported_fixture_fingerprint": "527ffd268894566159bc5356342a28d8088fdb69f569a9a50057102724cb9cdf",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Committed frontend; real disposable-persistence transfer payloads with synthetic API delivery and a lost POST response. No actual learner changes or grading.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "writes": [
+            {
+              "path": "/api/certification/credit-transfers",
+              "body": {
+                "request_id": "e685fa8ec4885bc189a69c2e5b6cf797",
+                "source_enrollment_id": "642379d7d63c43b49a4a43bec0f9ccd4",
+                "target_enrollment_id": "3f1a2249c8145da6b4a2db9942e77868",
+                "module_id": "ai_literacy",
+                "preview_sha256": "ff9df69cdc930e222ce25ef1c79c934a4ff6206d4988d25a0b383cac714133c1",
+                "consent": "transfer_reviewed_module_credit_preserve_original_no_new_xp_reward"
+              }
+            }
+          ],
+          "savedReceiptReads": 1,
+          "consentRequired": true,
+          "recoveredAcrossReload": true,
+          "duplicateWrites": 0,
+          "xpCarried": 50,
+          "newXpEarned": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "transfer-review-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-review-780.png",
+              "available": true,
+              "bytes": 183968
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-review-780.txt",
+              "available": true,
+              "bytes": 10887
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-review-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-uncertain-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-uncertain-780.png",
+              "available": true,
+              "bytes": 175079
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-uncertain-780.txt",
+              "available": true,
+              "bytes": 10538
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-uncertain-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-recovered-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-recovered-780.png",
+              "available": true,
+              "bytes": 187734
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-recovered-780.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-recovered-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "transfer-course-progress-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-course-progress-780.png",
+              "available": true,
+              "bytes": 195417
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-course-progress-780.txt",
+              "available": true,
+              "bytes": 10721
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-credit-application-2026-10-09/browser-native/transfer-course-progress-780.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -229541,7 +230327,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1070,
+    "1440x1000": 1075,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -229552,7 +230338,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 351,
+    "320x1000": 362,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -229575,7 +230361,7 @@
     "390x650": 52,
     "390x700": 28,
     "390x800": 16,
-    "390x844": 858,
+    "390x844": 862,
     "390x850": 264,
     "390x900": 192,
     "720x250": 2,
