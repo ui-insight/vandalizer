@@ -821,6 +821,29 @@ def _spend_block_code(exc: BaseException) -> str:
     return "email_unverified" if isinstance(exc, TrialUnverifiedError) else "budget_exhausted"
 
 
+def _notify_run_completed(db, activity_id, workflow_doc: dict, workflow_result_id) -> None:
+    """Bell the person who started a long run that just completed (#994).
+
+    Called from inside a finalize claim, so a retried task never bells twice.
+    """
+    try:
+        from bson import ObjectId
+
+        from app.services.run_notifications import notify_workflow_completed
+
+        result_doc = db.workflow_result.find_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"status": 1, "start_time": 1, "is_passive": 1, "automation_id": 1,
+             "batch_id": 1, "document_title": 1, "workflow": 1},
+        )
+        notify_workflow_completed(
+            db, user_id=_activity_owner(db, activity_id),
+            workflow_doc=workflow_doc, result_doc=result_doc,
+        )
+    except Exception:
+        logger.exception("Could not send completion notice for run %s", workflow_result_id)
+
+
 def _activity_owner(db, activity_id) -> str | None:
     """The user who launched the run, from its activity-rail entry.
 
@@ -1478,6 +1501,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             {"_id": ObjectId(workflow_id)},
             {"$inc": {"num_executions": 1}},
         )
+        _notify_run_completed(db, activity_id, workflow_doc, workflow_result_id)
     else:
         logger.info(
             "Workflow %s finalize side effects already ran; skipping on retry",
@@ -1963,6 +1987,7 @@ def resume_workflow_after_approval(self, approval_uuid):
             {"_id": ObjectId(workflow_id)},
             {"$inc": {"num_executions": 1}},
         )
+        _notify_run_completed(db, _act["_id"] if _act else None, workflow_doc, workflow_result_id)
     else:
         logger.info(
             "Approval-gated workflow %s finalize side effects already ran; "

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCheck, CheckCircle2, FileX, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -20,6 +20,8 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   support_status: Headphones,
   team_share: Share2,
   workflow_failed: XOctagon,
+  workflow_completed: CheckCircle2,
+  extraction_completed: CheckCircle2,
   extraction_failed: AlertTriangle,
   document_failed: FileX,
   automation_failed: Timer,
@@ -45,6 +47,9 @@ const kindColors: Record<string, string> = {
   support_status: '#059669',
   team_share: '#f1b300',
   workflow_failed: FAILURE_RED,
+  // A long run the user started has finished (#994).
+  workflow_completed: '#15803d',
+  extraction_completed: '#15803d',
   extraction_failed: FAILURE_RED,
   document_failed: FAILURE_RED,
   automation_failed: FAILURE_RED,
