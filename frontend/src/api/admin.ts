@@ -117,6 +117,8 @@ export function applyCatalogUpgrade(prune: boolean) {
 // Usage
 
 export interface UsageStats {
+  period_start?: string | null
+  period_end?: string | null
   conversations: number
   search_runs: number
   workflows_started: number
@@ -336,10 +338,12 @@ export interface PaginatedWorkflows {
   summary: WorkflowSummaryStats | null
 }
 
-export function getWorkflowEvents(page: number = 1, status?: string, search?: string) {
+export function getWorkflowEvents(page: number = 1, status?: string, search?: string, period?: { from?: string; until?: string }) {
   let url = `/api/admin/workflows?page=${page}&per_page=50`
   if (status) url += `&status=${encodeURIComponent(status)}`
   if (search) url += `&search=${encodeURIComponent(search)}`
+  if (period?.from) url += `&started_after=${encodeURIComponent(period.from)}`
+  if (period?.until) url += `&started_before=${encodeURIComponent(period.until)}`
   return apiFetch<PaginatedWorkflows>(url)
 }
 

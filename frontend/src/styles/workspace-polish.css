@@ -451,3 +451,27 @@
 /* Keep KB rename controls and feedback together inside a narrow table viewport. */
 .admin-table-region .admin-kb-table :is(th, td):first-child { min-width: 48px; width: 48px; }
 .admin-table-region .admin-kb-table :is(th, td):nth-child(2) { min-width: 280px; }
+
+.admin-table-view-toggle { display: none; }
+@media (max-width: 599px) {
+  .admin-table-view-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #e2e8f0; }
+  .admin-table-view-toggle button { min-height: 32px; padding: 4px 8px; border: 1px solid #94a3b8; border-radius: 6px; background: white; }
+  .admin-table-view-toggle button[aria-pressed="true"] { background: #e2e8f0; font-weight: 600; }
+  .admin-table-hint--summary { display: none; }
+  .admin-table-summary > table { display: block; min-width: 0 !important; width: 100% !important; }
+  .admin-table-summary thead, .admin-table-summary tbody { display: block; }
+  .admin-table-summary thead tr { display: flex; flex-wrap: wrap; }
+  .admin-table-summary thead th:not(:has(button)) { position: absolute; width: 1px !important; height: 1px; min-width: 0 !important; margin: -1px; padding: 0 !important; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .admin-table-summary tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid #cbd5e1 !important; }
+  .admin-table-summary tbody td { display: block; min-width: 0 !important; width: auto !important; padding: 4px !important; white-space: normal !important; text-align: left !important; overflow-wrap: anywhere; }
+  .admin-table-summary tbody td:first-child, .admin-table-summary tbody td:nth-child(2), .admin-table-summary tbody td[colspan], .admin-table-summary tbody td:has(input), .admin-table-summary tbody td:has(.admin-open-record) { grid-column: 1 / -1; }
+  .admin-table-summary tbody td::before { content: attr(data-column-label); display: block; margin-bottom: 4px; font-family: "Public Sans Variable", "Public Sans", Arial, sans-serif; font-size: 11px; line-height: 1.5; font-weight: 600; color: #64748b; }
+  .admin-table-summary .admin-icon-column .admin-open-record { min-width: 44px; }
+  .admin-table-summary input { max-width: 100%; }
+}
+
+.config-advanced-summary .config-disclosure { display: inline-block; }
+details[open] > .config-advanced-summary .config-disclosure { transform: rotate(90deg); }
+.config-advanced-summary:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+
+.section-page__content .recharts-default-tooltip .recharts-tooltip-item { color: #334155 !important; }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type Dispatch, type SetStateAction, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useCallback, useRef, useMemo, useState, type Dispatch, type SetStateAction, type ReactNode } from 'react'
 
 // Only explicitly opted-in filters, positions, and accepted job references live
 // here. Never retain form values, credentials, records, or consent decisions.
@@ -16,5 +16,12 @@ export function useAdminViewState<T>(key: string, initial: T): [T, Dispatch<SetS
   const values = useContext(Context)
   const [value, setValue] = useState<T>(() => values?.has(key) ? values.get(key) as T : initial)
   useEffect(() => { values?.set(key, value) }, [values, key, value])
-  return [value, setValue]
+  const current = useRef(value)
+  const update: Dispatch<SetStateAction<T>> = useCallback(next => {
+    const resolved = typeof next === 'function' ? (next as (value: T) => T)(current.current) : next
+    current.current = resolved
+    values?.set(key, resolved)
+    setValue(resolved)
+  }, [values, key])
+  return [value, update]
 }

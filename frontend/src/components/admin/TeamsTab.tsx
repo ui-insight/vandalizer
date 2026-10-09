@@ -1,3 +1,5 @@
+import { FullExportButton } from './shared/FullExportButton'
+import { useAdminDetailScroll } from './shared/AdminScrollRestoration'
 import { InventoryPages } from './shared/InventoryPages'
 import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
@@ -250,16 +252,19 @@ export function TeamsTab() {
   const [isolatedOffset, setIsolatedOffset] = useAdminViewState('TeamsTab.isolatedOffset', 0)
   // ── Stats sub-tab state ───────────────────────────────────────────────────
   const [statsTeams, setStatsTeams] = useState<TeamLeaderboardItem[]>([])
+  const [statsTotal, setStatsTotal] = useState<number | undefined>(undefined)
   const [statsCapped, setStatsCapped] = useState(false)
   const [loadingStats, setLoadingStats] = useState(false)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [search, setSearch] = useAdminViewState('TeamsTab.search', '')
   const [sort, setSort] = useAdminViewState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>('TeamsTab.sort', { key: 'tokens_total', dir: 'desc' })
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [selectedTeamId, selectTeamId] = useState<string | null>(null)
+  const setSelectedTeamId = useAdminDetailScroll(selectedTeamId, selectTeamId)
   const [statsDays, setStatsDays] = useAdminViewState<DayOption>('TeamsTab.statsDays', 'all')
 
   // ── Isolated sub-tab state ───────────────────────────────────────────────
   const [isolated, setIsolated] = useState<IsolatedUserItem[]>([])
+  const [isolatedTotal, setIsolatedTotal] = useState<number | undefined>(undefined)
   const [isolatedCapped, setIsolatedCapped] = useState(false)
   const [isolatedLoaded, setIsolatedLoaded] = useState(false)
   const [loadingIsolated, setLoadingIsolated] = useState(false)
@@ -315,6 +320,7 @@ export function TeamsTab() {
     getIsolatedUsers(500, isolatedOffset).then(res => {
       if (cancelled) return
       setIsolated(res.items)
+      setIsolatedTotal(res.total)
       setIsolatedCapped(res.capped)
       setIsolatedLoaded(true)
     }).catch(e => {
@@ -337,7 +343,7 @@ export function TeamsTab() {
     setStatsError(null)
     const arg = typeof statsDays === 'number' ? statsDays : undefined
     getTeamLeaderboard(arg, 500, statsOffset)
-      .then(res => { if (!cancelled) { setStatsTeams(res.items); setStatsCapped(res.capped) } })
+      .then(res => { if (!cancelled) { setStatsTeams(res.items); setStatsTotal(res.total); setStatsCapped(res.capped) } })
       .catch(e => { if (!cancelled) setStatsError(e?.message || 'Failed to load team stats') })
       .finally(() => { if (!cancelled) setLoadingStats(false) })
     return () => { cancelled = true }
@@ -467,25 +473,8 @@ export function TeamsTab() {
   const handleSort = (key: string) => {
     setSort(prev => ({ key: key as TeamSortKey, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }))
   }
-  const filteredStats = useMemo(() => {
-    let list = statsTeams
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(t => t.name.toLowerCase().includes(q))
-    }
-    return [...list].sort((a, b) => {
-      let cmp = 0
-      switch (sort.key) {
-        case 'name': cmp = a.name.localeCompare(b.name); break
-        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
-        case 'workflows_completed': cmp = a.workflows_completed - b.workflows_completed; break
-        case 'active_users': cmp = a.active_users - b.active_users; break
-        case 'member_count': cmp = a.member_count - b.member_count; break
-        case 'avg_latency_ms': cmp = (a.avg_latency_ms || 0) - (b.avg_latency_ms || 0); break
-      }
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-  }, [statsTeams, search, sort])
+  const filteredStats = useMemo(() => filterTeams(statsTeams, search, sort), [statsTeams, search, sort])
+
   const maxTokens = statsTeams.reduce((max, t) => Math.max(max, t.tokens_total), 1)
 
   if (selectedTeamId) {
@@ -728,14 +717,20 @@ export function TeamsTab() {
             <ExportButton disabled={loadingStats || !!statsError} onClick={() => downloadCSV(
               `teams-${statsDays === 'all' ? 'all' : statsDays + 'd'}.csv`,
               ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
-              filteredStats.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
+              filteredStats.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms]),
+              { Scope: 'Current page', Offset: String(statsOffset), 'Window (days)': String(statsDays), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }
             )} />
+            <FullExportButton scope={JSON.stringify([statsDays, search, sort])} filename="teams-all-matching.csv" disabled={loadingStats || !!statsError}
+              headers={['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)']}
+              fetchPage={offset => getTeamLeaderboard(typeof statsDays === 'number' ? statsDays : undefined, 500, offset)} getKey={team => team.team_id}
+              select={items => filterTeams(items, search, sort)} row={team => [team.name, team.tokens_total, team.workflows_completed, team.active_users, team.member_count, team.avg_latency_ms]}
+              metadata={{ 'Window (days)': String(statsDays), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }} />
           </div>
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
               Team Leaderboard ({filteredStats.length}) {statsDays !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {statsDays} days</span>}
             </div>
-            <InventoryPages offset={statsOffset} count={statsTeams.length} hasMore={statsCapped} busy={loadingStats} onChange={setStatsOffset} />
+            <InventoryPages offset={statsOffset} count={statsTeams.length} total={statsTotal} hasMore={statsCapped} busy={loadingStats} onChange={setStatsOffset} />
             {statsError && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -799,7 +794,7 @@ export function TeamsTab() {
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
             Isolated Users (only on their personal team) ({isolated.length})
           </div>
-          <InventoryPages offset={isolatedOffset} count={isolated.length} hasMore={isolatedCapped} busy={loadingIsolated} onChange={setIsolatedOffset} />
+          <InventoryPages offset={isolatedOffset} count={isolated.length} total={isolatedTotal} hasMore={isolatedCapped} busy={loadingIsolated} onChange={setIsolatedOffset} />
           {isolatedError && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
@@ -853,4 +848,24 @@ export function TeamsTab() {
       )}
     </div>
   )
+}
+
+function filterTeams(statsTeams: TeamLeaderboardItem[], search: string, sort: { key: TeamSortKey; dir: 'asc' | 'desc' }) {
+    let list = statsTeams
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(t => t.name.toLowerCase().includes(q))
+    }
+    return [...list].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'name': cmp = a.name.localeCompare(b.name); break
+        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
+        case 'workflows_completed': cmp = a.workflows_completed - b.workflows_completed; break
+        case 'active_users': cmp = a.active_users - b.active_users; break
+        case 'member_count': cmp = a.member_count - b.member_count; break
+        case 'avg_latency_ms': cmp = (a.avg_latency_ms || 0) - (b.avg_latency_ms || 0); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
 }

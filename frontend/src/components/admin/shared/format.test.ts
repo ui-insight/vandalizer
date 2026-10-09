@@ -124,3 +124,8 @@ describe('formatDate / formatDateTime', () => {
     expect(out).toMatch(/2026/)
   })
 })
+
+it('includes page scope and filter metadata without enabling CSV formulas', async () => {
+  const csv = await captureCSV(() => downloadCSV('page.csv', ['Name'], [['Record']], { Scope: 'Current page', Search: '=dangerous', Timezone: 'UTC' }))
+  expect(csv).toBe("Name,Scope,Search,Timezone\nRecord,Current page,'=dangerous,UTC")
+})

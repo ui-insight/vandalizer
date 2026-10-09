@@ -1,3 +1,5 @@
+import { FullExportButton } from './shared/FullExportButton'
+import { useAdminDetailScroll } from './shared/AdminScrollRestoration'
 import { InventoryPages } from './shared/InventoryPages'
 import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
@@ -14,7 +16,7 @@ import {
   getUserLeaderboard, getUserDetail, getUserHistory, updateUserRoles,
 } from '../../api/admin'
 import type {
-  UserHistoryItem,
+  UserHistoryItem, UserLeaderboardItem,
 } from '../../api/admin'
 import * as auditApi from '../../api/audit'
 import { useAuth } from '../../hooks/useAuth'
@@ -411,7 +413,8 @@ export function UsersTab() {
   const [offset, setOffset] = useAdminViewState('UsersTab.offset', 0)
   const [search, setSearch] = useAdminViewState('UsersTab.search', '')
   const [sort, setSort] = useAdminViewState<{ key: UserSortKey; dir: 'asc' | 'desc' }>('UsersTab.sort', { key: 'tokens_total', dir: 'desc' })
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [selectedUserId, selectUserId] = useState<string | null>(null)
+  const setSelectedUserId = useAdminDetailScroll(selectedUserId, selectUserId)
   const [days, setDays] = useAdminViewState<DayOption>('UsersTab.days', 'all')
 
   const request = useCallback(() => getUserLeaderboard(typeof days === 'number' ? days : undefined, 500, offset), [days, offset])
@@ -426,27 +429,7 @@ export function UsersTab() {
     }))
   }
 
-  const filtered = useMemo(() => {
-    let list = users
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(u =>
-        (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
-      )
-    }
-    const sorted = [...list].sort((a, b) => {
-      let cmp = 0
-      switch (sort.key) {
-        case 'name': cmp = (a.name || '').localeCompare(b.name || ''); break
-        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
-        case 'workflows_run': cmp = a.workflows_run - b.workflows_run; break
-        case 'conversations': cmp = a.conversations - b.conversations; break
-        case 'last_active': cmp = (a.last_active || '').localeCompare(b.last_active || ''); break
-      }
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-    return sorted
-  }, [users, search, sort])
+  const filtered = useMemo(() => filterUsers(users, search, sort), [users, search, sort])
 
   const maxTokens = users.reduce((max, u) => Math.max(max, u.tokens_total), 1)
 
@@ -457,7 +440,8 @@ export function UsersTab() {
         i + 1, u.name, u.email,
         [u.is_admin ? 'admin' : '', u.is_staff ? 'staff' : '', u.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '),
         u.tokens_total, u.workflows_run, u.conversations, u.last_active,
-      ])
+      ]),
+      { Scope: 'Current page', Offset: String(offset), 'Window (days)': String(days), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }
     )
   }
 
@@ -476,6 +460,12 @@ export function UsersTab() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
         <div style={{ flex: 1 }} />
         <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
+        <FullExportButton scope={JSON.stringify([days, search, sort])} filename="users-all-matching.csv" disabled={loading || !!error}
+          headers={['Name', 'Email', 'Roles', 'Tokens', 'Workflows', 'Conversations', 'Last Active']}
+          fetchPage={offset => getUserLeaderboard(typeof days === 'number' ? days : undefined, 500, offset)} getKey={user => user.user_id}
+          select={items => filterUsers(items, search, sort)}
+          row={user => [user.name, user.email, [user.is_admin ? 'admin' : '', user.is_staff ? 'staff' : '', user.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '), user.tokens_total, user.workflows_run, user.conversations, user.last_active]}
+          metadata={{ 'Window (days)': String(days), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
@@ -496,7 +486,7 @@ export function UsersTab() {
         {filtered.length === 0 ? (
           !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No users found.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="User leaderboard — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
@@ -541,9 +531,31 @@ export function UsersTab() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
     </div>
   )
+}
+
+function filterUsers(users: UserLeaderboardItem[], search: string, sort: { key: UserSortKey; dir: 'asc' | 'desc' }) {
+    let list = users
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(u =>
+        (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+      )
+    }
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'name': cmp = (a.name || '').localeCompare(b.name || ''); break
+        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
+        case 'workflows_run': cmp = a.workflows_run - b.workflows_run; break
+        case 'conversations': cmp = a.conversations - b.conversations; break
+        case 'last_active': cmp = (a.last_active || '').localeCompare(b.last_active || ''); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return sorted
 }

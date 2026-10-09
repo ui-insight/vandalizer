@@ -1,3 +1,4 @@
+import { FullExportButton } from './shared/FullExportButton'
 import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
@@ -55,7 +56,8 @@ export function CertificationsTab() {
         p.certified_at,
         p.last_activity_date,
         p.unlocked ? 'yes' : 'no',
-      ])
+      ]),
+      { Scope: 'Current page', Offset: String(offset), Search: query, Timezone: 'UTC' }
     )
   }
 
@@ -84,6 +86,11 @@ export function CertificationsTab() {
           <RefreshCw size={14} /> Refresh
         </button>
         <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
+        <FullExportButton scope={query} filename="certifications-all-matching.csv" disabled={loading || !!error}
+          headers={['User', 'Email', 'Level', 'Total XP', 'Modules Completed', 'Modules Total', 'Certified', 'Certified At', 'Last Activity', 'Unlocked']}
+          fetchPage={offset => getCertificationProgressList(100, offset, query)} getKey={item => item.user_id}
+          row={p => [p.name || p.user_id, p.email, p.level, p.total_xp, p.modules_completed, p.modules_total, p.certified ? 'yes' : 'no', p.certified_at, p.last_activity_date, p.unlocked ? 'yes' : 'no']}
+          metadata={{ Search: query, Timezone: 'UTC' }} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
@@ -91,7 +98,7 @@ export function CertificationsTab() {
           Certification Progress ({data?.total ?? 0} matching records)
         </div>
         <div className="admin-pagination" aria-label="Certification pages">
-          <p role="status">{loading ? 'Loading records…' : `${filtered.length ? offset + 1 : 0}–${offset + filtered.length} of ${data?.total ?? 0} matching records. Export contains this page only.`}</p>
+          <p role="status">{loading ? 'Loading records…' : `${filtered.length ? offset + 1 : 0}–${offset + filtered.length} of ${data?.total ?? 0} matching records. Export CSV contains this page; Export all matching records includes every match.`}</p>
           <button type="button" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - pageSize))}>Previous page</button>
           <button type="button" disabled={loading || !capped} onClick={() => setOffset(value => value + pageSize)}>Next page</button>
         </div>

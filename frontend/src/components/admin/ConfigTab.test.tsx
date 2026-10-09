@@ -217,7 +217,7 @@ describe('ConfigTab — panel inventory', () => {
       'Document Compliance Checks',
       'Document Retention Policy',
     ]) {
-      expect(await screen.findByText(heading, { selector: 'div' })).toBeInTheDocument()
+      expect(await screen.findByText(heading, { selector: 'div, summary' })).toBeInTheDocument()
     }
   })
 
@@ -691,4 +691,33 @@ it('rejects compliance overlap that is larger than its chunk', async () => {
   expect(mockUpdateCompliancePolicyConfig).not.toHaveBeenCalled()
   expect(overlap).toHaveFocus()
   expect(overlap).toHaveAccessibleDescription('Compliance chunk overlap must be smaller than chunk size.')
+})
+
+describe('ConfigTab — advanced settings', () => {
+  it('keeps advanced drafts when collapsed and opens invalid fields before focusing them', async () => {
+    await renderConfigTab()
+    const details = document.getElementById('cfg-extraction-advanced') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    fireEvent.click(screen.getByText('Advanced extraction: chunking, consensus and images'))
+    fireEvent.click(screen.getByLabelText('Enable Chunking'))
+    const field = screen.getByRole('spinbutton', { name: 'Maximum fields per chunk' })
+    fireEvent.change(field, { target: { value: '150' } })
+    fireEvent.click(screen.getByText('Advanced extraction: chunking, consensus and images'))
+    expect(details.open).toBe(false)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Processing Settings' })[0])
+    await waitFor(() => expect(details.open).toBe(true))
+    expect(field).toHaveValue(150)
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    expect(field).toHaveFocus()
+    expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
+  })
+  it('opens collapsed settings when following a section anchor', async () => {
+    await renderConfigTab()
+    const details = document.getElementById('cfg-playground') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    window.location.hash = '#cfg-playground'
+    fireEvent(window, new HashChangeEvent('hashchange'))
+    await waitFor(() => expect(details.open).toBe(true))
+    window.location.hash = ''
+  })
 })

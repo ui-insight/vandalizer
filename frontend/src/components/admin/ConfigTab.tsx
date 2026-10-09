@@ -1,3 +1,4 @@
+import { TableRegion } from './shared/TableRegion'
 import { useConfirm } from '../shared/useConfirm'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
@@ -132,6 +133,14 @@ function ocrDiagFacts(result: OcrTestResult): DiagnosticFact[] {
 // ──────────────────────────────────────────
 // Config Tab
 // ──────────────────────────────────────────
+
+function revealConfigField(id: string, focus = false) {
+  const target = document.getElementById(id)
+  let details = target?.closest('details')
+  while (details) { details.open = true; details = details.parentElement?.closest('details') ?? null }
+  if (focus) target?.focus()
+  else target?.scrollIntoView?.({ block: 'start' })
+}
 
 export function ConfigTab() {
   return <ConfigDraftProvider><ConfigEditor /></ConfigDraftProvider>
@@ -391,8 +400,10 @@ function ConfigEditor() {
 
   useEffect(() => {
     if (loading) return
-    const id = window.location.hash.slice(1)
-    if (id.startsWith('cfg-')) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }))
+    const reveal = () => { const id = window.location.hash.slice(1); if (id.startsWith('cfg-')) requestAnimationFrame(() => revealConfigField(id)) }
+    reveal()
+    window.addEventListener('hashchange', reveal)
+    return () => window.removeEventListener('hashchange', reveal)
   }, [loading])
 
   const numericFieldProps = (id: string) => ({
@@ -409,13 +420,13 @@ function ConfigEditor() {
     for (const input of inputs) {
       if (!input.checkValidity() || (input.value !== '' && !Number.isInteger(input.valueAsNumber))) {
         setFieldError({ id: input.id, message: `${input.getAttribute('aria-label') || 'Value'} must be a whole number of at least ${input.min || 0}.` })
-        input.focus()
+        revealConfigField(input.id, true)
         return false
       }
     }
     if (section === 'compliance' && complianceChunkOverlap >= complianceChunkSize) {
       setFieldError({ id: 'compliance-overlap', message: 'Compliance chunk overlap must be smaller than chunk size.' })
-      document.getElementById('compliance-overlap')?.focus()
+      revealConfigField('compliance-overlap', true)
       return false
     }
     setFieldError(null)
@@ -449,7 +460,7 @@ function ConfigEditor() {
     if (invalid) {
       setSaved(false)
       setError(invalid.message)
-      document.getElementById(invalid.id)?.focus()
+      revealConfigField(invalid.id, true)
       return
     }
     // Parse before touching the saving state so a malformed options blob fails
@@ -713,13 +724,14 @@ function ConfigEditor() {
       />
 
       {/* Prompt Playground */}
-      <div id="cfg-playground" style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
+      <details id="cfg-playground" style={sectionStyle}>
+        <summary className="config-advanced-summary" style={{ ...sectionHeaderStyle, cursor: 'pointer' }}>
+          <span className="config-disclosure" aria-hidden="true">▸</span>
           <Play size={18} color="#6b7280" /> Prompt Playground
           <span style={{ fontSize: 12, fontWeight: 400, color: '#4b5563' }}>
             — send a prompt to a configured model and see the raw round-trip
           </span>
-        </div>
+        </summary>
         <div style={sectionBodyStyle}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -839,7 +851,7 @@ ${playgroundResult.request.user_prompt}`}
             </div>
           )}
         </div>
-      </div>
+      </details>
 
       <AuthPanel
         providers={cfg.oauth_providers}
@@ -1176,6 +1188,9 @@ ${playgroundResult.request.user_prompt}`}
               </div>
             )}
 
+            <details id="cfg-extraction-advanced">
+              <summary className="config-advanced-summary" style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Advanced extraction: chunking, consensus and images</summary>
+              <div style={{ display: 'grid', gap: 20, marginTop: 16 }}>
             {/* Chunking */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
@@ -1213,6 +1228,8 @@ ${playgroundResult.request.user_prompt}`}
                 </div>
               </div>
             )}
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -1510,7 +1527,7 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                   Per-classification rules
                 </div>
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <TableRegion label="Retention policy rules — scroll for more columns"><table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', textAlign: 'left' }}>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Tier</th>
@@ -1541,7 +1558,7 @@ ${playgroundResult.request.user_prompt}`}
                               display: 'inline-flex', alignItems: 'center', gap: 6,
                               padding: '2px 10px', borderRadius: 9999,
                               fontSize: 12, fontWeight: 600,
-                              backgroundColor: `${level.color}1a`, color: level.color,
+                              backgroundColor: `${level.color}1a`, color: '#334155',
                               border: `1px solid ${level.color}66`,
                             }}>
                               <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: level.color }} />
@@ -1584,7 +1601,7 @@ ${playgroundResult.request.user_prompt}`}
                       )
                     })}
                   </tbody>
-                </table>
+                </table></TableRegion>
               </div>
 
               <div>

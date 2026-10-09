@@ -260,7 +260,12 @@ const libraryRoute = createRoute({
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin',
-  validateSearch: (search: Record<string, unknown>): { tab?: string } => ({ tab: typeof search.tab === 'string' ? search.tab : undefined }),
+  validateSearch: (search: Record<string, unknown>): { tab?: string; status?: string; from?: string; until?: string } => ({
+    tab: typeof search.tab === 'string' ? search.tab : undefined,
+    status: typeof search.status === 'string' && ['completed', 'running', 'failed', 'queued', 'canceled', ''].includes(search.status) ? search.status : undefined,
+    from: typeof search.from === 'string' && Number.isFinite(Date.parse(search.from)) ? search.from : undefined,
+    until: typeof search.until === 'string' && Number.isFinite(Date.parse(search.until)) ? search.until : undefined,
+  }),
   component: () => (
     <ProtectedRoute>
       <Admin />

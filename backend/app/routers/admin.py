@@ -187,6 +187,8 @@ def _can_view_platform_role_flags(team_scope: str | None) -> bool:
 # ---------------------------------------------------------------------------
 
 class UsageStatsResponse(BaseModel):
+    period_start: Optional[datetime.datetime] = None
+    period_end: Optional[datetime.datetime] = None
     conversations: int = 0
     search_runs: int = 0
     workflows_started: int = 0
@@ -479,8 +481,9 @@ async def usage_stats(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-    query_filter: dict = {"started_at": {"$gte": cutoff}}
+    period_end = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = period_end - datetime.timedelta(days=days)
+    query_filter: dict = {"started_at": {"$gte": cutoff, "$lt": period_end}}
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -515,6 +518,8 @@ async def usage_stats(
             team_ids.add(ev.team_id)
 
     return UsageStatsResponse(
+        period_start=cutoff,
+        period_end=period_end,
         conversations=conversations,
         search_runs=search_runs,
         workflows_started=workflows_started,
@@ -1366,10 +1371,27 @@ async def workflow_events(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, ge=1, le=200),
     user: User = Depends(get_current_user),
+    started_after: Optional[datetime.datetime] = None,
+    started_before: Optional[datetime.datetime] = None,
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
+    def utc(value):
+        return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
+    if started_after is not None:
+        started_after = utc(started_after)
+    if started_before is not None:
+        started_before = utc(started_before)
+    if started_after and started_before and started_after >= started_before:
+        raise HTTPException(status_code=422, detail="Start must be before end of the workflow window.")
+    period = {}
+    if started_after:
+        period["$gte"] = started_after
+    if started_before:
+        period["$lt"] = started_before
     query_filter: dict = {"type": "workflow_run"}
+    if period:
+        query_filter["started_at"] = period
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -1383,7 +1405,7 @@ async def workflow_events(
     skip = (page - 1) * per_page
 
     events = await ActivityEvent.find(query_filter).sort(
-        -ActivityEvent.started_at
+        "-started_at", "_id"
     ).skip(skip).limit(per_page).to_list()
 
     # Resolve user and team names
@@ -1436,6 +1458,8 @@ async def workflow_events(
 
     # Compute summary stats across all matching workflows (not just this page)
     summary_filter: dict = {"type": "workflow_run"}
+    if period:
+        summary_filter["started_at"] = period
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         summary_filter["team_id"] = {"$in": team_scope_ids}

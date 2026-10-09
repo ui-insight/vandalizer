@@ -1,3 +1,4 @@
+import { AdminScrollRestoration } from '../components/admin/shared/AdminScrollRestoration'
 import { AdminViewState } from '../components/admin/shared/AdminViewState'
 import { adminAccess } from '../lib/adminAccess'
 import { useNavigate, useSearch } from '@tanstack/react-router'
@@ -81,10 +82,10 @@ const TABS: TabDef[] = [
 
 const ADMIN_PURPOSE: Record<Tab, string> = {
   usage: 'Compare activity over the selected period. Counts cover recorded events; token totals combine input and output.',
-  users: 'Inspect user activity and access. Search and exports cover the records shown; open a user to review their history.',
+  users: 'Inspect user activity and access. Search filters this page; choose a page CSV or export every matching user. Open a user to review their history.',
   teams: 'Manage teams across the installation, inspect usage, and assign users who have no shared workspace.',
   organizations: 'Maintain the organization hierarchy and its memberships. Moving a node changes its parent and inherited context.',
-  workflows: 'Investigate running and failed workflows. Open an event for its failure details; exports contain the current result page.',
+  workflows: 'Investigate running and failed workflows. Open an event for its failure details; choose a page CSV or export every matching event.',
   quality: 'Monitor quality trends and alerts, investigate individual results, or run a regression suite. Compare models using the same suite and inputs.',
   optimizer: 'Review optimization outcomes by status and surface. Applied changes are recorded here; pending decisions belong in the tuning inbox.',
   knowledgebases: 'Review knowledge base ownership, sharing status, and versions across the installation.',
@@ -185,13 +186,14 @@ export default function Admin() {
           {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
           {isGlobalAdmin && <TelemetryOptInBanner />}
           <AdminViewState key={viewScope} scope={viewScope}>
+          <AdminScrollRestoration key={effectiveActiveTab} section={effectiveActiveTab}>
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div>}>
             {waitingForFeature && <p role="status">Loading section availability…</p>}
             {effectiveActiveTab === 'usage' && canSee(tabByKey.usage) && <UsageTab />}
             {effectiveActiveTab === 'users' && canSee(tabByKey.users) && <UsersTab />}
             {effectiveActiveTab === 'teams' && canSee(tabByKey.teams) && <TeamsTab />}
             {effectiveActiveTab === 'organizations' && canSee(tabByKey.organizations) && <OrganizationsTab />}
-            {effectiveActiveTab === 'workflows' && canSee(tabByKey.workflows) && <WorkflowsTab />}
+            {effectiveActiveTab === 'workflows' && canSee(tabByKey.workflows) && <WorkflowsTab linkedFilter={{ status: search.status, from: search.from, until: search.until }} onFilterChange={filter => { void navigate({ to: '/admin', search: { tab: 'workflows', ...filter }, replace: true }) }} />}
             {effectiveActiveTab === 'quality' && canSee(tabByKey.quality) && <QualityTab />}
             {effectiveActiveTab === 'optimizer' && canSee(tabByKey.optimizer) && <OptimizerTab />}
             {effectiveActiveTab === 'knowledgebases' && canSee(tabByKey.knowledgebases) && <KnowledgeBasesTab canEdit={isGlobalAdmin} />}
@@ -205,6 +207,7 @@ export default function Admin() {
             {effectiveActiveTab === 'telemetry' && canSee(tabByKey.telemetry) && <TelemetryTab />}
             {effectiveActiveTab === 'config' && canSee(tabByKey.config) && <ConfigTab />}
           </Suspense>
+          </AdminScrollRestoration>
           </AdminViewState>
       </SectionPage>
     </PageLayout>

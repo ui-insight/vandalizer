@@ -115,6 +115,8 @@ export function UsageTab() {
             <KpiCard label="Active Users" value={formatNumber(stats.active_users)} icon={Users} color="#06b6d4" trend={prev ? { current: stats.active_users, previous: prev.active_users } : undefined} />
           </div>
 
+          {stats.period_start && stats.period_end && !loading && !error && loadedDays === days && <a className="admin-open-record" href={`/admin?${new URLSearchParams({ tab: 'workflows', status: 'failed', from: stats.period_start, until: stats.period_end })}`}>Inspect {formatNumber(stats.workflows_failed)} failed workflows in this window</a>}
+
           {/* Daily Activity Chart */}
           {timeseries && timeseries.days.length > 0 && (
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>

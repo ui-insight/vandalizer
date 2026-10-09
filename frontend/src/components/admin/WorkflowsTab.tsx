@@ -1,3 +1,4 @@
+import { FullExportButton } from './shared/FullExportButton'
 import { useAdminViewState } from './shared/AdminViewState'
 import { TableRegion } from './shared/TableRegion'
 import { useAdminQuery } from './shared/useAdminQuery'
@@ -8,15 +9,23 @@ import { getWorkflowEvents } from '../../api/admin'
 import { downloadCSV, formatDateTime, formatDuration, formatNumber } from './shared/format'
 import { ExportButton, SearchInput, StatusBadge, UserAvatar } from './shared/primitives'
 
-export function WorkflowsTab() {
+export type WorkflowPeriod = { status?: string; from?: string; until?: string }
+export function WorkflowsTab({ linkedFilter, onFilterChange }: { linkedFilter?: WorkflowPeriod; onFilterChange?: (filter: WorkflowPeriod) => void } = {}) {
   const [page, setPage] = useAdminViewState('WorkflowsTab.page', 1)
-  const [status, setStatus] = useAdminViewState<string>('WorkflowsTab.status', '')
+  const [storedStatus, setStatus] = useAdminViewState<string>('WorkflowsTab.status', '')
+  const status = linkedFilter?.status ?? storedStatus
+  const [savedPeriod, setSavedPeriod] = useAdminViewState<WorkflowPeriod>('WorkflowsTab.period', {})
+  const hasLink = linkedFilter?.status !== undefined || !!linkedFilter?.from || !!linkedFilter?.until
+  const from = hasLink ? linkedFilter?.from : savedPeriod.from
+  const until = hasLink ? linkedFilter?.until : savedPeriod.until
+  useEffect(() => { if (hasLink) setSavedPeriod({ from, until }) }, [hasLink, from, until, setSavedPeriod])
+  useEffect(() => { if (linkedFilter?.status !== undefined) setStatus(linkedFilter.status); if (linkedFilter?.status !== undefined || from || until) setPage(1) }, [linkedFilter?.status, from, until, setStatus, setPage])
   const [search, setSearch] = useAdminViewState('WorkflowsTab.search', '')
   const [searchInput, setSearchInput] = useAdminViewState('WorkflowsTab.searchInput', '')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const request = useCallback(() => getWorkflowEvents(page, status || undefined, search || undefined), [page, status, search])
+  const request = useCallback(() => getWorkflowEvents(page, status || undefined, search || undefined, { from, until }), [page, status, search, from, until])
   const { data, loading, error, load } = useAdminQuery(request)
 
   const handleSearchChange = (v: string) => {
@@ -38,7 +47,8 @@ export function WorkflowsTab() {
         ev.status, ev.title, ev.user_name || ev.user_id, ev.team_name || ev.team_id,
         `${ev.steps_completed}/${ev.steps_total}`, ev.tokens_in + ev.tokens_out,
         ev.duration_ms, ev.started_at,
-      ])
+      ]),
+      { Scope: 'Current page', Page: String(page), 'Status filter': status || 'all', Search: search, 'Start (UTC)': from || 'all', 'End exclusive (UTC)': until || 'all', Timezone: 'UTC' }
     )
   }
 
@@ -67,7 +77,9 @@ export function WorkflowsTab() {
         </div>
       )}
 
-      <p style={{ margin: 0, fontSize: 13, color: '#59616b' }}>Completion records finished execution, not correctness. Inspect failed events for the reason; CSV includes only the loaded page.</p>
+      <p style={{ margin: 0, fontSize: 13, color: '#59616b' }}>Completion records finished execution, not correctness. Inspect failed events for the reason; Export CSV includes the loaded page; Export all matching records includes every match.</p>
+
+      {(from || until) && <p role="status" style={{ margin: 0, fontSize: 13 }}>Workflow start window (UTC): {from || 'any start'} to {until || 'now'} (end exclusive). <button type="button" className="admin-open-record" onClick={() => { setSavedPeriod({}); setPage(1); onFilterChange?.({ status }) }}>Clear date range</button></p>}
 
       {/* Filters + search */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -75,7 +87,7 @@ export function WorkflowsTab() {
           <button
             key={f}
             aria-pressed={status === f}
-            onClick={() => { setStatus(f); setPage(1) }}
+            onClick={() => { setStatus(f); setPage(1); onFilterChange?.({ from, until, status: f }) }}
             style={{
               padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
               fontSize: 13, fontWeight: 500, cursor: 'pointer', textTransform: 'capitalize',
@@ -89,6 +101,11 @@ export function WorkflowsTab() {
         <div style={{ flex: 1 }} />
         <SearchInput value={searchInput} onChange={handleSearchChange} placeholder="Search workflows..." />
         <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
+        <FullExportButton scope={JSON.stringify([status, search, from, until])} filename="workflows-all-matching.csv" disabled={loading || !!error}
+          headers={['Status', 'Workflow', 'User', 'Team', 'Steps', 'Tokens', 'Duration (ms)', 'Started']}
+          fetchPage={offset => getWorkflowEvents(Math.floor(offset / 50) + 1, status || undefined, search || undefined, { from, until })} getKey={event => event.id}
+          row={event => [event.status, event.title, event.user_name || event.user_id, event.team_name || event.team_id, `${event.steps_completed}/${event.steps_total}`, event.tokens_in + event.tokens_out, event.duration_ms, event.started_at]}
+          metadata={{ 'Status filter': status || 'all', Search: search, 'Start (UTC)': from || 'all', 'End exclusive (UTC)': until || 'all', Timezone: 'UTC' }} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>

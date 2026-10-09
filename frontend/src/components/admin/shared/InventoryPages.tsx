@@ -1,4 +1,4 @@
-export function InventoryPages({ offset, count, total, hasMore, busy, onChange, pageSize = 500, scopeNote = 'Filters, sorting and export cover this page.' }: {
+export function InventoryPages({ offset, count, total, hasMore, busy, onChange, pageSize = 500, scopeNote = 'Filters, sorting and Export CSV cover this page.' }: {
   offset: number; count: number; total?: number; hasMore: boolean; busy: boolean; onChange: (offset: number) => void; pageSize?: number; scopeNote?: string
 }) {
   return <div className="admin-pagination">
