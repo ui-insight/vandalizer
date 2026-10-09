@@ -16,7 +16,7 @@ from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -252,6 +252,7 @@ app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(obligations.router, prefix="/api/obligations", tags=["obligations"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:

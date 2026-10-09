@@ -56,12 +56,14 @@ from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.user_memory import UserMemory
 from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
+from app.models.obligation import Obligation
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
 from app.models.telemetry import TelemetryHeartbeat
 
 ALL_MODELS = [
+    Obligation,
     User,
     Team,
     TeamMembership,

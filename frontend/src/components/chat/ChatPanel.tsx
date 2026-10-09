@@ -12,6 +12,7 @@ import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell
 import { toolResultToText } from './ToolCallDisplay'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { WorkspaceBriefing } from './WorkspaceBriefing'
+import { RAInbox } from './RAInbox'
 import { OnboardingStepper } from './WelcomeExperience'
 import { ConceptStrip } from './ConceptTip'
 import { ContextMeter } from './ContextMeter'
@@ -1072,6 +1073,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 pending work, or post-demo state. Surfacing it for any non-newcomer
                 (or anyone with docs waiting / alerts open) gives the 2nd-visit user
                 a personalized reason to re-engage instead of a generic banner. */}
+            {/* What each proposal or award needs, from its documents (#999). */}
+            <RAInbox />
             {((onboardingStatus?.recent_activity?.length ?? 0) > 0
               || (onboardingStatus?.active_alerts?.length ?? 0) > 0
               || onboardingStatus?.daily_guidance

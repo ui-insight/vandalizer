@@ -4497,6 +4497,126 @@ async def set_project_status(
     }
 
 
+def _describe_obligation(clean: dict) -> str:
+    src = clean["sources"][0]
+    where = f'{src.document_title}, p. {src.page}' if src.page else src.document_title
+    if clean["kind"] == "deadline":
+        when = clean.get("due_text") or f'{clean["due_at"]:%b %-d, %Y}'
+        return f'{clean["title"]}: {when} ({where})'
+    if clean["kind"] == "limit":
+        unit = clean.get("unit") or ""
+        return f'{clean["title"]}: {clean["observed_value"]:,.0f}{unit} against a limit of {clean["limit_value"]:,.0f}{unit} ({where})'
+    return f'{clean["title"]} ({where})'
+
+
+async def propose_obligations(
+    context: RunContext[AgenticChatDeps],
+    obligations: list[dict],
+    project_uuid: Optional[str] = None,
+    confirmed: bool = False,
+) -> dict:
+    """Add deadlines, required material and sponsor limits to a project's RA inbox.
+
+    The RA inbox on Home lists what each proposal or award needs: dates, what's
+    still missing, and where a draft conflicts with the sponsor's rules. Use
+    this when the user asks to track a project's deadlines or requirements, or
+    asks what's due or missing after adding a solicitation, amendment or draft
+    to a project. Read the documents first (get_document_text), then propose
+    each item with the exact quote it comes from. Each item is checked against
+    its document: the quote must be on the cited page, a deadline's date must
+    be in its quote, and a limit's figures in theirs. Items that fail come back
+    with the reason and are not saved. Call with confirmed=false to show the
+    user what will be added; save only after they approve.
+
+    Rules:
+    - Only what the documents state. No deadline, page limit or rule the
+      sources don't give; the project period is not a deadline.
+    - When an amendment changes a date, propose the new date: the inbox shows
+      it replacing the old one.
+    - A promised item is not a received one: a letter that is "promised" is
+      still required material.
+    - For a limit, cite the limit (role "limit", e.g. the solicitation's cap)
+      and the value that exceeds or meets it (role "observed", e.g. the draft
+      budget) as two sources.
+
+    Args:
+        context: The call context.
+        obligations: Items, each {"kind": "deadline" | "required_material" |
+            "limit", "title", "sources": [{"document_uuid", "page", "quote",
+            "role"}], ...}. Deadlines add "deadline_type"
+            ("sponsor_submission", "internal_routing", "report_due", "other"),
+            "due_at" (ISO date or date-time, e.g. "2026-11-19T17:00") and
+            "due_text" (the time as written, e.g. "5:00 p.m. Pacific Time").
+            Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
+        project_uuid: The project; defaults to the one open in chat.
+        confirmed: Must be true to save; false returns a preview.
+    """
+    import hashlib
+
+    from app.services import obligation_service, project_service
+
+    if project_uuid:
+        project = await project_service.get_authorized_project(project_uuid, context.deps.user)
+    else:
+        project = await _resolve_active_project(context)
+    if not project:
+        return _err(
+            "No project is open.",
+            hint="Open the project in chat, or pass its project_uuid (list it with the project tools).",
+        )
+    if not await project_service.can_manage_project(project, context.deps.user):
+        return {"error": "You need edit access to change this project's inbox."}
+    if not isinstance(obligations, list) or not obligations:
+        return {"error": "Pass at least one obligation."}
+
+    checked = await obligation_service.propose(project, context.deps.user, obligations)
+    accepted, rejected = checked["accepted"], checked["rejected"]
+    lines = []
+    for a in accepted:
+        line = f"Add: {_describe_obligation(a['clean'])}"
+        if a["replaces"]:
+            old = a["replaces"]
+            line += f" — replaces {old['due_at'][:10]} ({old['sources'][0]['document_title']})"
+        lines.append(line)
+    lines += [f"Not added: {r['title'] or 'item'} — {r['reason']}" for r in rejected]
+    if not accepted:
+        return {
+            "error": "None of the proposed items could be checked against their documents.",
+            "rejected": rejected,
+            "hint": "Fix each item using its reason (usually the exact quote or its page) and propose again.",
+        }
+
+    digest = hashlib.sha256(
+        json.dumps(obligations, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    gate = await _confirm_gate(
+        context,
+        tool_name="propose_obligations",
+        key={"project": project.uuid, "items": digest},
+        preview={
+            "action": "propose_obligations",
+            "preview": f'Add {len(accepted)} item{"s" if len(accepted) != 1 else ""} to the inbox for "{project.title}":\n' + "\n".join(lines),
+            "needs_confirmation": True,
+            "rejected": rejected,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    saved = [await obligation_service.save_checked(project, context.deps.user, a["clean"]) for a in accepted]
+    return {
+        "ok": True,
+        "project": project.title,
+        "added": [obligation_service.serialize(o, context.deps.user, project.title) for o in saved],
+        "rejected": rejected,
+        "message": (
+            f'Added {len(saved)} item{"s" if len(saved) != 1 else ""} to the RA inbox for "{project.title}". '
+            "They're on Home, where each can be marked done or dismissed."
+        ),
+    }
+
+
 async def create_project(
     context: RunContext[AgenticChatDeps],
     title: str,
@@ -5783,6 +5903,7 @@ TOOLS = [
     pin_to_project,
     unpin_from_project,
     set_project_status,
+    propose_obligations,
     # Phase 9 — Automations
     create_automation,
     # Phase 10 — Workflow authoring

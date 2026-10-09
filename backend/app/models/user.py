@@ -60,6 +60,8 @@ class User(Document):
     # sends) — the cross-sequence frequency cap keys off this.
     last_marketing_email_at: Optional[datetime.datetime] = None
     email_preferences: dict = {}  # {"onboarding": True, "nudges": True, "announcements": True}
+    # The RA inbox on Home (#999) can be turned off per user.
+    home_inbox_hidden: bool = False
 
     # v5.0 launch — one-time announcement send tracking
     v5_announcement_sent_at: Optional[datetime.datetime] = None

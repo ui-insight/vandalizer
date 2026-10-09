@@ -15,6 +15,10 @@ const mockUser = { user_id: 'testuser', email: 'old@example.com', name: 'Test Us
 const mockSsoUser = { ...mockUser, sso_provider: 'saml' }
 const mockAuthValue = { user: mockUser, refreshUser: mockRefreshUser }
 
+vi.mock('../api/obligations', () => ({
+  getInbox: vi.fn().mockResolvedValue({ items: [], inbox_hidden: false }),
+  setInboxHidden: vi.fn(),
+}))
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => mockAuthValue,
 }))
@@ -129,7 +133,8 @@ describe('Account recovery', () => {
     mockGetPreferences.mockRejectedValueOnce(new Error('Preferences unavailable'))
     render(<Account />)
     await screen.findByRole('button', { name: 'Retry email preferences' })
-    expect(screen.queryByRole('checkbox')).toBeNull()
+    // The email-preference checkboxes; the Home inbox setting (#999) loads separately.
+    expect(screen.queryByRole('checkbox', { name: /Onboarding|Activity nudges|Product announcements/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry email preferences' }))
     expect(await screen.findByRole('checkbox', { name: /Activity nudges/ })).not.toBeChecked()
   })

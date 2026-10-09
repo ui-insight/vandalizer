@@ -80,6 +80,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   pin_to_project:        { label: 'Pinning to project',       category: 'write' },
   unpin_from_project:    { label: 'Removing project pin',     category: 'write' },
   set_project_status:    { label: 'Updating project status',  category: 'write' },
+  propose_obligations: { label: 'Updating the RA inbox', category: 'write' },
   create_automation:     { label: 'Creating automation',      category: 'write' },
   create_workflow:       { label: 'Building workflow',         category: 'write' },
   get_certification_progress:      { label: 'Checking certification progress', category: 'read' },

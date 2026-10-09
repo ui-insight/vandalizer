@@ -13,6 +13,7 @@ import {
   type EmailPreferences,
 } from '../api/auth'
 import { getUserMemory, clearUserMemory, type UserMemoryResponse } from '../api/chat'
+import { HomeInboxSetting } from '../components/account/HomeInboxSetting'
 
 export default function Account() {
   const { user, refreshUser } = useAuth()
@@ -404,6 +405,8 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
             )}
           </div>
         </div>
+
+        <HomeInboxSetting />
 
         {/* Email Preferences */}
         <div className="rounded-lg border border-gray-200 bg-white">
