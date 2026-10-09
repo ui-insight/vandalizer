@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "notices": [
+    {
+      "id": "quality-evidence-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+        "validation_qa.set-up-validation-for-your-workflow",
+        "validation_qa.worked-example-five-checks-and-a-failing-run",
+        "validation_qa.trust-signals-quality-tiers-v5-0",
+        "validation_qa.guided-verification-v5-0",
+        "governance.organizing-for-reuse",
+        "governance.sharing-with-everyone",
+        "governance.establish-your-workflow-governance",
+        "governance.worked-example-one-workflow-two-offices",
+        "governance.glossary-review"
+      ],
+      "issued_at": "2026-10-09",
+      "title": "Correction to historical quality guidance",
+      "paragraphs": [
+        "The preserved lesson below includes outdated quality claims. Scores can be missing or Unscored; neither establishes a pass or failure. A score describes the tested cases and configuration, not the correctness of the current answer.",
+        "Additional test cases can expose failures and lower a score. Saving a test case does not itself repair an artifact. Check source values and inspect measured reruns before claiming improvement.",
+        "Chat can receive score metadata. Inspect the stored evaluation details rather than relying on an assurance. Successful execution and reviewer acceptance are separate from measured correctness."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "1798e6dd0315aa05c02a2e3ccea494f67bbace78cc9d52cdb3db6df6a50cd59e",
+        "9d9143292c7cd0c3f8ccc8c09d2d1b790e9ac0a804d05ea52cd735c48f438fa4",
+        "81a23f82b09cfd736f68a0b50ed9cc0bc4a853cb60dc4b790f5f29369b601aad",
+        "798714afd70a537ed22dbe67b548165f085856aaa9781555dfce91d2c60a5f22",
+        "96e4788feca10d055e70bfa14ba35a6d11fd21034d62b61cf67877880f077c27",
+        "d8018585113437959dd8d554effb4cda001ab256dfe402f056bc238e60fb757d",
+        "e8ee10a208c237d02a08cdc345b04b794c1a9a0e93438f7a2299645de20470da",
+        "b08923e937178e5a103240c612c7954012ccce01607282c45a551271b76de48b",
+        "e0d615748c43ae5d7f1c7878f4e6587b84df20af79303d919d55151e1c5eace1",
+        "cbc344ef1b93d59a127a0ab044983b44894eb26dd2440eb967a7cbdbce9ceb5d"
+      ]
+    }
+  ]
+}

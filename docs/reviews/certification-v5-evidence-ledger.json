@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "a3a7d1e8b710ccf2ee02dc1b839b8cfa28fd96d2",
+  "working_head_at_inventory": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 61902,
-    "sha256": "70ebdd655e68828355b66270de06dfc4b7040d7e4745d9bb2366df9d4b3f7820"
+    "bytes": 62290,
+    "sha256": "d3f9b468dd1041c2cc9c72f5b4a271cf7118b48ecaf48af8fd58e1b421c1bd7b"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 727953,
-    "sha256": "80d4488a88165793ec41a1d2032c51c1e7566b67bf4394fb2794a6b0fd044495"
+    "bytes": 731557,
+    "sha256": "564ac525ecccfb1cd397533b1c1b53766d7b0f7fc7b9eac481052b6fa91b957c"
   },
   "counts": {
-    "accepted": 63,
-    "open": 99,
+    "accepted": 64,
+    "open": 98,
     "items": 162,
-    "checkpoints": 304,
-    "browser_runs": 449,
-    "recorded_captures_including_diagnostics_and_repeats": 6015,
+    "checkpoints": 305,
+    "browser_runs": 453,
+    "recorded_captures_including_diagnostics_and_repeats": 6045,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -448,8 +448,8 @@
     },
     {
       "id": "C8-CONTENT-02",
-      "accepted": false,
-      "requirement": "P1 · Fix: Correct quality claims everywhere.** Explain that Unscored is possible, template scores describe tested examples and additional test cases may expose failures. Remove guarantees that every result has a score or more verification necessarily increases it."
+      "accepted": true,
+      "requirement": "P1 · Fix: Correct quality claims everywhere.** Explain that Unscored is possible, template scores describe tested examples and additional test cases may expose failures. Remove guarantees that every result has a score or more verification necessarily increases it. Accepted at checkpoints 303/305: working and V5 teaching correct these claims; the same dated guidance supplements ten affected frozen lessons in the panel and tutor payload and also appears on old-format chat cards. Exact text matches support unversioned cards without inventing their historical course. Original lesson bytes, assessment requirements and earned credit remain preserved."
     },
     {
       "id": "C8-CONTENT-03",
@@ -3159,6 +3159,13 @@
       "evidence_directories": [
         "certification-method-selection-teaching-2026-10-09"
       ]
+    },
+    {
+      "number": 305,
+      "title": "Correct preserved teaching without rewriting learner history on October 9 2026",
+      "evidence_directories": [
+        "certification-historical-corrections-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3953,6 +3960,24 @@
       "available": true,
       "bytes": 508,
       "sha256": "c0b1cce0ae7dfa1525272daa1d81b2e286a9e0c4800046d825526a525b746473"
+    },
+    {
+      "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/source-hashes-final.json",
+      "available": true,
+      "bytes": 1859,
+      "sha256": "638142882020311a745646435abff2fd9d123294ad3c66b1bd0ca63c5b40f80e"
+    },
+    {
+      "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/source-hashes.json",
+      "available": true,
+      "bytes": 323,
+      "sha256": "34aea2fee9eebda4d7f8574dea0cc01c3e882b49402f95fa82c127f0f4a2d717"
+    },
+    {
+      "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 444,
+      "sha256": "62558544197334c5e4ceecc3d305b4dbbb9a138f3ae4fc4b68d677a26d5db59c"
     },
     {
       "path": "artifacts/visual-review/certification-home-panel-fallback-2026-10-09/checkpoint.json",
@@ -121585,6 +121610,1080 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 6537,
+        "sha256": "ab07523e37e714a50092375b85ca9bdc5dd45b45ffb0c48f2b69977264de843c"
+      },
+      "checkpoints": [
+        305
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:23:47.485Z",
+      "reported_commit": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
+      "reported_source_fingerprint": "837f38d20a86e5fc5422b85c06abd7bca59e5c5a91d7da8815eb9e564c2253da",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-correction.png",
+              "available": true,
+              "bytes": 81566
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-correction.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-preservation.png",
+              "available": true,
+              "bytes": 92390
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 76327
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 5580
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 82170
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-correction.png",
+              "available": true,
+              "bytes": 152944
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 7506
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 222397
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 7506
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 151343
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 5646
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 151343
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 5646
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/manifest.json",
+        "available": true,
+        "bytes": 8671,
+        "sha256": "3831d9f550e0630876d5b00fe05047ce29899c8f888a2277c3899d7052ab1e98"
+      },
+      "checkpoints": [
+        305
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:30:35.134Z",
+      "reported_commit": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
+      "reported_source_fingerprint": "e32b15bd3e3731c5e6c9b022c5856588caf574242d1dc1e2cf1ceea615c99821",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 114187,
+        "sha256": "47c321fed41d5eee03562baed46090abeb1803651d77f11a0d157eb43f43cffa"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-correction.png",
+              "available": true,
+              "bytes": 81566
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-correction.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-preservation.png",
+              "available": true,
+              "bytes": 92390
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 76327
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 5580
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 82170
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 80068
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 10361
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 82193
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 10361
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-correction.png",
+              "available": true,
+              "bytes": 152944
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 7506
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 222397
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 7506
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 151343
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 5646
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 151343
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 5646
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 152482
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 10427
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 152482
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 10427
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-final/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 4793,
+        "sha256": "c9d76b0f601f1c31f76b09db83296dc7c72e6f5282ea94b944400dc368dc7265"
+      },
+      "checkpoints": [
+        305
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:24:04.558Z",
+      "reported_commit": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
+      "reported_source_fingerprint": "837f38d20a86e5fc5422b85c06abd7bca59e5c5a91d7da8815eb9e564c2253da",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-correction.png",
+              "available": true,
+              "bytes": 198456
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-correction.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-preservation.png",
+              "available": true,
+              "bytes": 229836
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-preservation.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/panel-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-correction.png",
+              "available": true,
+              "bytes": 158904
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-correction.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-preservation.png",
+              "available": true,
+              "bytes": 195997
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native/historical-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/manifest.json",
+        "available": true,
+        "bytes": 6043,
+        "sha256": "ed8352641459abd07edf40d1e95d88917450de25daaebd38dc086c4df8bd4831"
+      },
+      "checkpoints": [
+        305
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:30:46.864Z",
+      "reported_commit": "169d3380b3df4a5cfc8fcb7e0485ad577f2e572d",
+      "reported_source_fingerprint": "e32b15bd3e3731c5e6c9b022c5856588caf574242d1dc1e2cf1ceea615c99821",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 114187,
+        "sha256": "47c321fed41d5eee03562baed46090abeb1803651d77f11a0d157eb43f43cffa"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-correction.png",
+              "available": true,
+              "bytes": 198456
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-correction.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-preservation.png",
+              "available": true,
+              "bytes": 229836
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-preservation.txt",
+              "available": true,
+              "bytes": 7440
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/panel-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-correction.png",
+              "available": true,
+              "bytes": 158904
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-correction.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-preservation.png",
+              "available": true,
+              "bytes": 195997
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 5612
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/historical-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-correction.png",
+              "available": true,
+              "bytes": 182038
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-correction.txt",
+              "available": true,
+              "bytes": 10361
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-preservation.png",
+              "available": true,
+              "bytes": 195957
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 10361
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-historical-corrections-2026-10-09/browser-native-final/unversioned-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-home-panel-fallback-2026-10-09/browser-complete/manifest.json",
         "available": true,
         "bytes": 49410,
@@ -233771,7 +234870,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1098,
+    "1440x1000": 1108,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -233782,7 +234881,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 383,
+    "320x1000": 393,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -233804,7 +234903,7 @@
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 16,
+    "390x800": 26,
     "390x844": 862,
     "390x850": 276,
     "390x900": 192,

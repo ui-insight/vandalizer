@@ -4,6 +4,7 @@ import { renderCertificationMarkdown } from '../../lib/certificationMarkdown'
 import { cn } from '../../lib/cn'
 import type { LessonSection } from '../../types/certification'
 import { KnowledgeCheck } from './KnowledgeCheck'
+import { EditorialCorrection } from './EditorialCorrection'
 import { practiceStorageKey, type PracticeScope } from '../../lib/certificationPractice'
 import { HowLLMWorksDiagram } from './diagrams/HowLLMWorks'
 import { AIHumanPatternDiagram } from './diagrams/AIHumanPattern'
@@ -56,7 +57,7 @@ function parseKeyTerms(content: string): { term: string; definition: string }[] 
   return terms.length >= 2 ? terms : null
 }
 
-export function LessonContent({ section, practiceScope }: { section: LessonSection; practiceScope?: PracticeScope }) {
+export function LessonContent({ section, practiceScope, manifestSha256 }: { section: LessonSection; practiceScope?: PracticeScope; manifestSha256?: string }) {
   const style = VARIANT_STYLES[section.variant]
   const Icon = style.icon
 
@@ -84,6 +85,7 @@ export function LessonContent({ section, practiceScope }: { section: LessonSecti
         {section.objective && (
           <p className="text-xs italic text-gray-500 mb-2">{section.objective}</p>
         )}
+        <EditorialCorrection manifestSha256={manifestSha256} lessonId={section.id} content={section.content} />
 
         {keyTerms ? (
           <div>

@@ -214,7 +214,7 @@ export function LessonStepper({
 
       {/* Lesson content with transition */}
       <div className="cert-slide-in" key={safeIndex}>
-        <LessonContent section={lessons[safeIndex]} practiceScope={lessons[safeIndex].id && lessons[safeIndex].revision ? {
+        <LessonContent section={lessons[safeIndex]} manifestSha256={manifestSha256} practiceScope={lessons[safeIndex].id && lessons[safeIndex].revision ? {
           userId: user?.user_id || '', enrollmentId, moduleId, lessonId: lessons[safeIndex].id!, revision: lessons[safeIndex].revision!,
         } : undefined} />
       </div>

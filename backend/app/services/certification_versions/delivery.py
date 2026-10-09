@@ -11,6 +11,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .grading import grade, selected_outcome_completion_available
 from .writes import progress_filter
+from .editorial_corrections import notices_for
 
 
 def public_modules(package):
@@ -20,6 +21,9 @@ def public_modules(package):
     modules = []
     for module in package.json('panel-modules.json'):
         item = {**module, 'assessment': lessons[module['id']].get('assessment')}
+        item['lessons'] = [{**lesson, **({'editorialNotices': notices} if notices else {})}
+                           for lesson in module['lessons']
+                           for notices in [notices_for(package.manifest_sha256, lesson.get('id'))]]
         if f"assessments/{module['id']}.json" in package.manifest.artifacts:
             item['scenarioAssessment'] = module_bank(package, module['id']).public_definition()
             item['assessment'] = None
@@ -116,6 +120,7 @@ class CourseDelivery:
             **lesson, 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
             'manifest_sha256': package.manifest_sha256, 'module_id': module_id,
             'lesson_number': position, 'lesson_count': count,
+            'editorial_notices': notices_for(package.manifest_sha256, lesson_id),
         }
 
     @staticmethod

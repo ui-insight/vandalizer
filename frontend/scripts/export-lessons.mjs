@@ -12,6 +12,8 @@
  * Both arrays must remain pure literals (strings/numbers/arrays/objects) —
  * this script evaluates the extracted text in isolation and fails loudly if
  * it references imports.
+ * Supplemental editorialCorrections.json is exported separately; frozen
+ * course packages and their assessment requirements are never rewritten.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +26,8 @@ const outPath = path.join(here, '../../backend/certification-data/lessons.json')
 const panelPath = path.join(here, '../../backend/certification-data/panel-modules.json')
 const structurePath = path.join(here, '../../backend/certification-data/course-structure.json')
 const constantsPath = path.join(here, '../src/components/certification/constants.ts')
+const correctionsPath = path.join(here, '../src/components/certification/editorialCorrections.json')
+const correctionsOutput = path.join(here, '../../backend/certification-data/editorial-corrections.json')
 
 /** Extract a top-level literal that starts after `marker` and ends at the
  * first line that is exactly `closer` at column 0. */
@@ -87,17 +91,19 @@ for (const m of modules) {
 }
 
 const serialized = JSON.stringify(out, null, 2) + '\n'
+const correctionsSerialized = JSON.stringify(JSON.parse(readFileSync(correctionsPath, 'utf8')), null, 2) + '\n'
 const panelSerialized = JSON.stringify(modules, null, 2) + '\n'
 const structureSerialized = JSON.stringify({
   levels: extractLiteral(constantsPath, 'export const LEVEL_THRESHOLDS', '[', ']'),
   tiers: extractLiteral(constantsPath, 'export const TIERS', '[', ']'),
 }, null, 2) + '\n'
 if (process.argv.includes('--check')) {
-  if (readFileSync(outPath, 'utf8') !== serialized || readFileSync(panelPath, 'utf8') !== panelSerialized || readFileSync(structurePath, 'utf8') !== structureSerialized) throw new Error('Certification lesson export is stale. Run node scripts/export-lessons.mjs.')
+  if (readFileSync(outPath, 'utf8') !== serialized || readFileSync(panelPath, 'utf8') !== panelSerialized || readFileSync(structurePath, 'utf8') !== structureSerialized || readFileSync(correctionsOutput, 'utf8') !== correctionsSerialized) throw new Error('Certification lesson export is stale. Run node scripts/export-lessons.mjs.')
 } else {
   writeFileSync(outPath, serialized)
   writeFileSync(panelPath, panelSerialized)
   writeFileSync(structurePath, structureSerialized)
+  writeFileSync(correctionsOutput, correctionsSerialized)
 }
 const counts = Object.entries(out).map(([id, m]) => `${id}:${m.lessons.length}`).join(' ')
 console.log(`${process.argv.includes('--check') ? 'Verified' : 'Wrote'} ${outPath}\nLessons per module — ${counts}`)

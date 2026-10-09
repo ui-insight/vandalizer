@@ -69,6 +69,12 @@ def get_lessons(module_id: str) -> dict | None:
     return _load_lessons().get(module_id)
 
 
+def editorial_notices(lesson_id: str | None, content: str | None = None) -> list[dict]:
+    from .certification_versions.editorial_corrections import notices_for
+    operation = current_operation()
+    return notices_for(operation.package.manifest_sha256 if operation else None, lesson_id, content)
+
+
 # ---------------------------------------------------------------------------
 # XP & Level constants
 # ---------------------------------------------------------------------------

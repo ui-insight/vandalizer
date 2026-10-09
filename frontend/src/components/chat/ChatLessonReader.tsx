@@ -4,6 +4,7 @@ import { AuthContext } from '../../contexts/AuthContext'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { MODULES } from '../certification/modules'
 import { LessonExtras } from '../certification/LessonContent'
+import { EditorialCorrection } from '../certification/EditorialCorrection'
 import type { KnowledgeCheckData } from '../../types/certification'
 import { renderMarkdown } from './markdown'
 
@@ -77,6 +78,8 @@ export function ChatLessonReader({ content }: { content: Record<string, unknown>
       <span className="cert-lesson-position text-gray-700">Lesson {index + 1}/{selected ? lessons.length : Number(content.lesson_count)} · {String(content.module_title ?? moduleId)}</span>
     </div>
     {objective && <p className="mb-2 italic leading-relaxed text-gray-700">{objective}</p>}
+    <EditorialCorrection manifestSha256={typeof content.manifest_sha256 === 'string' ? content.manifest_sha256 : undefined}
+      lessonId={selected?.id ?? (typeof content.lesson_id === 'string' ? content.lesson_id : undefined)} content={body} />
     <div className="select-text chat-markdown" style={{ lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: html }} />
     <LessonExtras key={`${selected?.id ?? content.lesson_id}:${selected?.revision ?? content.lesson_revision}`}
       practiceScope={selected?.id && selected.revision ? { userId: auth?.user?.user_id || '', enrollmentId, moduleId, lessonId: selected.id, revision: selected.revision } : undefined}

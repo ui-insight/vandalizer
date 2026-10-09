@@ -7,11 +7,11 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const repository = fileURLToPath(new URL('../../', import.meta.url))
-const outputs = ['lessons.json', 'panel-modules.json', 'course-structure.json']
+const outputs = ['lessons.json', 'panel-modules.json', 'course-structure.json', 'editorial-corrections.json']
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'certification-export-qa-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  const files = ['frontend/scripts/export-lessons.mjs', ...['modules.ts', 'SelfAssessment.tsx', 'constants.ts'].map(name => `frontend/src/components/certification/${name}`), ...outputs.map(name => `backend/certification-data/${name}`)]
+  const files = ['frontend/scripts/export-lessons.mjs', ...['modules.ts', 'SelfAssessment.tsx', 'constants.ts', 'editorialCorrections.json'].map(name => `frontend/src/components/certification/${name}`), ...outputs.map(name => `backend/certification-data/${name}`)]
   for (const name of files) { mkdirSync(dirname(join(root, name)), { recursive: true }); copyFileSync(join(repository, name), join(root, name)) }
   const run = () => spawnSync(process.execPath, [join(root, 'frontend/scripts/export-lessons.mjs'), '--check'], { encoding: 'utf8' })
   const valid = run()
@@ -25,7 +25,8 @@ for (const name of outputs) test(`stale ${name} fails the read-only export gate`
   const value = JSON.parse(readFileSync(path, 'utf8'))
   if (name === 'lessons.json') value.ai_literacy.lessons[0].diagram = 'flowchart LR\nSource --> Changed'
   else if (name === 'panel-modules.json') value[0].lessons[0].title = 'A stale panel title'
-  else value.levels[0].xp = 999
+  else if (name === 'course-structure.json') value.levels[0].xp = 999
+  else value.notices[0].paragraphs[0] = 'A stale correction'
   writeFileSync(path, JSON.stringify(value, null, 2) + '\n')
   const before = readFileSync(path)
   const result = run()

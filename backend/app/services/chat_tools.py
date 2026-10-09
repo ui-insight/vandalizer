@@ -5567,6 +5567,8 @@ async def get_certification_lesson(
     card; invite the learner to try them and ask for help if needed. Do not
     duplicate the question or claim to have seen their local answer. Practice
     checks do not award module credit.
+    Apply editorial_notices when explaining outdated historical statements;
+    those corrections preserve assessment requirements and earned credit.
 
     Args:
         context: The call context.
@@ -5604,6 +5606,7 @@ async def get_certification_lesson(
         "lesson_count": len(lessons),
         "lesson_id": lesson.get("id"),
         "lesson_revision": lesson.get("revision"),
+        "editorial_notices": cert_svc.editorial_notices(lesson.get("id"), lesson.get("content")),
         "title": lesson["title"],
         "objective": lesson.get("objective", ""),
         "variant": lesson.get("variant", "concept"),

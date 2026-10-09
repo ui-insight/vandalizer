@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChatLessonReader } from './ChatLessonReader'
 import { ChatModuleLessons } from './ChatModuleLessons'
 import { MODULES } from '../certification/modules'
+import corrections from '../certification/editorialCorrections.json'
 
 const state = vi.hoisted(() => ({ value: null as unknown, save: vi.fn(), refresh: vi.fn(), open: vi.fn() }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => state.value }))
@@ -18,6 +19,42 @@ function context() {
     course: { ...identity, modules: [{ id: 'module', lessons }] }, savePosition: state.save, refresh: state.refresh, openPanel: state.open }
 }
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); state.save.mockResolvedValue(undefined); state.value = context() })
+
+it('corrects a preserved historical card without an active course, new payload metadata or a write', () => {
+  state.value = null
+  const notice = corrections.notices[0]
+  render(<ChatLessonReader content={{ ...content, manifest_sha256: notice.manifest_sha256,
+    lesson_id: notice.lesson_ids[0], content: 'Preserved historical lesson body.' }} />)
+  expect(screen.getByRole('complementary', { name: notice.title })).toBeInTheDocument()
+  expect(screen.getByText('Preserved historical lesson body.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Save my place' })).not.toBeInTheDocument()
+  expect(state.save).not.toHaveBeenCalled()
+})
+
+it('does not attach historical corrections to a different package with the same lesson ID', () => {
+  state.value = null
+  const notice = corrections.notices[0]
+  render(<ChatLessonReader content={{ ...content, manifest_sha256: 'f'.repeat(64), lesson_id: notice.lesson_ids[0] }} />)
+  expect(screen.queryByRole('complementary', { name: notice.title })).not.toBeInTheDocument()
+})
+
+it('does not attach a late text match to a different unversioned historical lesson', async () => {
+  state.value = null
+  const notice = corrections.notices[0]
+  let finish!: (value: ArrayBuffer) => void
+  const digest = vi.fn().mockImplementationOnce(() => new Promise<ArrayBuffer>(resolve => { finish = resolve }))
+    .mockResolvedValue(new Uint8Array(32).buffer)
+  vi.stubGlobal('crypto', { subtle: { digest } })
+  try {
+    const historical = { ...content, enrollment_id: undefined, manifest_sha256: undefined, lesson_id: undefined }
+    const { rerender } = render(<ChatLessonReader content={historical} />)
+    rerender(<ChatLessonReader content={{ ...historical, content: 'A different preserved body.' }} />)
+    finish(Uint8Array.from(notice.unversioned_content_sha256[0].match(/../g)!, byte => parseInt(byte, 16)).buffer)
+    await waitFor(() => expect(digest).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('complementary', { name: notice.title })).not.toBeInTheDocument()
+    expect(screen.getByText('A different preserved body.')).toBeInTheDocument()
+  } finally { vi.unstubAllGlobals() }
+})
 
 it('starts module teaching directly and returns to the saved stable lesson', () => {
   render(<ChatModuleLessons content={{ ...identity, module_id: 'module' }} />)
