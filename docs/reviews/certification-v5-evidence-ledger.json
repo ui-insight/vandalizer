@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "e9ce89ad0015232939c07ec2933fce612c50c2ed",
+  "working_head_at_inventory": "8f45609a5f25df42c2b445d3dafceeef278412e7",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 62905,
-    "sha256": "09d934812ed0d5aba4b98a5f09c0498cd14e001bcedc95840ff2cb54ec5d533b"
+    "bytes": 63233,
+    "sha256": "354308f238408a2f1e9f9bdfe041d3be307d767a1f6248ed0bc40863e9fb8cc2"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 739653,
-    "sha256": "93fb02c89101d7d8346e0aac624ba187fc4772615a82a0344af7465f58ba6ef5"
+    "bytes": 741731,
+    "sha256": "bd5ef8bb735ed1e1e1b311198d319ff4a8aee39e21a501ef50ac90e9442d2f4c"
   },
   "counts": {
-    "accepted": 66,
-    "open": 96,
+    "accepted": 67,
+    "open": 95,
     "items": 162,
-    "checkpoints": 308,
-    "browser_runs": 461,
-    "recorded_captures_including_diagnostics_and_repeats": 6128,
+    "checkpoints": 309,
+    "browser_runs": 463,
+    "recorded_captures_including_diagnostics_and_repeats": 6151,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -472,8 +472,8 @@
     },
     {
       "id": "C8-CONTENT-04",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach source and scope distinctions.** Explain selected files, project knowledge, attached knowledge bases and public web information using the actual product behavior. Include the consequences of choosing the wrong team, project or document."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach source and scope distinctions.** Explain selected files, project knowledge, attached knowledge bases and public web information using the actual product behavior. Include the consequences of choosing the wrong team, project or document. Accepted at checkpoint 309: Foundations distinguishes selected document context, project knowledge override, separately attached knowledge-base retrieval and configured public web lookup. It explains bounded/missing source coverage, readiness and search failure, workspace-wide tool limits and concrete wrong-scope corrections."
     },
     {
       "id": "C8-CONTENT-05",
@@ -3201,6 +3201,13 @@
       "evidence_directories": [
         "certification-approval-decisions-2026-10-09"
       ]
+    },
+    {
+      "number": 309,
+      "title": "Distinguish source selection, retrieval and workspace scope on October 9 2026",
+      "evidence_directories": [
+        "certification-source-scope-teaching-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4931,6 +4938,12 @@
       "available": true,
       "bytes": 446,
       "sha256": "a9e92ad591e0e34568ce08115bf23fc424277a88cd8af0ab790da04434b81a51"
+    },
+    {
+      "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 595,
+      "sha256": "79b80f2dbc9a4ecb1169e3807a6edade313051adee517c0db195715fcbb6ef75"
     },
     {
       "path": "artifacts/visual-review/certification-stable-lessons-2026-10-08/checkpoint.json",
@@ -206435,6 +206448,809 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 11287,
+        "sha256": "a97084295f369c426246f897fc2460868afacff2e65cba0b35490d32649068f3"
+      },
+      "checkpoints": [
+        309
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:53:40.208Z",
+      "reported_commit": "8f45609a5f25df42c2b445d3dafceeef278412e7",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "foundations",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "foundations.the-document-pipeline",
+              "revision": 3
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-3-reading-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-320.png",
+              "available": true,
+              "bytes": 84225
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-1-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-320.png",
+              "available": true,
+              "bytes": 85702
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-320.png",
+              "available": true,
+              "bytes": 88872
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-3-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-320.png",
+              "available": true,
+              "bytes": 85929
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-4-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-320.png",
+              "available": true,
+              "bytes": 81714
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-5-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-320.png",
+              "available": true,
+              "bytes": 82669
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-practice-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-320.png",
+              "available": true,
+              "bytes": 71766
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-320.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-feedback-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-feedback-320.png",
+              "available": true,
+              "bytes": 71451
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-feedback-320.txt",
+              "available": true,
+              "bytes": 9332
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-reading-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-1440.png",
+              "available": true,
+              "bytes": 305446
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-1-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-1440.png",
+              "available": true,
+              "bytes": 305446
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-1440.png",
+              "available": true,
+              "bytes": 305446
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-3-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-1440.png",
+              "available": true,
+              "bytes": 305446
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-3-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-4-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-1440.png",
+              "available": true,
+              "bytes": 305446
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-4-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-5-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-1440.png",
+              "available": true,
+              "bytes": 308078
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-detail-5-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-practice-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-1440.png",
+              "available": true,
+              "bytes": 179269
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-1440.txt",
+              "available": true,
+              "bytes": 9398
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser/foundations-3-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 7243,
+        "sha256": "69b9d77dbe503d640a8de2c87ecc0a5bb2955c211c2a7f1dd278f4ca47a03d4c"
+      },
+      "checkpoints": [
+        309
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:53:39.061Z",
+      "reported_commit": "8f45609a5f25df42c2b445d3dafceeef278412e7",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "foundations",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "foundations.the-document-pipeline",
+              "revision": 3
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-3-reading-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-reading-780.png",
+              "available": true,
+              "bytes": 162519
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-reading-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-1-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-1-780.png",
+              "available": true,
+              "bytes": 154137
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-1-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-2-780.png",
+              "available": true,
+              "bytes": 157448
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-2-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-3-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-3-780.png",
+              "available": true,
+              "bytes": 158936
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-3-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-3-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-4-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-4-780.png",
+              "available": true,
+              "bytes": 156460
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-4-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-4-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-5-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-5-780.png",
+              "available": true,
+              "bytes": 154718
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-5-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-detail-5-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-practice-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-practice-780.png",
+              "available": true,
+              "bytes": 111546
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-practice-780.txt",
+              "available": true,
+              "bytes": 9153
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-feedback-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-feedback-780.png",
+              "available": true,
+              "bytes": 104878
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-feedback-780.txt",
+              "available": true,
+              "bytes": 9332
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-source-scope-teaching-2026-10-09/browser-native/foundations-3-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-stopped-run-teaching-2026-10-06/normal/manifest.json",
         "available": true,
         "bytes": 14178,
@@ -237868,7 +238684,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1133,
+    "1440x1000": 1140,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -237889,14 +238705,14 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 587,
+    "320x844": 595,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 129,
+    "390x500": 137,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
