@@ -7,6 +7,7 @@ import { LessonExtras } from '../certification/LessonContent'
 import { EditorialCorrection } from '../certification/EditorialCorrection'
 import type { KnowledgeCheckData } from '../../types/certification'
 import { renderMarkdown } from './markdown'
+import { wrapCertificationTables } from '../../lib/certificationMarkdown'
 
 const button = 'min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50'
 
@@ -45,7 +46,7 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
   })
   const savedId = enrollmentId ? progress?.modules[moduleId]?.learning_position?.lesson_id
     : legacyPlace !== null && Number.isInteger(legacyPlace) ? lessons[legacyPlace]?.id : undefined
-  const html = useMemo(() => renderMarkdown(body), [body])
+  const html = useMemo(() => wrapCertificationTables(renderMarkdown(body)), [body])
   useLayoutEffect(() => {
     if (focusHeading.current) { focusHeading.current = false; heading.current?.focus() }
   }, [selectedId])

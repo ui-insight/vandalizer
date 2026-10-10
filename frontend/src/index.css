@@ -1297,6 +1297,36 @@ html {
   font-style: italic;
 }
 
+/* Preserve readable column widths without widening the course or transcript. */
+.cert-table-region {
+  container-type: inline-size;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin-block: 0.75rem;
+}
+.cert-table-region table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  margin: 0;
+}
+.cert-table-region th,
+.cert-table-region td {
+  min-width: min(9rem, 100cqw);
+  max-width: min(24rem, 100cqw);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: inherit;
+  line-height: 1.5;
+}
+.cert-table-region th { background: #f1f5f9; color: #111827; font-weight: 600; }
+
 /* Panel mode transitions */
 .cert-panel-enter {
   animation: cert-panel-enter 0.25s cubic-bezier(0.4, 0, 0.2, 1);
