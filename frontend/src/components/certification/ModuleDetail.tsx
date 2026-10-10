@@ -78,7 +78,7 @@ function ProgressWidget({ moduleProgress, lessonsCount, outcomeAssessment }: {
   )
 }
 
-export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onOpenWorkspace, onSubmitAssessment, onTabChange, exercise, validating, completing, provisioning, submittingAssessment, enrollmentId, savedLessonId, onSavePosition, onReloadPosition, onScenarioSaved, openChallengeRequest, courseIdentity, onCompleteOutcomes, outcomeCompletionPending, progressRefreshPending }: {
+export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onOpenWorkspace, onSubmitAssessment, onTabChange, exercise, validating, completing, provisioning, submittingAssessment, enrollmentId, savedLessonId, onSavePosition, onReloadPosition, onScenarioSaved, openChallengeRequest, courseIdentity, onCompleteOutcomes, outcomeCompletionPending, progressRefreshPending, requirementCheck = 'unchecked' }: {
   module: ModuleDefinition
   moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; self_assessment?: Record<string, string>; scenario_attempt_id?: string } | null
   onValidate: () => void
@@ -101,6 +101,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   onCompleteOutcomes?: (selection: OutcomeCompletionSelection) => Promise<void>
   outcomeCompletionPending?: boolean
   progressRefreshPending?: boolean
+  requirementCheck?: 'unchecked' | 'met' | 'remaining' | 'checking' | 'unavailable'
   courseIdentity?: ReadinessIdentity
 }) {
   const [tab, setTab] = useState<'learn' | 'challenge'>(() => openChallengeRequest === undefined ? 'learn' : 'challenge')
@@ -120,6 +121,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   const { toast } = useToast()
   const Icon = ICON_MAP[module.icon] || BookOpen
   const completed = moduleProgress?.completed || false
+  const requirementsMet = requirementCheck === 'met'
   const isProvisioned = (moduleProgress?.provisioned_docs?.length ?? 0) > 0
   const hasDocuments = (exercise?.documents?.length ?? 0) > 0
   const challengeNeedsLab = hasDocuments && !isProvisioned && !hasOutcomeAssessment(module)
@@ -410,11 +412,19 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             })()}
 
             {/* Action buttons */}
+            {!completed && <p className="mb-3 text-sm text-gray-700">{{
+              met: 'The last check met the module requirements. Complete Module checks your current work again before saving earned credit.',
+              remaining: 'Review the remaining checks below, update your work, then check progress again.',
+              unavailable: 'Your last feedback is preserved. Try Check Progress again to confirm the current requirements.',
+              checking: 'Checking the current module requirements…',
+              unchecked: 'Check your progress to see which requirements remain. Complete Module checks your current work before saving earned credit.',
+            }[requirementCheck]}</p>}
             <div className="flex items-center gap-3">
               <button
                 onClick={onValidate}
                 disabled={validating}
-                className="flex items-center gap-2 px-4 py-2.5 border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:border-highlight hover:text-highlight-text hover:bg-highlight transition-all disabled:opacity-50"
+                className={cn('flex items-center gap-2 px-4 py-2.5 border-2 text-sm font-semibold transition-all disabled:opacity-50',
+                  requirementsMet && !completed ? 'border-gray-200 bg-white text-gray-700 hover:border-highlight' : 'border-transparent bg-highlight text-highlight-text hover:brightness-90')}
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}
               >
                 <FlaskConical size={16} />
@@ -424,7 +434,8 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 <button
                   onClick={onComplete}
                   disabled={completing}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all disabled:opacity-50"
+                  className={cn('flex items-center gap-2 px-4 py-2.5 border-2 text-sm font-bold transition-all disabled:opacity-50',
+                    requirementsMet ? 'border-transparent bg-highlight text-highlight-text hover:brightness-90' : 'border-gray-200 bg-white text-gray-700 hover:border-highlight')}
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
                   <Zap size={16} />

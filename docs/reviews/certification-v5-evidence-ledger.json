@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "e308102028552e96033140b59b67bc3e32f782ac",
+  "working_head_at_inventory": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 68568,
-    "sha256": "4cc56269d12ff43d48faac85774a3915986d7374e23117d704fdfe74c7ad7599"
+    "bytes": 68933,
+    "sha256": "be0caa6882618f0ea9fcfeb4a36f627ca54239f74fe2c38b542cc92c368968b8"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 819683,
-    "sha256": "fee1678a71d120e0877d3b6f094cfce041019391c1d021f5878c21c2f9d9bced"
+    "bytes": 822806,
+    "sha256": "304b5138a59d1323fe19f8154601e9a397c3b00c5f72fbc55b8bdead69fe4452"
   },
   "counts": {
-    "accepted": 83,
-    "open": 79,
+    "accepted": 84,
+    "open": 78,
     "items": 162,
-    "checkpoints": 338,
-    "browser_runs": 621,
-    "recorded_captures_including_diagnostics_and_repeats": 7315,
+    "checkpoints": 339,
+    "browser_runs": 628,
+    "recorded_captures_including_diagnostics_and_repeats": 7335,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -355,8 +355,8 @@
     },
     {
       "id": "C8-VIS-07",
-      "accepted": false,
-      "requirement": "P2 · Improve: Clarify the primary action.** For each state, prioritize the appropriate action: start/resume lesson, practice, verify, remediate or complete. Avoid presenting completion as equivalent to preparation before the learner has done the required work."
+      "accepted": true,
+      "requirement": "P2 · Improve: Clarify the primary action.** For each state, prioritize the appropriate action: start/resume lesson, practice, verify, remediate or complete. Avoid presenting completion as equivalent to preparation before the learner has done the required work. Accepted at checkpoint 339: original-module actions prioritize checking and repair until requirements pass, then emphasize completion; an unavailable recheck restores checking priority. Existing learning/practice/recovery journeys and explicit selected-evidence completion retain their distinct actions. Backend requirements and direct completion remain unchanged."
     },
     {
       "id": "C8-VIS-08",
@@ -3440,9 +3440,22 @@
       "evidence_directories": [
         "certification-keyboard-journey-2026-10-10"
       ]
+    },
+    {
+      "number": 339,
+      "title": "Match the primary module action to the current check state on October 10 2026",
+      "evidence_directories": [
+        "certification-action-priority-2026-10-10"
+      ]
     }
   ],
   "source_records": [
+    {
+      "path": "artifacts/visual-review/certification-action-priority-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 663,
+      "sha256": "43a705688261b12fa1ba3a8689502947f6116653b12e60c0787809c6ac028967"
+    },
     {
       "path": "artifacts/visual-review/certification-action-status-2026-10-09/source-hashes.json",
       "available": true,
@@ -11304,6 +11317,1003 @@
               "available": true,
               "bytes": 2,
               "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-baseline/manifest.json",
+        "available": true,
+        "bytes": 3289,
+        "sha256": "e8df134985743ee439c6d2948cbb44a0ef92c3654acce2c9ec59522773b1670f"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:52:16.567Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "73556cf14943749bc54540ede3e4268d1e1714c0605d64530447f2d45011beb3",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-control-focus-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136704,
+        "sha256": "a7c818cd6ff05b53caab80653a475f56116c2c9a1fc6dc6df9a4371b373651af"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "blocked",
+          "note": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-cert-panel]').getByRole('button', { name: 'Challenge', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button disabled title=\"Set up your lab first to unlock the challenge\" class=\"px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px border-transparent text-gray-500 hover:text-gray-700 opacity-40 cursor-not-allowed\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    57 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not enabled\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-baseline/blocked.png",
+              "available": true,
+              "bytes": 69601
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-baseline/blocked.txt",
+              "available": true,
+              "bytes": 7467
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-baseline/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/manifest.json",
+        "available": true,
+        "bytes": 2809,
+        "sha256": "aaa0e6dd7f471252bf29da4329275e5226f2c1f6092a55981041dde7f8fe4d20"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:50:33.611Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "2f712be43196a27606b91f1d0019e50df96ada4c45f45bab585878fb70606282",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-control-focus-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136704,
+        "sha256": "a7c818cd6ff05b53caab80653a475f56116c2c9a1fc6dc6df9a4371b373651af"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [
+        "GET /api/certification/modules/foundations/exercise"
+      ],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgba(0, 0, 0, 0)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/actions-unchecked.png",
+              "available": true,
+              "bytes": 87415
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/actions-unchecked.txt",
+              "available": true,
+              "bytes": 4654
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'GET /api/certification/modules/foundations/exercise'\n+ ]\n- []\n",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/blocked.png",
+              "available": true,
+              "bytes": 87415
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/blocked.txt",
+              "available": true,
+              "bytes": 4654
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before-verified/manifest.json",
+        "available": true,
+        "bytes": 2270,
+        "sha256": "080e3e618f7bddd261e88aacfecedd4ec546888223300b99a22c5232895af557"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:53:12.861Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "1b3c5648211371de1996d3317f7c86132a2e4ec56ab6b72df41c7ceced3f17d8",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-control-focus-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136704,
+        "sha256": "a7c818cd6ff05b53caab80653a475f56116c2c9a1fc6dc6df9a4371b373651af"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgba(0, 0, 0, 0)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before-verified/actions-unchecked.png",
+              "available": true,
+              "bytes": 82369
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before-verified/actions-unchecked.txt",
+              "available": true,
+              "bytes": 8075
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-before-verified/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/manifest.json",
+        "available": true,
+        "bytes": 4095,
+        "sha256": "7c26eb2f390c8fceec7d2e5af6af653a947c5f709884240d10de6270e0e4ae62"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:56:02.541Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "53090e16a9b4203ae1e791974e37a2c41546cd47fd0f0911e8f3a84c4a7273aa",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/final/retained-source.json",
+        "available": true,
+        "bytes": 137033,
+        "sha256": "315cb550034b242b1274b405103dc14eb5978d64e1e26e5f489413ca300e7606"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "failed",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "passed",
+          "colors": {
+            "check": "rgb(255, 255, 255)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "unavailable",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unchecked.png",
+              "available": true,
+              "bytes": 81200
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unchecked.txt",
+              "available": true,
+              "bytes": 8214
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-failed",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-failed.png",
+              "available": true,
+              "bytes": 85278
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-failed.txt",
+              "available": true,
+              "bytes": 8429
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-failed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-passed",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-passed.png",
+              "available": true,
+              "bytes": 86651
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-passed.txt",
+              "available": true,
+              "bytes": 8483
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-passed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-unavailable",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unavailable.png",
+              "available": true,
+              "bytes": 82345
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unavailable.txt",
+              "available": true,
+              "bytes": 8709
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final/actions-unavailable.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/manifest.json",
+        "available": true,
+        "bytes": 4099,
+        "sha256": "89b0adb9856dd753400f1e2f9ab6960e9692706a41d887ce972c304998b5a7d3"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:56:02.543Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "53090e16a9b4203ae1e791974e37a2c41546cd47fd0f0911e8f3a84c4a7273aa",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/final/retained-source.json",
+        "available": true,
+        "bytes": 137033,
+        "sha256": "315cb550034b242b1274b405103dc14eb5978d64e1e26e5f489413ca300e7606"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "failed",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "passed",
+          "colors": {
+            "check": "rgb(255, 255, 255)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "unavailable",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unchecked.png",
+              "available": true,
+              "bytes": 171416
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unchecked.txt",
+              "available": true,
+              "bytes": 8214
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-failed",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-failed.png",
+              "available": true,
+              "bytes": 172997
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-failed.txt",
+              "available": true,
+              "bytes": 8429
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-failed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-passed",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-passed.png",
+              "available": true,
+              "bytes": 177933
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-passed.txt",
+              "available": true,
+              "bytes": 8483
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-passed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-unavailable",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unavailable.png",
+              "available": true,
+              "bytes": 160422
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unavailable.txt",
+              "available": true,
+              "bytes": 8709
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-final-native/actions-unavailable.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/manifest.json",
+        "available": true,
+        "bytes": 4087,
+        "sha256": "34ee8c5ce72ceedcb207d130a145c047be5d1d0fb6fe14e70bcfffb949b8db4a"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:54:18.705Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "02f2a86b7e3342ebf0a2d833dbf88ad38e4d02829633df97e96d18964d85ac22",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 137033,
+        "sha256": "6793183f802466204759ab86caa8ba520394936e72575d96fb5d80231f5066e0"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "failed",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "passed",
+          "colors": {
+            "check": "rgb(255, 255, 255)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "unavailable",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unchecked.png",
+              "available": true,
+              "bytes": 171416
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unchecked.txt",
+              "available": true,
+              "bytes": 8214
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-failed",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-failed.png",
+              "available": true,
+              "bytes": 171540
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-failed.txt",
+              "available": true,
+              "bytes": 8473
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-failed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-passed",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-passed.png",
+              "available": true,
+              "bytes": 171375
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-passed.txt",
+              "available": true,
+              "bytes": 8483
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-passed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-unavailable",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unavailable.png",
+              "available": true,
+              "bytes": 157022
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unavailable.txt",
+              "available": true,
+              "bytes": 8738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-native/actions-unavailable.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/manifest.json",
+        "available": true,
+        "bytes": 4083,
+        "sha256": "bfb8191d6e89a92933fcd6761c8cc52cd2f9940bee26ceda98bc9c46511a6d9c"
+      },
+      "checkpoints": [
+        339
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:53:29.288Z",
+      "reported_commit": "19d1046235882eb5e441d5ffdfa4c0a7ea90181c",
+      "reported_source_fingerprint": "1b3c5648211371de1996d3317f7c86132a2e4ec56ab6b72df41c7ceced3f17d8",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Original module controls with synthetic validation states. No completion, grading, provisioning or provider writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-action-priority-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 137033,
+        "sha256": "6793183f802466204759ab86caa8ba520394936e72575d96fb5d80231f5066e0"
+      },
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "state": "unchecked",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "failed",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "passed",
+          "colors": {
+            "check": "rgb(255, 255, 255)",
+            "complete": "rgb(234, 179, 8)"
+          },
+          "completionStillAvailable": true
+        },
+        {
+          "state": "unavailable",
+          "colors": {
+            "check": "rgb(234, 179, 8)",
+            "complete": "rgb(255, 255, 255)"
+          },
+          "completionStillAvailable": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "actions-unchecked",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unchecked.png",
+              "available": true,
+              "bytes": 81200
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unchecked.txt",
+              "available": true,
+              "bytes": 8214
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unchecked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-failed",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-failed.png",
+              "available": true,
+              "bytes": 81239
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-failed.txt",
+              "available": true,
+              "bytes": 8473
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-failed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-passed",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-passed.png",
+              "available": true,
+              "bytes": 80348
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-passed.txt",
+              "available": true,
+              "bytes": 8483
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-passed.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "actions-unavailable",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unavailable.png",
+              "available": true,
+              "bytes": 80312
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unavailable.txt",
+              "available": true,
+              "bytes": 8738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-action-priority-2026-10-10/browser-verified/actions-unavailable.axe.json",
+              "available": true,
+              "bytes": 2
             }
           },
           "axe_observations": []
@@ -312973,7 +313983,7 @@
     "320x650": 70,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 844,
+    "320x844": 852,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
@@ -312987,7 +313997,7 @@
     "390x650": 52,
     "390x700": 28,
     "390x800": 92,
-    "390x844": 917,
+    "390x844": 929,
     "390x850": 276,
     "390x900": 194,
     "720x250": 2,

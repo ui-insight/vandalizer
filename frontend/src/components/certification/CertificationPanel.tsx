@@ -516,6 +516,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
           enrollmentId={progress?.enrollment_id}
           courseIdentity={course ?? undefined}
           progressRefreshPending={savedWritePendingRefresh}
+          requirementCheck={validationRecheckState ?? (savedWritePendingRefresh ? 'unchecked' : validationResult ? validationResult.passed ? 'met' : 'remaining' : 'unchecked')}
           outcomeCompletionPending={completing || pendingCompletions?.some(item => item.module_id === activeModuleDef.id)}
           onCompleteOutcomes={course?.selected_outcome_completion === true ? async selection => {
             setCompleting(true)
