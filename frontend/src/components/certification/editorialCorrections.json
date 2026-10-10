@@ -152,6 +152,75 @@
         "dd4bac997a3b99eb114d87aaba3207b5bc4e59c468288853d43c6de49cbebd68",
         "79b03003c3db0037f6733f6fcdb2f3c76cd52b70fd2d90e8c9fe47b1b6d4220a"
       ]
+    },
+    {
+      "id": "batch-processing-delivery-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "batch_processing.single-vs-batch-execution",
+        "batch_processing.monitoring-and-debugging-batch-runs",
+        "batch_processing.choosing-the-right-model-for-batch-work",
+        "batch_processing.worked-example-thirty-proposals-one-bad-scan",
+        "batch_processing.glossary-review"
+      ],
+      "title": "Current guidance on batch coverage and targeted recovery",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Batch mode queues one workflow execution per selected document; workers need not finish in selection order. Inspect per-document results and reconcile the actual inputs. An aggregate Completed label can coexist with failed items, and completed processing does not prove correct values.",
+        "A basic pilot is useful but one easy document does not establish accuracy across a varied collection. Inspect effective models and overrides, source-supported values and measured usage. Batch mode does not guarantee that a validation plan ran or automatically merge every output into a correct dataset.",
+        "For an unreadable scan, inspect the text actually available, repair the permitted source or ingestion and check the repaired text before a new run. Re-uploading identical poor bytes is not a guaranteed repair. Preserve successful results and the original failure, select only the justified retry input, and verify any already-executed external action before repeating it.",
+        "A batch download can omit failed or unfinished items. Inspect its actual members and retain an exception list. A small random spot check and a plausible result do not prove every output is correct; source-check the values required for the task. The thirty-proposal story is illustrative, not an executed result."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "c3ec08c2a8bdbdc4764faa89dd1412cf1fa8186b81044916b3eb0fbf5452d42f",
+        "60c51b6f2062e44b9a62e29b4643d0ca02925f2110dec2768c2f8b1b3cdb76e0",
+        "8e08d9a4de62a030c735316197a5d48d509c4fefd1cbc091ec0eac8c64a7c902",
+        "eb723b1f41604af9febc84782c2361a43e8ce29f3617101d27cf73d286c70b71",
+        "c691c9e907fb5ce2dd699c32b3160a9987b543fa3eef84f9262f4f05e714dcdb"
+      ]
+    },
+    {
+      "id": "output-delivery-delivery-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "output_delivery.designing-end-to-end-deliverable-workflows",
+        "output_delivery.build-a-deliverable-workflow",
+        "output_delivery.worked-example-one-report-in-two-deliverables-out"
+      ],
+      "title": "Current guidance on generated files and release scope",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "File generation does not establish correctness or permission to share. Identify the intended recipient and data scope, inspect the actual file, and preserve unresolved content. A download-only exercise does not authorize sending files externally.",
+        "An output task receives its configured input. Data Export needs suitable tabular input for CSV; a narrative paragraph does not automatically preserve the original rows, and sibling tasks do not get different sources just because their formats differ. Inspect saved source settings, actual output format and warnings.",
+        "The original two-deliverable story is illustrative. Its publication count, delay and spending percentage are not verified answer keys. Preserve reviewed rows for the data export and supply the intended source for the narrative, then compare both actual files with the assigned report. Include in deliverables can bundle marked outputs; inspect every ZIP member rather than assuming one download contains complete, usable and authorized files."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "69a9b4f3ed11c48cdeffb0202b28204576f38dcf2ec382b701678d7a8ec538b9",
+        "6e5468977f08e728e9f17f2f33392c02a0c60741176b8c52568bdae7e31f3618",
+        "56f67f2b65fc7026abdf2d6fef7e773a92ad7d0ebebdbd0b2aa52cd46664e47d"
+      ]
+    },
+    {
+      "id": "governance-delivery-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "governance.sharing-workflows-across-teams",
+        "governance.establish-your-workflow-governance"
+      ],
+      "title": "Current guidance on sharing receipts and imported workflows",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "A sharing request and an imported file are separate from an assessed course completion. Use the course check and completion actions to establish saved credit under your existing requirements. Examiner review remains a separate product process; it is not a routine certification grading queue.",
+        "Inspect a workflow export before sharing it: it can contain prompts, extraction definitions, text validation inputs and exporter metadata. Confirm the intended audience and data scope. Export/import does not automatically carry every source, access right, configured model or integration.",
+        "Inspect portability warnings and the imported tasks, resolve authorized local references, and test the imported revision. Keep the tested original and imported/adapted revisions distinguishable. Record actual sharing and validation evidence; successful import alone does not establish readiness or make the original score current."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "8395fec8efe2017910e3ee0d63c51fc49cebd0e47fed73a5b9a0df49d7718cca",
+        "b08923e937178e5a103240c612c7954012ccce01607282c45a551271b76de48b"
+      ]
     }
   ],
   "module_notices": [

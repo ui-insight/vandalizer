@@ -77,7 +77,7 @@
     },
     {
       "id": "governance.sharing-workflows-across-teams",
-      "revision": 2,
+      "revision": 3,
       "title": "Hand off a workflow with its dependencies and evidence",
       "variant": "concept",
       "objective": "Prepare a portable, scoped handoff and verify imported behavior before relying on it.",
@@ -105,7 +105,7 @@
     },
     {
       "id": "governance.establish-your-workflow-governance",
-      "revision": 3,
+      "revision": 4,
       "title": "Prepare a bounded governance handoff",
       "variant": "walkthrough",
       "objective": "Create reviewable ownership, scope and change records without compulsory broad publication.",

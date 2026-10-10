@@ -694,32 +694,43 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'output_delivery.designing-end-to-end-deliverable-workflows',
-        revision: 1,
+        revision: 2,
         title: 'Designing end-to-end deliverable workflows',
-        content: 'The most powerful workflows go from raw document to finished deliverable in one run:\n\n1. **Extract** \u2014 Pull structured data from the source document.\n2. **Analyze** \u2014 Use Prompt nodes to reason over the data, flag issues, or generate summaries.\n3. **Render** \u2014 Use output nodes to produce the final deliverable.\n\nThe result: upload a grant proposal, click Run, and download a completed compliance checklist.\n\nPhase 1 is an Extraction task when you need fixed fields from a long document. For a short or context-heavy source, the Prompt reads the document directly and phases 1 and 2 collapse into one step \u2014 the deliverable is built the same way.',
+        content: "Begin with the intended audience, destination and data scope. An internal working summary, a sponsor submission and a dataset for another system can require different content and authorization. A request to prepare one does not silently authorize all three.\n\nSpecify which source and reviewed result the artifact should represent, which details it should include or exclude, and who is allowed to receive it. Review those choices after inspecting the actual file. A proposed sharing target broader than the assigned destination needs correction before release, even if the analysis is accurate.\n\nA workflow may gather source content, interpret it and generate files, but file generation is not an approval decision. If a later operation sends or updates something, its dependency on review must be implemented and tested. A written instruction to obtain approval is not by itself a pause. For a download-only lab, inspect and retain the file; do not invent an external delivery step.\n\nUse an explicit release decision: accept the exact artifact for the named destination, revise it, or leave it unreleased. Preserve unresolved values and limitations in the artifact when they matter to the recipient. Do not treat an assistant’s message that a file is “ready” as your decision.\n\n**Practice:** The task requests an internal award-file summary, but the proposed next action targets a broad mailing list. Identify the scope change and the decision needed before any send.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What are the three phases of a complete end-to-end deliverable workflow?',
-          options: [
-            { text: 'Upload, Run, Download', correct: false, explanation: 'Those are UI actions, not the workflow\'s internal phases. The phases describe what the steps do, not what the user does.' },
-            { text: 'Extract, Analyze, Render', correct: true, explanation: 'Correct! Extract structured data, analyze or reason over it, then render a deliverable. This maps to the task types: Extraction \u2192 Prompt \u2192 Output node \u2014 or, for a short document, Prompt over the document \u2192 Output node.' },
-            { text: 'Prompt, Format, Export', correct: false, explanation: 'Those are task type names, not the three-phase pattern. The pattern is higher-level: Extract \u2192 Analyze \u2192 Render.' },
-            { text: 'Parse, Validate, Deliver', correct: false, explanation: 'Parse and Validate aren\'t workflow phases in Vandalizer. The pattern is Extract (get data), Analyze (reason about it), Render (produce output).' },
-          ],
+          "question": "The file is correct, but the proposed destination is broader than the assigned internal handoff. What should happen?",
+          "options": [
+            {
+              "text": "Release it because content correctness implies sharing permission.",
+              "correct": false,
+              "explanation": "Correct content does not establish authority for a broader audience."
+            },
+            {
+              "text": "Correct the destination and explicitly review the artifact, audience and data scope before release.",
+              "correct": true,
+              "explanation": "The release decision applies to the exact artifact and intended destination."
+            },
+            {
+              "text": "Let the assistant infer the appropriate recipients.",
+              "correct": false,
+              "explanation": "The assigned scope and an explicit decision must determine release authority."
+            }
+          ]
         },
       },
       {
         id: 'output_delivery.build-a-deliverable-workflow',
-        revision: 1,
+        revision: 2,
         title: 'Build a deliverable workflow',
-        content: '1. Start with a workflow that extracts and analyzes data (from Module 3).\n2. Add a new step at the end of your workflow.\n3. Add a Document Renderer or Data Export task to that step.\n4. For Document Renderer: the previous step\'s output will be rendered as a downloadable file.\n5. For Data Export: choose JSON or CSV format.\n6. Run the workflow on a document.\n7. In the results panel, you\'ll see a download link for the generated file.',
+        content: "Use the assigned progress report and the deliverable requirements for this course version. The evidence should link the saved workflow revision, source, reviewed result, generated files and your release decision.\n\n1. Define the required sections or data fields and the intended internal destination. Identify unresolved content that must remain visible.\n2. Inspect the saved workflow and its input sources. Supply structured rows to Data Export when a CSV is required and the reviewed text or data to Document Renderer.\n3. Choose an actual supported format and a clear filename. Configure Include in deliverables on the intended output steps; keep intermediate or unintended content out of the handoff.\n4. Run the reviewed revision on the assigned source. Inspect step results and warnings before downloading. A request for one format can still produce a different actual artifact when the input is unsuitable.\n5. Open each downloaded file. Check required content, values, units, source references and layout. For a bundle, inspect every member and confirm that the set is complete without extra unintended material.\n6. If anything is missing, unreadable or inconsistent, repair the relevant input or configuration and generate a new result. Preserve which run produced the inspected version.\n7. Record your decision for the exact files and destination. If the lab includes an authorized delivery action, inspect its receipt or destination state. If it only requires a local download, record that narrower outcome accurately.\n\n**Practice:** Explain the difference between a generated file, an inspected file and a confirmed delivery to the assigned destination.",
         variant: 'walkthrough',
       },
       {
         id: 'output_delivery.worked-example-one-report-in-two-deliverables-out',
-        revision: 1,
+        revision: 2,
         title: 'Worked example: one report in, two deliverables out',
-        content: 'The Year-2 progress report from this module\u2019s lab, taken all the way to files you could attach to an email.\n\n**Step 1 \u2014 Extraction**: accomplishments, publications (4), students trained (3), expenditures by category.\n\n**Step 2 \u2014 Prompt**: \u201cSummarize progress against the original aims; note anything under-spent or behind schedule.\u201d Output: a tight summary noting Aim 2 is a semester behind and equipment is 40% under-spent.\n\n**Step 3 \u2014 two tasks, side by side:**\n\u2022 **Document Renderer** \u2192 \u201cYear-2-Progress-Summary.pdf\u201d \u2014 the summary formatted with a title, for the award file and the PI.\n\u2022 **Data Export** \u2192 \u201cexpenditures.csv\u201d \u2014 the expenditure fields as a spreadsheet, ready to reconcile against the ledger.\n\nOne run, one download, both deliverables. The pattern to notice: the *same* extracted data fanned out into a document for people and a dataset for systems \u2014 which audience each output serves decided its format, not habit.',
+        content: "Consider an illustrative progress-report handoff with two outputs: an internal narrative summary and a table of expenditures. The narrative serves a reader; the table serves reconciliation or later processing. Those purposes determine the required content and format.\n\nTrace the input to each output. A narrative paragraph is not automatically a structured expenditure table. If the workflow turns extracted rows into prose and passes only that prose forward, adding a Data Export task afterward does not recover the original rows. Preserve or supply the reviewed tabular data through a supported design and test that the export receives it. Do not assume sibling tasks receive different inputs merely because their output formats differ.\n\nOne concrete design is to extract the required rows, export those rows as CSV, then use a later Prompt explicitly configured to read the assigned Workflow Documents for the narrative. Render that narrative in a following step. The Prompt must not treat the preceding file-download payload as its source text. Inspect the saved source choice, and compare the narrative with the reviewed rows because it reads the document separately.\n\nMark the intended output steps for inclusion in the deliverables. The result-download path can bundle multiple marked step outputs into a ZIP. Package Builder is not offered in the standard palette; do not rely on that unavailable node to prove that the required files exist. Open the actual bundle and inspect its members.\n\nCheck the report and table against the same assigned source and run. Make sure their amounts, periods and uncertainty agree. Do not invent publication counts, progress delays or spending percentages to make the example appear complete. If the source lacks a comparison target, preserve that limitation.\n\n**Practice:** A polished report and a one-cell text export are downloaded together. Explain why the bundle is not yet the required two-deliverable result.",
         variant: 'walkthrough',
       },
       {
@@ -855,42 +866,64 @@ export const MODULES: ModuleDefinition[] = [
     lessons: [
       {
         id: 'batch_processing.single-vs-batch-execution',
-        revision: 1,
+        revision: 2,
         title: 'Single vs. batch execution',
         objective: 'After this lesson, you\'ll understand when and how to use batch mode for large-scale document processing.',
-        content: 'So far you\'ve been running workflows on one document at a time. Batch mode lets you process multiple documents in a single operation.\n\nIn batch mode, the workflow runs once per document, sequentially. Each document gets its own WorkflowResult, and you can monitor progress for the entire batch.\n\nThis is the core value proposition of Vandalizer: define a workflow once, validate it, then run it across hundreds of documents with confidence.',
+        content: "Batch mode queues a separate workflow execution for each selected document. Each execution has its own result and session identity, and the related results share a batch identity. Workers process queued jobs according to available capacity; do not assume documents finish sequentially or in selection order.\n\nBefore starting, record the intended document identities and inspect the workflow and source scope. Three results do not establish coverage of three assigned documents if one input was repeated and another omitted. A matching title is also weaker evidence than the identity of the actual input.\n\nAfter execution, reconcile the selected input list with the per-document results. Account for completed, failed, canceled and still-running items. The current aggregate status can be \"completed\" when all items are terminal even though some failed. Read the item inventory and counts together.\n\nA completed execution means processing reached its completion state; it does not establish that its values are correct or that the output is usable. Inspect required fields and relevant source evidence for each assigned certification document. Preserve missing or ambiguous values explicitly.\n\nBatch mode also does not automatically combine every result into one correct dataset or guarantee that a validation plan was applied. Inspect the actual exported files and validation evidence separately.\n\n**Practice:** A batch shows three terminal results, but two belong to the same source. Explain why the assigned three-document task is incomplete.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What does batch mode do that single-document mode doesn\'t?',
-          options: [
-            { text: 'Uses a more powerful model to produce higher-quality results', correct: false, explanation: 'Batch mode doesn\'t change the model. You can choose any model in either mode.' },
-            { text: 'Runs the workflow once per selected document, giving each its own result', correct: true, explanation: 'Correct! Batch mode queues one workflow execution per document. Each run is independent with its own WorkflowResult you can review separately.' },
-            { text: 'Skips validation checks to process documents faster', correct: false, explanation: 'Batch mode doesn\'t skip validation. It just applies the workflow across multiple documents automatically.' },
-            { text: 'Merges the output of all documents into a single combined result', correct: false, explanation: 'Each document gets its own result. Merging outputs is a workflow design choice, not something batch mode does automatically.' },
-          ],
+          "question": "A batch has three completed result rows. What establishes assigned coverage?",
+          "options": [
+            {
+              "text": "The number three alone.",
+              "correct": false,
+              "explanation": "Counts can hide repeated inputs or missing assigned documents."
+            },
+            {
+              "text": "Each distinct assigned input is linked to its actual per-document result in the intended batch.",
+              "correct": true,
+              "explanation": "Coverage depends on identities and results, not just counts."
+            },
+            {
+              "text": "The assistant says the batch looks complete.",
+              "correct": false,
+              "explanation": "A summary cannot replace the input/result inventory."
+            }
+          ]
         },
       },
       {
         id: 'batch_processing.monitoring-and-debugging-batch-runs',
-        revision: 1,
+        revision: 2,
         title: 'Monitoring and debugging batch runs',
-        content: 'When running a batch:\n\n\u2022 **Real-time progress** \u2014 The UI shows which document is currently processing.\n\u2022 **Per-document results** \u2014 Each document\'s result is stored independently.\n\u2022 **Error handling** \u2014 Common failures include documents that are too long, unexpected formats, or missing expected fields.\n\nAlways test your workflow on a single document before running a batch.',
+        content: "Start with the per-document inventory, then investigate exceptions. A failure may come from unreadable source text, an unavailable model, workflow configuration or an external service. Empty values in an otherwise completed result can also be a substantive quality problem.\n\nOpen the failed item's result and inspect the error, intermediate outputs and actual source text. A scanned PDF may need a usable text source or an appropriate ingestion repair. Uploading the same unreadable bytes again does not guarantee better text. Verify the repaired input before paying for another execution.\n\nKeep successful items and their outputs intact. For an identified recoverable failure, select only the intended item for a new run and preserve the link to the original failure, changed input or workflow and new result. Do not report the original failed run as though it succeeded.\n\nAn uncertain response is different from a confirmed failed action. Check existing run status before launching a duplicate. If a workflow sends or updates anything externally, a later failure or stop request does not prove the earlier action was undone. Establish its actual status before retrying that action.\n\nA batch download includes completed results and can omit failed or unfinished items. Compare the downloaded inventory with the expected inputs and retain an exception list. A usable partial export is still partial coverage.\n\n**Practice:** Two assigned proposals completed and the third has unreadable text. Describe what to preserve, what to repair and which input to select for the next run.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What should you always do before running a batch?',
-          options: [
-            { text: 'Export your workflow as a .vandalizer.json file for backup', correct: false, explanation: 'Exporting is useful for sharing, but not a prerequisite for batch runs.' },
-            { text: 'Increase the model\'s context window to handle larger documents', correct: false, explanation: 'Context window is a model property you can\'t configure directly. The right prep step is validating your workflow works on a sample.' },
-            { text: 'Test the workflow on a single document first to confirm it works', correct: true, explanation: 'Correct! Always validate with a single document before scaling up. Debugging a batch of 200 failed runs is much harder than fixing one.' },
-            { text: 'Create a validation plan with at least 5 checks', correct: false, explanation: 'A validation plan is a good practice, but the essential step is a single-document test run to confirm the workflow produces usable output.' },
-          ],
+          "question": "Two items completed and one failed after an uncertain external response. What comes next?",
+          "options": [
+            {
+              "text": "Rerun all three to obtain a clean batch label.",
+              "correct": false,
+              "explanation": "That can repeat completed work and duplicate external effects."
+            },
+            {
+              "text": "Preserve completed results, inspect the failed item and external status, then retry only justified work.",
+              "correct": true,
+              "explanation": "Recovery must account for both input scope and any actions already performed."
+            },
+            {
+              "text": "Treat the failed item as completed because the batch is terminal.",
+              "correct": false,
+              "explanation": "Terminal status does not establish successful output."
+            }
+          ]
         },
       },
       {
         id: 'batch_processing.choosing-the-right-model-for-batch-work',
-        revision: 1,
+        revision: 2,
         title: 'Choosing the right model for batch work',
-        content: 'Model selection matters more for batch processing because costs and time multiply across documents. Consider speed, cost, accuracy, and data privacy tradeoffs.\n\nYou can override the model per-workflow or per-task. Consider using a faster model for format/prompt steps and a more capable model for extraction steps.',
+        content: "Model choice and workflow design affect cost, latency and output quality. Batch execution multiplies these tradeoffs across documents and repeated model stages. The cheapest or fastest pilot is not sufficient if it misses required fields or confuses source meaning.\n\nUse a small representative pilot before scaling. Include the document layouts and difficult fields that matter, inspect source-supported correctness and record execution time and available usage measurements. An easy single document can expose basic configuration errors but cannot establish reliable behavior across a diverse collection.\n\nInspect the model actually selected for the run and any saved task or step overrides. The workflow default and user default can influence execution when no explicit model is chosen; an override may use a different model for part of the workflow. Keep those settings consistent when comparing pilots, or explain exactly what changed.\n\nUse models and data routes permitted for the task. Check the source scope and destination before processing more documents. A speed or quality claim does not authorize a new provider or wider data access. Select from available configured options rather than assuming chat can enable one.\n\nChoose a batch size that permits useful review and recovery. If a pilot exposes a weak field, repair and retest it before scaling. State the measured tradeoff and remaining uncertainty rather than claiming an unmeasured percentage saving or universal best model.\n\n**Practice:** Compare a fast pilot with a wrong project period against a slower source-correct result. Name the evidence needed to choose or repair the configuration.",
         variant: 'insight',
       },
       {
@@ -902,16 +935,16 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'batch_processing.worked-example-thirty-proposals-one-bad-scan',
-        revision: 1,
+        revision: 2,
         title: 'Worked example: thirty proposals, one bad scan',
-        content: 'Proposal deadline week: 30 PDFs to triage into the tracking sheet.\n\n**Setup** \u2014 Select all 30 documents, pick the proposal extractor, run as a batch. Each document gets its own independent run \u2014 same workflow, 30 separate results.\n\n**Monitoring** \u2014 The batch view fills in: 28 complete, then 29\u2026 and one sits at *error*. Proposal #17 is a scanned image with garbled text \u2014 the extraction returned mostly empty fields.\n\n**The part worth copying** \u2014 nothing about the other 29 is blocked or redone. Their results export to CSV now. #17 gets handled alone: re-uploaded so the text can be read properly, then re-run \u2014 one document, not thirty-one.\n\n**Spot-check before you trust** \u2014 open three results at random against their PDFs. Budgets match, one \u201cProject Period\u201d picked up the submission date instead \u2014 noted, corrected, and a candidate for a validation check so it\u2019s caught automatically next deadline.\n\nThis is an illustrative scenario, not a measured time-saving result. Compare task time and source-checking errors on your own representative documents before adopting the batch process.',
+        content: "Consider an illustrative thirty-proposal batch with twenty-nine completed executions and one failed item. The failed source is an image scan whose ingested text does not preserve the needed values. This is a teaching scenario, not a measured production run or a promised success rate.\n\nFirst preserve the twenty-nine results and review the required source-backed values. A completed status does not make them accurate. An export can include those completed outputs, but the inventory should clearly identify the omitted failed proposal and any other unresolved quality issue.\n\nFor the failed source, inspect the actual text available to the workflow. Obtain a suitable readable version or perform an allowed ingestion repair, then confirm the needed content is present. Re-uploading the same poor scan is only an attempted repair until the resulting text is checked. Preserve the relationship between the original and replacement source.\n\nSelect the repaired item alone for a new execution. Link the new result to the original failure and explain what changed. If the workflow had external effects, establish whether any already completed before deciding which action may safely repeat.\n\nIf the recovered output uses the submission date as the project period, that is another substantive failure even if the run completed. Correct the field definition, execute again and use the failure as a representative validation case. A small random spot check cannot establish every assigned output is correct.\n\n**Practice:** Describe the minimum evidence needed to say the omitted proposal has been recovered, and what remains outside that claim.",
         variant: 'walkthrough',
       },
       {
         id: 'batch_processing.glossary-review',
-        revision: 1,
+        revision: 2,
         title: 'Glossary & Review',
-        content: 'Batch Mode \u2014 You\'ve now run a workflow across multiple documents in one operation. In batch mode, the workflow executes once per document \u2014 each run independent, each result stored separately. This is the core of what makes Vandalizer useful at scale.\n\nBatch ID \u2014 A unique identifier for the batch run. All documents processed in the same batch share this ID, making it easy to find and review the full set of results.\n\nSession ID \u2014 Each individual document execution within a batch has its own session ID. Use it when you need to review or debug a specific document\'s result.\n\nBatch Status \u2014 The aggregated view: how many documents completed successfully, how many failed, and how many are still in progress. Check this to know when your batch is done and whether anything needs reprocessing.',
+        content: "**Batch identity:** the link grouping a submitted set of per-document workflow executions. Preserve the intended input list as well as that identity; the label alone does not prove correct scope.\n\n**Per-document result:** the actual execution record for an input. Inspect its status, source identity, intermediate output and required values. Queued jobs need not finish in document order.\n\n**Coverage:** reconciliation of every assigned distinct input with its intended result. Counts, similar titles and repeated input rows cannot substitute for that mapping.\n\n**Terminal status:** an item has finished, failed or been canceled. A terminal batch can contain failures. A completed execution can still contain incorrect or unusable output.\n\n**Representative pilot:** a bounded trial that measures the quality and resource tradeoffs relevant to the larger task. Its usefulness depends on coverage of meaningful variations, not merely being the first document tried.\n\n**Targeted recovery:** a justified new execution for the affected input, linked to the original failure and checked repair. Preserve successful outputs and verify uncertain external actions before repeating them.\n\n**Review task:** Show the assigned input inventory, per-item source checks, unresolved exceptions and any recovery links. Explain the model and scope choice using pilot evidence. Formative practice does not award assessed batch credit.",
         variant: 'key-terms',
       },
     ],
@@ -963,16 +996,16 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'governance.sharing-workflows-across-teams',
-        revision: 1,
+        revision: 2,
         title: 'Sharing workflows across teams',
-        content: 'Workflows can be shared in two ways:\n\n\u2022 **Within the same team** \u2014 Duplicate or adapt workflows inside the team workspace and library.\n\u2022 **Cross-team sharing via export/import** \u2014 Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nShared, checked workflows that teams reuse are how organizational standards form.',
+        content: "A useful handoff includes the saved artifact revision, intended task, owner, supported inputs, dependencies, model assumptions, validation evidence, known limits and required approval or release points. Identify the intended recipient and data scope before actually sharing anything.\n\nWithin an authorized team, confirm who can access and modify the underlying workflow and its source resources. A library bookmark alone is not proof that every dependency is accessible to the intended user. Keep ownership and change responsibility explicit.\n\nA Vandalizer workflow export can carry steps, task settings, prompts and embedded extraction definitions. It can also include text validation inputs and metadata about the exporter. Inspect the exported content before sending it; do not assume that an export contains only harmless structural information.\n\nPortability has limits. A selected document reference may need to be reselected after import, and a knowledge-base task can require a local knowledge base. An export does not automatically transfer all source files, access rights, configured models or a working integration. Read portability warnings and inspect the imported tasks.\n\nImport into an appropriate test context, resolve permitted local dependencies and run representative checks. Keep the original tested revision and the imported/adapted revision distinguishable. The old score is context for review, not proof that the new environment behaves identically.\n\n**Practice:** A colleague imports an extraction workflow but its document reference is empty. Explain the repair and evidence needed before use, without borrowing unrelated source access.",
         variant: 'concept',
       },
       {
         id: 'governance.establish-your-workflow-governance',
-        revision: 2,
+        revision: 3,
         title: 'Establish your workflow governance',
-        content: "1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. Inspect the available validation results from Module 8 and resolve relevant failures before sharing. The shared entry may have limited or missing quality evidence; a review badge does not certify a future result.\n5. Share the workflow with everyone (⋯ → Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.",
+        content: "1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. Inspect the available validation results from Module 8 and resolve relevant failures before sharing. The shared entry may have limited or missing quality evidence; a review badge does not certify a future result.\n5. Share the workflow with everyone (⋯ → Share with everyone). Then use the course check and completion actions to record the result under your saved requirements. A sharing request alone is not a completion receipt. Examiner review is separate, and certification does not wait for that review.\n6. If you export and import the workflow, inspect the exported content and portability warnings. Resolve authorized local dependencies and test the imported revision.\n7. Record what was actually submitted, which revision was tested and what remains unresolved. Successful import alone does not establish portability or readiness for wider use.",
         variant: 'walkthrough',
       },
       {
