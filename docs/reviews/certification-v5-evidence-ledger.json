@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "ab18ba8217731c312a1b37ae6e62b5ddc4a7e668",
+  "working_head_at_inventory": "8eb342c43247bcb973d1470a3c0a8b576ecd0401",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 65228,
-    "sha256": "feaf074e019cb42060d59e3e1de9b890d54c971a0bd743a693f1858a3b7f0de4"
+    "bytes": 65581,
+    "sha256": "174a4bdc76ac919cd170f24e7d7455249942f4178f98871569999f61d20b9bf3"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 791643,
-    "sha256": "db21b981e810ee0c3cad2cddb12ef5c0b80dafc504b13415ca8ff292feac615d"
+    "bytes": 793854,
+    "sha256": "a0ab71e1c6c77d43fc6ff7691b0b4ab62d7b0b3812e77e5e3be8798db0f6ec17"
   },
   "counts": {
-    "accepted": 74,
-    "open": 88,
+    "accepted": 75,
+    "open": 87,
     "items": 162,
-    "checkpoints": 328,
-    "browser_runs": 552,
-    "recorded_captures_including_diagnostics_and_repeats": 7004,
+    "checkpoints": 329,
+    "browser_runs": 553,
+    "recorded_captures_including_diagnostics_and_repeats": 7011,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -410,8 +410,8 @@
     },
     {
       "id": "C8-A11Y-06",
-      "accepted": false,
-      "requirement": "P1 · Verify: Manage modal and handoff focus.** Verification dialogs and celebrations contain focus appropriately; Escape closes the intended layer and restores a useful target. Nonmodal course panels remain usable alongside the workspace."
+      "accepted": true,
+      "requirement": "P1 · Verify: Manage modal and handoff focus.** Verification dialogs and celebrations contain focus appropriately; Escape closes the intended layer and restores a useful target. Nonmodal course panels remain usable alongside the workspace. Accepted at checkpoint 329: fullscreen and source-preview dialogs, tier/course celebrations and editor handoffs have actual keyboard containment/exit/return evidence; docked panels permit workspace focus. Current panel checks and 71 focused cases pass. This does not substitute for actual screen-reader announcements or mobile OS keyboard verification."
     },
     {
       "id": "C8-A11Y-07",
@@ -3369,6 +3369,13 @@
       "evidence_directories": [
         "certification-milestone-copy-2026-10-09"
       ]
+    },
+    {
+      "number": 329,
+      "title": "Consolidate modal and handoff focus acceptance on October 9 2026",
+      "evidence_directories": [
+        "certification-focus-reconciliation-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4181,6 +4188,12 @@
       "available": true,
       "bytes": 457,
       "sha256": "264f5a6bbeb570ead0313c1f852974a35d38652ca93d760cdab645dcfc17f0c2"
+    },
+    {
+      "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 307,
+      "sha256": "f826f4878b855576f624598edbd1a984b8d8bb4b778f1018ccceace0764e10c4"
     },
     {
       "path": "artifacts/visual-review/certification-foundations-assignment-2026-10-07/checkpoint.json",
@@ -123301,6 +123314,341 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-field-instructions-2026-10-08/browser-webkit-final/linked-retest-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/manifest.json",
+        "available": true,
+        "bytes": 6825,
+        "sha256": "669801535518bd01d85e87f64cfc3a1ccb92e4052d06194666c2ddc6b413428a"
+      },
+      "checkpoints": [
+        329
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:05:56.151Z",
+      "reported_commit": "8eb342c43247bcb973d1470a3c0a8b576ecd0401",
+      "reported_source_fingerprint": "a42604301f185c21d84e85a8e7cf1b1262c16537383a8f46d6ab4920f12c634e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual frontend with synthetic API fixtures; panel bounds, keyboard navigation and unsent chat preservation. Viewport contraction is not an actual mobile keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "id": "floating-drag-edge",
+          "bounds": {
+            "left": 900,
+            "top": 260,
+            "right": 1440,
+            "bottom": 1000,
+            "width": 1440,
+            "height": 1000
+          },
+          "contained": true
+        },
+        {
+          "id": "floating-after-contraction",
+          "bounds": {
+            "left": 16,
+            "top": 50,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        },
+        {
+          "id": "short-docked-bottom",
+          "bounds": {
+            "left": 0,
+            "top": 0,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        },
+        {
+          "id": "short-docked-left",
+          "bounds": {
+            "left": 0,
+            "top": 69,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        },
+        {
+          "id": "short-docked-right",
+          "bounds": {
+            "left": 0,
+            "top": 69,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        },
+        {
+          "id": "short-fullscreen",
+          "bounds": {
+            "left": 0,
+            "top": 0,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        },
+        {
+          "id": "short-floating",
+          "bounds": {
+            "left": 16,
+            "top": 50,
+            "right": 390,
+            "bottom": 250,
+            "width": 390,
+            "height": 250
+          },
+          "contained": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "floating-drag-edge",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-drag-edge.png",
+              "available": true,
+              "bytes": 174573
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-drag-edge.txt",
+              "available": true,
+              "bytes": 6060
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-drag-edge.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "floating-after-contraction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-after-contraction.png",
+              "available": true,
+              "bytes": 18825
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-after-contraction.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/floating-after-contraction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "short-docked-bottom",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-bottom.png",
+              "available": true,
+              "bytes": 17984
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-bottom.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-bottom.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "short-docked-left",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-left.png",
+              "available": true,
+              "bytes": 16367
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-left.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-left.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "short-docked-right",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-right.png",
+              "available": true,
+              "bytes": 16518
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-right.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-docked-right.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "short-fullscreen",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-fullscreen.png",
+              "available": true,
+              "bytes": 17975
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-fullscreen.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-fullscreen.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "short-floating",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 250
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-floating.png",
+              "available": true,
+              "bytes": 18825
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-floating.txt",
+              "available": true,
+              "bytes": 5994
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-focus-reconciliation-2026-10-09/browser-panel-current/short-floating.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -269430,7 +269778,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1450,
+    "1440x1000": 1451,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -269456,7 +269804,7 @@
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
-    "390x250": 37,
+    "390x250": 43,
     "390x480": 3,
     "390x500": 263,
     "390x550": 24,
