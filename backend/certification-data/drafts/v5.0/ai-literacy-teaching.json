@@ -33,7 +33,7 @@
     },
     {
       "id": "ai_literacy.structured-vs-unstructured-data",
-      "revision": 2,
+      "revision": 3,
       "title": "Turn source text into checkable fields",
       "variant": "concept",
       "objective": "Explain how structured fields remain tied to the source document.",
@@ -61,7 +61,7 @@
     },
     {
       "id": "ai_literacy.what-is-an-llm-really",
-      "revision": 2,
+      "revision": 3,
       "title": "Why a fluent answer still needs evidence",
       "variant": "concept",
       "objective": "Distinguish a plausible generated answer from a source-supported conclusion.",
@@ -145,7 +145,7 @@
     },
     {
       "id": "ai_literacy.ai-for-research-administration",
-      "revision": 2,
+      "revision": 3,
       "title": "AI assistance and accountable decisions",
       "variant": "concept",
       "objective": "Separate preparation that an agent can assist with from institutional judgments that need an authorized human.",
@@ -201,7 +201,7 @@
     },
     {
       "id": "ai_literacy.worked-example-monday-morning-12-proposals",
-      "revision": 2,
+      "revision": 3,
       "title": "Worked example: review one proposal before twelve",
       "variant": "walkthrough",
       "objective": "Apply a source, scope and review sequence before expanding a task.",
@@ -229,7 +229,7 @@
     },
     {
       "id": "ai_literacy.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Key terms for supervising a task",
       "variant": "key-terms",
       "objective": "Use the course’s evidence and action vocabulary to explain a review decision.",

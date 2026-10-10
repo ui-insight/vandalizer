@@ -133,7 +133,7 @@
     },
     {
       "id": "foundations.why-structured-extraction-matters",
-      "revision": 2,
+      "revision": 3,
       "title": "Verify values and repair a mismatch",
       "variant": "insight",
       "objective": "Use source evidence to decide whether a result needs correction and a new run.",

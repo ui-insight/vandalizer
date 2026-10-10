@@ -221,6 +221,63 @@
         "8395fec8efe2017910e3ee0d63c51fc49cebd0e47fed73a5b9a0df49d7718cca",
         "b08923e937178e5a103240c612c7954012ccce01607282c45a551271b76de48b"
       ]
+    },
+    {
+      "id": "ai-literacy-evidence-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "ai_literacy.structured-vs-unstructured-data",
+        "ai_literacy.what-is-an-llm-really",
+        "ai_literacy.what-ai-is-genuinely-good-at",
+        "ai_literacy.ai-for-research-administration",
+        "ai_literacy.worked-example-monday-morning-12-proposals",
+        "ai_literacy.glossary-review"
+      ],
+      "title": "Current guidance on model evidence and training examples",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "A language model generates from learned patterns and supplied context. Fluent explanations and plausible citations are not evidence checks. Tool-enabled chat can retrieve information and perform supported actions, but the actual source, permissions and tool results must be inspected. Model generation alone is not a current search.",
+        "Structured output makes comparison easier; it does not guarantee complete, correct or identical output on every document. Preserve units, periods, conditions and missing values. A retrieved passage can be incomplete or belong to the wrong source; inspect its meaning and identity rather than treating a citation as proof.",
+        "The proposal-intake and twelve-proposal stories are illustrative. Their minutes-versus-hours and thirty-minute comparisons were not measured learner results. A platform name or institutionally managed interface does not by itself establish the permitted data route; use only configured, authorized sources and providers.",
+        "Separate proposal, creation, execution, verification and delivery. Confirmation behavior differs by operation; request proposal-only help when review must come first. A successful first document, saved artifact or generated file does not establish the whole task succeeded or authorize wider release."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "e7fcbc7d20667f2f800b7a334fb1240eb075387271abc9f7dbb8ba612183510e",
+        "d4c1b795cbc70a5f37e16de59e94536b095a8452d5c7a5ff07800e3f9a99e4ec",
+        "19671dc7e93ab084d9808e9d3e6b773ac0e29a5c71e0d257378e8c719c68907a",
+        "67df7a3c4b4c2c64f2281c78a8633b46617c4a88c17ea434b2e8679f7e2ce9b1",
+        "83155aff742e7b963b15d9de2237918b1c5f44654b48befa4960fa91fcc6e6c0",
+        "c45df59cc551ae1f2e53caf6fbeb98875589aed27aa631675b429efb2b6462d0"
+      ]
+    },
+    {
+      "id": "foundations-evidence-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "foundations.what-is-a-workflow",
+        "foundations.what-you-ll-build",
+        "foundations.the-document-pipeline",
+        "foundations.why-structured-extraction-matters",
+        "foundations.glossary-review"
+      ],
+      "title": "Current guidance on source readiness and first-run evidence",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Use the assigned training document and your saved course requirements. The five-field example is not a completed run or a change to the original three-field base and five/eight-field enrichment criteria. Expected names and amounts in a lesson are not substitutes for actual extracted values and source checks.",
+        "Uploading or selecting a file does not establish that preparation succeeded or that every relevant passage is readable. Inspect the actual text and source identity. Tables, scans and conversion can lose values or meaning; repair failed preparation before relying on extraction.",
+        "An extraction template, a saved workflow, a completed operation and a verified answer are different evidence. Structured output and a reusable design do not guarantee truth on every document. Check required values, units, periods and missing support against the intended source.",
+        "Chat uses selected files, project knowledge, attached knowledge bases and public web tools according to the active context and available capabilities. Retrieval can cover only selected passages, and project context does not confine every tool to that project. Name the allowed scope, inspect proposed targets and distinguish unavailable retrieval from no matching evidence.",
+        "Preserve existing artifacts and results when a reply or operation fails. Read saved status before repeating work, re-establish missing context, and repair only the justified failure. Stopping a reply is not rollback. Reading this guidance neither runs the lab nor awards credit."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "635ef9beb77f237b2a46d089acaae63bc7ea66125eb0a892cca2ec189a28146f",
+        "145bbbc2d6fb9f301afb4716026764c5094d8267e5f70ee0099f02df5d735527",
+        "8ffeb4ad81cb75682e7e38c79eeefbda2a45e5dd5c80bddef5466eaff3c6bcaa",
+        "73a5f714208e58c59248055ec908d9a22ff7865f8cb1187333fc1e7f6149e4d2",
+        "c3f867a8e52ea0ee053dcd66ae2aed66b06be738e79ff1efd531ae4366e5ef92"
+      ]
     }
   ],
   "module_notices": [

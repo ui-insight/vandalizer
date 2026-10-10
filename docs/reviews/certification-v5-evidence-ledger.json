@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "d4bcd6f8370045e5ef1a844d15a1fef027cb8562",
+  "working_head_at_inventory": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 766961,
-    "sha256": "e3336be2919d67eee548d97a288cdcf70c262d865eec3dec86c8927100f89abe"
+    "bytes": 769649,
+    "sha256": "08f5e3f28016c2c063699d5fbc653c599f01f3cc6d5fd93fb14bd60f9c909e4d"
   },
   "counts": {
     "accepted": 72,
     "open": 90,
     "items": 162,
-    "checkpoints": 319,
-    "browser_runs": 502,
-    "recorded_captures_including_diagnostics_and_repeats": 6515,
+    "checkpoints": 320,
+    "browser_runs": 507,
+    "recorded_captures_including_diagnostics_and_repeats": 6574,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3306,6 +3306,13 @@
       "evidence_directories": [
         "certification-delivery-copy-2026-10-09"
       ]
+    },
+    {
+      "number": 320,
+      "title": "Correct introductory model and source-evidence promises without changing old requirements on October 9 2026",
+      "evidence_directories": [
+        "certification-intro-copy-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4202,6 +4209,12 @@
       "available": true,
       "bytes": 438,
       "sha256": "6322c8fcbbf57677ba21f64a8c32af24d7a14ad4b7d332293b201da6f40f8822"
+    },
+    {
+      "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 730,
+      "sha256": "5ee7a9fb5b75675624a1152b7dd652e92809c8f61d3c5454aa5b75f9f10887ce"
     },
     {
       "path": "artifacts/visual-review/certification-journey-events-2026-10-09/checkpoint.json",
@@ -138524,6 +138537,2098 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/manifest.json",
+        "available": true,
+        "bytes": 12526,
+        "sha256": "52384f0856223440094334f2f28b77d255a9baf4c37bc23067015d4d1553b0fc"
+      },
+      "checkpoints": [
+        320
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T02:43:15.337Z",
+      "reported_commit": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
+      "reported_source_fingerprint": "2fbda093825bb50e21d4162a289534e99c0f18793ed8fc91d48edfe9a3a7e22b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12216,
+        "sha256": "9ab294e727011bbca2ba019009e6e1317a6e63e2b9cb5ff13ae19fa880f2cbc6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "foundations",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "foundations.what-is-a-workflow",
+              "revision": 2
+            },
+            {
+              "id": "foundations.what-you-ll-build",
+              "revision": 2
+            },
+            {
+              "id": "foundations.the-document-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "foundations.why-structured-extraction-matters",
+              "revision": 2
+            },
+            {
+              "id": "foundations.glossary-review",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 0,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-1-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-320.png",
+              "available": true,
+              "bytes": 84068
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-320.txt",
+              "available": true,
+              "bytes": 4995
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-320.png",
+              "available": true,
+              "bytes": 69832
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-320.txt",
+              "available": true,
+              "bytes": 3851
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-2-detail-1-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-320.png",
+              "available": true,
+              "bytes": 69832
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-320.txt",
+              "available": true,
+              "bytes": 3851
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-320.png",
+              "available": true,
+              "bytes": 83140
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-320.txt",
+              "available": true,
+              "bytes": 8092
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-320.png",
+              "available": true,
+              "bytes": 88886
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-320.txt",
+              "available": true,
+              "bytes": 8092
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-5-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-320.png",
+              "available": true,
+              "bytes": 84982
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-320.txt",
+              "available": true,
+              "bytes": 4677
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-320.png",
+              "available": true,
+              "bytes": 84370
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-320.txt",
+              "available": true,
+              "bytes": 7930
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-detail-3-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-320.png",
+              "available": true,
+              "bytes": 87263
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-320.txt",
+              "available": true,
+              "bytes": 7930
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-1-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-1440.png",
+              "available": true,
+              "bytes": 176592
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-1440.txt",
+              "available": true,
+              "bytes": 5093
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-1-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-1440.png",
+              "available": true,
+              "bytes": 117644
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-1440.txt",
+              "available": true,
+              "bytes": 3941
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-2-detail-1-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-1440.png",
+              "available": true,
+              "bytes": 117644
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-1440.txt",
+              "available": true,
+              "bytes": 3941
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-2-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-1440.png",
+              "available": true,
+              "bytes": 301870
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-1440.txt",
+              "available": true,
+              "bytes": 8174
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-1440.png",
+              "available": true,
+              "bytes": 301870
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-1440.txt",
+              "available": true,
+              "bytes": 8174
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-3-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-5-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-1440.png",
+              "available": true,
+              "bytes": 164951
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-1440.txt",
+              "available": true,
+              "bytes": 4751
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-5-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-1440.png",
+              "available": true,
+              "bytes": 269732
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-1440.txt",
+              "available": true,
+              "bytes": 7996
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-detail-3-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-1440.png",
+              "available": true,
+              "bytes": 269732
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-1440.txt",
+              "available": true,
+              "bytes": 7996
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations/foundations-6-detail-3-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/manifest.json",
+        "available": true,
+        "bytes": 6582,
+        "sha256": "a2ceacb8653a59a00ca4f1bc0d2438f91425cf6850fed70d3d8490eec361fe06"
+      },
+      "checkpoints": [
+        320
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T02:43:50.601Z",
+      "reported_commit": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
+      "reported_source_fingerprint": "2fbda093825bb50e21d4162a289534e99c0f18793ed8fc91d48edfe9a3a7e22b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12216,
+        "sha256": "9ab294e727011bbca2ba019009e6e1317a6e63e2b9cb5ff13ae19fa880f2cbc6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "foundations",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "foundations.what-you-ll-build",
+              "revision": 2
+            },
+            {
+              "id": "foundations.the-document-pipeline",
+              "revision": 2
+            },
+            {
+              "id": "foundations.glossary-review",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 0,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-2-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-reading-780.png",
+              "available": true,
+              "bytes": 143719
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-reading-780.txt",
+              "available": true,
+              "bytes": 3851
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-2-detail-1-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-detail-1-780.png",
+              "available": true,
+              "bytes": 145036
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-detail-1-780.txt",
+              "available": true,
+              "bytes": 3851
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-2-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-reading-780.png",
+              "available": true,
+              "bytes": 154742
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-reading-780.txt",
+              "available": true,
+              "bytes": 8092
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-3-detail-2-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-detail-2-780.png",
+              "available": true,
+              "bytes": 156561
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-detail-2-780.txt",
+              "available": true,
+              "bytes": 8092
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-3-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-reading-780.png",
+              "available": true,
+              "bytes": 146970
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-reading-780.txt",
+              "available": true,
+              "bytes": 7922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-6-detail-3-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-detail-3-780.png",
+              "available": true,
+              "bytes": 153623
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-detail-3-780.txt",
+              "available": true,
+              "bytes": 7922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-foundations-native/foundations-6-detail-3-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/manifest.json",
+        "available": true,
+        "bytes": 8327,
+        "sha256": "73cf1e38fa0bda848e18d9bbec9761a44f9ec94ecebe197b15a98172ac196c7f"
+      },
+      "checkpoints": [
+        320
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T02:43:58.870Z",
+      "reported_commit": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
+      "reported_source_fingerprint": "2fbda093825bb50e21d4162a289534e99c0f18793ed8fc91d48edfe9a3a7e22b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12216,
+        "sha256": "9ab294e727011bbca2ba019009e6e1317a6e63e2b9cb5ff13ae19fa880f2cbc6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "foundations.what-is-a-workflow",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-correction.png",
+              "available": true,
+              "bytes": 67429
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-correction.txt",
+              "available": true,
+              "bytes": 5438
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-preservation.png",
+              "available": true,
+              "bytes": 83858
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 5438
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 74246
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 3984
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 79717
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 3984
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 77710
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 7169
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 79807
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 7137
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-correction.png",
+              "available": true,
+              "bytes": 146217
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 5504
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 184815
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 5504
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 158231
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 4050
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 177301
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 4050
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 158949
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 7235
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 177298
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 7203
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-history/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/manifest.json",
+        "available": true,
+        "bytes": 14377,
+        "sha256": "50cd5002d45cb942f9e511f963593e6d8ce0eb58ad74c3ed7fb62f700505fba9"
+      },
+      "checkpoints": [
+        320
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T02:43:16.117Z",
+      "reported_commit": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
+      "reported_source_fingerprint": "2fbda093825bb50e21d4162a289534e99c0f18793ed8fc91d48edfe9a3a7e22b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12216,
+        "sha256": "9ab294e727011bbca2ba019009e6e1317a6e63e2b9cb5ff13ae19fa880f2cbc6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "ai_literacy.structured-vs-unstructured-data",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.what-is-an-llm-really",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.what-ai-is-genuinely-good-at",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.ai-for-research-administration",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.worked-example-monday-morning-12-proposals",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.glossary-review",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-320.png",
+              "available": true,
+              "bytes": 86683
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-320.txt",
+              "available": true,
+              "bytes": 5348
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-320.png",
+              "available": true,
+              "bytes": 83039
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-320.txt",
+              "available": true,
+              "bytes": 6802
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-detail-2-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-320.png",
+              "available": true,
+              "bytes": 83039
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-320.txt",
+              "available": true,
+              "bytes": 6802
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-320.png",
+              "available": true,
+              "bytes": 59781
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-320.txt",
+              "available": true,
+              "bytes": 6802
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-feedback-320.png",
+              "available": true,
+              "bytes": 60191
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-feedback-320.txt",
+              "available": true,
+              "bytes": 7004
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-4-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-320.png",
+              "available": true,
+              "bytes": 85336
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-320.txt",
+              "available": true,
+              "bytes": 6224
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-6-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-320.png",
+              "available": true,
+              "bytes": 81622
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-320.txt",
+              "available": true,
+              "bytes": 5983
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-320.png",
+              "available": true,
+              "bytes": 79835
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-320.txt",
+              "available": true,
+              "bytes": 5640
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-detail-1-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-320.png",
+              "available": true,
+              "bytes": 71809
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-320.txt",
+              "available": true,
+              "bytes": 5640
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-320.png",
+              "available": true,
+              "bytes": 79155
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-320.txt",
+              "available": true,
+              "bytes": 5754
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-1440.png",
+              "available": true,
+              "bytes": 179846
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-1440.txt",
+              "available": true,
+              "bytes": 5454
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-1440.png",
+              "available": true,
+              "bytes": 166608
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-1440.txt",
+              "available": true,
+              "bytes": 7324
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-detail-2-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-1440.png",
+              "available": true,
+              "bytes": 166608
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-1440.txt",
+              "available": true,
+              "bytes": 7324
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-1440.png",
+              "available": true,
+              "bytes": 166608
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-1440.txt",
+              "available": true,
+              "bytes": 7324
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-3-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-4-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-1440.png",
+              "available": true,
+              "bytes": 204001
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-1440.txt",
+              "available": true,
+              "bytes": 6314
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-4-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-6-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-1440.png",
+              "available": true,
+              "bytes": 171168
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-1440.txt",
+              "available": true,
+              "bytes": 6065
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-6-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-1440.png",
+              "available": true,
+              "bytes": 193035
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-1440.txt",
+              "available": true,
+              "bytes": 5714
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-detail-1-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-1440.png",
+              "available": true,
+              "bytes": 193035
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-1440.txt",
+              "available": true,
+              "bytes": 5714
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-8-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-1440.png",
+              "available": true,
+              "bytes": 173774
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-1440.txt",
+              "available": true,
+              "bytes": 5820
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy/ai_literacy-9-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/manifest.json",
+        "available": true,
+        "bytes": 6516,
+        "sha256": "e5578328038c9dbd68b5d660ac626469630305c64426ac3367f14728cdd2b62f"
+      },
+      "checkpoints": [
+        320
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T02:43:49.064Z",
+      "reported_commit": "e9c6ea0e26850a86a88e2cc98bbc67c2e7a2052d",
+      "reported_source_fingerprint": "2fbda093825bb50e21d4162a289534e99c0f18793ed8fc91d48edfe9a3a7e22b",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12216,
+        "sha256": "9ab294e727011bbca2ba019009e6e1317a6e63e2b9cb5ff13ae19fa880f2cbc6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "ai_literacy.what-is-an-llm-really",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.worked-example-monday-morning-12-proposals",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-3-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-reading-780.png",
+              "available": true,
+              "bytes": 148553
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-reading-780.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-detail-2-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-detail-2-780.png",
+              "available": true,
+              "bytes": 148553
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-detail-2-780.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-practice-780.png",
+              "available": true,
+              "bytes": 85050
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-practice-780.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-feedback-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-feedback-780.png",
+              "available": true,
+              "bytes": 99831
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-feedback-780.txt",
+              "available": true,
+              "bytes": 6996
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-3-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-reading-780.png",
+              "available": true,
+              "bytes": 137808
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-reading-780.txt",
+              "available": true,
+              "bytes": 5616
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-detail-1-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-detail-1-780.png",
+              "available": true,
+              "bytes": 119060
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-detail-1-780.txt",
+              "available": true,
+              "bytes": 5616
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-intro-copy-2026-10-09/browser-literacy-native/ai_literacy-8-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/manifest.json",
         "available": true,
         "bytes": 4040,
@@ -251862,7 +253967,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1254,
+    "1440x1000": 1277,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -251873,7 +253978,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 443,
+    "320x1000": 449,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -251883,14 +253988,14 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 695,
+    "320x844": 713,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 217,
+    "390x500": 229,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
