@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "73b5f64e29d035c5cd1d0ced5720636dd21a8c1f",
+  "working_head_at_inventory": "cadae9bf55e9f0fe5c44a46c5d411b6530ccc5d3",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,14 +11,14 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 836566,
-    "sha256": "9ea9a24ddc4dd23653cb202e3e105e22fb1b46593a5fc8de51c206de5f3ac4b9"
+    "bytes": 839608,
+    "sha256": "2a150fbe8af852f5289e93174cc50aa5078118f89d8fb29d45b6a2007ee4c0f9"
   },
   "counts": {
     "accepted": 86,
     "open": 76,
     "items": 162,
-    "checkpoints": 344,
+    "checkpoints": 345,
     "browser_runs": 645,
     "recorded_captures_including_diagnostics_and_repeats": 7466,
     "baseline_selected_captures": 151
@@ -3483,6 +3483,13 @@
       "evidence_directories": [
         "certification-chat-recovery-2026-10-10"
       ]
+    },
+    {
+      "number": 345,
+      "title": "Complete authored qualitative-grading coverage on October 10 2026",
+      "evidence_directories": [
+        "certification-calibration-coverage-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -3761,6 +3768,18 @@
       "available": true,
       "bytes": 13063,
       "sha256": "f8aaed60114623d2b2b488b7d7aae2b5241808a6c62e95c0cb3f459a56495880"
+    },
+    {
+      "path": "artifacts/visual-review/certification-calibration-coverage-2026-10-10/source-hashes.json",
+      "available": true,
+      "bytes": 2176,
+      "sha256": "65c6536201335fd8e176bda2038dc350a8add1c573eaa291bcf6d7f44e22ef83"
+    },
+    {
+      "path": "artifacts/visual-review/certification-calibration-coverage-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 368,
+      "sha256": "cc25c728ac6a29f74cde400da09e09b29b097c83348ec09744ade82e24763690"
     },
     {
       "path": "artifacts/visual-review/certification-capstone-drafts-2026-10-08/source-hashes.json",

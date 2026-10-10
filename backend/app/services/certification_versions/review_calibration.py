@@ -53,12 +53,16 @@ async def run_review_calibration(contract, suite, *, model_name, system_config, 
         unavailable = result['status'] == 'grading_unavailable'
         false_support = [outcome for outcome, expected in case.expected.items()
                          if expected != 'supported' and actual.get(outcome) == 'supported']
+        false_rejection = [outcome for outcome, expected in case.expected.items()
+                           if expected == 'supported' and actual.get(outcome) in {'contradicted', 'unclear'}]
         rows.append({'case_id': case.id, 'expected': case.expected, 'actual': actual,
                      'matches': not unavailable and actual == case.expected,
-                     'false_supported_outcomes': false_support, 'grading_unavailable': unavailable,
+                     'false_supported_outcomes': false_support, 'false_rejected_outcomes': false_rejection,
+                     'grading_unavailable': unavailable,
                      'review_result': result})
     return {'suite_id': suite.suite_id, 'suite_sha256': encode(suite.model_dump(mode='json'))[1],
             'synthetic': True, 'cases': rows, 'all_cases_matched': all(row['matches'] for row in rows),
             'false_support_count': sum(len(row['false_supported_outcomes']) for row in rows),
+            'false_rejection_count': sum(len(row['false_rejected_outcomes']) for row in rows),
             'unavailable_cases': sum(row['grading_unavailable'] for row in rows),
             'release_ready': False, 'credit_awarded': False}
