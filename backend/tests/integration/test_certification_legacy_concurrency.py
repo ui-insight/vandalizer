@@ -45,11 +45,11 @@ async def test_delayed_legacy_completion_cannot_erase_another_modules_earned_cre
 
     monkeypatch.setattr(service, 'save_progress', delayed_save)
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as first, AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as second:
-        params = {'request_id': uuid4().hex}
+        params = {'request_id': uuid4().hex, 'expected_attempts': 0}
         task = asyncio.create_task(first.post('/certification/modules/ai_literacy/complete', params=params))
         try:
             await asyncio.wait_for(entered.wait(), 30)
-            other = await second.post('/certification/modules/process_mapping/complete', params={'request_id': uuid4().hex})
+            other = await second.post('/certification/modules/process_mapping/complete', params={'request_id': uuid4().hex, 'expected_attempts': 0})
             assert other.status_code == 200, other.text
         finally:
             release.set()

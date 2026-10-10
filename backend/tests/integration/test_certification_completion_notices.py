@@ -220,7 +220,7 @@ async def test_real_completion_retries_recover_notice_after_a_lost_insert_reply(
             raise RuntimeError('Synthetic notification write unavailable')
         return await original_notify(self, raw)
     monkeypatch.setattr(CompletionNoticeRepository, 'notify', lost)
-    params = {'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}
+    params = {'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}
     async with client:
         first = await client.post('/certification/modules/validation_qa/complete', params=params, json=body)
         assert first.status_code == 200, first.text

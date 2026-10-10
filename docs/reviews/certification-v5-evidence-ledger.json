@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "b6d05347ca6254304db14743b079bb162abb1382",
+  "working_head_at_inventory": "38e1def4213255757e2cc5eb98883f959bb11a76",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 826330,
-    "sha256": "4cb1a0bb127b9da2177b3cbcb0293b5931adcf7ab83c1c899bc2b91b5f37dc14"
+    "bytes": 830991,
+    "sha256": "270d8f80825b3eb44746af94a2a7ec05e72424fdeef9e9669042e662a19d95a9"
   },
   "counts": {
     "accepted": 85,
     "open": 77,
     "items": 162,
-    "checkpoints": 340,
-    "browser_runs": 640,
-    "recorded_captures_including_diagnostics_and_repeats": 7425,
+    "checkpoints": 342,
+    "browser_runs": 641,
+    "recorded_captures_including_diagnostics_and_repeats": 7437,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3455,6 +3455,20 @@
         "certification-content-extremes-2026-10-10",
         "certification-table-readability-2026-10-10"
       ]
+    },
+    {
+      "number": 341,
+      "title": "Require reviewed completion state in both HTTP and chat on October 10 2026",
+      "evidence_directories": [
+        "certification-completion-counter-2026-10-10"
+      ]
+    },
+    {
+      "number": 342,
+      "title": "Restore chat-specific original-course directions on October 10 2026",
+      "evidence_directories": [
+        "certification-chat-directions-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -3777,6 +3791,18 @@
       "sha256": "cf2ba630540db993a18e2e6293802ab5dd914a63e86e1bf5647a9f4dd08ad74c"
     },
     {
+      "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/source-hashes.json",
+      "available": true,
+      "bytes": 500,
+      "sha256": "e39da7f6df362cd044ebf01f423cd4209ccc7687020d945b70e1b3fc79689f73"
+    },
+    {
+      "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 350,
+      "sha256": "3897341f12d026dffacdf2ba8aebece28f2d52616365e1e90208908ec2aa766b"
+    },
+    {
       "path": "artifacts/visual-review/certification-chat-identity-2026-10-08/checkpoint.json",
       "available": true,
       "bytes": 355,
@@ -3841,6 +3867,18 @@
       "available": true,
       "bytes": 296,
       "sha256": "81c93d9f8485ac048f8922ded8b342255c3262e5c61b5f192277a5c2bb35269e"
+    },
+    {
+      "path": "artifacts/visual-review/certification-completion-counter-2026-10-10/source-hashes.json",
+      "available": true,
+      "bytes": 2635,
+      "sha256": "8987540cb0c5b43a096c888be7e499dbc9055700282c829a0ae5cbc630f62287"
+    },
+    {
+      "path": "artifacts/visual-review/certification-completion-counter-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 393,
+      "sha256": "00a835e52df81b93af1964b571417bec477671e3119e14e141de10d2a76f5634"
     },
     {
       "path": "artifacts/visual-review/certification-completion-notices-2026-10-07/checkpoint.json",
@@ -51439,6 +51477,410 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-chat-contracts-2026-10-07/normal/valid-4-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/manifest.json",
+        "available": true,
+        "bytes": 7040,
+        "sha256": "867c03b02195874b26b4740c3b0dcd8a83ea7d4dcb351eab6840d4a8e7c253be"
+      },
+      "checkpoints": [
+        342
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T20:34:32.530Z",
+      "reported_commit": "38e1def4213255757e2cc5eb98883f959bb11a76",
+      "reported_source_fingerprint": "f32990a50109de963d31e489f296f875b6ee3068c419e69d35948997ec13e3ac",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual current exercise and tutor projection via synthetic transport. Active identity is synthetic; lab document list omitted only for challenge access. Original criteria retained. No learner or grading writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "ai_literacy",
+            "foundations",
+            "governance"
+          ],
+          "exactPanelAndChatInstructions": true,
+          "originalCriteriaPreserved": true,
+          "keyboardDisclosure": true,
+          "courseWrites": [],
+          "modelCalls": 0,
+          "credit": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-panel-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-320.png",
+              "available": true,
+              "bytes": 96853
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-320.txt",
+              "available": true,
+              "bytes": 7510
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-chat-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-320.png",
+              "available": true,
+              "bytes": 77989
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-320.txt",
+              "available": true,
+              "bytes": 2944
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-panel-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-320.png",
+              "available": true,
+              "bytes": 98498
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-320.txt",
+              "available": true,
+              "bytes": 5891
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-chat-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-320.png",
+              "available": true,
+              "bytes": 82496
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-320.txt",
+              "available": true,
+              "bytes": 4434
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-panel-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-320.png",
+              "available": true,
+              "bytes": 99702
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-320.txt",
+              "available": true,
+              "bytes": 5654
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-chat-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-320.png",
+              "available": true,
+              "bytes": 83744
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-320.txt",
+              "available": true,
+              "bytes": 4060
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-panel-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-1440.png",
+              "available": true,
+              "bytes": 136182
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-1440.txt",
+              "available": true,
+              "bytes": 7576
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-panel-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-chat-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-1440.png",
+              "available": true,
+              "bytes": 138937
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-1440.txt",
+              "available": true,
+              "bytes": 3010
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/ai_literacy-chat-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-panel-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-1440.png",
+              "available": true,
+              "bytes": 177938
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-1440.txt",
+              "available": true,
+              "bytes": 5957
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-panel-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-chat-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-1440.png",
+              "available": true,
+              "bytes": 170491
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-1440.txt",
+              "available": true,
+              "bytes": 4500
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/foundations-chat-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-panel-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-1440.png",
+              "available": true,
+              "bytes": 182645
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-1440.txt",
+              "available": true,
+              "bytes": 5720
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-panel-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-chat-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-1440.png",
+              "available": true,
+              "bytes": 166512
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-1440.txt",
+              "available": true,
+              "bytes": 4126
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-directions-2026-10-10/browser/governance-chat-1440.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -321242,7 +321684,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1503,
+    "1440x1000": 1509,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -321253,7 +321695,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 594,
+    "320x1000": 600,
     "320x1100": 362,
     "320x250": 6,
     "320x480": 6,

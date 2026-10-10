@@ -8,8 +8,16 @@ class CompletionChanged(EnrollmentConflict):
         self.detail = {'code': 'CERTIFICATION_COMPLETION_CHANGED', 'message': str(self)}
 
 
-def check_completion_counter(progress, module_id, expected_attempts):
+class CompletionReviewRequired(EnrollmentConflict):
+    def __init__(self):
+        super().__init__('Reload the app and review your course’s latest saved result before starting a new completion')
+        self.detail = {'code': 'CERTIFICATION_COMPLETION_REVIEW_REQUIRED', 'message': str(self)}
+
+
+def check_completion_counter(progress, module_id, expected_attempts, *, required=False):
     if expected_attempts is None:
+        if required:
+            raise CompletionReviewRequired()
         return
     if type(expected_attempts) is not int or expected_attempts < 0:
         raise EnrollmentConflict('Completion requires the original nonnegative module attempt counter')

@@ -5545,6 +5545,7 @@ async def get_certification_progress(
             "xp": cert_svc.course_module_xp()[mid],
             "completed": completed,
             "stars": data.get("stars", 0),
+            "attempts": data.get("attempts", 0),
         })
     completed_count = sum(1 for m in modules if m["completed"])
     operation = cert_svc.current_operation()
@@ -5626,6 +5627,7 @@ async def get_certification_module(
         "xp": cert_svc.course_module_xp()[module_id],
         "completed": completed,
         "stars": data.get("stars", 0),
+        "attempts": data.get("attempts", 0),
         "overview": exercise.get("overview", ""),
         # New-course cards show the learner's procedure, not assistant directives.
         # Original courses retain their established chat-native wording.
@@ -5842,6 +5844,7 @@ async def complete_certification_module(
     module_id: str,
     enrollment_id: str | None = None,
     request_id: str | None = None,
+    expected_attempts: int | None = None,
 ) -> dict:
     """Complete a supported legacy module under its pinned rubric and XP rules.
 
@@ -5860,6 +5863,7 @@ async def complete_certification_module(
         context: The call context.
         module_id: The certification module to complete.
         enrollment_id: Enrollment returned by get_certification_progress; required for a versioned course.
+        expected_attempts: The attempts counter from freshly read progress or module details, required for a new submission. Never infer or increment it; refresh and review after a conflict. Recorded requests can replay without it.
         request_id: Optional 32-character lowercase hexadecimal retry identity. Reuse it after an uncertain response; use a new identity for a new assessed submission.
     """
     from app.services import certification_service as cert_svc
@@ -5879,7 +5883,8 @@ async def complete_certification_module(
             # completion identity without asking the model to invent one.
             request_id = hashlib.sha256(json.dumps(['certification-completion', context.deps.user_id,
                 conversation_id, marker, call_id, module_id, enrollment_id], separators=(',', ':')).encode()).hexdigest()[:32]
-    result = await cert_svc.complete_module(context.deps.user_id, module_id, request_id=request_id)
+    result = await cert_svc.complete_module(context.deps.user_id, module_id, request_id=request_id,
+        expected_attempts=expected_attempts, require_attempt_counter=True)
     if "error" in result:
         return {
             **cert_svc.course_identity(),

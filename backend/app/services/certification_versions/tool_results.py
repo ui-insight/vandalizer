@@ -45,6 +45,8 @@ class ModuleRow(BaseModel):
     xp: Count
     completed: bool
     stars: Stars
+    # Historical retained cards may predate the completion precondition.
+    attempts: Count | None = None
 
 
 class ProgressionSummary(BaseModel):
@@ -100,6 +102,8 @@ class ModuleResult(Result):
     xp: Count
     completed: bool
     stars: Stars
+    # Historical retained cards may predate the completion precondition.
+    attempts: Count | None = None
     overview: str
     instructions: list[Text]
     agent_guidance: list[Text] = Field(default_factory=list)

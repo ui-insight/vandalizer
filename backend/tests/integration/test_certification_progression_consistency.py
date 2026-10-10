@@ -39,7 +39,7 @@ async def test_later_legacy_module_is_accessible_but_still_requires_its_original
         check = await chat_tools.check_certification_module(context, 'process_mapping', **identity)
         assert check['passed'] is False
         assert all(item['name'] != 'prerequisite' for item in check['checks'])
-        denied = await client.post('/certification/modules/process_mapping/complete', params={**identity, 'request_id': uuid4().hex})
+        denied = await client.post('/certification/modules/process_mapping/complete', params={**identity, 'expected_attempts': 0, 'request_id': uuid4().hex})
         assert denied.status_code == 400
         assert (await saved_progress()).total_xp == 0
         answers = {key: 'My original process decision and explanation.' for key in service.ASSESSMENT_KEYS['process_mapping']}
@@ -47,7 +47,7 @@ async def test_later_legacy_module_is_accessible_but_still_requires_its_original
         assert saved['stored'] is True
         allowed = await client.post('/certification/modules/process_mapping/validate', params=identity)
         assert allowed.status_code == 200 and allowed.json()['passed'] is True
-        completed = await chat_tools.complete_certification_module(context, 'process_mapping', request_id=uuid4().hex, **identity)
+        completed = await chat_tools.complete_certification_module(context, 'process_mapping', request_id=uuid4().hex, expected_attempts=0, **identity)
         assert completed['xp_earned'] > 0
         progress = await saved_progress()
         assert progress.modules['process_mapping']['completed'] is True

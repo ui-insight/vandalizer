@@ -28,7 +28,7 @@ async def test_actual_saved_failures_success_and_completion_are_retained_without
     async with client:
         for scenario, status in ((failed, 400), (body['scenario_attempt_id'], 200)):
             response = await client.post('/certification/modules/validation_qa/complete',
-                params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex},
+                params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex},
                 json={**body, 'scenario_attempt_id': scenario})
             assert response.status_code == status, response.text
     service = TransitionRecordReconciliation(repo)

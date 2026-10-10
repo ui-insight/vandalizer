@@ -251,7 +251,7 @@ async def test_support_reads_actual_selected_completion_and_rejects_changed_term
     request_id = uuid4().hex
     async with client:
         response = await client.post('/certification/modules/validation_qa/complete',
-            params={'enrollment_id': f.learner.uuid, 'request_id': request_id}, json=body)
+            params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': request_id}, json=body)
         assert response.status_code == (200 if passing else 400), response.text
     monkeypatch.setattr(readers, 'EnrollmentRepository', lambda: repo)
     monkeypatch.setattr(enrollments, 'EnrollmentRepository', lambda: repo)

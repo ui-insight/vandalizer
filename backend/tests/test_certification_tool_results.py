@@ -85,8 +85,8 @@ async def test_explicit_check_roles_preserve_advice_and_reject_contradictory_sum
 async def test_uncertain_completion_does_not_repeat_the_already_invoked_write(caplog):
     completion = AsyncMock(return_value={'module_id': 'foundations', 'total_xp': 125, 'private_source': 'DO NOT LOG THIS SOURCE'})
     with patch.object(service, 'complete_module', new=completion):
-        saved = await tools.complete_certification_module(_make_context(), 'foundations', request_id='a' * 32)
-    completion.assert_awaited_once_with('user1', 'foundations', request_id='a' * 32)
+        saved = await tools.complete_certification_module(_make_context(), 'foundations', request_id='a' * 32, expected_attempts=0)
+    completion.assert_awaited_once_with('user1', 'foundations', request_id='a' * 32, expected_attempts=0, require_attempt_counter=True)
     assert saved['code'] == 'certification_response_invalid'
     assert 'Work may already be saved' in saved['hint']
     assert 'private_source' not in json.dumps(saved)
@@ -109,7 +109,7 @@ def test_course_identity_and_count_contradictions_are_rejected():
 
 def test_tool_signature_still_exposes_the_original_typed_arguments():
     signature = inspect.signature(tools.complete_certification_module)
-    assert list(signature.parameters) == ['context', 'module_id', 'enrollment_id', 'request_id']
+    assert list(signature.parameters) == ['context', 'module_id', 'enrollment_id', 'request_id', 'expected_attempts']
     assert signature.parameters['module_id'].annotation is str
 
 
@@ -150,3 +150,21 @@ def test_reward_metadata_cannot_misstate_saved_credit(metadata):
              'modules_total': 1, 'next_module_id': None}
     with pytest.raises(ValidationError):
         ProgressResult.model_validate({**value, **metadata})
+
+
+@pytest.mark.parametrize('counter', [True, -1, '1'])
+async def test_malformed_stored_attempt_counter_is_not_offered_for_completion(counter):
+    progress = _progress()
+    progress['modules']['foundations'] = {'attempts': counter}
+    with patch.object(service, 'get_progress_dict', new=AsyncMock(return_value=progress)):
+        for result in (await tools.get_certification_progress(_make_context()),
+                       await tools.get_certification_module(_make_context(), 'foundations')):
+            assert result['code'] == 'certification_response_invalid'
+            assert 'attempts' not in result
+
+
+def test_historical_cards_without_attempt_counter_remain_readable():
+    row = {'module_id': 'one', 'title': 'One', 'xp': 100, 'completed': False, 'stars': 0}
+    value = {'modules': [row], 'total_xp': 0, 'level': 'novice', 'certified': False,
+             'modules_completed': 0, 'modules_total': 1, 'next_module_id': 'one'}
+    assert ProgressResult.model_validate(value).modules[0].attempts is None

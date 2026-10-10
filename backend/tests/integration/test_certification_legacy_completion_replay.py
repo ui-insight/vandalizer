@@ -184,12 +184,12 @@ async def test_live_chat_derives_a_stable_request_reference_and_preserves_explic
     learner = 'live-chat-retry'
     await service.store_assessment(learner, 'ai_literacy', {'experience': 'Original', 'comfort': 'Original', 'concern': 'Original'})
     context = SimpleNamespace(deps=SimpleNamespace(user_id=learner, conversation=SimpleNamespace(uuid='original-conversation'), turn_marker=4), tool_call_id='original-call')
-    first = await chat_tools.complete_certification_module(context, 'ai_literacy')
+    first = await chat_tools.complete_certification_module(context, 'ai_literacy', expected_attempts=0)
     assert len(first['attempt_id']) == 32
     await service.store_assessment(learner, 'ai_literacy', {'experience': 'New incomplete answer'})
     assert await chat_tools.complete_certification_module(context, 'ai_literacy') == first
     context.tool_call_id = 'new-call'
     assert await chat_tools.complete_certification_module(context, 'ai_literacy', request_id=first['attempt_id']) == first
-    different = await chat_tools.complete_certification_module(context, 'ai_literacy')
+    different = await chat_tools.complete_certification_module(context, 'ai_literacy', expected_attempts=1)
     assert different['error'] == 'Validation did not pass' and different['attempt_id'] != first['attempt_id']
     assert (await service.get_progress(learner)).total_xp == 125

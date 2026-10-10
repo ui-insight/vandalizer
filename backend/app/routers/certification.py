@@ -199,7 +199,7 @@ async def validate_module(module_id: str, user: User = Depends(get_current_user)
 @router.post("/modules/{module_id}/complete")
 @course_operation(write=True, http=True)
 async def complete_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None, request_id: str | None = None, payload: OutcomeCompletionPayload | None = None, expected_attempts: Annotated[int | None, Query(ge=0)] = None):
-    selected = {}
+    selected = {'require_attempt_counter': True}
     if expected_attempts is not None:
         selected['expected_attempts'] = expected_attempts
     if payload is not None:

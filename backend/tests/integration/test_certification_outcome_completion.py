@@ -36,7 +36,7 @@ async def setup(repo, monkeypatch, *, wrong_execution=False, single_module=False
 
 async def test_explicit_completion_records_original_outcomes_once_and_replays_the_same_request(repo, monkeypatch):
     f, client, _, body, failed, judge = await setup(repo, monkeypatch)
-    params = {'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}
+    params = {'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}
     path = '/certification/modules/validation_qa/complete'
     async with client:
         definition = await client.get('/certification/course', params={'enrollment_id': f.learner.uuid})
@@ -74,7 +74,7 @@ async def test_new_request_for_same_saved_outcomes_preserves_original_earned_cre
     first_id, repeat_id = uuid4().hex, uuid4().hex
     path = '/certification/modules/validation_qa/complete'
     async with client:
-        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': first_id}, json=body)
+        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': first_id}, json=body)
         assert first.status_code == 200, first.text
         original = await repo.read_progress(f.learner.user_id, f.learner.uuid)
         if lost_receipt_reply:
@@ -88,8 +88,8 @@ async def test_new_request_for_same_saved_outcomes_preserves_original_earned_cre
                 return await finish(journal, record, result, **kwargs)
             monkeypatch.setattr(AttemptRepository, 'finish', lose_once)
             with pytest.raises(RuntimeError, match='Synthetic lost repeat receipt'):
-                await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': repeat_id}, json=body)
-        repeated = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': repeat_id}, json=body)
+                await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': repeat_id}, json=body)
+        repeated = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': repeat_id}, json=body)
         assert repeated.status_code == 200, repeated.text
         assert repeated.json()['xp_earned'] == 0 and repeated.json()['attempt_id'] == repeat_id
         saved = await repo.read_progress(f.learner.user_id, f.learner.uuid)
@@ -97,9 +97,9 @@ async def test_new_request_for_same_saved_outcomes_preserves_original_earned_cre
         assert saved.total_xp == original.total_xp
         snapshot = verified_credit_snapshot(f.package, saved, 'validation_qa', saved.modules['validation_qa']['outcome_credit'], expected_attempt_id=first_id)
         assert snapshot['all_required_outcomes_supported']
-        replay = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': repeat_id}, json=body)
+        replay = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': repeat_id}, json=body)
         assert replay.json() == repeated.json()
-        first_replay = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': first_id}, json=body)
+        first_replay = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': first_id}, json=body)
         assert first_replay.json() == first.json()
     # Request receipts remain separately auditable; the module records one
     # earned assessment using the same immutable review/scenario evidence.
@@ -107,26 +107,28 @@ async def test_new_request_for_same_saved_outcomes_preserves_original_earned_cre
     judge.assert_awaited_once()
 
 
-async def test_new_saved_scenario_is_a_distinct_completion_and_its_repeat_keeps_that_credit(repo, monkeypatch):
+async def test_repeated_scenario_uses_returned_receipt_and_cannot_duplicate_completion(repo, monkeypatch):
     f, client, _, body, _, judge = await setup(repo, monkeypatch)
     path = '/certification/modules/validation_qa/complete'
     bank = grading.module_bank(f.package, 'validation_qa')
-    second_scenario = uuid4().hex
+    requested_scenario = uuid4().hex
     async with client:
-        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=body)
+        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert first.status_code == 200, first.text
-        await grading.base.submit_scenario(repo, f.learner, f.package, bank,
-            {q.id: q.correct_choice_id for q in bank.questions}, second_scenario)
-        changed = {**body, 'scenario_attempt_id': second_scenario}
-        second = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=changed)
-        assert second.status_code == 200, second.text
-        saved = await repo.read_progress(f.learner.user_id, f.learner.uuid)
-        assert saved.modules['validation_qa']['attempts'] == 2
-        assert saved.modules['validation_qa']['completion_attempt_id'] == second.json()['attempt_id']
-        repeat = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=changed)
+        original = await repo.read_progress(f.learner.user_id, f.learner.uuid)
+        receipt = await grading.base.submit_scenario(repo, f.learner, f.package, bank,
+            {q.id: q.correct_choice_id for q in bank.questions}, requested_scenario)
+        assert receipt['attempt_id'] == body['scenario_attempt_id']
+        # Exact answers reuse the saved receipt, not the caller's proposed ID.
+        guessed = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': uuid4().hex},
+            json={**body, 'scenario_attempt_id': requested_scenario})
+        assert guessed.status_code == 409, guessed.text
+        repeat = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': uuid4().hex},
+            json={**body, 'scenario_attempt_id': receipt['attempt_id']})
         assert repeat.status_code == 200, repeat.text
-        assert (await repo.read_progress(f.learner.user_id, f.learner.uuid)).modules == saved.modules
-        assert second.json()['xp_earned'] == repeat.json()['xp_earned'] == 0
+        assert repeat.json()['xp_earned'] == 0
+        saved = await repo.read_progress(f.learner.user_id, f.learner.uuid)
+        assert saved.modules == original.modules and saved.total_xp == original.total_xp
     judge.assert_awaited_once()
 
 
@@ -134,13 +136,13 @@ async def test_repeat_cannot_replace_a_corrupt_original_credit_record(repo, monk
     f, client, _, body, _, _ = await setup(repo, monkeypatch)
     path = '/certification/modules/validation_qa/complete'
     async with client:
-        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=body)
+        first = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert first.status_code == 200, first.text
         await repo.progress.update_one({'enrollment_id': f.learner.uuid}, {'$set': {
             'modules.validation_qa.outcome_credit.validation_sha256': '0' * 64,
         }})
         before = await repo.read_progress(f.learner.user_id, f.learner.uuid)
-        repeat = await client.post(path, params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=body)
+        repeat = await client.post(path, params={'enrollment_id': f.learner.uuid, 'expected_attempts': 1, 'request_id': uuid4().hex}, json=body)
         assert repeat.status_code == 503, repeat.text
         after = await repo.read_progress(f.learner.user_id, f.learner.uuid)
         assert after.modules == before.modules and after.total_xp == before.total_xp
@@ -149,7 +151,7 @@ async def test_repeat_cannot_replace_a_corrupt_original_credit_record(repo, monk
 @pytest.mark.parametrize('lost_issuance', [False, True])
 async def test_graduation_freezes_original_outcomes_and_recovers_issuance_without_regrading(repo, monkeypatch, lost_issuance):
     f, client, _, body, _, judge = await setup(repo, monkeypatch, single_module=True)
-    params = {'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}
+    params = {'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}
     path = '/certification/modules/validation_qa/complete'
     original_persist = CredentialRepository.persist
     async def unavailable(*args, **kwargs):
@@ -176,7 +178,7 @@ async def test_graduation_freezes_original_outcomes_and_recovers_issuance_withou
         original = record.model_dump_json()
         again = await client.post(path, params=params, json=body)
         assert again.json() == completed.json()
-        later = await client.post(path, params={**params, 'request_id': uuid4().hex}, json=body)
+        later = await client.post(path, params={**params, 'expected_attempts': 1, 'request_id': uuid4().hex}, json=body)
         assert later.status_code == 200 and later.json()['xp_earned'] == 0
         assert (await credentials.for_enrollment(f.learner.user_id, f.learner.uuid)).model_dump_json() == original
         assert await credentials.records.count_documents({}) == 1
@@ -194,7 +196,7 @@ async def test_partial_or_failed_evidence_cannot_earn_module_credit(repo, monkey
         body['scenario_attempt_id'] = failed
     async with client:
         response = await client.post('/certification/modules/validation_qa/complete',
-            params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=body)
+            params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert response.status_code == 400, response.text
     saved = await repo.read_progress(f.learner.user_id, f.learner.uuid)
     assert saved.total_xp == 0 and not saved.certified
@@ -224,7 +226,7 @@ async def test_participation_and_high_xp_cannot_replace_required_selected_eviden
         before = await client.get('/certification/progress', params=params)
         assert before.status_code == 200 and before.json()['certified'] is False
         response = await client.post('/certification/modules/validation_qa/complete',
-            params={**params, 'request_id': uuid4().hex}, json=body)
+            params={**params, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert response.status_code == 400, response.text
         download = await client.get('/certification/certificate', params=params)
         assert download.status_code == 404, download.text
@@ -241,7 +243,7 @@ async def test_participation_and_high_xp_cannot_replace_required_selected_eviden
 async def test_completion_requires_explicit_consent_request_identity_and_authenticated_course(repo, monkeypatch):
     f, client, app, body, _, judge = await setup(repo, monkeypatch)
     path = '/certification/modules/validation_qa/complete'
-    params = {'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}
+    params = {'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}
     async with client:
         for bad in ({**body, 'consent': 'grade_for_me'}, {**body, 'passed': True}, {'consent': body['consent']},
                     {**body, 'review_attempt_id': 'latest'}):
@@ -275,7 +277,7 @@ async def test_completion_rechecks_original_receipts_after_a_passing_readiness_p
         else:
             await CertificationScenarioAttempt.get_motor_collection().update_one(
                 {'uuid': body['scenario_attempt_id']}, {'$set': {'record_sha256': '0' * 64}})
-        response = await client.post(path + '/complete', params={**params, 'request_id': uuid4().hex}, json=body)
+        response = await client.post(path + '/complete', params={**params, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert response.status_code == status, response.text
         assert (await client.get('/certification/certificate', params=params)).status_code == 404
     saved = await repo.read_progress(f.learner.user_id, f.learner.uuid)

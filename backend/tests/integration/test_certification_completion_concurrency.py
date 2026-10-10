@@ -55,7 +55,7 @@ async def test_simultaneous_completion_preserves_one_award_and_original_receipts
     expected_total += package.manifest.maximum_stars * package.manifest.star_bonus_xp
     first_id = uuid4().hex
     second_id = first_id if same_request else uuid4().hex
-    params = {'enrollment_id': learner.uuid, 'request_id': first_id}
+    params = {'enrollment_id': learner.uuid, 'request_id': first_id, 'expected_attempts': before.modules.get(module_id, {}).get('attempts', 0)}
     path = f'/certification/modules/{module_id}/complete'
     entered, release = asyncio.Event(), asyncio.Event()
     validate = service.validate_module
@@ -92,6 +92,8 @@ async def test_simultaneous_completion_preserves_one_award_and_original_receipts
         # New repository/catalog objects replay the persisted original receipt.
         restarted = EnrollmentRepository(CourseCatalog(repo.catalog.root))
         monkeypatch.setattr(runtime, 'EnrollmentRepository', lambda: restarted)
+        if not same_request:
+            params['expected_attempts'] = earned.modules[module_id]['attempts']
         retried = await other.post(path, params={**params, 'request_id': second_id}, json=body)
         assert retried.status_code == 200, retried.text
         if same_request:

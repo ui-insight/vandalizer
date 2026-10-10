@@ -470,8 +470,13 @@ async def validate_module(user_id: str, module_id: str, *, enrollment_id: str | 
 
 
 @course_operation(write=True)
-async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | None = None, request_id: str | None = None, assessment_selection: dict | None = None, expected_attempts: int | None = None) -> dict:
-    """Mark a module complete after validation passes. Returns updated progress."""
+async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | None = None, request_id: str | None = None, assessment_selection: dict | None = None, expected_attempts: int | None = None, require_attempt_counter: bool = False) -> dict:
+    """Mark a module complete after validation passes. Returns updated progress.
+
+    Public HTTP and chat entry points require a reviewed attempt counter for
+    new requests. Recorded requests resume before this guard, including those
+    created by earlier clients that did not send a counter.
+    """
     operation = current_operation()
     if assessment_selection is not None and not operation:
         from .certification_versions.enrollments import EnrollmentConflict
@@ -499,9 +504,9 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
         journal = AttemptRepository()
         # An already recorded request replays its original outcome even after
         # credit advances. Fence only a new request, before creating its journal.
-        if expected_attempts is not None and not (request_id and await journal.records.find_one({'uuid': request_id})):
+        if (require_attempt_counter or expected_attempts is not None) and not (request_id and await journal.records.find_one({'uuid': request_id})):
             from .certification_versions.completion_preconditions import check_completion_counter
-            check_completion_counter(operation.progress, module_id, expected_attempts)
+            check_completion_counter(operation.progress, module_id, expected_attempts, required=require_attempt_counter)
         attempt, started = await journal.begin(operation, module_id, request_id, assessment_selection=assessment_selection)
         if attempt['state'] in ('applied', 'rejected', 'failed'):
             result = journal.payload(attempt, 'result')
@@ -530,9 +535,9 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
                 raise
             attempt = await journal.graded(attempt, validation)
     else:
-        if expected_attempts is not None:
+        if require_attempt_counter or expected_attempts is not None:
             from .certification_versions.completion_preconditions import check_completion_counter
-            check_completion_counter(await get_progress(user_id), module_id, expected_attempts)
+            check_completion_counter(await get_progress(user_id), module_id, expected_attempts, required=require_attempt_counter)
         validation = await validate_module(user_id, module_id)
     if not validation["passed"]:
         result = {"error": "Validation did not pass", "validation": validation}

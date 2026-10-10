@@ -359,10 +359,10 @@ async def test_real_chat_flow_pins_teaching_assessment_and_completion_to_one_enr
     validation = await chat_tools.check_certification_module(context, 'ai_literacy', enrollment_id=enrollment_id)
     assert validation['passed'] is True
     assert validation['enrollment_id'] == enrollment_id
-    completed = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment_id)
+    completed = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment_id, expected_attempts=0)
     assert completed['xp_earned'] == 125
     assert completed['course_version'] == VERSION
-    repeated = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment_id)
+    repeated = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment_id, expected_attempts=1)
     assert repeated['xp_earned'] == 0
     persisted = await repo.read_progress('chat-learner', enrollment_id)
     assert persisted.total_xp == 125
@@ -452,7 +452,7 @@ async def test_http_panel_and_chat_share_the_actual_versioned_course_and_progres
         assert saved.json()['enrollment_id'] == progress['enrollment_id']
         checked = await chat_tools.check_certification_module(context, 'ai_literacy', **params)
         assert checked['passed'] is True
-        completion_params = {**params, 'request_id': uuid4().hex}
+        completion_params = {**params, 'request_id': uuid4().hex, 'expected_attempts': 0}
         completed = await client.post('/certification/modules/ai_literacy/complete', params=completion_params)
         assert completed.status_code == 200
         assert completed.json()['xp_earned'] == 125
@@ -696,6 +696,7 @@ async def test_new_issuance_retries_the_frozen_payload_after_insert_failure(vers
     progress.total_xp = 2675
     await progress.save()
     context = SimpleNamespace(deps=SimpleNamespace(user_id=user_id))
+    request_id = uuid4().hex
     original_persist = CredentialRepository.persist
     async def fail_insert(self, record):
         if failure_stage == 'after_insert':
@@ -703,7 +704,7 @@ async def test_new_issuance_retries_the_frozen_payload_after_insert_failure(vers
         raise RuntimeError('Simulated interruption during credential issuance')
     monkeypatch.setattr(CredentialRepository, 'persist', fail_insert)
     with pytest.raises(RuntimeError, match='Simulated interruption'):
-        await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid)
+        await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid, request_id=request_id, expected_attempts=0)
     pending = await repo.read_progress(user_id, enrollment.uuid)
     assert pending.certified is True
     assert pending.pending_credential['learner_name'] == 'Original learner name'
@@ -713,7 +714,7 @@ async def test_new_issuance_retries_the_frozen_payload_after_insert_failure(vers
     learner.name = 'Changed profile name'
     await learner.save()
     monkeypatch.setattr(CredentialRepository, 'persist', original_persist)
-    retried = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid)
+    retried = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid, request_id=request_id)
     assert retried['xp_earned'] == 0
     record = await CredentialRepository().for_enrollment(user_id, enrollment.uuid)
     assert record.learner_name == 'Original learner name'
@@ -725,7 +726,7 @@ async def test_new_issuance_retries_the_frozen_payload_after_insert_failure(vers
     assert (await repo.read_progress(user_id, enrollment.uuid)).pending_credential is None
     assert await CertificationCredential.count() == 1
     first = record.model_dump()
-    await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid)
+    await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid, request_id=request_id, expected_attempts=0)
     assert (await CredentialRepository().for_enrollment(user_id, enrollment.uuid)).model_dump() == first
 
 

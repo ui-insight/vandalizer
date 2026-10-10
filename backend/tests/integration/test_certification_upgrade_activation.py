@@ -205,7 +205,7 @@ async def completed_outcome_choice(repo, monkeypatch):
     f, client, _, body, _, judge = await completion.setup(repo, monkeypatch, single_module=True)
     async with client:
         response = await client.post('/certification/modules/validation_qa/complete',
-            params={'enrollment_id': f.learner.uuid, 'request_id': uuid4().hex}, json=body)
+            params={'enrollment_id': f.learner.uuid, 'expected_attempts': 0, 'request_id': uuid4().hex}, json=body)
         assert response.status_code == 200, response.text
     target_version = 'synthetic-next-outcome-course'
     target = repo.catalog.root / target_version

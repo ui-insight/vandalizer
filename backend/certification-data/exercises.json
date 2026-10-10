@@ -10,10 +10,10 @@
       "The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Read the 9 lessons listed in **Learn** for this module. The displayed lesson list is authoritative; earlier six-lesson instructions are outdated.",
-      "Open **Challenge** and answer all 3 original reflection questions. Use a fictional or authorized example where workplace details would be sensitive.",
-      "Save the reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
-      "Use **Check Progress**, review the result, then **Complete Module** to save original course credit. Chat may help with those actions when available; the learning panel provides the direct route.",
+      "Ask chat to teach this module’s 9 lessons one at a time using your saved original course. The returned lesson list is authoritative; earlier six-lesson instructions are outdated.",
+      "Answer all 3 original reflection questions in chat. Use a fictional or authorized example where workplace details would be sensitive.",
+      "Ask chat to save your supplied reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
+      "Ask chat to check the module, review its returned requirements, then request completion to save original course credit. Inspect the saved completion receipt before continuing.",
       "The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes."
     ],
     "expected_fields": [],
@@ -33,10 +33,10 @@
       "The original reflection rubric checks that all four answers are present. It does not assess the quality of the process map or establish the new course’s outcomes."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Read the 7 lessons listed in **Learn** for this module. The displayed lesson list is authoritative; earlier six-lesson instructions are outdated.",
-      "Open **Challenge** and answer all 4 original reflection questions. Use a fictional or authorized example where workplace details would be sensitive.",
-      "Save the reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
-      "Use **Check Progress**, review the result, then **Complete Module** to save original course credit. Chat may help with those actions when available; the learning panel provides the direct route.",
+      "Ask chat to teach this module’s 7 lessons one at a time using your saved original course. The returned lesson list is authoritative; earlier six-lesson instructions are outdated.",
+      "Answer all 4 original reflection questions in chat. Use a fictional or authorized example where workplace details would be sensitive.",
+      "Ask chat to save your supplied reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
+      "Ask chat to check the module, review its returned requirements, then request completion to save original course credit. Inspect the saved completion receipt before continuing.",
       "The original reflection rubric checks that all four answers are present. It does not assess the quality of the process map or establish the new course’s outcomes."
     ],
     "expected_fields": [],
@@ -56,10 +56,10 @@
       "The original reflection rubric checks that all four answers are present. It does not assess an executed architecture or establish the new course’s outcomes."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Read the 8 lessons listed in **Learn** for this module. The displayed lesson list is authoritative; earlier six-lesson instructions are outdated.",
-      "Open **Challenge** and answer all 4 original reflection questions. Use a fictional or authorized example where workplace details would be sensitive.",
-      "Save the reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
-      "Use **Check Progress**, review the result, then **Complete Module** to save original course credit. Chat may help with those actions when available; the learning panel provides the direct route.",
+      "Ask chat to teach this module’s 8 lessons one at a time using your saved original course. The returned lesson list is authoritative; earlier six-lesson instructions are outdated.",
+      "Answer all 4 original reflection questions in chat. Use a fictional or authorized example where workplace details would be sensitive.",
+      "Ask chat to save your supplied reflection answers and inspect the saved response. Reading or an unsent reply does not establish saved progress.",
+      "Ask chat to check the module, review its returned requirements, then request completion to save original course credit. Inspect the saved completion receipt before continuing.",
       "The original reflection rubric checks that all four answers are present. It does not assess an executed architecture or establish the new course’s outcomes."
     ],
     "expected_fields": [],
@@ -83,13 +83,13 @@
       "Use **Check Progress** and inspect its preserved criteria before **Complete Module**. A saved completion receipt establishes course credit; the historical check does not inspect source accuracy."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Use **Set Up Lab** when offered and check the resulting readiness status for **nsf-proposal-alpine-ecology.pdf**. Open the assigned source rather than relying only on its title.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the assigned lab when needed and check the resulting readiness status for **nsf-proposal-alpine-ecology.pdf**. Open the assigned source rather than relying only on its title.",
       "Ask for a proposal limited to this source and the intended PI Name, Institution, Total Budget, Project Period and Sponsoring Agency fields. Review scope before authorizing creation; the original three-field base and five-/eight-field enrichment remain separate.",
       "Name the saved extraction **NSF Proposal Extractor** or another clear name. Inspect the complete saved field definitions in the editor; a proposed list does not prove those fields were saved.",
       "Authorize a run on the assigned proposal only after checking the saved configuration and input scope. Inspect actual run status and returned values.",
       "Compare PI Name and Total Budget with the assigned source, including period and currency. Sarah Chen and $485,000 are example targets, not evidence that extraction occurred. A score can be absent and does not establish that this result is correct.",
       "For the editor route, use Library → New → New Workflow, add an Extractions task and select the intended template. Either route needs the same source and result checks.",
-      "Use **Check Progress** and inspect its preserved criteria before **Complete Module**. A saved completion receipt establishes course credit; the historical check does not inspect source accuracy."
+      "Ask chat to check the module and inspect its preserved criteria before requesting completion. A saved completion receipt establishes course credit; the historical check does not inspect source accuracy."
     ],
     "expected_fields": [
       "PI Name",
@@ -137,7 +137,7 @@
       "Save a justified repair and inspect a fresh retest. Use the original course completion controls separately from evidence of actual output quality."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Prepare and open the assigned **nih-r01-neuroscience.pdf** using the lab status controls.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the assigned source, then open **nih-r01-neuroscience.pdf** and inspect its readiness status.",
       "Ask for a proposed extraction covering PI, institution, grant number, budget categories, aims, human subjects, vertebrate animals and key personnel. Keep the assigned source scope explicit.",
       "Review and refine the proposed fields, authorize creation when ready, then inspect the complete saved template. The original base is 15 fields, with 20-/25-field enrichment.",
       "In field settings, use **Allowed values** for supported categories and **Optional** for legitimate absence. Multiple people alone do not make a personnel field optional; neither setting establishes source truth.",
@@ -214,7 +214,7 @@
       "Review the disclosed historical star-counter limitation before pursuing optional enrichment. Do not add irrelevant tasks or substitute unrelated work to satisfy a counter."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Prepare and open the assigned **subaward-agreement.pdf**.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the assigned source, then open **subaward-agreement.pdf**.",
       "Propose the original three-step pipeline: extract parties and terms, analyze supported obligations, then format a compliance summary. Keep the task internal and exclude sending or submission.",
       "In the editor, use **Extractions**, **Prompts** and **Format**. Format is the Formatter operation in the saved criteria. Inspect each step’s source and any task override.",
       "Connect the intended intermediate outputs. A step does not automatically receive every earlier file or recover omitted source context.",
@@ -270,7 +270,7 @@
       "Code Execution is restricted; this original exercise does not require enabling it or supplying credentials. Follow the saved criteria and inspect actual course completion separately."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Prepare and open the assigned **budget-justification.pdf**.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the assigned source, then open **budget-justification.pdf**.",
       "Create the original lab workflow and extract the relevant salary, supplies, travel, subaward and indirect-cost figures with their source context.",
       "Use an available **Deep Analysis** operation for model analysis of the figures. Older chat instructions call it Research. It needs no external API key for this internal route and is not a deterministic calculator.",
       "Keep two or more independent tasks in one step for the original parallel-task requirement. A separate Prompt may summarize the same input, but it must not claim to use its sibling’s unfinished check.",
@@ -322,7 +322,7 @@
       "File generation and download do not authorize external delivery. Keep this training result internal and use course completion controls separately."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Prepare and open the assigned **progress-report-year2.pdf**.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the assigned source, then open **progress-report-year2.pdf**.",
       "Propose a bounded internal deliverable using the accomplishments, publications, training and expenditure data needed by its audience.",
       "Choose **Document Renderer** for a narrative report or **Data Export** for an appropriate structured input. A CSV task cannot be assumed to reconstruct tabular rows after an earlier Prompt reduced them to prose.",
       "Inspect the saved operations and configured data passed to the output step. A focused Prompt can replace unnecessary earlier steps only if its output preserves what the chosen deliverable operation needs.",
@@ -376,13 +376,13 @@
       "After a repair, retain the original failure and new linked evaluation. Use **Check Progress** and **Complete Module** separately; the original count-based criteria do not assess complete current accuracy."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Reuse the assigned NSF proposal and the intended extraction. Confirm current source access and configuration rather than assuming earlier setup still establishes readiness.",
+      "Ask chat for this module’s saved original requirements. Reuse the assigned NSF proposal and the intended extraction. Confirm current source access and configuration rather than assuming earlier setup still establishes readiness.",
       "Ask to list the extraction’s saved test cases. No cases yet is a starting state, not a validation failure.",
       "Propose a test case from **nsf-proposal-alpine-ecology.pdf**, then compare each expected value with the source in guided verification. Preserve unresolved or skipped values as coverage gaps.",
       "Run validation on the intended saved cases and inspect the actual evaluation, including unavailable checks, inputs and model settings. A score may be absent; accuracy and consistency measure different things.",
       "Open available quality details and inspect the measured cases and alerts. A high historical score or absence of alerts does not prove this current output is correct.",
       "Add a source-checked representative case that tests a meaningful difference, then rerun. More cases can expose failures and lower a score; they do not automatically improve the extraction.",
-      "After a repair, retain the original failure and new linked evaluation. Use **Check Progress** and **Complete Module** separately; the original count-based criteria do not assess complete current accuracy."
+      "After a repair, retain the original failure and new linked evaluation. Ask chat to check and complete the module separately; the original count-based criteria do not assess complete current accuracy."
     ],
     "expected_fields": [],
     "expected_values": {},
@@ -409,7 +409,7 @@
       "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Prepare the three assigned files: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**. Verify each distinct source identity.",
+      "Ask chat for this module’s saved original requirements. Ask chat to prepare the three assigned files: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**. Verify each distinct source identity.",
       "Select a suitable saved extraction and inspect its fields and configured input scope. Test representative behavior before processing the set.",
       "In chat, authorize the extraction on exactly those three documents. In the workflow editor route, select the three documents and choose **Run per document (3 runs)** before **Run**.",
       "Inspect actual per-document status and retain the intended input list and run identities. Streaming activity or a combined table alone does not prove all inputs completed.",
@@ -450,11 +450,11 @@
       "Reviewed status, measured validation and suitability for your use are separate. Preserve the original course’s credit and credentials; this exercise creates no new staff certification grading queue."
     ],
     "chat_instructions": [
-      "Use the learning panel’s **Learn** and **Challenge** controls or ask chat for the same module and saved original requirements. Use a workflow already built; no new source document is required. Inspect its purpose, inputs, outputs and current evidence before sharing.",
+      "Ask chat for this module’s saved original requirements. Use a workflow already built; no new source document is required. Inspect its purpose, inputs, outputs and current evidence before sharing.",
       "If practicing another permitted team or workspace, select it using the available workspace controls and check access before copying work. Keep credentials and private source data out of exports.",
       "Give the workflow a clear description of its intended use and limitations.",
       "For the original base requirement, choose **Share with everyone** from the workflow’s available sharing menu. Inspect the saved request. Examiner acceptance is optional enrichment under the original criteria and is not required to pass.",
-      "Then use **Check Progress** and **Complete Module**, or ask chat to perform those course actions and inspect the saved result. Submitting the sharing request alone does not save module completion.",
+      "Then ask chat to check the module, review the criteria and request completion. Inspect the saved result. Submitting the sharing request alone does not save module completion.",
       "For portability practice, inspect the exported `.vandalizer.json` contents, resolve permitted local dependencies after import and test the imported revision. Export or import success alone does not establish portability.",
       "Reviewed status, measured validation and suitability for your use are separate. Preserve the original course’s credit and credentials; this exercise creates no new staff certification grading queue."
     ],
