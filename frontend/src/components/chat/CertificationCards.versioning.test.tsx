@@ -1,12 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { CertCheckCard, CertCompletionCard, CertProgressCard, CertModuleCard } from './CertificationCards'
+import { CertCheckCard, CertCompletionCard, CertProgressCard, CertModuleCard, CertLessonCard } from './CertificationCards'
 
 const state = vi.hoisted(() => ({ enrollment: 'current', courseAvailable: true, progressDigest: 'a'.repeat(64), refresh: vi.fn(), send: vi.fn(), open: vi.fn() }))
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ sendChatMessage: state.send }) }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanelOptional: () => ({
-    progress: { enrollment_id: state.enrollment, course_version: 'original', manifest_sha256: state.progressDigest },
+    progress: { enrollment_id: state.enrollment, course_version: 'original', manifest_sha256: state.progressDigest, modules: {} },
     course: state.courseAvailable ? { enrollment_id: state.enrollment, course_version: 'original', manifest_sha256: 'a'.repeat(64), modules: [{ id: 'foundations' }] } : null,
     refresh: state.refresh, openPanel: state.open,
   }),
@@ -87,5 +87,23 @@ it('keeps historical instructions and source links readable without enabling cou
   fireEvent.click(source)
   expect(allowed).toBe(true)
   expect(screen.queryByRole('button', { name: 'Check my progress' })).not.toBeInTheDocument()
+  expect(state.send).not.toHaveBeenCalled()
+})
+
+
+it('keeps historical diagrams keyboard reachable while disabling practice and course writes', () => {
+  render(<CertLessonCard content={{ ...identity, enrollment_id: 'previous', module_id: 'foundations',
+    title: 'Preserved lesson', content: 'Original teaching', lesson_number: 1, lesson_count: 1,
+    diagram: 'extraction-output-example', knowledge_check: { question: 'Original question', options: [
+      { text: 'Original answer', correct: true, explanation: 'Original feedback' },
+    ] } }} />)
+  const diagram = screen.getByRole('region', { name: 'Lesson diagram' })
+  expect(diagram).toHaveAttribute('tabindex', '0')
+  expect(diagram.closest('fieldset[disabled]')).toBeNull()
+  expect(screen.getByRole('radio', { name: 'Original answer' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Check answer' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Save my place' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Open learning panel' }))
+  expect(state.open).toHaveBeenCalledOnce()
   expect(state.send).not.toHaveBeenCalled()
 })

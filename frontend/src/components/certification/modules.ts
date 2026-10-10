@@ -387,37 +387,59 @@ export const MODULES: ModuleDefinition[] = [
     lessons: [
       {
         id: 'extraction_engine.one-pass-vs-two-pass-extraction',
-        revision: 1,
+        revision: 2,
         title: 'One-pass vs. two-pass extraction',
         objective: 'After this lesson, you\'ll know when to use two-pass vs. consensus extraction and what quality tradeoff you\'re making.',
         diagram: 'extraction-output-example',
-        content: 'Vandalizer offers two extraction strategies:\n\n**One-pass extraction** sends the document and field definitions to the LLM in a single call. It\'s faster and cheaper, but can miss nuances in complex documents.\n\n**Two-pass extraction** (the default) works in two stages:\n\u2022 Pass 1: The LLM creates a draft extraction, thinking through each field.\n\u2022 Pass 2: A second LLM call refines the draft, using structured output to produce clean, validated JSON.\n\nThe two-pass approach is more accurate because the second pass can correct mistakes from the first, and the structured output format prevents formatting errors.',
+        content: "An extraction strategy controls how the engine attempts the task. It does not establish that the returned values are true. Start with the source, field meanings and a small set of checked examples; then compare the available configurations against those examples.\n\nOne-pass mode uses a configured extraction pass for each document and field group. Two-pass mode first produces a draft, then attempts refinement. Each pass can use its own configured model and reasoning settings. Do not assume both passes use the same model, or that a mode label describes every setting in the saved extraction.\n\nA second pass can help, but it can also retain or introduce an error. In the current engine, refinement failure can return the first-pass draft. A completed result therefore does not prove that two successful passes independently verified each value. Inspect the output and any available run information; source-check consequential values regardless of mode.\n\nField grouping, repetition, image handling and retries can affect the number of calls and resource use. Compare observed accuracy, unresolved values, time and usage on the same representative examples. Avoid promising a fixed cost ratio or choosing the most elaborate configuration without evidence.\n\n**Practice:** Two configurations return the same budget. Both selected the annual amount when the task requires the total project amount. Explain why changing the number of passes alone does not resolve the field-definition error.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What makes two-pass extraction more accurate than one-pass?',
-          options: [
-            { text: 'It processes large documents by splitting them into chunks', correct: false, explanation: 'That\'s chunking, a separate feature. Two-pass is about using a second LLM call to refine the first draft.' },
-            { text: 'A second LLM call refines the first draft, correcting mistakes and enforcing structured output', correct: true, explanation: 'Correct! The second pass reviews and cleans up the first pass, producing validated JSON with fewer errors.' },
-            { text: 'It uses a smarter model for the second pass to catch errors from the first', correct: false, explanation: 'Both passes use the same model. The improvement comes from the second pass having a draft to refine, not from a model change.' },
-            { text: 'It runs the same extraction twice and averages the results', correct: false, explanation: 'That\'s consensus repetition, not two-pass. Two-pass uses the first draft as context for a more accurate second attempt.' },
-          ],
+          "question": "Both extraction modes return the wrong annual budget. What should you check first?",
+          "options": [
+            {
+              "text": "Use more passes until the answers agree.",
+              "correct": false,
+              "explanation": "Agreement can preserve the same misunderstanding. Check the task and source before adding calls."
+            },
+            {
+              "text": "Clarify the requested budget scope, then rerun and compare the result with the source.",
+              "correct": true,
+              "explanation": "The field definition must identify the intended amount. A new result needs its own source check."
+            },
+            {
+              "text": "Accept the two-pass answer because refinement guarantees correctness.",
+              "correct": false,
+              "explanation": "Refinement can fail or repeat an error; the returned value still needs evidence."
+            }
+          ]
         },
       },
       {
         id: 'extraction_engine.configuring-fields-for-accuracy',
-        revision: 1,
+        revision: 2,
         title: 'Configuring fields for accuracy',
         objective: 'After this lesson, you\'ll be able to configure extraction fields that minimize hallucinations and missed values.',
-        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Allowed values** (the field setting labeled "Allowed values" in the Extraction editor, sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like "Document Type", you might set Allowed values to "Grant Proposal, Progress Report, Budget Justification". The LLM must pick one of those; it can\'t invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
+        content: "A field needs a meaning that a reviewer can check. “Budget” could mean annual direct costs, total direct costs or total project costs including indirect costs. Name the intended amount, period and unit. “PI Name” distinguishes the investigator from a grants officer named elsewhere in the proposal.\n\nAllowed values constrain a category to an authored set. They help control output shape; they do not prove that the selected label matches the source. A model can choose an allowed but incorrect value. Inspect the underlying statement as well as the returned label, and check behavior on the actual configured route.\n\nOptionality describes whether the task permits a value to be absent. It is not a guarantee against invented answers. Conversely, a required field can still be missing or unsupported in the source. Keep that absence visible as a problem to resolve; do not force a plausible value merely to fill every cell. The structured extraction schema can represent null values, so a well-formed response can still be incomplete.\n\nFor a Yes/No question, missing evidence is not automatically No. Decide what counts as support for each category and how an absent statement will be represented. If the task permits an explicit unknown category, define its meaning. Otherwise preserve the unresolved value and explain the gap rather than silently changing the required categories.\n\n### What chat creates and what you inspect in the editor\n\nThe current document-based creation tool reads the selected source and discovers candidate field names before its confirmation preview. It can create a reusable template from that discovered proposal. This route does not accept your full field-by-field Optional and Allowed values configuration as an authored schema. Asking for those settings in prose is not proof they were stored. Review the proposed source, name and fields, then inspect the saved template.\n\nIn the extraction editor, open the field’s settings to edit its meaning and inspect **Optional** and **Allowed values**. Use that supported route to correct an ambiguous field, set the permitted absence behavior and define category choices. Reopen or reread the saved field after editing to establish what will actually run. Do not increase the field count to compensate for a missing setting.\n\nFor example, define “Full project requested amount, USD, including indirect costs” rather than “Budget,” and check which source amount answers it. For an animal-use category, use only the task’s permitted categories and keep missing support unresolved. An Optional setting, an allowed category or a syntactically valid value does not establish source truth. Run the saved revision and compare the returned value with the relevant passage; preserve both the earlier result and the checked repair.\n\n**Practice:** Rewrite “Animals” as a question about the assigned proposal’s vertebrate-animal use. Name the source statement that would establish Yes or No, and describe what you would record if neither is supported.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'When should you mark an Extraction field as optional?',
-          options: [
-            { text: 'When you\'re not sure what value to expect', correct: false, explanation: 'Uncertainty about value isn\'t the reason to mark optional. Optional means the field might not exist in the document at all.' },
-            { text: 'When the field may not appear in every document of that type', correct: true, explanation: 'Correct! Marking a field optional tells the extraction engine not to hallucinate a value when the field simply isn\'t present.' },
-            { text: 'When you want the LLM to skip the field to save processing time', correct: false, explanation: 'Optional fields still get processed. The flag tells the engine it\'s acceptable to return null, not to skip the field.' },
-            { text: 'When the field contains numbers instead of text', correct: false, explanation: 'Data type doesn\'t determine optionality. A budget figure might always be present; that\'s not optional.' },
-          ],
+          "question": "A required compliance statement is absent. Which response preserves the evidence?",
+          "options": [
+            {
+              "text": "Return No because the document did not say Yes.",
+              "correct": false,
+              "explanation": "Absence of a statement does not necessarily establish the negative category."
+            },
+            {
+              "text": "Keep the value unresolved and identify the missing source support.",
+              "correct": true,
+              "explanation": "A required answer still needs evidence. Required does not authorize guessing."
+            },
+            {
+              "text": "Mark the field optional and assume any returned answer is safe.",
+              "correct": false,
+              "explanation": "Optionality concerns permitted absence; it does not validate the model’s answer."
+            }
+          ]
         },
       },
       {
@@ -429,23 +451,23 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'extraction_engine.when-to-use-consensus-repetition',
-        revision: 1,
+        revision: 2,
         title: 'When to use consensus repetition',
-        content: 'Consensus repetition runs the same extraction 3 times and takes the majority answer for each field. Use it when the stakes are high \u2014 compliance data, financial figures, legal terms \u2014 and the cost of an incorrect extraction outweighs the 3x processing cost. For routine extractions or exploratory work, two-pass is usually sufficient.',
+        content: "Repetition compares multiple attempts at the same extraction. In the current engine, consensus starts with two attempts. If their normalized answers agree, it can return that result without a third attempt. A disagreement can trigger another attempt and field-level voting. Failure handling can also affect how many usable attempts remain.\n\nThis is not a promise of exactly three calls or a fixed three-times cost. Each attempt can itself use multiple passes and field groups. Inspect the effective configuration and observed usage when deciding whether the additional work is justified.\n\nAgreement is a signal about consistency, not independent confirmation of the source. Repeated attempts can share the same ambiguous instruction, miss the same paragraph or choose the same unsupported value. A voted answer still needs comparison with the document. For a consequential amount or compliance category, identify the supporting passage and resolve any conflict before accepting it.\n\nStart by fixing the source and field definition. Then compare repetition with a simpler configuration on representative examples, including missing information and conflicting amounts. Record which errors improved, which remained and what the extra work cost. Retain the option to leave a result unresolved rather than treating consensus as permission to release it.\n\n**Practice:** Two attempts agree on a plausible date that appears nowhere in the assigned source. Decide what evidence would be needed before accepting it.",
         variant: 'insight',
       },
       {
         id: 'extraction_engine.worked-example-fixing-a-weak-field-list',
-        revision: 1,
+        revision: 2,
         title: 'Worked example: fixing a weak field list',
-        content: 'A first draft of an NIH R01 extraction, and the repair.\n\n**Draft fields** \u2014 \u201cName\u201d, \u201cBudget\u201d, \u201cPeople\u201d, \u201cAnimals\u201d. The run comes back muddled: \u201cName\u201d returns the grants officer from the cover letter, \u201cBudget\u201d returns Year 1 direct costs instead of the total, \u201cPeople\u201d returns a paragraph, and \u201cAnimals\u201d hallucinates \u201cN/A\u201d wording not in the document.\n\n**The repairs, one principle each:**\n\u2022 \u201cName\u201d \u2192 \u201cPI Name\u201d \u2014 the field name is the LLM\u2019s biggest clue; make it point at exactly one thing.\n\u2022 \u201cBudget\u201d \u2192 \u201cTotal Budget (all years, direct + indirect)\u201d \u2014 when a document holds five budget numbers, the name must say which one.\n\u2022 \u201cPeople\u201d \u2192 \u201cKey Personnel\u201d plus a separate \u201cCo-Investigator\u201d marked **optional** \u2014 one field, one value; optional stops made-up answers when no Co-I exists.\n\u2022 \u201cAnimals\u201d \u2192 \u201cVertebrate Animals\u201d with **Allowed values** \u201cYes, No\u201d \u2014 constrained fields can\u2019t invent prose.\n\nRe-run: James Park, $1,250,000, a clean personnel list, \u201cYes\u201d. Same document \u2014 the configuration was the difference.',
+        content: "Consider a practice case where “Budget” returns Year 1 direct costs, while the task requires the total for the full project including indirect costs. First inspect the source and establish what the returned amount actually represents. Do not treat a neat number or a matching currency symbol as proof of the requested meaning.\n\nRepair the definition to state the period and included cost categories. If the source does not explicitly provide the required total, do not describe an inferred sum as an extracted quotation. Record that limitation and use a separately checked calculation only when the task permits it. Keep the original field revision and result so the reason for the change remains visible.\n\nSave the revised extraction, inspect it, and run that revision on the same assigned source. Compare the new amount, unit and period with the source. Check the other required fields as well; a narrow repair does not establish that the rest of the output remains correct. Record remaining disagreements or missing values explicitly.\n\nThe useful evidence is the error you identified, the actual saved change, the linked new run and your source-based acceptance or further-repair decision. A setting change, an increased field count or a claim that quality improved is insufficient without that comparison. Do not invent a successful result for an illustrative repair.\n\n**Practice:** A new field returns a different budget after your edit. Describe the check that distinguishes a genuine correction from merely a different answer.",
         variant: 'walkthrough',
       },
       {
         id: 'extraction_engine.glossary-review',
-        revision: 1,
+        revision: 2,
         title: 'Glossary & Review',
-        content: 'Structured Output \u2014 You\'ve now seen this in action: the LLM is constrained to return data matching a schema built from your Extraction fields. This is what prevents formatting errors and ensures you get the same JSON structure every time, regardless of how different the source documents look.\n\nThinking Mode \u2014 When enabled, the LLM reasons step-by-step before answering. Two-pass extraction uses Thinking Mode in Pass 1 for accuracy and disables it in Pass 2 for speed \u2014 you get both benefits.\n\nConsensus Repetition \u2014 Runs the same extraction 3 times and takes the majority answer for each field. The right choice when stakes are high: compliance data, financial figures, legal terms. 3x the cost, but highest accuracy.\n\nChunking \u2014 When you have many fields (20+), the extraction splits into smaller batches to stay within the LLM\'s context window. Vandalizer handles this automatically when you exceed the threshold.',
+        content: "**Structured output:** A response constrained to an expected shape or set of categories. It can still contain null, incomplete or incorrect values. Validate meaning against the source after checking shape.\n\n**Reasoning settings:** Model and pass configuration that can affect how an extraction is attempted. Effective behavior depends on the selected model and route. Do not treat a thinking label as an accuracy score or as evidence that a person reviewed the output.\n\n**Field grouping:** The extraction engine can divide requested keys into groups when its chunking setting is enabled with a positive group size. It is not automatically triggered by every long field list, and it is different from splitting document text into retrieval chunks. Inspect the active setting and test interactions between related fields.\n\n**Consensus:** Comparison and voting across repeated attempts. Agreement does not replace source support. Observe actual call and usage behavior instead of assuming a fixed number of attempts.\n\n**Source reference:** A passage or location associated with a value. Check both that the passage belongs to the assigned source and that it supports the exact value and interpretation. The presence of a citation is not enough.\n\n**Verified test case:** In the chat verification flow, proposing a test case runs an extraction and opens a guided verification session. The test case is created after the learner finalizes that review. Opening a session or an assistant saying “looks right” does not itself establish verified expected values or certification credit.\n\n**Practice:** Explain the difference between an extraction result, a completed verification session and evidence that a certification outcome has been met.",
         variant: 'key-terms',
       },
     ],

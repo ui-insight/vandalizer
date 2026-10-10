@@ -21,7 +21,7 @@
   "replacements": [
     {
       "id": "extraction_engine.one-pass-vs-two-pass-extraction",
-      "revision": 2,
+      "revision": 3,
       "title": "Choose and inspect the extraction strategy",
       "variant": "concept",
       "objective": "Compare the configured passes and their actual output instead of assuming a mode guarantees accuracy.",
@@ -105,7 +105,7 @@
     },
     {
       "id": "extraction_engine.when-to-use-consensus-repetition",
-      "revision": 2,
+      "revision": 3,
       "title": "Use repetition as a testable tradeoff",
       "variant": "insight",
       "objective": "Distinguish model agreement from source-supported correctness and observe actual resource use.",
@@ -133,7 +133,7 @@
     },
     {
       "id": "extraction_engine.worked-example-fixing-a-weak-field-list",
-      "revision": 2,
+      "revision": 3,
       "title": "Repair an error and verify the new run",
       "variant": "walkthrough",
       "objective": "Link an observed error to a field repair, new execution and source-checked result.",
@@ -161,7 +161,7 @@
     },
     {
       "id": "extraction_engine.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Review configuration, evidence and verification terms",
       "variant": "key-terms",
       "objective": "Use accurate terms without mistaking a technical setting or badge for a learner decision.",

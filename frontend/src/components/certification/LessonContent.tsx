@@ -119,7 +119,7 @@ const DIAGRAM_TEXT: Record<string, string> = {
 }
 
 /** Shared practice and illustrations for chat and the learning panel. */
-export function LessonExtras({ diagram, knowledgeCheck, practiceScope }: Pick<LessonSection, 'diagram' | 'knowledgeCheck'> & { practiceScope?: PracticeScope }) {
+export function LessonExtras({ diagram, knowledgeCheck, practiceScope, practiceDisabled = false }: Pick<LessonSection, 'diagram' | 'knowledgeCheck'> & { practiceScope?: PracticeScope; practiceDisabled?: boolean }) {
   const Diagram = diagram ? DIAGRAM_MAP[diagram] : null
   const storageKey = practiceStorageKey(practiceScope)
   return <>
@@ -127,6 +127,6 @@ export function LessonExtras({ diagram, knowledgeCheck, practiceScope }: Pick<Le
       <figcaption className="mb-2 text-sm leading-relaxed text-gray-700">{DIAGRAM_TEXT[diagram!]}</figcaption>
       <div className="overflow-auto [&>*]:min-w-[480px]" role="region" aria-label="Lesson diagram" tabIndex={0}><Diagram /></div>
     </figure>}
-    {knowledgeCheck && <KnowledgeCheck key={`${storageKey}:${JSON.stringify(knowledgeCheck)}`} data={knowledgeCheck} storageKey={storageKey} />}
+    {knowledgeCheck && <fieldset disabled={practiceDisabled} className="min-w-0 border-0 p-0"><KnowledgeCheck key={`${storageKey}:${JSON.stringify(knowledgeCheck)}`} data={knowledgeCheck} storageKey={storageKey} /></fieldset>}
   </>
 }

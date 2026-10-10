@@ -11,7 +11,7 @@ import { renderMarkdown } from './markdown'
 const button = 'min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50'
 
 /** Browsing is local. Only the explicit save action changes the reading cursor. */
-export function ChatLessonReader({ content }: { content: Record<string, unknown> }) {
+export function ChatLessonReader({ content, readOnly = false }: { content: Record<string, unknown>; readOnly?: boolean }) {
   const certification = useCertificationPanelOptional()
   const auth = useContext(AuthContext)
   const moduleId = String(content.module_id)
@@ -26,7 +26,7 @@ export function ChatLessonReader({ content }: { content: Record<string, unknown>
   const module = identityMatches ? (enrollmentId ? course?.modules : MODULES)?.find(item => item.id === moduleId) : undefined
   const lessons = module?.lessons ?? []
   const original = lessons.find(item => item.id === content.lesson_id)
-  const available = !!original && original.revision === content.lesson_revision && original.content === content.content
+  const available = !readOnly && !!original && original.revision === content.lesson_revision && original.content === content.content
     && lessons.every(item => typeof item.id === 'string' && item.id.length > 0)
     && new Set(lessons.map(item => item.id)).size === lessons.length
   const [selectedId, setSelectedId] = useState(String(content.lesson_id ?? ''))
@@ -81,7 +81,7 @@ export function ChatLessonReader({ content }: { content: Record<string, unknown>
     <EditorialCorrection manifestSha256={typeof content.manifest_sha256 === 'string' ? content.manifest_sha256 : undefined}
       lessonId={selected?.id ?? (typeof content.lesson_id === 'string' ? content.lesson_id : undefined)} content={body} />
     <div className="select-text chat-markdown" style={{ lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: html }} />
-    <LessonExtras key={`${selected?.id ?? content.lesson_id}:${selected?.revision ?? content.lesson_revision}`}
+    <LessonExtras practiceDisabled={readOnly} key={`${selected?.id ?? content.lesson_id}:${selected?.revision ?? content.lesson_revision}`}
       practiceScope={selected?.id && selected.revision ? { userId: auth?.user?.user_id || '', enrollmentId, moduleId, lessonId: selected.id, revision: selected.revision } : undefined}
       diagram={selected ? selected.diagram : typeof content.diagram === 'string' ? content.diagram : undefined}
       knowledgeCheck={selected ? selected.knowledgeCheck : content.knowledge_check as KnowledgeCheckData | undefined} />

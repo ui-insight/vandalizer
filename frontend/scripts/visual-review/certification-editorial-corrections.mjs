@@ -43,6 +43,19 @@ async function inspect(scope, prefix) {
   await capture(prefix + '-preservation', notice.getByText(/Your saved course, assessment requirements and earned credit are preserved/))
   assert.ok((await scope.innerText()).includes(process.env.REVIEW_ORIGINAL_TEXT || 'Every result carries a quality score'))
 }
+async function inspectHistoricalDiagram(scope, prefix) {
+  const diagram = scope.getByRole('region', { name: 'Lesson diagram', exact: true })
+  if (!await diagram.count()) return
+  await scope.getByRole('button', { name: 'Refresh progress', exact: true }).focus()
+  await page.keyboard.press('Tab')
+  assert.equal(await diagram.evaluate(element => element === document.activeElement), true, 'Historical diagram must be keyboard reachable')
+  if (await diagram.evaluate(element => element.scrollWidth > element.clientWidth)) {
+    await page.keyboard.press('ArrowRight')
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Lesson diagram' && document.activeElement.scrollLeft > 0)
+  }
+  for (const input of await scope.getByRole('radio').all()) assert.equal(await input.isDisabled(), true)
+  await capture(prefix + '-diagram-keyboard', diagram)
+}
 try {
   for (const width of native ? [780] : [320, 1440]) {
     await page.setViewportSize({ width, height: native ? 1600 : 1000 })
@@ -62,6 +75,7 @@ try {
     await page.getByRole('button', { name: 'Send message', exact: true }).click()
     const card = page.locator('.cert-chat-card').last()
     await inspect(card, `historical-chat-${width}`)
+    await inspectHistoricalDiagram(card, `historical-chat-${width}`)
     assert.equal(await card.getByRole('button', { name: 'Save my place', exact: true }).count(), 0)
     const unversioned = { ...historical }
     for (const key of ['enrollment_id', 'course_version', 'course_title', 'manifest_sha256', 'lesson_id', 'lesson_revision', 'maximum_stars', 'credit_basis']) delete unversioned[key]
@@ -72,6 +86,7 @@ try {
     const oldCard = page.locator('.cert-chat-card').last()
     await oldCard.getByText(/The original course version is unavailable/).waitFor()
     await inspect(oldCard, `unversioned-chat-${width}`)
+    await inspectHistoricalDiagram(oldCard, `unversioned-chat-${width}`)
     assert.equal(await oldCard.getByRole('button', { name: 'Save my place', exact: true }).count(), 0)
   }
   assert.deepEqual(writes, []); assert.deepEqual(review.errors, []); assert.deepEqual([...review.unmatched], [])

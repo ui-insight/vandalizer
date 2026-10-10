@@ -97,6 +97,34 @@
         "896ef31ef324090392b74b342f4bf4a6fb9d6ef40304988892a158985dcf79cb",
         "cbc344ef1b93d59a127a0ab044983b44894eb26dd2440eb967a7cbdbce9ceb5d"
       ]
+    },
+    {
+      "id": "extraction-guarantees-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "extraction_engine.one-pass-vs-two-pass-extraction",
+        "extraction_engine.configuring-fields-for-accuracy",
+        "extraction_engine.when-to-use-consensus-repetition",
+        "extraction_engine.worked-example-fixing-a-weak-field-list",
+        "extraction_engine.glossary-review"
+      ],
+      "title": "Current guidance on extraction settings and source checks",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Optional fields, Allowed values and structured output control permitted absence or output shape. They do not establish that an answer is supported by the source. A required field can remain missing, an allowed category can be wrong, and an optional field can still contain an invented value. Missing evidence is not automatically No.",
+        "Two-pass extraction attempts a draft and refinement, with separately configurable models and reasoning settings. Refinement can retain or introduce an error, and refinement failure can return the first-pass draft. A completed result does not prove two successful independent checks.",
+        "Consensus starts with two attempts and can add another when their answers disagree. Agreement is consistency, not proof of truth. Calls and usage also depend on passes, field grouping and failure handling; there is no guaranteed three-call or three-times-cost rule, or guaranteed highest accuracy.",
+        "Field grouping depends on enabled chunking and its configured group size; a list exceeding 20 fields does not automatically activate it. Inspect the saved settings and compare actual results with representative sources.",
+        "Treat the original worked repair as an illustration, not an executed result or guarantee. Establish a repair by inspecting the saved revision, running that revision on the intended source and checking the new amount, period, unit and other required values. Retain unresolved evidence instead of claiming success."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "c81801db6657c528750063d003890649196d989a1da674ce439ba39747f53f3f",
+        "5568746d33ff0dfb82fb50551353d3128f0032a6ee3509ddfa26a5734632e75a",
+        "e6dd7db1bbb90cfa86521fd7dd9e1247e2722eeb8fb22c81cbdab9f20f48877a",
+        "770429042ecd03cda5af95c8dd2be9861be7fcc397dc36e32dae75224bb79e08",
+        "a8a232a35c2e337d99b2c0956b2039cda208dc538d81b6c87b4c75061a53d94c"
+      ]
     }
   ],
   "module_notices": [

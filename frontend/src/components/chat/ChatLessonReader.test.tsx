@@ -162,3 +162,11 @@ it('preserves legacy browser positions and never calls the enrolled position end
   await waitFor(() => expect(localStorage.getItem(`cert-lesson::${module.id}`)).toBe('3'))
   expect(state.save).not.toHaveBeenCalled()
 })
+
+it('honors a read-only card boundary even when lesson identity otherwise matches', () => {
+  render(<ChatLessonReader content={content} readOnly />)
+  expect(screen.getByText(content.content)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Save my place' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(state.save).not.toHaveBeenCalled()
+})

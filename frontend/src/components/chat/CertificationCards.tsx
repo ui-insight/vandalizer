@@ -62,7 +62,7 @@ function matchesSelectedCourse(content: Record<string, unknown>, certification: 
     && (typeof content.module_id !== 'string' || course.modules.some(module => module.id === content.module_id))
 }
 
-function CardShell({ children, content, footer }: { children: React.ReactNode; content: Record<string, unknown>; footer?: React.ReactNode }) {
+function CardShell({ children, content, footer, readingOnly = false }: { children: React.ReactNode; content: Record<string, unknown>; footer?: React.ReactNode; readingOnly?: boolean }) {
   const certification = useCertificationPanelOptional()
   const stale = !matchesSelectedCourse(content, certification)
   return (
@@ -82,9 +82,9 @@ function CardShell({ children, content, footer }: { children: React.ReactNode; c
           <p>This card is from an earlier or unavailable course selection. Refresh your progress to continue.</p>
           {certification && <button type="button" className="mt-1 underline" onClick={() => void certification.refresh()}>Refresh progress</button>}
         </div>}
-        <fieldset disabled={stale} onClickCapture={event => {
+        <fieldset disabled={stale && !readingOnly} onClickCapture={event => {
           const control = event.target instanceof Element ? event.target.closest('button, input, select, textarea') : null
-          if (stale && control) { event.preventDefault(); event.stopPropagation() }
+          if (stale && !readingOnly && control) { event.preventDefault(); event.stopPropagation() }
         }} style={{ minWidth: 0, margin: 0, padding: 0, border: 0 }}>{children}</fieldset>
         {footer}
       </div>
@@ -351,7 +351,9 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
 // ---------------------------------------------------------------------------
 
 export function CertLessonCard({ content }: { content: Record<string, unknown> }) {
-  return <CardShell content={content}><ChatLessonReader key={`${content.enrollment_id ?? 'legacy'}:${content.manifest_sha256 ?? ''}:${content.module_id}:${content.lesson_id ?? content.lesson_number}`} content={content} /></CardShell>
+  const certification = useCertificationPanelOptional()
+  const readOnly = !matchesSelectedCourse(content, certification)
+  return <CardShell content={content} readingOnly><ChatLessonReader readOnly={readOnly} key={`${content.enrollment_id ?? 'legacy'}:${content.manifest_sha256 ?? ''}:${content.module_id}:${content.lesson_id ?? content.lesson_number}`} content={content} /></CardShell>
 }
 
 // ---------------------------------------------------------------------------
