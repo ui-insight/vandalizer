@@ -1472,6 +1472,7 @@ def _run_to_dict(r: ValidationRun) -> dict:
         "score": r.score,
         "score_breakdown": r.score_breakdown if hasattr(r, 'score_breakdown') and r.score_breakdown else None,
         "model": r.model,
+        "model_settings": r.model_settings,
         "num_runs": r.num_runs,
         "num_test_cases": r.num_test_cases,
         "num_checks": r.num_checks,

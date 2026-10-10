@@ -170,20 +170,16 @@ describe('ReturningHome', () => {
       />,
     )
 
-    expect(screen.getByText('Review what changed since your last visit')).toBeInTheDocument()
-    expect(screen.getByText('Continue where you left off')).toBeInTheDocument()
-    expect(screen.getByText('Suggested questions')).toBeInTheDocument()
-    expect(screen.getByText('Ready in this workspace')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Review alert/i }))
-    expect(onSendMessage).toHaveBeenNthCalledWith(1, 'Check quality of Budget Review')
-
-    // Resuming reopens the run itself. It must not become a chat prompt:
-    // the agent has no tool that reopens past work, so a prompt sends it
-    // searching the user's files for the title.
-    fireEvent.click(screen.getByRole('button', { name: /Budget review workflow/i }))
+    expect(screen.getByRole('heading', { name: 'Your workspace' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Recent work' })).toBeInTheDocument()
+    expect(screen.getAllByText('Budget Review')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /Run Budget Review/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open results: Budget review workflow' }))
     expect(onOpenActivity).toHaveBeenCalledWith('act-workflow-1')
-    expect(onSendMessage).toHaveBeenCalledTimes(1)
+    expect(onSendMessage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'View evaluation details' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask assistant about this warning' }))
+    expect(onSendMessage).toHaveBeenCalledWith(expect.stringContaining('Do not run this tool on documents.'))
   })
 
   it('reopens the last conversation from the resume card instead of prompting the agent', () => {
@@ -238,13 +234,38 @@ describe('ReturningHome', () => {
     if (mode === 'knowledge') {
       fireEvent.click(screen.getByRole('button', { name: 'Choose a knowledge base' }))
       expect(onChooseKnowledgeBase).toHaveBeenCalledOnce()
-    } else if (mode === 'workflows') {
-      fireEvent.click(screen.getByRole('button', { name: 'Find a workflow' }))
-      expect(onSendMessage).toHaveBeenCalledWith('List my available workflows and help me choose one for my next task.')
     } else {
       fireEvent.click(screen.getByRole('button', { name: 'Start a conversation' }))
       expect(onFocusComposer).toHaveBeenCalledOnce()
     }
+  })
+
+  it('puts real work before notices and selects an explicit source without running anything', () => {
+    const onSelectDocument = vi.fn()
+    const onSendMessage = vi.fn()
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={onSendMessage} onOpenActivity={vi.fn()}
+      workQueue={<section aria-label="Project obligations">Project deadline</section>}
+      status={{ ...baseStatus, recent_documents: [{ uuid: 'doc-1', title: 'Award notice.pdf' }] }}
+      suggestionPills={baseStatus.suggestion_pills} onSelectDocument={onSelectDocument} />)
+    const obligations = screen.getByRole('region', { name: 'Project obligations' })
+    const notices = screen.getByRole('region', { name: 'Tool quality notices' })
+    expect(obligations.compareDocumentPosition(notices) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Select document: Award notice.pdf' }))
+    expect(onSelectDocument).toHaveBeenCalledWith({ uuid: 'doc-1', title: 'Award notice.pdf' })
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(screen.queryByText(baseStatus.daily_guidance!)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /latest documents/i })).not.toBeInTheDocument()
+  })
+
+  it('separates an unfinished run from recent work without duplicating it', () => {
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      status={{ ...baseStatus, recent_activity: [{ ...baseStatus.recent_activity[0], status: 'running' }] }} suggestionPills={[]} />)
+    expect(screen.getByRole('region', { name: 'Work in progress' })).toBeInTheDocument()
+    expect(screen.getAllByText('Budget review workflow')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Recent work' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View progress: Budget review workflow' })).toBeInTheDocument()
   })
 
   it('shows a continue-certification CTA with the completed count', async () => {
@@ -292,7 +313,7 @@ describe('ReturningHome', () => {
     ))
 
     // Wait for the provider's progress fetch to settle, then assert absence.
-    await screen.findByText('Suggested questions')
+    await screen.findByText('Recent work')
     await Promise.resolve()
     expect(screen.queryByRole('button', { name: /certification/i })).not.toBeInTheDocument()
   })

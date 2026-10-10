@@ -1,5 +1,6 @@
 """Request/response models for config endpoints."""
 
+import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -64,12 +65,28 @@ class RecentActivityItem(BaseModel):
     title: str
     relative_time: str  # "2h ago", "yesterday"
     status: str  # completed | failed | running
+    item_kind: Optional[str] = None
+    item_id: Optional[str] = None
+    pending_review: bool = False
 
 
 class ActiveAlertItem(BaseModel):
     message: str
     severity: str  # info | warning | critical
     item_name: str
+    uuid: Optional[str] = None
+    item_kind: Optional[str] = None
+    item_id: Optional[str] = None
+    alert_type: Optional[str] = None
+    previous_score: Optional[float] = None
+    current_score: Optional[float] = None
+    created_at: Optional[datetime.datetime] = None
+    review_state: str = "new"
+
+
+class HomeDocument(BaseModel):
+    uuid: str
+    title: str
 
 
 class OnboardingStatusResponse(BaseModel):
@@ -93,6 +110,7 @@ class OnboardingStatusResponse(BaseModel):
     has_only_onboarding_docs: bool = False
     top_extraction_set_name: Optional[str] = None
     top_workflow_name: Optional[str] = None
+    recent_documents: list[HomeDocument] = []
     recent_activity: list[RecentActivityItem] = []
     active_alerts: list[ActiveAlertItem] = []
     maturity_stage: str = "newcomer"

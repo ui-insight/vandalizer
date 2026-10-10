@@ -69,12 +69,23 @@ export interface RecentActivityItem {
   title: string
   relative_time: string
   status: string
+  item_kind?: string | null
+  item_id?: string | null
+  pending_review?: boolean
 }
 
 export interface ActiveAlertItem {
   message: string
   severity: string
   item_name: string
+  uuid?: string | null
+  item_kind?: 'search_set' | 'workflow' | 'knowledge_base' | null
+  item_id?: string | null
+  alert_type?: string | null
+  previous_score?: number | null
+  current_score?: number | null
+  created_at?: string | null
+  review_state?: 'new' | 'in_review' | 'acknowledged'
 }
 
 export type MaturityStage = 'newcomer' | 'explorer' | 'practitioner' | 'builder' | 'architect'
@@ -100,6 +111,7 @@ export interface OnboardingStatus {
   has_only_onboarding_docs: boolean
   top_extraction_set_name: string | null
   top_workflow_name: string | null
+  recent_documents?: { uuid: string; title: string }[]
   recent_activity: RecentActivityItem[]
   active_alerts: ActiveAlertItem[]
   maturity_stage: MaturityStage
@@ -153,4 +165,33 @@ export interface FeatureFlags {
 
 export function getFeatureFlags() {
   return apiFetch<FeatureFlags>('/api/config/features')
+}
+
+
+export interface HomeEvaluation {
+  uuid: string
+  created_at: string | null
+  score: number | null
+  model: string | null
+  source: string | null
+  num_test_cases: number
+  num_runs: number
+  checks_failed: number
+  num_checks: number
+  accuracy: number | null
+  consistency: number | null
+  model_settings?: Record<string, unknown> | null
+  result_snapshot: Record<string, unknown>
+  extraction_config: Record<string, unknown> | null
+  score_breakdown: Record<string, unknown> | null
+}
+
+export function getHomeAlertEvidence(uuid: string) {
+  return apiFetch<{ runs: HomeEvaluation[]; linked_run: boolean }>(`/api/config/home-alerts/${encodeURIComponent(uuid)}/evidence`)
+}
+
+export function reviewHomeAlert(uuid: string, state: NonNullable<ActiveAlertItem['review_state']>) {
+  return apiFetch<ActiveAlertItem>(`/api/config/home-alerts/${encodeURIComponent(uuid)}`, {
+    method: 'PATCH', body: JSON.stringify({ state }),
+  })
 }

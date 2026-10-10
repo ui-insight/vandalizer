@@ -11,8 +11,8 @@ import { AttachmentList } from './AttachmentList'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { toolResultToText } from './ToolCallDisplay'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
-import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { RAInbox } from './RAInbox'
+import { HomeWorkQueue } from './HomeWorkQueue'
 import { OnboardingStepper } from './WelcomeExperience'
 import { ConceptStrip } from './ConceptTip'
 import { ContextMeter } from './ContextMeter'
@@ -138,7 +138,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
   } })
 
-  const { workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -160,7 +160,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const { toast } = useToast()
   const { openActivityById } = useOpenActivity()
   const shareLink = useShareLink()
-  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus } = useOnboarding()
+  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus, refetchStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
   // flip it mid-conversation (markFirstSessionComplete fires early).
   const lockedFirstSession = useRef<boolean | null>(null)
@@ -988,6 +988,22 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               onOpenActivity={openActivityById}
               status={onboardingStatus}
               suggestionPills={onboardingPills}
+              workQueue={<HomeWorkQueue />}
+              onNoticeChanged={refetchStatus}
+              onChooseDocuments={() => setWorkspaceMode('files')}
+              onSelectDocument={doc => {
+                setSelectedDocUuids([doc.uuid])
+                setSelectedDocNames({ [doc.uuid]: doc.title })
+                setSelectedFolderUuids([])
+                setSelectedFolderNames({})
+                focusChat()
+              }}
+              onOpenTool={alert => {
+                if (!alert.item_id) return
+                if (alert.item_kind === 'search_set') openExtraction(alert.item_id)
+                else if (alert.item_kind === 'workflow') openWorkflow(alert.item_id)
+                else if (alert.item_kind === 'knowledge_base') activateKB(alert.item_id, alert.item_name)
+              }}
             />
           </div>
         )}
@@ -1069,32 +1085,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            {/* Workspace briefing for returning users with data, guidance, alerts,
-                pending work, or post-demo state. Surfacing it for any non-newcomer
-                (or anyone with docs waiting / alerts open) gives the 2nd-visit user
-                a personalized reason to re-engage instead of a generic banner. */}
             {/* What each proposal or award needs, from its documents (#999). */}
             <RAInbox />
-            {((onboardingStatus?.recent_activity?.length ?? 0) > 0
-              || (onboardingStatus?.active_alerts?.length ?? 0) > 0
-              || onboardingStatus?.daily_guidance
-              || onboardingStatus?.has_only_onboarding_docs
-              || (onboardingStatus?.unprocessed_doc_count ?? 0) > 0
-              || (!!onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer')) && (
-              <div style={{ marginTop: 'var(--workspace-space-12)' }}>
-                <WorkspaceBriefing
-                  onOpenActivity={openActivityById}
-                  recentActivity={onboardingStatus!.recent_activity}
-                  activeAlerts={onboardingStatus!.active_alerts ?? []}
-                  maturityStage={onboardingStatus!.maturity_stage ?? 'newcomer'}
-                  unprocessedDocCount={onboardingStatus!.unprocessed_doc_count ?? 0}
-                  dailyGuidance={onboardingStatus!.daily_guidance}
-                  sinceLastVisit={onboardingStatus!.since_last_visit}
-                  hasOnlyOnboardingDocs={onboardingStatus!.has_only_onboarding_docs}
-                  onSendMessage={(msg) => handleSend(msg)}
-                />
-              </div>
-            )}
 
             <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
               {/* Inside a project, surface project-specific actions (run pinned

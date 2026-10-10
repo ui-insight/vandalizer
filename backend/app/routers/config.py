@@ -38,6 +38,8 @@ from app.services.config_service import (
 from app.services import workflow_service
 from app.services.version_service import get_current_version
 
+from app.services.home_alerts import ReviewAlertRequest
+
 router = APIRouter()
 
 
@@ -517,7 +519,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_earned_certification(uid),
         # Recent activities for workspace briefing + "continue where you left off" pill
         ActivityEvent.find(
-            {"user_id": uid, "status": {"$in": ["completed", "failed", "running"]}}
+            {"user_id": uid, "status": {"$in": ["completed", "failed", "running", "queued"]}}
         ).sort("-last_updated_at").limit(3).to_list(),
         # Completed extraction runs — drives maturity stage progression
         ActivityEvent.find(
@@ -525,25 +527,36 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         ).count(),
     )
 
-    # Fetch quality scores + alerts for extraction sets
-    quality_map: dict[str, float] = {}
-    quality_alerts: list = []
-    if search_sets:
-        from app.models.quality_alert import QualityAlert
-        from app.models.validation_run import ValidationRun
+    # Notices only for owned tools. Workflow ObjectIds and extraction UUIDs
+    # are different namespaces; keep the kind in every filter.
+    from app.models.quality_alert import QualityAlert
+    from app.models.validation_run import ValidationRun
+    from app.services.home_alerts import alert_item
 
-        ss_uuids = [ss.uuid for ss in search_sets]
-        vr_list, quality_alerts = await asyncio.gather(
-            ValidationRun.find(
-                {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
-            ).sort("-created_at").to_list(),
-            QualityAlert.find(
-                {"item_kind": "search_set", "item_id": {"$in": ss_uuids}, "acknowledged": {"$ne": True}}
-            ).sort("-created_at").limit(3).to_list(),
-        )
+    quality_map: dict[str, float] = {}
+    ss_uuids = [ss.uuid for ss in search_sets]
+    pairs = []
+    if ss_uuids:
+        pairs.append({"item_kind": "search_set", "item_id": {"$in": ss_uuids}})
+    if workflows:
+        pairs.append({"item_kind": "workflow", "item_id": {"$in": [str(w.id) for w in workflows]}})
+    if knowledge_bases:
+        pairs.append({"item_kind": "knowledge_base", "item_id": {"$in": [kb.uuid for kb in knowledge_bases]}})
+    quality_alerts = await QualityAlert.find(
+        {"$or": pairs, "acknowledged": {"$ne": True}}
+    ).sort("-created_at").limit(10).to_list() if pairs else []
+    if ss_uuids:
+        vr_list = await ValidationRun.find(
+            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
+        ).sort("-created_at").to_list()
         for vr in vr_list:
             if vr.item_id not in quality_map and vr.accuracy is not None:
                 quality_map[vr.item_id] = round(vr.accuracy * 100)
+
+    recent_documents = await SmartDocument.find({
+        "user_id": uid, "raw_text": {"$type": "string", "$ne": ""},
+        "soft_deleted": {"$ne": True}, "task_status": "complete",
+    }).sort("-created_at").limit(3).to_list()
 
     has_enabled_automation = any(getattr(a, "enabled", False) for a in automations)
 
@@ -576,18 +589,14 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
             title=ev.title or "Activity",
             relative_time=_relative_time(ev.last_updated_at) if ev.last_updated_at else "",
             status=ev.status,
+            item_kind="search_set" if ev.search_set_uuid else "workflow" if ev.workflow else None,
+            item_id=ev.search_set_uuid or (str(ev.workflow) if ev.workflow else None),
+            pending_review=bool((ev.meta_summary or {}).get("pending_review_uuid")),
         )
         for ev in recent_activities[:3]
     ]
 
-    alert_items = [
-        ActiveAlertItem(
-            message=alert.message,
-            severity=alert.severity,
-            item_name=alert.item_name,
-        )
-        for alert in quality_alerts
-    ]
+    alert_items = [alert_item(alert) for alert in quality_alerts]
 
     # Unprocessed doc count: simple heuristic — all docs are unprocessed if
     # user has never run an extraction
@@ -634,6 +643,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_only_onboarding_docs=(doc_count > 0 and doc_count == onboarding_doc_count),
         top_extraction_set_name=search_sets[0].title if search_sets else None,
         top_workflow_name=workflows[0].name if workflows else None,
+        recent_documents=[{"uuid": d.uuid, "title": d.title or "Untitled document"} for d in recent_documents],
         recent_activity=recent_activity_items,
         active_alerts=alert_items,
         maturity_stage=maturity_stage,
@@ -740,3 +750,30 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
             )[:20]
         ],
     }
+
+
+@router.get("/home-alerts/{uuid}/evidence")
+async def home_alert_evidence(uuid: str, user: User = Depends(get_current_user)):
+    from app.services.home_alerts import owned_alert
+    from app.services.quality_service import get_quality_history
+    alert = await owned_alert(uuid, user)
+    # Legacy notices have no run ID. Display history as history, never claim
+    # a later run or merely matching score is the evaluation behind a notice.
+    history = await get_quality_history(alert.item_kind, alert.item_id, limit=5)
+    return {"runs": history, "linked_run": False}
+
+
+@router.patch("/home-alerts/{uuid}", response_model=ActiveAlertItem)
+async def review_home_alert(
+    uuid: str,
+    body: "ReviewAlertRequest",
+    user: User = Depends(get_current_user),
+):
+    from app.services.home_alerts import owned_alert, alert_item
+    alert = await owned_alert(uuid, user)
+    alert.review_state = body.state if body.state != "acknowledged" else "in_review"
+    alert.acknowledged = body.state == "acknowledged"
+    alert.acknowledged_by = user.user_id if alert.acknowledged else None
+    alert.acknowledged_at = datetime.datetime.now(datetime.timezone.utc) if alert.acknowledged else None
+    await alert.save()
+    return alert_item(alert)

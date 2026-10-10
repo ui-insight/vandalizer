@@ -128,6 +128,7 @@ function InboxRow({ item, onChanged, onError }: {
 
 export function RAInbox() {
   const [items, setItems] = useState<Obligation[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const [hidden, setHidden] = useState(false)
   const [showDismissed, setShowDismissed] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,16 +136,18 @@ export function RAInbox() {
   const load = useCallback(async (includeDismissed: boolean) => {
     try {
       const data = await getInbox(includeDismissed)
+      setLoadError(false)
       setItems(data.items)
       setHidden(data.inbox_hidden)
       setError(null)
     } catch {
-      setItems(current => current ?? [])
+      setLoadError(true)
     }
   }, [])
 
   useEffect(() => { void load(showDismissed) }, [load, showDismissed])
 
+  if (loadError) return <p role="status" className="home-meta">Project obligations could not be loaded. <button type="button" className="home-text-action" onClick={() => void load(showDismissed)}>Retry obligations</button></p>
   if (hidden || items == null) return null
   const visible = showDismissed ? items : items.filter(i => !i.dismissed)
   const dismissedCount = items.filter(i => i.dismissed).length
