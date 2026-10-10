@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+  "working_head_at_inventory": "6f2c7764f22f76508f515c66ab0d5360842f89c7",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,14 +11,14 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 811658,
-    "sha256": "7a85bf69da57ed7ccafb888cff657854264c273db5d1da5243fc9bd64a3459c8"
+    "bytes": 813313,
+    "sha256": "02bf4cc953151e30e656eba43f46340b0b08d2bf6f841a27380cbbf12f6e68e9"
   },
   "counts": {
     "accepted": 81,
     "open": 81,
     "items": 162,
-    "checkpoints": 335,
+    "checkpoints": 336,
     "browser_runs": 590,
     "recorded_captures_including_diagnostics_and_repeats": 7230,
     "baseline_selected_captures": 151
@@ -3419,6 +3419,13 @@
         "certification-browser-support-2026-10-10",
         "certification-nested-bounds-2026-10-10"
       ]
+    },
+    {
+      "number": 336,
+      "title": "Cover the remaining committed build and routing inputs on October 10 2026",
+      "evidence_directories": [
+        "certification-deployment-inputs-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -4021,6 +4028,12 @@
       "available": true,
       "bytes": 836,
       "sha256": "2b4fde33f2976ea13e0e9f6eda304794edfce13821799026c70663bb91b79b36"
+    },
+    {
+      "path": "artifacts/visual-review/certification-deployment-inputs-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 425,
+      "sha256": "9c706c74629bb3057d7a0251109d90334bfd5b7e7cf36ed96b6fa72ea4ed5719"
     },
     {
       "path": "artifacts/visual-review/certification-deployment-triggers-2026-10-10/checkpoint.json",

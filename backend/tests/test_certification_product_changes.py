@@ -90,6 +90,9 @@ def test_runtime_new_capabilities_course_content_and_visuals_trigger_review(path
     'charts/vandalizer/templates/configmap-env.yaml', 'frontend/Dockerfile',
     'frontend/vite.config.ts', '.env.example', 'setup.sh', 'upgrade.sh',
     '.dockerignore', 'scripts/cut_release.sh',
+    'frontend/nginx.conf', 'frontend/.env.example', 'frontend/.dockerignore',
+    'backend/.dockerignore', 'Makefile', '.gitlab-ci.yml',
+    '.github/workflows/build-container.yaml', '.github/workflows/release.yaml',
 ])
 def test_repository_deployment_changes_require_review_even_without_app_changes(repository, path):
     root, base = repository

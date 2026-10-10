@@ -15,6 +15,9 @@ REGISTRY = 'backend/certification-data/courses/registry.json'
 DEPLOYMENT_FILES = {
     '.dockerignore', '.env.example', 'setup.sh', 'upgrade.sh',
     'frontend/vite.config.ts', 'scripts/cut_release.sh',
+    'frontend/nginx.conf', 'frontend/.env.example', 'frontend/.dockerignore',
+    'backend/.dockerignore', 'Makefile', '.gitlab-ci.yml',
+    '.github/workflows/build-container.yaml', '.github/workflows/release.yaml',
 }
 
 
