@@ -82,3 +82,36 @@ def test_unknown_git_revision_fails_instead_of_returning_no_changes(repository):
                                  'Dockerfile', 'docker-compose.yml'])
 def test_runtime_new_capabilities_course_content_and_visuals_trigger_review(path):
     assert changes.triggers(path)
+
+
+@pytest.mark.parametrize('path', [
+    'compose.yaml', 'compose.prod.yaml', 'compose.override.yaml',
+    'charts/vandalizer/values.yaml', 'charts/vandalizer/templates/celery-workers.yaml',
+    'charts/vandalizer/templates/configmap-env.yaml', 'frontend/Dockerfile',
+    'frontend/vite.config.ts', '.env.example', 'setup.sh', 'upgrade.sh',
+    '.dockerignore', 'scripts/cut_release.sh',
+])
+def test_repository_deployment_changes_require_review_even_without_app_changes(repository, path):
+    root, base = repository
+    commit(root, path, 'Synthetic deployment capability change')
+    report = changes.inspect(root, base)
+    assert report['status'] == 'compatibility_review_required'
+    assert report['changed_paths'] == [{'path': path, 'triggers': ['product_capabilities_or_runtime']}]
+    assert report['required_evidence']
+
+
+def test_removing_deployment_config_remains_visible_without_exposing_values(repository):
+    root, _ = repository
+    commit(root, 'charts/vandalizer/values.yaml', 'SYNTHETIC_PRIVATE_CONFIG_VALUE')
+    base = git(root, 'rev-parse', 'HEAD')
+    git(root, 'rm', 'charts/vandalizer/values.yaml')
+    git(root, 'commit', '-m', 'Remove deployment configuration')
+    report = changes.inspect(root, base)
+    assert report['status'] == 'compatibility_review_required'
+    assert report['changed_paths'][0]['path'] == 'charts/vandalizer/values.yaml'
+    assert 'SYNTHETIC_PRIVATE_CONFIG_VALUE' not in json.dumps(report)
+
+
+@pytest.mark.parametrize('path', ['docs/deployment.md', 'frontend/vitest.config.ts', 'docs/compose.notes.md'])
+def test_non_runtime_notes_and_test_configuration_do_not_trigger_course_review(path):
+    assert changes.triggers(path) == []

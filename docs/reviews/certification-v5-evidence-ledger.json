@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "3b7c26919693d204d73809ec833dabe0fda9d153",
+  "working_head_at_inventory": "8e76930f52433f2675bf607d4bc0d095e115a4b5",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,14 +11,14 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 802420,
-    "sha256": "2bc4552cace24fa27da49b47940ce0b921ffafd93ffa6f61e5d69fc782c22881"
+    "bytes": 804827,
+    "sha256": "cbf059cc712ca2e83497538c3eba91da70ffbde12320fcfcb7fbd9b4642b416f"
   },
   "counts": {
     "accepted": 79,
     "open": 83,
     "items": 162,
-    "checkpoints": 332,
+    "checkpoints": 333,
     "browser_runs": 575,
     "recorded_captures_including_diagnostics_and_repeats": 7146,
     "baseline_selected_captures": 151
@@ -3397,6 +3397,13 @@
       "evidence_directories": [
         "certification-card-structure-2026-10-09"
       ]
+    },
+    {
+      "number": 333,
+      "title": "Include deployed product inputs in compatibility review on October 10 2026",
+      "evidence_directories": [
+        "certification-deployment-triggers-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -3999,6 +4006,12 @@
       "available": true,
       "bytes": 836,
       "sha256": "2b4fde33f2976ea13e0e9f6eda304794edfce13821799026c70663bb91b79b36"
+    },
+    {
+      "path": "artifacts/visual-review/certification-deployment-triggers-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 484,
+      "sha256": "f433de33fac8b5819a0ed017a976826559ef551d7834850b39e5c49854ae5599"
     },
     {
       "path": "artifacts/visual-review/certification-design-authoring-teaching-2026-10-09/checkpoint.json",

@@ -12,6 +12,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = 'backend/certification-data/courses/registry.json'
+DEPLOYMENT_FILES = {
+    '.dockerignore', '.env.example', 'setup.sh', 'upgrade.sh',
+    'frontend/vite.config.ts', 'scripts/cut_release.sh',
+}
 
 
 def triggers(path):
@@ -30,7 +34,10 @@ def triggers(path):
     if path.startswith(('frontend/src/', 'frontend/public/')):
         reasons.add('learner_controls_or_teaching_visuals')
     if (path.startswith(('backend/app/', 'backend/pyproject.toml', 'backend/uv.lock',
-                         'frontend/package.json', 'frontend/package-lock.json', 'docker/', 'deploy/'))
+                         'frontend/package.json', 'frontend/package-lock.json', 'docker/', 'deploy/',
+                         'charts/'))
+            or path in DEPLOYMENT_FILES
+            or (Path(path).name.startswith('compose.') and Path(path).suffix in ('.yaml', '.yml'))
             or Path(path).name.startswith(('Dockerfile', 'docker-compose'))):
         reasons.add('product_capabilities_or_runtime')
     return sorted(reasons)
