@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+  "working_head_at_inventory": "3b7c26919693d204d73809ec833dabe0fda9d153",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 66389,
-    "sha256": "9cd01b0aa6570321e0a4ccb8d83f41de11bfe676b5cfeebfcc5c0ab0c31b5ee8"
+    "bytes": 67117,
+    "sha256": "ac5a5fd67cbe05a7b37dddd6a27656b114bd3f8777e39503bd0d7085008be2a7"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 799592,
-    "sha256": "f8f64677ffb9eb096672d33b97bea1e095fe25da2b8014e48e0916de1135b9e3"
+    "bytes": 802420,
+    "sha256": "2bc4552cace24fa27da49b47940ce0b921ffafd93ffa6f61e5d69fc782c22881"
   },
   "counts": {
-    "accepted": 77,
-    "open": 85,
+    "accepted": 79,
+    "open": 83,
     "items": 162,
-    "checkpoints": 331,
-    "browser_runs": 573,
-    "recorded_captures_including_diagnostics_and_repeats": 7131,
+    "checkpoints": 332,
+    "browser_runs": 575,
+    "recorded_captures_including_diagnostics_and_repeats": 7146,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -375,8 +375,8 @@
     },
     {
       "id": "C8-VIS-11",
-      "accepted": false,
-      "requirement": "P2 · Improve: Use coherent status and completion visuals.** Loading, saved, completed, failed, advisory and certified states must look distinct and match their meanings. Avoid relying on decorative stars or tool status to communicate learner completion."
+      "accepted": true,
+      "requirement": "P2 · Improve: Use coherent status and completion visuals.** Loading, saved, completed, failed, advisory and certified states must look distinct and match their meanings. Avoid relying on decorative stars or tool status to communicate learner completion. Accepted at checkpoint 332: preserved state/feedback matrices distinguish pending, saved, failed, advisory and earned completion; tier completion no longer claims certification, and historical check verdicts are textual. Loading/tool success, saved practice/design and assessment support remain separate from module credit and issued credentials."
     },
     {
       "id": "C8-VIS-12",
@@ -390,8 +390,8 @@
     },
     {
       "id": "C8-A11Y-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Expose course structure semantically.** Use meaningful headings and named progress information. Screen-reader users can identify the module, lesson position, required checks, current result and next action without interpreting layout alone."
+      "accepted": true,
+      "requirement": "P1 · Improve: Expose course structure semantically.** Use meaningful headings and named progress information. Screen-reader users can identify the module, lesson position, required checks, current result and next action without interpreting layout alone. Accepted at checkpoint 332: chat card titles are semantic headings, module/check collections are lists and historical roleless checks retain explicit verdict text. Named course/tier progress, lesson position, required controls/results and next actions are verified through current card structure and retained panel/form evidence. Actual screen-reader announcements remain A11Y-05."
     },
     {
       "id": "C8-A11Y-03",
@@ -3390,6 +3390,13 @@
       "evidence_directories": [
         "certification-typography-2026-10-09"
       ]
+    },
+    {
+      "number": 332,
+      "title": "Expose chat card structure and accept coherent course states on October 9 2026",
+      "evidence_directories": [
+        "certification-card-structure-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3680,6 +3687,12 @@
       "available": true,
       "bytes": 361,
       "sha256": "8a7b9456b812ee5bb12cca28e2fd39b48a9311bb118a4081962b07046e2bded5"
+    },
+    {
+      "path": "artifacts/visual-review/certification-card-structure-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 481,
+      "sha256": "0cc81ede66d5ba52c0ee23ca94fc9ff9f5a77e832f3b407510eb557a9ddbfd07"
     },
     {
       "path": "artifacts/visual-review/certification-certificate-preflight-2026-10-08/checkpoint.json",
@@ -46090,6 +46103,631 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-capstone-drafts-2026-10-08/browser-webkit/release-storage-unavailable-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 12252,
+        "sha256": "9ac2d178f6838400c319590ad6ce665e9b88cff30cb65301b61e7450bc3d424f"
+      },
+      "checkpoints": [
+        332
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:30:48.004Z",
+      "reported_commit": "3b7c26919693d204d73809ec833dabe0fda9d153",
+      "reported_source_fingerprint": "b88ebc34823f893b652127bb5fc28b0ae114e190a8abdc381b863f7561aafe2e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135736,
+        "sha256": "e46eb73871a4af55413c581e166602ace2034b80550d73c04e0d9064b57e6ef6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12125,
+        "sha256": "7a1a18fef954a2e575c1a777cc69539f2096d27a7e3356d93926b04f52b508d3"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "tool": "get_certification_progress",
+          "width": 780,
+          "accessibleStructure": "- group:\n  - heading \"Vandal Workflow Architect\" [level=3]\n  - text: apprentice · 150 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: AI Literacy 50 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Foundations 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Thinking in Workflows 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Workflow Design 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Extraction Engine 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Multi-Step Workflows 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Advanced Nodes 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Output & Delivery 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Validation & QA 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Batch Processing 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Governance 300 XP\n  - button \"Start with AI Literacy\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 780,
+          "accessibleStructure": "- group:\n  - heading \"AI Literacy\" [level=3]\n  - text: 50 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group: Exercise instructions · 3 steps\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 780,
+          "accessibleStructure": "- group:\n  - heading \"What is AI, and why is it in your office?\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 780,
+          "accessibleStructure": "- group:\n  - heading \"Foundations\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Required run — Met — Output saved\n    - listitem: Optional enrichment — Not met — Review the extra source context\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 780,
+          "accessibleStructure": "- heading \"Foundations complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 125 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "semanticCardCases": 5,
+          "headings": true,
+          "namedProgress": true,
+          "moduleAndCheckLists": true,
+          "originalRolelessVerdicts": true,
+          "actualCertificationWrites": 0,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "valid-0-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-0-native200-780.png",
+              "available": true,
+              "bytes": 93474
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-0-native200-780.txt",
+              "available": true,
+              "bytes": 2593
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-0-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-1-native200-780.png",
+              "available": true,
+              "bytes": 92913
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-1-native200-780.txt",
+              "available": true,
+              "bytes": 2903
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-1-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-2-native200-780.png",
+              "available": true,
+              "bytes": 94847
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-2-native200-780.txt",
+              "available": true,
+              "bytes": 4948
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-2-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-3-native200-780.png",
+              "available": true,
+              "bytes": 81380
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-3-native200-780.txt",
+              "available": true,
+              "bytes": 1611
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-3-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-4-native200-780.png",
+              "available": true,
+              "bytes": 84350
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-4-native200-780.txt",
+              "available": true,
+              "bytes": 1441
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-native/valid-4-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/manifest.json",
+        "available": true,
+        "bytes": 21787,
+        "sha256": "8253ae4739e49ce289384b7631ee5664508d77a61ef0176b04440957a6e96c99"
+      },
+      "checkpoints": [
+        332
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:30:52.773Z",
+      "reported_commit": "3b7c26919693d204d73809ec833dabe0fda9d153",
+      "reported_source_fingerprint": "b88ebc34823f893b652127bb5fc28b0ae114e190a8abdc381b863f7561aafe2e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135736,
+        "sha256": "e46eb73871a4af55413c581e166602ace2034b80550d73c04e0d9064b57e6ef6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12125,
+        "sha256": "7a1a18fef954a2e575c1a777cc69539f2096d27a7e3356d93926b04f52b508d3"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "accessibleStructure": "- group:\n  - heading \"Vandal Workflow Architect\" [level=3]\n  - text: apprentice · 150 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: AI Literacy 50 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Foundations 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Thinking in Workflows 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Workflow Design 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Extraction Engine 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Multi-Step Workflows 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Advanced Nodes 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Output & Delivery 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Validation & QA 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Batch Processing 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Governance 300 XP\n  - button \"Start with AI Literacy\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "accessibleStructure": "- group:\n  - heading \"AI Literacy\" [level=3]\n  - text: 50 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group: Exercise instructions · 3 steps\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "accessibleStructure": "- group:\n  - heading \"What is AI, and why is it in your office?\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "accessibleStructure": "- group:\n  - heading \"Foundations\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Required run — Met — Output saved\n    - listitem: Optional enrichment — Not met — Review the extra source context\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "accessibleStructure": "- heading \"Foundations complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 125 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 1440,
+          "accessibleStructure": "- group:\n  - heading \"Vandal Workflow Architect\" [level=3]\n  - text: apprentice · 150 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: AI Literacy 50 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Foundations 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Thinking in Workflows 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Workflow Design 100 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Extraction Engine 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Multi-Step Workflows 150 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Advanced Nodes 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Output & Delivery 200 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Validation & QA 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Batch Processing 250 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Governance 300 XP\n  - button \"Start with AI Literacy\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- group:\n  - heading \"AI Literacy\" [level=3]\n  - text: 50 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group: Exercise instructions · 3 steps\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 1440,
+          "accessibleStructure": "- group:\n  - heading \"What is AI, and why is it in your office?\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- group:\n  - heading \"Foundations\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Required run — Met — Output saved\n    - listitem: Optional enrichment — Not met — Review the extra source context\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- heading \"Foundations complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 125 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "semanticCardCases": 5,
+          "headings": true,
+          "namedProgress": true,
+          "moduleAndCheckLists": true,
+          "originalRolelessVerdicts": true,
+          "actualCertificationWrites": 0,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "valid-0-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-320.png",
+              "available": true,
+              "bytes": 59524
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-320.txt",
+              "available": true,
+              "bytes": 2593
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-320.png",
+              "available": true,
+              "bytes": 60757
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-320.txt",
+              "available": true,
+              "bytes": 2903
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-320.png",
+              "available": true,
+              "bytes": 65506
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-320.txt",
+              "available": true,
+              "bytes": 4948
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-320.png",
+              "available": true,
+              "bytes": 45920
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-320.txt",
+              "available": true,
+              "bytes": 1579
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-320.png",
+              "available": true,
+              "bytes": 37744
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-320.txt",
+              "available": true,
+              "bytes": 1409
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-0-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-1440.png",
+              "available": true,
+              "bytes": 91968
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-1440.txt",
+              "available": true,
+              "bytes": 2627
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-0-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-1440.png",
+              "available": true,
+              "bytes": 143905
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-1440.txt",
+              "available": true,
+              "bytes": 2969
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-1-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-1440.png",
+              "available": true,
+              "bytes": 192953
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-1440.txt",
+              "available": true,
+              "bytes": 5014
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-2-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-1440.png",
+              "available": true,
+              "bytes": 66119
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-1440.txt",
+              "available": true,
+              "bytes": 1645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-3-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-1440.png",
+              "available": true,
+              "bytes": 58422
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-1440.txt",
+              "available": true,
+              "bytes": 1476
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-card-structure-2026-10-09/browser-normal/valid-4-normal-1440.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -276135,7 +276773,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1487,
+    "1440x1000": 1492,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -276156,14 +276794,14 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 802,
+    "320x844": 807,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 43,
     "390x480": 3,
-    "390x500": 263,
+    "390x500": 268,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,

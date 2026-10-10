@@ -139,7 +139,7 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
     <CardShell content={content} footer={certified && <ChatCertificateAccess enrollmentId={typeof content.enrollment_id === 'string' ? content.enrollment_id : undefined} />}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
-        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{typeof content.course_title === 'string' ? 'Course progress' : 'Vandal Workflow Architect'}</span>
+        <h3 style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{typeof content.course_title === 'string' ? 'Course progress' : 'Vandal Workflow Architect'}</h3>
         <span style={{ flex: 1 }} />
         <span style={{ color: 'var(--cert-text-muted)', textTransform: 'capitalize' }}>
           {level} · {xp.toLocaleString()} XP
@@ -153,9 +153,9 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
         {completed}/{total} modules complete
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+      <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
         {modules.map((m) => (
-          <div key={m.module_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
+          <li key={m.module_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
             {m.completed
               ? <CircleCheck role="img" aria-label="Completed" size={13} style={{ color: 'var(--cert-text-success)', flexShrink: 0 }} />
               : <Circle role="img" aria-label={m.module_id === nextId ? 'Next module' : 'Not completed'} size={13} style={{ color: m.module_id === nextId ? 'var(--highlight-on-light, #806600)' : '#6b7280', flexShrink: 0 }} />}
@@ -168,9 +168,9 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
             <Stars count={m.completed ? m.stars : 0} content={content} />
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--cert-text-muted)' }}>{m.xp} XP</span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {certified ? (
         <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', color: 'var(--cert-text-success)', fontWeight: 600 }}>
@@ -230,7 +230,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
     </div>}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
-        <span style={{ flex: '1 1 8rem', minWidth: 0, fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
+        <h3 style={{ flex: '1 1 8rem', minWidth: 0, fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</h3>
         {completed && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)', color: 'var(--cert-text-success)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, whiteSpace: 'nowrap' }}>
             <Check size={11} /> Completed <Stars count={stars} content={content} />
@@ -305,9 +305,9 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
 
             {expectedFields.length > 0 && (
               <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
-                <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--cert-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--workspace-space-4)' }}>
+                <h4 style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--cert-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--workspace-space-4)' }}>
                   Expected fields
-                </div>
+                </h4>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-4)' }}>
                   {expectedFields.map((f) => (
                     <span key={f} style={{
@@ -373,7 +373,7 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
   return (
     <CardShell content={content}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
-        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
+        <h3 style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</h3>
         <span style={{
           display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-4)',
           fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
@@ -384,9 +384,9 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
       </div>
 
       {passed && checks.some(check => !check.passed && check.role === 'advisory') && <p className="mb-3 text-sm text-gray-700">Advisory suggestions do not block completion.</p>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
+      <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
         {checks.map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)' }}>
+          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)' }}>
             {c.passed
               ? <Check size={13} style={{ color: 'var(--cert-text-success)', flexShrink: 0, marginTop: 1 }} />
               : c.role === 'advisory'
@@ -394,12 +394,12 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
                 : <X size={13} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />}
             <div style={{ lineHeight: 1.45 }}>
               <span style={{ fontWeight: 600 }}>{c.name}</span>
-              {c.role && <span> — {c.role === 'advisory' ? `Advisory: ${c.passed ? 'Met' : 'Suggestion'}` : `Required: ${c.passed ? 'Met' : 'Not met'}`}</span>}
+              <span> — {c.role === 'advisory' ? `Advisory: ${c.passed ? 'Met' : 'Suggestion'}` : `${c.role === 'required' ? 'Required: ' : ''}${c.passed ? 'Met' : 'Not met'}`}</span>
               {c.detail && <span style={{ color: 'var(--cert-text-muted)' }}> — {c.detail}</span>}
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {passed && (
         <div style={{ marginTop: 'var(--workspace-space-12)' }}>
@@ -443,9 +443,9 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
         {typeof content.course_version === 'string' && <p className="mb-2 text-xs text-gray-700">Course version: {content.course_version}</p>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
           <Sparkles size={15} style={{ color: 'var(--cert-text-success)', flexShrink: 0 }} />
-          <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)', color: '#166534' }}>
+          <h3 style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)', color: '#166534' }}>
             {title} complete
-          </span>
+          </h3>
           <Stars count={stars} content={content} />
         </div>
         <div style={{ lineHeight: 1.6 }}>

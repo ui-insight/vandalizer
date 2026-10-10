@@ -23,6 +23,7 @@ const valid = [
   ['check_certification_module', { module_id: 'foundations', title: 'Foundations', passed: true, stars: 1, checks: [{ name: 'Required run', passed: true, detail: 'Output saved' }, { name: 'Optional enrichment', passed: false, detail: 'Review the extra source context' }] }],
   ['complete_certification_module', { module_id: 'foundations', title: 'Foundations', stars: 1, xp_earned: 125, total_xp: 125, level: 'apprentice', level_up: true, certified: false }],
 ]
+const structureOnly = process.env.REVIEW_CARD_STRUCTURE === '1'
 let sequence = 0
 async function send(tool, payload) {
   await page.goto(review.baseURL, { waitUntil: 'domcontentloaded' })
@@ -41,9 +42,9 @@ async function capture(id, target) {
   console.log(id)
 }
 try {
-  for (const width of native ? [780] : [320, 390, 1440]) {
+  for (const width of native ? [780] : structureOnly ? [320, 1440] : [320, 390, 1440]) {
     await page.setViewportSize({ width, height: native ? 1000 : width < 500 ? 844 : 1000 })
-    for (const [index, [tool, payload]] of bad.entries()) {
+    for (const [index, [tool, payload]] of (structureOnly ? [] : bad).entries()) {
       const result = await send(tool, payload)
       if (native) await review.setBrowserZoom(2)
       assert.ok((await result.getByRole('status').innerText()).endsWith('Result needs review'))
@@ -59,8 +60,23 @@ try {
     }
     for (const [index, [tool, payload]] of valid.entries()) {
       const result = await send(tool, payload)
+      if (native) await review.setBrowserZoom(2)
       assert.equal(await result.locator('.cert-chat-card').count(), 1)
       assert.equal(await result.getByRole('alert').count(), 0)
+      if (structureOnly) {
+        const card = result.locator('.cert-chat-card')
+        assert.ok(await card.getByRole('heading', { level: 3 }).count())
+        if (tool === 'get_certification_progress') {
+          assert.equal(await card.getByRole('progressbar', { name: 'Course modules completed' }).count(), 1)
+          assert.equal(await card.getByRole('listitem').count(), payload.modules.length)
+        }
+        if (tool === 'check_certification_module') {
+          assert.equal(await card.getByRole('listitem').count(), payload.checks.length)
+          assert.match(await card.getByRole('listitem').nth(0).innerText(), /— Met/)
+          assert.match(await card.getByRole('listitem').nth(1).innerText(), /— Not met/)
+        }
+        review.observations.push({ tool, width, accessibleStructure: await card.ariaSnapshot() })
+      }
       if (tool === 'check_certification_module') {
         assert.equal(await result.getByText('"Foundations" — module requirements met; review check details', { exact: true }).count(), 1)
         assert.equal(await result.getByText(/all checks passed/i).count(), 0)
@@ -70,5 +86,7 @@ try {
   }
   assert.ok(apiCalls.every(c => c.method === 'GET'))
   assert.deepEqual(review.errors, []); assert.deepEqual([...review.unmatched], [])
-  review.observations.push({ malformedCases: bad.length, validCases: valid.length, savedStateRecovery: 'GET-only', actualCertificationWrites: 0, actualModelCalls: 0 })
+  review.observations.push(structureOnly
+    ? { semanticCardCases: valid.length, headings: true, namedProgress: true, moduleAndCheckLists: true, originalRolelessVerdicts: true, actualCertificationWrites: 0, actualModelCalls: 0 }
+    : { malformedCases: bad.length, validCases: valid.length, savedStateRecovery: 'GET-only', actualCertificationWrites: 0, actualModelCalls: 0 })
 } catch (error) { await review.capture('blocked', String(error)); throw error } finally { await review.flush(); await review.browser.close() }

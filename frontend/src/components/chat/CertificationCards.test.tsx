@@ -39,6 +39,13 @@ const earnedCards = [
   { name: 'completion', Component: CertCompletionCard, content: { module_id: 'foundations', title: 'Foundations', stars: 2, xp_earned: 100, total_xp: 100, level: 'apprentice', certified: false } },
 ]
 
+it.each([true, false])('preserves the textual verdict for historical checks without a role (%s)', passed => {
+  render(<CertCheckCard content={{ module_id: 'foundations', title: 'Foundations', passed, stars: passed ? 1 : 0,
+    checks: [{ name: 'Saved source evidence', passed, detail: 'Original check detail' }] }} />)
+  expect(screen.getByText('Saved source evidence').parentElement).toHaveTextContent(passed ? '— Met' : '— Not met')
+  expect(screen.getByText('Saved source evidence').parentElement).not.toHaveTextContent('Required:')
+})
+
 it.each(earnedCards)('uses the recorded reward policy in $name cards', ({ Component, content }) => {
   const { rerender } = render(<Component content={{ ...content, maximum_stars: 2, credit_basis: 'legacy_rubric' }} />)
   expect(screen.getByRole('img', { name: '2 of 2 stars' })).toBeInTheDocument()
