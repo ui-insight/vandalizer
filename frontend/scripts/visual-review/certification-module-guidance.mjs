@@ -48,6 +48,9 @@ try {
         assert.ok(correction)
         const note = panel.getByRole('complementary', { name: correction.title, exact: true })
         await note.waitFor()
+        if (process.env.REVIEW_TEXT_SCALE === '2' && width <= 390) {
+          assert.ok((await note.locator('p').first().boundingBox()).width >= 220, 'Enlarged correction text must not be squeezed by nested padding')
+        }
         assert.equal(await note.evaluate((element, text) => {
           const paragraph = [...element.parentElement.querySelectorAll('p')].find(item => item.textContent === text)
           return !!paragraph && !!(element.compareDocumentPosition(paragraph) & Node.DOCUMENT_POSITION_FOLLOWING)

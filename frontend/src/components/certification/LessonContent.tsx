@@ -72,7 +72,7 @@ export function LessonContent({ section, practiceScope, manifestSha256 }: { sect
   return (
     <div>
       <div
-        className={cn('border-l-4 p-4', style.border, style.bg)}
+        className={cn('border-l-4 px-[8px] py-4 sm:p-4', style.border, style.bg)}
         style={{ borderRadius: `0 var(--ui-radius, 12px) var(--ui-radius, 12px) 0` }}
       >
         <div className="flex items-center gap-2 mb-2">

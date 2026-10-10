@@ -19,7 +19,7 @@ export function EditorialCorrection({ manifestSha256, lessonId, moduleId, conten
     ? item.manifest_sha256 === manifestSha256 && item.targetIds.includes(moduleId ?? lessonId ?? '')
     : !!fingerprint && fingerprint.content === content && item.unversioned_content_sha256.includes(fingerprint.sha256))
   return <>{notices.map(notice => <aside key={notice.id} aria-label={notice.title}
-    className="my-3 min-w-0 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950"
+    className="my-3 min-w-0 rounded-lg border border-amber-300 bg-amber-50 px-[8px] py-3 text-sm leading-relaxed text-amber-950 sm:p-3"
     style={{ overflowWrap: 'anywhere' }}>
     <p className="mb-2 font-bold">{notice.title}</p>
     {!manifestSha256 && <p className="mb-2">The original course version is unavailable. This correction matches the preserved {moduleId ? 'module description' : 'lesson text'}; it does not identify a historical course version.</p>}

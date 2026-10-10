@@ -491,7 +491,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
           Module {activeModuleDef.number}: {activeModuleDef.title}
         </span>
       </div>
-      <div className="p-3 sm:p-5 space-y-4">
+      <div className="p-[8px] sm:p-5 space-y-4">
         <ModuleDetail
           key={`${progress?.user_id}:${progress?.id}:${progress?.enrollment_id ?? 'legacy'}:${activeModuleDef.id}`}
           enrollmentId={progress?.enrollment_id}

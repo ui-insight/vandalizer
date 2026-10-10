@@ -37,16 +37,16 @@ export function KnowledgeCheck({ data, storageKey }: { data: KnowledgeCheckData;
     }
   }
   return (
-    <fieldset ref={fieldset} className="my-4 min-w-0 rounded-lg border-2 border-indigo-200 bg-indigo-50/30 p-4">
+    <fieldset ref={fieldset} className="my-4 min-w-0 rounded-lg border-2 border-indigo-200 bg-indigo-50/30 px-[8px] py-4 [overflow-wrap:anywhere] sm:p-4">
       <legend className="flex items-center gap-2 px-1 text-xs font-bold text-indigo-800">
         <HelpCircle size={16} aria-hidden="true" /> Knowledge check · practice
       </legend>
       <p id={`${id}-question`} className="mb-3 text-sm font-medium text-gray-900">{data.question}</p>
       <div role="radiogroup" aria-labelledby={`${id}-question`} className="space-y-2">
         {data.options.map((option, index) => (
-          <label key={index} className="flex cursor-pointer items-start gap-2 rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-800 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-700">
+          <label key={index} className="flex cursor-pointer items-start gap-[8px] rounded-md border border-gray-300 bg-white px-[8px] py-3 text-sm text-gray-800 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-700 sm:gap-2 sm:p-3">
             <input type="radio" name={id} checked={selected === index} onChange={() => { setSelected(index); setSubmitted(false) }} className="mt-0.5 shrink-0" />
-            <span>{option.text}</span>
+            <span className="min-w-0">{option.text}</span>
           </label>
         ))}
       </div>

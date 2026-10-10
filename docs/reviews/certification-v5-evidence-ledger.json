@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "892f1fd23ba813979243ccbea37234bebb303843",
+  "working_head_at_inventory": "f971df43949eb042c79fdee4b91a49b7b8626817",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
     "bytes": 64848,
-    "sha256": "3e8eaa7f0835db5caed9b0964f1a4cf089bb59266a231bd16ee344d4fae40ea8"
+    "sha256": "225d4f4a190bdbd950048b4f24df38dbc4badebf881e6db242b865a969a44521"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 780247,
-    "sha256": "e066a60195ebfa04d4925143deda2b5b78c2bb7054458e4ae66c21fa1e0edac6"
+    "bytes": 783216,
+    "sha256": "69a7693ff92080e6531deb2ed4254f05c1c18e63948406bfee91684981faf715"
   },
   "counts": {
-    "accepted": 72,
-    "open": 90,
+    "accepted": 73,
+    "open": 89,
     "items": 162,
-    "checkpoints": 324,
-    "browser_runs": 525,
-    "recorded_captures_including_diagnostics_and_repeats": 6788,
+    "checkpoints": 325,
+    "browser_runs": 535,
+    "recorded_captures_including_diagnostics_and_repeats": 6874,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -425,7 +425,7 @@
     },
     {
       "id": "C8-A11Y-09",
-      "accepted": false,
+      "accepted": true,
       "requirement": "P1 · Verify: Support actual enlargement.** Check actual 200% browser zoom, enlarged text and narrow-screen reflow. Device pixel ratio alone is insufficient; lesson headings, answer groups and primary actions must remain usable."
     },
     {
@@ -3341,6 +3341,13 @@
       "evidence_directories": [
         "certification-module-guidance-2026-10-09"
       ]
+    },
+    {
+      "number": 325,
+      "title": "Repair enlarged-text reading width and consolidate enlargement acceptance on October 9 2026",
+      "evidence_directories": [
+        "certification-enlargement-reconciliation-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4027,6 +4034,12 @@
       "available": true,
       "bytes": 3261,
       "sha256": "613e69134bc59dd9236c95b3fe213c14d47a7a92add3b289d132954790dbfc71"
+    },
+    {
+      "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 1100,
+      "sha256": "e2b2e936d3af8acf9637744b1797cfd8a04bd2791bf74b43bb95c16289b810d9"
     },
     {
       "path": "artifacts/visual-review/certification-enrollment-lifecycle-2026-10-07/checkpoint.json",
@@ -93497,6 +93510,3087 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-editor-return-2026-10-08/repair-browser-verified/governance-course-retained-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/manifest.json",
+        "available": true,
+        "bytes": 3543,
+        "sha256": "a19afa9ae25d4b70c95c6e6dcfdc12414429f1fe3069ee661a70bd62ff720805"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:12:19.708Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "validation_qa-1-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/validation_qa-1-reading-320.png",
+              "available": true,
+              "bytes": 43139
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/validation_qa-1-reading-320.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/validation_qa-1-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/blocked.png",
+              "available": true,
+              "bytes": 43139
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/blocked.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-before-width-guard/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/manifest.json",
+        "available": true,
+        "bytes": 5930,
+        "sha256": "0918f1a2cf96d0f5386c76a4918e139ca42f2457feb56b0ca58edfb0bcf8c4e2"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:09:34.429Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes"
+          ],
+          "working": false,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": true,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-320.png",
+              "available": true,
+              "bytes": 47338
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-320.txt",
+              "available": true,
+              "bytes": 8319
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 59607
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 3363
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-320.png",
+              "available": true,
+              "bytes": 52224
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-320.txt",
+              "available": true,
+              "bytes": 6176
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 58254
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 3447
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-1440.png",
+              "available": true,
+              "bytes": 142893
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-1440.txt",
+              "available": true,
+              "bytes": 8385
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 144676
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 3429
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-1440.png",
+              "available": true,
+              "bytes": 139719
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-1440.txt",
+              "available": true,
+              "bytes": 6242
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 149193
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 3513
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/manifest.json",
+        "available": true,
+        "bytes": 6434,
+        "sha256": "c1d55921e0cf745afb1645fbc8df5544cfe0f69211febacc1e8ed7279e22fe82"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:13:16.717Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes"
+          ],
+          "working": false,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": true,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-320.png",
+              "available": true,
+              "bytes": 80381
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-320.txt",
+              "available": true,
+              "bytes": 8319
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 77859
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 3363
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-320.png",
+              "available": true,
+              "bytes": 80262
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-320.txt",
+              "available": true,
+              "bytes": 6176
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 83937
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 3447
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-1440.png",
+              "available": true,
+              "bytes": 142893
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-1440.txt",
+              "available": true,
+              "bytes": 8385
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 144676
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 3429
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-1440.png",
+              "available": true,
+              "bytes": 139719
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-1440.txt",
+              "available": true,
+              "bytes": 6242
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 149193
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 3513
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-historical-text-final/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/manifest.json",
+        "available": true,
+        "bytes": 8394,
+        "sha256": "703ad7cabf799d7196d0b9ef8380a1adc650489c402c348924cf0acca9079167"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:14:37.028Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "batch_processing.run-your-first-batch",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-correction.png",
+              "available": true,
+              "bytes": 81183
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-correction.txt",
+              "available": true,
+              "bytes": 4922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-preservation.png",
+              "available": true,
+              "bytes": 81183
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 4922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 71496
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 2990
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 76206
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 3022
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 73951
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 5181
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 76266
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 5181
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-correction.png",
+              "available": true,
+              "bytes": 129970
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 4988
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 153560
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 4988
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 143551
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 3056
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 143551
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 3056
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 143349
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 5247
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 143349
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 5247
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-history-normal-final/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/manifest.json",
+        "available": true,
+        "bytes": 5569,
+        "sha256": "881f1502ff1dc2937b52070181f9cb1dc3eb6577ff077472c22d2bcee520d9bf"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:14:29.865Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes",
+            "governance"
+          ],
+          "working": true,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": false,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-description-780.png",
+              "available": true,
+              "bytes": 165635
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-description-780.txt",
+              "available": true,
+              "bytes": 6757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-tips-780.png",
+              "available": true,
+              "bytes": 147087
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-tips-780.txt",
+              "available": true,
+              "bytes": 2856
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/extraction_engine-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-description-780.png",
+              "available": true,
+              "bytes": 166734
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-description-780.txt",
+              "available": true,
+              "bytes": 5815
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-tips-780.png",
+              "available": true,
+              "bytes": 146839
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-tips-780.txt",
+              "available": true,
+              "bytes": 2849
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/advanced_nodes-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-description-780.png",
+              "available": true,
+              "bytes": 225221
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-description-780.txt",
+              "available": true,
+              "bytes": 4280
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-tips-780.png",
+              "available": true,
+              "bytes": 148297
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-tips-780.txt",
+              "available": true,
+              "bytes": 2854
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-native-final/governance-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/manifest.json",
+        "available": true,
+        "bytes": 7682,
+        "sha256": "0b05a27cbb83dd2bb9020a472233ff8fe561ca41106c35540aae350e84d10a08"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:09:37.651Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes",
+            "governance"
+          ],
+          "working": true,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": false,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-320.png",
+              "available": true,
+              "bytes": 63024
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-320.txt",
+              "available": true,
+              "bytes": 6757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 60811
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 2856
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-320.png",
+              "available": true,
+              "bytes": 54301
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-320.txt",
+              "available": true,
+              "bytes": 5815
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 63215
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 2849
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-320.png",
+              "available": true,
+              "bytes": 72178
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-320.txt",
+              "available": true,
+              "bytes": 4280
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-320.png",
+              "available": true,
+              "bytes": 61201
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-320.txt",
+              "available": true,
+              "bytes": 2854
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-1440.png",
+              "available": true,
+              "bytes": 128184
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-1440.txt",
+              "available": true,
+              "bytes": 6823
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 111015
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 2922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-1440.png",
+              "available": true,
+              "bytes": 132015
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-1440.txt",
+              "available": true,
+              "bytes": 5881
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 109511
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 2915
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-1440.png",
+              "available": true,
+              "bytes": 140708
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-1440.txt",
+              "available": true,
+              "bytes": 4346
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-1440.png",
+              "available": true,
+              "bytes": 113611
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-1440.txt",
+              "available": true,
+              "bytes": 2920
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text/governance-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/manifest.json",
+        "available": true,
+        "bytes": 8186,
+        "sha256": "3463c6b373a37fa35e613f6a746b374c60f080e0d367b0d7ffd8f82b3962b23b"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:13:20.213Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes",
+            "governance"
+          ],
+          "working": true,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": false,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-320.png",
+              "available": true,
+              "bytes": 72822
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-320.txt",
+              "available": true,
+              "bytes": 6757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 80586
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 2856
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-320.png",
+              "available": true,
+              "bytes": 68566
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-320.txt",
+              "available": true,
+              "bytes": 5815
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 74599
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 2849
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-320.png",
+              "available": true,
+              "bytes": 85085
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-320.txt",
+              "available": true,
+              "bytes": 4280
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-320.png",
+              "available": true,
+              "bytes": 73541
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-320.txt",
+              "available": true,
+              "bytes": 2854
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-1440.png",
+              "available": true,
+              "bytes": 128184
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-1440.txt",
+              "available": true,
+              "bytes": 6823
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 111015
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 2922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-1440.png",
+              "available": true,
+              "bytes": 132015
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-1440.txt",
+              "available": true,
+              "bytes": 5881
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 109511
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 2915
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-1440.png",
+              "available": true,
+              "bytes": 140708
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-1440.txt",
+              "available": true,
+              "bytes": 4346
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-1440.png",
+              "available": true,
+              "bytes": 113611
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-1440.txt",
+              "available": true,
+              "bytes": 2920
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-module-text-final/governance-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/manifest.json",
+        "available": true,
+        "bytes": 6588,
+        "sha256": "680f433aeb78fa1f9c7f92eb313e3099586b833ac3e3ff6efb087d0143a7503d"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:14:29.490Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "validation_qa",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "validation_qa.why-validation-matters",
+              "revision": 2
+            },
+            {
+              "id": "validation_qa.building-effective-validation-plans",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 2,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation_qa-1-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-reading-780.png",
+              "available": true,
+              "bytes": 161198
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-reading-780.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-practice-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-practice-780.png",
+              "available": true,
+              "bytes": 118602
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-practice-780.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-feedback-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-feedback-780.png",
+              "available": true,
+              "bytes": 98238
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-feedback-780.txt",
+              "available": true,
+              "bytes": 6000
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-1-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-reading-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-reading-780.png",
+              "available": true,
+              "bytes": 166639
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-reading-780.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-practice-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-practice-780.png",
+              "available": true,
+              "bytes": 93416
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-practice-780.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-feedback-780",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-feedback-780.png",
+              "available": true,
+              "bytes": 108235
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-feedback-780.txt",
+              "available": true,
+              "bytes": 7488
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-native-final/validation_qa-2-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/manifest.json",
+        "available": true,
+        "bytes": 8398,
+        "sha256": "b58650f765acb08af9aeff8088cc4bb53877f6ab00f7e95b9be9e906d241412c"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:09:35.381Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "validation_qa",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "validation_qa.why-validation-matters",
+              "revision": 2
+            },
+            {
+              "id": "validation_qa.building-effective-validation-plans",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 2,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation_qa-1-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-320.png",
+              "available": true,
+              "bytes": 43139
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-320.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-320.png",
+              "available": true,
+              "bytes": 38491
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-320.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-feedback-320.png",
+              "available": true,
+              "bytes": 40156
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-feedback-320.txt",
+              "available": true,
+              "bytes": 6000
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-320.png",
+              "available": true,
+              "bytes": 44001
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-320.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-320.png",
+              "available": true,
+              "bytes": 43708
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-320.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-feedback-320.png",
+              "available": true,
+              "bytes": 45160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-feedback-320.txt",
+              "available": true,
+              "bytes": 7488
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-1440.png",
+              "available": true,
+              "bytes": 238247
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-1440.txt",
+              "available": true,
+              "bytes": 6297
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-1440.png",
+              "available": true,
+              "bytes": 145652
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-1440.txt",
+              "available": true,
+              "bytes": 6297
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-1-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-1440.png",
+              "available": true,
+              "bytes": 243130
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-1440.txt",
+              "available": true,
+              "bytes": 7805
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-1440.png",
+              "available": true,
+              "bytes": 111470
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-1440.txt",
+              "available": true,
+              "bytes": 7805
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text/validation_qa-2-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/manifest.json",
+        "available": true,
+        "bytes": 8902,
+        "sha256": "512bb574a745d6f8ea513e7fe928484050a9ab98d6f3ff2217e1a9f88e670145"
+      },
+      "checkpoints": [
+        325
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:13:18.724Z",
+      "reported_commit": "f971df43949eb042c79fdee4b91a49b7b8626817",
+      "reported_source_fingerprint": "8999aa964cb1a478d2aa761c7b077355fe16432bfcead35c736400538076dca1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 103064,
+        "sha256": "a5d94b5e788da6ccd0b8aa769fa87e6e89dd3563e1f6b57613d1dc1118de064a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12327,
+        "sha256": "cd663bd5cc02b8a8e6b39a90d7b5dc0a0a38e2833f320e3ed9b6d4f57771b0f2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "validation_qa",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "validation_qa.why-validation-matters",
+              "revision": 2
+            },
+            {
+              "id": "validation_qa.building-effective-validation-plans",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 2,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation_qa-1-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-320.png",
+              "available": true,
+              "bytes": 69569
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-320.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-320.png",
+              "available": true,
+              "bytes": 53966
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-320.txt",
+              "available": true,
+              "bytes": 5819
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-feedback-320.png",
+              "available": true,
+              "bytes": 57614
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-feedback-320.txt",
+              "available": true,
+              "bytes": 6000
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-320.png",
+              "available": true,
+              "bytes": 70160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-320.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-320.png",
+              "available": true,
+              "bytes": 52996
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-320.txt",
+              "available": true,
+              "bytes": 7304
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-feedback-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-feedback-320.png",
+              "available": true,
+              "bytes": 59156
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-feedback-320.txt",
+              "available": true,
+              "bytes": 7488
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-1440.png",
+              "available": true,
+              "bytes": 238247
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-1440.txt",
+              "available": true,
+              "bytes": 6297
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-1-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-1440.png",
+              "available": true,
+              "bytes": 145652
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-1440.txt",
+              "available": true,
+              "bytes": 6297
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-1-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-1440.png",
+              "available": true,
+              "bytes": 243130
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-1440.txt",
+              "available": true,
+              "bytes": 7805
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-2-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-1440.png",
+              "available": true,
+              "bytes": 111470
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-1440.txt",
+              "available": true,
+              "bytes": 7805
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-enlargement-reconciliation-2026-10-09/browser-practice-text-final/validation_qa-2-practice-1440.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -261524,7 +264618,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1370,
+    "1440x1000": 1404,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -261535,7 +264629,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 503,
+    "320x1000": 529,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -261545,19 +264639,19 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 757,
+    "320x844": 771,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 246,
+    "390x500": 252,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 64,
+    "390x800": 70,
     "390x844": 862,
     "390x850": 276,
     "390x900": 192,

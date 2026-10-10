@@ -2,7 +2,7 @@
 
 Bring **every audited dimension and every module’s Vandalizer 5.0 alignment to at least 8/10**. This checklist turns the [October 2 certification audit](reviews/certification-v5-audit.html) into bounded implementation and acceptance work. The target applies to each area independently; a good desktop score cannot compensate for poor mobile behavior, weak grading or unsafe course updates.
 
-**Implementation started October 2, 2026. 72/162 items complete; 90 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
+**Implementation started October 2, 2026. 73/162 items complete; 89 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
 
 ## Completion rules
 
@@ -84,7 +84,7 @@ Existing document-and-tool composition remains a constraint: preserve the open f
 - [ ] **C8-A11Y-06 · P1 · Verify: Manage modal and handoff focus.** Verification dialogs and celebrations contain focus appropriately; Escape closes the intended layer and restores a useful target. Nonmodal course panels remain usable alongside the workspace.
 - [ ] **C8-A11Y-07 · P1 · Improve: Make assessment controls accessible.** Associate questions, answer groups, instructions and errors; expose selected and required states. A learner can correct an answer and understand grading feedback without color or pointer input.
 - [x] **C8-A11Y-08 · P2 · Improve: Provide alternatives for diagrams and stars.** Diagrams need equivalent explanatory text; star counts, status icons and progress changes need meaningful accessible labels where they carry information. Hide purely decorative icons from the reading order.
-- [ ] **C8-A11Y-09 · P1 · Verify: Support actual enlargement.** Check actual 200% browser zoom, enlarged text and narrow-screen reflow. Device pixel ratio alone is insufficient; lesson headings, answer groups and primary actions must remain usable.
+- [x] **C8-A11Y-09 · P1 · Verify: Support actual enlargement.** Check actual 200% browser zoom, enlarged text and narrow-screen reflow. Device pixel ratio alone is insufficient; lesson headings, answer groups and primary actions must remain usable.
 - [ ] **C8-A11Y-10 · P2 · Verify: Support touch and reduced motion.** Controls must have usable target size/spacing and work without hover. Reduced-motion settings preserve status, reading position and completion feedback without essential animated-only cues.
 
 ## Lesson journey and continuity

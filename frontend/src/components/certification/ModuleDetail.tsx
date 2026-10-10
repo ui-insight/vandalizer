@@ -137,7 +137,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
       style={{ borderRadius: 'var(--ui-radius, 12px)' }}
     >
       {/* Header */}
-      <div className="p-6 pb-0">
+      <div className="p-[8px] pb-0 sm:p-6 sm:pb-0">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div
@@ -211,7 +211,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
       </div>}
 
       {/* Tab content */}
-      <div className={module.validationAssessment || module.batchAssessment || module.governanceAssessment || module.connectedWorkflowAssessment ? "p-[8px] sm:p-6" : "p-4 sm:p-6"}>
+      <div className="p-[8px] sm:p-6">
         {tab === 'challenge' && <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />}
         {tab === 'learn' ? (
           <div className="mx-auto max-w-3xl space-y-4">

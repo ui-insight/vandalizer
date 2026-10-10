@@ -102,6 +102,10 @@ try {
         }
       }
       if (!lesson.knowledgeCheck) continue
+      if (process.env.REVIEW_TEXT_SCALE === '2' && width <= 390) {
+        const answerText = page.locator('[data-cert-panel] [role="radiogroup"] label span').first()
+        assert.ok((await answerText.boundingBox()).width >= 200, 'Enlarged answers need usable text width inside nested cards')
+      }
       await page.getByText(lesson.knowledgeCheck.question, { exact: true }).scrollIntoViewIfNeeded()
       await capture(`${moduleId}-${index + 1}-practice-${width}`)
       if (width === practiceWidth) {
