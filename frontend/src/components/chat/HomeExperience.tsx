@@ -16,6 +16,7 @@ import { useWorkspaceTour } from '../../contexts/WorkspaceTourContext'
 import { ConceptStrip } from './ConceptTip'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 import { HomeQualityAlerts } from './HomeQualityAlerts'
+import { HomeTaskShortcuts, type TaskDocument } from './HomeTaskShortcuts'
 import './home-work.css'
 
 /**
@@ -418,7 +419,7 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
   )
 }
 
-export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, onOpenTool, onSelectDocument, onChooseDocuments, onNoticeChanged, status, workQueue }: SharedHomeProps & {
+export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, onOpenTool, onSelectDocument, onChooseDocuments, onNoticeChanged, onPrepareTask, onOpenProjects, workspaceLabel, status, workQueue }: SharedHomeProps & {
   onOpenActivity: (activityId: string) => void
   onOpenTool?: (alert: ActiveAlertItem) => void
   onSelectDocument?: (document: { uuid: string; title: string }) => void
@@ -427,6 +428,9 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
   suggestionPills: string[] // Older callers may still provide these; unscoped run prompts are not rendered.
   onNoticeChanged?: () => void
   workQueue?: ReactNode
+  workspaceLabel?: string
+  onOpenProjects?: () => void
+  onPrepareTask?: (prompt: string, document?: TaskDocument) => void
 }) {
   const openTour = useWorkspaceTour()
   const activities = [...new Map((status?.recent_activity || []).filter(item => item.type !== 'quality_alert').map(item => [item.id, item])).values()]
@@ -446,7 +450,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
     <div className="chat-home returning-home">
       <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
-        <div><span className="home-eyebrow">{orgName}</span><h2>Your workspace</h2><p>Pick up your work, or ask the assistant anything.</p></div>
+        <div><span className="home-eyebrow">{orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</span><h2>Your workspace</h2><p>Pick up your work, or ask the assistant anything.</p></div>
       </div>
       {workQueue}
       {unfinished.length > 0 && <section className="home-activity" aria-label="Work in progress">
@@ -455,16 +459,18 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
       <div className="home-primary-actions">
         <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
         <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
+        {onOpenProjects && <ActionPillButton label="Open projects" icon={BookOpen} onClick={onOpenProjects} />}
       </div>
+      {onPrepareTask && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} />}
       {recent.length > 0 && <section className="home-activity" aria-label="Recent work">
-        <h3>Recent work</h3><ul>{recent.map(activityRow)}</ul>
+        <h3>Recent work</h3><p className="home-meta">Your most recent conversations and runs across workspaces.</p><ul>{recent.map(activityRow)}</ul>
       </section>}
       {!status && <p className="home-meta" role="status">Workspace activity is unavailable. You can still start a conversation or upload a document.</p>}
       {status && activities.length === 0 && <p className="home-meta">No recent conversations or runs to resume. Ask a question or upload a document to get started.</p>}
       {(documents.length > 0 || status?.has_ready_knowledge_base) && <section className="home-sources" aria-label="Start from your sources">
         <h3>Start from your sources</h3>
         {documents.length > 0 && <>
-          <p className="home-meta">Select a document to ask about it. Nothing runs until you send a request.</p>
+          <p className="home-meta">Recent readable documents you own. Select a document to ask about it; nothing runs until you send a request.</p>
           <ul>{documents.map(doc => <li key={doc.uuid}><FileSearch size={16} aria-hidden="true" /><span>{doc.title}</span><button className="home-text-action" type="button" disabled={disabled || !onSelectDocument} aria-label={`Select document: ${doc.title}`} onClick={() => onSelectDocument?.(doc)}>Select document</button></li>)}</ul>
           {onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose other documents</button>}
         </>}

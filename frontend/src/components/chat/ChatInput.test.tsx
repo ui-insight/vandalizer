@@ -13,6 +13,16 @@ vi.mock('../../contexts/BrandingContext', () => ({
 }))
 
 describe('ChatInput', () => {
+  it('adds a prepared task once, preserves an existing draft, and waits for Send', () => {
+    const send = vi.fn(), changed = vi.fn()
+    const view = render(<ChatInput onSend={send} onDraftChange={changed} initialDraft="Keep my notes." />)
+    view.rerender(<ChatInput onSend={send} onDraftChange={changed} draftInsertion={{ id: 1, text: 'Review the selected award.' }} />)
+    expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('Keep my notes.\n\nReview the selected award.')
+    expect(changed).toHaveBeenLastCalledWith('Keep my notes.\n\nReview the selected award.')
+    view.rerender(<ChatInput onSend={send} onDraftChange={changed} draftInsertion={{ id: 1, text: 'Review the selected award.' }} />)
+    expect(changed).toHaveBeenCalledOnce()
+    expect(send).not.toHaveBeenCalled()
+  })
   it('keeps the one-line composer from producing a horizontal scrollbar', () => {
     render(<ChatInput onSend={vi.fn()} />)
 

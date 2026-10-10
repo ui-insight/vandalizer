@@ -40,3 +40,16 @@
 .home-evidence-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .home-evidence-table caption { text-align: left; padding: 6px 0; color: #59616b; }
 .home-evidence-table th, .home-evidence-table td { text-align: left; vertical-align: top; border-bottom: 1px solid #dce1e5; padding: 8px; overflow-wrap: anywhere; }
+
+.home-task-buttons, .home-task-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-task-buttons button, .home-task-actions button { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #25364a; font-size: 13px; cursor: pointer; }
+.home-task-buttons button:hover, .home-task-actions button:hover { background: #f1f5f9; }
+.home-task-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.home-task-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; background: #0006; padding: 16px; }
+.home-task-dialog { width: 100%; max-width: 520px; max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: 12px; padding: 20px; background: #fff; color: #242b32; box-shadow: 0 12px 40px #0003; }
+.home-task-dialog h2 { font-size: 20px; margin: 0 0 12px; }
+.home-task-dialog p { font-size: 14px; line-height: 1.5; margin: 12px 0; }
+.home-task-dialog label { display: block; font-weight: 600; font-size: 14px; margin-top: 16px; }
+.home-task-dialog select { width: 100%; margin: 8px 0 12px; padding: 8px; border: 1px solid #64748b; border-radius: 6px; }
+.home-task-dialog summary { cursor: pointer; padding: 8px 0; font-size: 14px; }
+.home-task-actions { margin-top: 16px; }

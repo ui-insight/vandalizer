@@ -9,7 +9,9 @@ export function HomeWorkQueue() {
   const { user } = useAuth()
   const reviews = useQuery({ queryKey: ['home-pending-reviews', user?.id, user?.current_team], enabled: !!user, queryFn: () => listMyReviews('pending'), staleTime: 30_000, refetchInterval: 60_000, retry: false })
   return <div className="home-work-queue">
+    <p className="home-meta">Saved obligations from active projects you can access, plus approvals assigned to you. Coverage depends on what has been recorded in each project.</p>
     <RAInbox />
+    {reviews.isPending && <p role="status" className="home-meta">Loading pending approvals…</p>}
     {reviews.isError && <p role="status" className="home-meta">Pending approvals could not be loaded. <button type="button" className="home-text-action" onClick={() => void reviews.refetch()}>Retry approvals</button></p>}
     {!!reviews.data?.reviews.length && <section className="home-approvals" aria-label="Pending approvals">
       <h3>Awaiting your review</h3>

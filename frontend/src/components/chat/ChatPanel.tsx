@@ -89,6 +89,7 @@ function StreamingLabel() {
 }
 
 interface ChatPanelProps {
+  workspaceLabel?: string
   initialDraft?: string
   onDraftChange?: (draft: string) => void
   conversationToLoad?: string | null
@@ -96,7 +97,7 @@ interface ChatPanelProps {
   onPendingMessageConsumed?: () => void
 }
 
-export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange }: ChatPanelProps) {
+export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange, workspaceLabel }: ChatPanelProps) {
   const certification = useCertificationPanelOptional()
   const branding = useBranding()
   const brandIcon = branding.iconUrl
@@ -175,6 +176,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const modelPreference = useChatModelPreference()
   const { selectedModel, models: modelsList } = modelPreference
   const [showAttachKB, setShowAttachKB] = useState(false)
+  const [draftInsertion, setDraftInsertion] = useState<{ id: number; text: string }>()
   const [showContextDialog, setShowContextDialog] = useState(false)
   const [showContextNudge, setShowContextNudge] = useState(false)
   const contextNudgeShownRef = useRef(false)
@@ -989,6 +991,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               status={onboardingStatus}
               suggestionPills={onboardingPills}
               workQueue={<HomeWorkQueue />}
+              workspaceLabel={workspaceLabel}
+              onOpenProjects={() => setWorkspaceMode('projects')}
+              onPrepareTask={(prompt, document) => {
+                if (document) {
+                  setSelectedDocUuids([document.uuid])
+                  setSelectedDocNames({ [document.uuid]: document.title })
+                  setSelectedFolderUuids([])
+                  setSelectedFolderNames({})
+                }
+                setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: prompt }))
+                focusChat()
+              }}
               onNoticeChanged={refetchStatus}
               onChooseDocuments={() => setWorkspaceMode('files')}
               onSelectDocument={doc => {
@@ -1570,6 +1584,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       <CertificationRefreshNotice />
       <ChatInput
         initialDraft={initialDraft}
+        draftInsertion={draftInsertion}
         onDraftChange={onDraftChange}
         onSend={async (msg) => {
           if (isStreaming) await queueMessage(msg)

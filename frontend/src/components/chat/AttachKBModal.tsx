@@ -99,8 +99,8 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
 
           <div className="px-5 pt-3">
             <p className="text-xs text-gray-500">
-              Chat can search up to {maxAttached} knowledge bases at once, alongside any
-              documents you have selected.
+              Attach sources to this conversation. Chat can search up to {maxAttached} knowledge bases at once, alongside any
+              documents you have selected. This selection is remembered in this browser; remove sources from the conversation's source bar.
               {remaining <= 0 && ' You have reached the limit — detach one to add another.'}
             </p>
             <div className="mt-3 flex gap-1">

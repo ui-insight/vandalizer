@@ -9,6 +9,7 @@ import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface Props {
   initialDraft?: string
+  draftInsertion?: { id: number; text: string }
   onDraftChange?: (draft: string) => void
   onSend: (message: string) => void | Promise<void>
   onAttachFile?: (files: File[]) => void
@@ -39,7 +40,7 @@ export function ChatInput({
   onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onModelsLoaded, onExport, hasMessages, hasDocuments,
-  contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange,
+  contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
 }: Props) {
   const branding = useBranding()
   const uploadPolicy = useUploadPolicy()
@@ -70,6 +71,19 @@ export function ChatInput({
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const draftChangeRef = useRef(onDraftChange)
+  draftChangeRef.current = onDraftChange
+  const insertedDraft = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!draftInsertion || insertedDraft.current === draftInsertion.id) return
+    insertedDraft.current = draftInsertion.id
+    const next = [messageRef.current, draftInsertion.text].filter(Boolean).join('\n\n')
+    messageRef.current = next
+    setMessage(next)
+    draftChangeRef.current?.(next)
+    textareaRef.current?.focus()
+  }, [draftInsertion])
 
   // Auto-grow the textarea to fit its content, capped by max-height (CSS).
   useEffect(() => {

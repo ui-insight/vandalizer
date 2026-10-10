@@ -67,6 +67,7 @@ export function AssistantTab() {
     <div className="h-full">
       <ChatPanel
         key={`${draftScope}:${resetKey}`}
+        workspaceLabel={currentTeam ? `Team: ${currentTeam.name}` : 'Personal workspace'}
         initialDraft={drafts.current.get(draftScope) ?? ''}
         onDraftChange={draft => { if (draft) drafts.current.set(draftScope, draft); else drafts.current.delete(draftScope) }}
         conversationToLoad={lastLoadedRef.current}
