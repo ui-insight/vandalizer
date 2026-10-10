@@ -133,7 +133,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 50,
     icon: 'Lightbulb',
-    estimatedMinutes: 10,
   },
   {
     id: 'foundations',
@@ -142,14 +141,14 @@ export const MODULES: ModuleDefinition[] = [
     subtitle: 'Documents In, Intelligence Out',
     description: 'Learn the basics of workflows using a sample NSF proposal from Dr. Sarah Chen. Click Set Up Lab to load it, then build your first extraction workflow.',
     objectives: [
-      'Add the sample NSF proposal to your workspace',
-      'Create a workflow with an Extraction step and 5 fields',
-      'Run the workflow and verify extracted values',
+      "Prepare and inspect the assigned sample NSF proposal",
+      "Build the original three-field base; distinguish five- and eight-field enrichment",
+      "Run the workflow and check the actual extracted values against the source"
     ],
     tips: [
-      'The sample NSF proposal contains clearly labeled fields like PI Name, Institution, and Total Budget',
-      'Use clear, descriptive field names in your Extraction that match the document labels',
-      'After running, check that PI Name = Sarah Chen and Total Budget = $485,000',
+      "Use the assigned sample identity, even if another file has the same name",
+      "Define precise field meaning, including currency and project period",
+      "Sarah Chen and $485,000 are example targets; verify the actual source and result before accepting them"
     ],
     lessons: [
       {
@@ -200,7 +199,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 100,
     icon: 'BookOpen',
-    estimatedMinutes: 15,
   },
   {
     id: 'process_mapping',
@@ -214,9 +212,9 @@ export const MODULES: ModuleDefinition[] = [
       'Apply the process decomposition framework to a real task from your work',
     ],
     tips: [
-      'Think about the tasks you do every week that follow the same pattern',
-      'The best workflow candidates are tasks where you spend most of your time reading and re-typing',
-      'Don\'t try to automate everything \u2014 the goal is to automate the tedious parts so you can focus on the important parts',
+      "Consider repetition, source quality, exceptions and review cost together",
+      "Choose bounded chat, extraction, a saved workflow or human judgment according to the task",
+      "Use a fictional or authorized example when mapping a real process would expose sensitive information"
     ],
     lessons: [
       {
@@ -295,7 +293,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 100,
     icon: 'Search',
-    estimatedMinutes: 15,
   },
   {
     id: 'workflow_design',
@@ -309,9 +306,9 @@ export const MODULES: ModuleDefinition[] = [
       'Design workflows that support human review, not replace it',
     ],
     tips: [
-      'Start simple \u2014 a 2-3 step workflow that works is better than a 10-step workflow that doesn\'t',
-      'Design your output for the person who will review it, not for the computer',
-      'When in doubt about step granularity, split \u2014 it\'s easier to combine steps later than to debug one giant step',
+      "Use the fewest operations that preserve the context and evidence the task needs",
+      "Design output for the reviewer and inspect the actual result",
+      "Separate steps when dependencies, reuse or review boundaries justify it; more steps do not guarantee better quality"
     ],
     lessons: [
       {
@@ -399,23 +396,22 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 100,
     icon: 'Compass',
-    estimatedMinutes: 15,
   },
   {
     id: 'extraction_engine',
     number: 4,
     title: 'Extraction Engine',
     subtitle: 'Master the Extraction Pipeline',
-    description: 'Build a comprehensive 20+ field extraction using a sample NIH R01 proposal from Dr. James Park. The document has budget breakdowns, key personnel, and specific aims to extract.',
+    description: "Use the assigned NIH R01 proposal to build the original course’s 15-field base, with optional 20- and 25-field enrichment. Inspect source-supported values across budget, personnel, aims and compliance sections.",
     objectives: [
       'Add the sample NIH R01 proposal to your workspace',
       'Create an Extraction with 15+ fields covering all document sections',
       'Extract each budget category as its own field, plus personnel, aims, and compliance fields',
     ],
     tips: [
-      'The NIH R01 has clearly structured sections: budget, key personnel, specific aims, vertebrate animals',
-      'Use the Allowed values setting on a field to constrain answers to a list (e.g., Human Subjects: Yes/No, Clinical Trial: Yes/No)',
-      'Mark fields like Co-Investigator as optional since there may be multiple',
+      "Use the saved challenge criteria to distinguish required work from optional enrichment",
+      "Allowed values constrains categories; compare the returned category with source evidence",
+      "Use Optional when absence is legitimate; multiple possible people do not by themselves make a personnel field optional"
     ],
     lessons: [
       {
@@ -506,7 +502,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 150,
     icon: 'FlaskConical',
-    estimatedMinutes: 20,
   },
   {
     id: 'multi_step',
@@ -515,14 +510,14 @@ export const MODULES: ModuleDefinition[] = [
     subtitle: 'Chain Steps Together',
     description: 'Build a multi-step pipeline using a sample subaward agreement between University of Idaho and Boise State. Extract parties and terms, analyze obligations, then format a compliance summary.',
     objectives: [
-      'Add the sample subaward agreement to your workspace',
-      'Build a 3-step workflow: Extraction + Prompt + Formatter',
-      'Verify the pipeline chains correctly from extraction to formatted report',
+      "Prepare and inspect the assigned subaward agreement",
+      "Build the original three-step pipeline using Extractions, Prompts and Format",
+      "Inspect configured inputs and actual intermediate and final output"
     ],
     tips: [
-      'The subaward has two parties (UI and BSU), financial terms, deliverables, and compliance requirements',
-      'Use the Prompt step to analyze obligations and flag key deadlines',
-      'The Formatter step should produce a clean compliance summary from the analysis',
+      "Check parties, terms and amounts against the assigned source",
+      "Require source support for obligations and deadlines; preserve unresolved points",
+      "The Format task is the Formatter operation named in the saved criteria; formatting must preserve qualifications"
     ],
     lessons: [
       {
@@ -613,7 +608,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 150,
     icon: 'Layers',
-    estimatedMinutes: 20,
   },
   {
     id: 'advanced_nodes',
@@ -622,14 +616,14 @@ export const MODULES: ModuleDefinition[] = [
     subtitle: 'Parallel Tasks & Power Nodes',
     description: 'Process a sample budget justification document using an advanced node (the Deep Analysis node) to analyze the figures, plus parallel tasks for concurrent processing.',
     objectives: [
-      'Add the sample budget justification to your workspace',
-      'Use an advanced node (Deep Analysis, API, or Crawler) to analyze the budget',
-      'Run 2+ tasks in parallel within a single step',
+      "Prepare and inspect the assigned budget justification",
+      "Use an available advanced operation; Deep Analysis supplies an internal route for the original lab",
+      "Keep the original requirement for two or more independent tasks in one step"
     ],
     tips: [
-      'The budget has personnel costs, supplies, travel, and subaward line items that should sum to $542,800',
-      'Use the Deep Analysis node to analyze the extracted figures and check whether the line items add up. It runs two LLM passes over the data, no URL or API key required',
-      'Add a parallel Prompt task alongside the Deep Analysis node to generate a budget narrative',
+      "$542,800 is a training target; check the assigned figures, units and arithmetic independently",
+      "Deep Analysis uses model analysis and synthesis; it is not a deterministic calculator",
+      "Parallel tasks do not automatically consume a sibling’s new output. Put a dependent memo after the check it needs"
     ],
     lessons: [
       {
@@ -700,7 +694,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 200,
     icon: 'Puzzle',
-    estimatedMinutes: 25,
   },
   {
     id: 'output_delivery',
@@ -787,23 +780,22 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 200,
     icon: 'FileOutput',
-    estimatedMinutes: 20,
   },
   {
     id: 'validation_qa',
     number: 8,
     title: 'Validation & QA',
     subtitle: 'Ensure Quality at Scale',
-    description: 'Add validation to your NSF proposal workflow from Module 1. Define quality checks that verify your extraction produces correct results, then run validation to measure accuracy.',
+    description: "Add validation to the original NSF proposal workflow. Define checks, verify expected answers against source evidence and inspect actual evaluations. Presence, numeric format, repeatability and accuracy establish different things.",
     objectives: [
       'Open your workflow from Module 1 (or create a new one for the NSF proposal)',
       'Create a validation plan with 2+ quality checks',
       'Run validation and review the results',
     ],
     tips: [
-      'This module reuses the NSF proposal from Module 1 - no new documents needed',
-      'Start with checks like "PI Name is not null" and "Total Budget is a valid number"',
-      'Use auto-generated validation checks as a starting point, then customize',
+      "Reuse the assigned NSF proposal and preserve its identity",
+      "Presence and numeric-format checks establish shape, not that the budget amount is correct",
+      "Review proposed checks and expected values; a saved plan or old score does not validate every later run"
     ],
     lessons: [
       {
@@ -911,7 +903,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 250,
     icon: 'ShieldCheck',
-    estimatedMinutes: 20,
   },
   {
     id: 'batch_processing',
@@ -925,9 +916,9 @@ export const MODULES: ModuleDefinition[] = [
       'Verify all 3 complete successfully with correct PI names',
     ],
     tips: [
-      'Use your extraction workflow from Module 1 or 2, or create a new one',
-      'The three proposals have PIs: Dr. Maria Lopez, Dr. Robert Kim, Dr. Amara Okafor',
-      'Check that all 3 documents complete successfully before marking done',
+      "Reuse a suitable extraction workflow or create one; the Process Mapping module does not itself supply a workflow",
+      "Reconcile each assigned proposal with its own result and source-checked PI name",
+      "Inspect every item before checking course completion; an aggregate terminal status can include failures"
     ],
     lessons: [
       {
@@ -1016,7 +1007,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 250,
     icon: 'Play',
-    estimatedMinutes: 25,
   },
   {
     id: 'governance',
@@ -1030,9 +1020,9 @@ export const MODULES: ModuleDefinition[] = [
       'No new documents needed - uses workflows you have already built',
     ],
     tips: [
-      'Switch into a shared team if you want to practice collaboration flows',
-      'Export workflows as .vandalizer.json files to share with teammates',
-      'Verified workflows signal to your team that a workflow is production-ready',
+      "Use an authorized shared team only when the task calls for it",
+      "After importing an exported workflow, resolve local dependencies and test the imported revision",
+      "Checked denotes examiner review status; measured validation and suitability for your intended use require separate evidence"
     ],
     lessons: [
       {
@@ -1107,7 +1097,6 @@ export const MODULES: ModuleDefinition[] = [
     ],
     xp: 300,
     icon: 'FolderGit2',
-    estimatedMinutes: 15,
   },
 ]
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "d0f0e9d3dfb17240a6367f0754e8bec106b6b58a",
+  "working_head_at_inventory": "892f1fd23ba813979243ccbea37234bebb303843",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 777499,
-    "sha256": "b74656d833426f4f9688104ef53f7661a91232c0608ea643944d3beec456db44"
+    "bytes": 780247,
+    "sha256": "e066a60195ebfa04d4925143deda2b5b78c2bb7054458e4ae66c21fa1e0edac6"
   },
   "counts": {
     "accepted": 72,
     "open": 90,
     "items": 162,
-    "checkpoints": 323,
-    "browser_runs": 522,
-    "recorded_captures_including_diagnostics_and_repeats": 6710,
+    "checkpoints": 324,
+    "browser_runs": 525,
+    "recorded_captures_including_diagnostics_and_repeats": 6788,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3334,6 +3334,13 @@
       "evidence_directories": [
         "certification-lab-controls-2026-10-09"
       ]
+    },
+    {
+      "number": 324,
+      "title": "Reconcile module objectives and hints with corrected teaching on October 9 2026",
+      "evidence_directories": [
+        "certification-module-guidance-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4434,6 +4441,12 @@
       "available": true,
       "bytes": 680,
       "sha256": "88382f6d24fdb6da74bdea3426ec22ccd52e82b0fb775e1274a78cc7969bd75d"
+    },
+    {
+      "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 627,
+      "sha256": "e446f156c5df05d16196e40bc670b34b52da6dd5f22b6a036bf838cccfb5168a"
     },
     {
       "path": "artifacts/visual-review/certification-module-readiness-2026-10-07/checkpoint.json",
@@ -159096,6 +159109,2517 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/manifest.json",
+        "available": true,
+        "bytes": 18736,
+        "sha256": "f9594f6e66dbe0030560ba57b0d713d2dad51a1284145109ea6098ec27f61cca"
+      },
+      "checkpoints": [
+        324
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:07:14.330Z",
+      "reported_commit": "892f1fd23ba813979243ccbea37234bebb303843",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 102927,
+        "sha256": "41bf1865b1ec632fc6240b9f452159d57ce9e3081dd6d8da489b4cc8e9fd422e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12278,
+        "sha256": "43640ac902c11a49b9c4f4f9aa3355bce801152ad5dc307218ee359027b72f34"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "foundations",
+            "process_mapping",
+            "workflow_design",
+            "extraction_engine",
+            "multi_step",
+            "advanced_nodes",
+            "validation_qa",
+            "batch_processing",
+            "governance"
+          ],
+          "working": false,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": true,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-320.png",
+              "available": true,
+              "bytes": 74841
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-320.txt",
+              "available": true,
+              "bytes": 5903
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-320.png",
+              "available": true,
+              "bytes": 77000
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-320.txt",
+              "available": true,
+              "bytes": 3273
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-320.png",
+              "available": true,
+              "bytes": 77516
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-320.txt",
+              "available": true,
+              "bytes": 6154
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-320.png",
+              "available": true,
+              "bytes": 69082
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-320.txt",
+              "available": true,
+              "bytes": 6898
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-320.png",
+              "available": true,
+              "bytes": 76399
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-320.txt",
+              "available": true,
+              "bytes": 5952
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-320.png",
+              "available": true,
+              "bytes": 71857
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-320.txt",
+              "available": true,
+              "bytes": 7270
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-320.png",
+              "available": true,
+              "bytes": 84427
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-320.txt",
+              "available": true,
+              "bytes": 8319
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 75183
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 3363
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-320.png",
+              "available": true,
+              "bytes": 83445
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-320.txt",
+              "available": true,
+              "bytes": 8808
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-320.png",
+              "available": true,
+              "bytes": 82678
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-320.txt",
+              "available": true,
+              "bytes": 4276
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-320.png",
+              "available": true,
+              "bytes": 76044
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-320.txt",
+              "available": true,
+              "bytes": 6176
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 79399
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 3447
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-320.png",
+              "available": true,
+              "bytes": 75193
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-320.txt",
+              "available": true,
+              "bytes": 7318
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-320.png",
+              "available": true,
+              "bytes": 73778
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-320.txt",
+              "available": true,
+              "bytes": 3249
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-320.png",
+              "available": true,
+              "bytes": 73444
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-320.txt",
+              "available": true,
+              "bytes": 6979
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-320.png",
+              "available": true,
+              "bytes": 75551
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-320.txt",
+              "available": true,
+              "bytes": 3228
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-320.png",
+              "available": true,
+              "bytes": 94398
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-320.txt",
+              "available": true,
+              "bytes": 6179
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-320.png",
+              "available": true,
+              "bytes": 89106
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-320.txt",
+              "available": true,
+              "bytes": 3883
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-1440.png",
+              "available": true,
+              "bytes": 123268
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-1440.txt",
+              "available": true,
+              "bytes": 5969
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-1440.png",
+              "available": true,
+              "bytes": 93623
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-1440.txt",
+              "available": true,
+              "bytes": 3339
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/foundations-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-1440.png",
+              "available": true,
+              "bytes": 136805
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-1440.txt",
+              "available": true,
+              "bytes": 6220
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-1440.png",
+              "available": true,
+              "bytes": 114014
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-1440.txt",
+              "available": true,
+              "bytes": 6964
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/process_mapping-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-1440.png",
+              "available": true,
+              "bytes": 164024
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-1440.txt",
+              "available": true,
+              "bytes": 6018
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-1440.png",
+              "available": true,
+              "bytes": 120332
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-1440.txt",
+              "available": true,
+              "bytes": 7336
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/workflow_design-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-1440.png",
+              "available": true,
+              "bytes": 192951
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-1440.txt",
+              "available": true,
+              "bytes": 8385
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 98883
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 3429
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-1440.png",
+              "available": true,
+              "bytes": 195248
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-1440.txt",
+              "available": true,
+              "bytes": 8874
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-1440.png",
+              "available": true,
+              "bytes": 148564
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-1440.txt",
+              "available": true,
+              "bytes": 4342
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/multi_step-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-1440.png",
+              "available": true,
+              "bytes": 132435
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-1440.txt",
+              "available": true,
+              "bytes": 6242
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 107608
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 3513
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-1440.png",
+              "available": true,
+              "bytes": 134573
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-1440.txt",
+              "available": true,
+              "bytes": 7384
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-1440.png",
+              "available": true,
+              "bytes": 92880
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-1440.txt",
+              "available": true,
+              "bytes": 3315
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/validation_qa-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-1440.png",
+              "available": true,
+              "bytes": 134071
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-1440.txt",
+              "available": true,
+              "bytes": 7045
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-1440.png",
+              "available": true,
+              "bytes": 93261
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-1440.txt",
+              "available": true,
+              "bytes": 3294
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/batch_processing-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-1440.png",
+              "available": true,
+              "bytes": 190839
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-1440.txt",
+              "available": true,
+              "bytes": 6245
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-1440.png",
+              "available": true,
+              "bytes": 131050
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-1440.txt",
+              "available": true,
+              "bytes": 3949
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-history/governance-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 5633,
+        "sha256": "d1279cb1bc7c6163d60243450334cc0722bcbba53678f6b789cb5d8037ac32ab"
+      },
+      "checkpoints": [
+        324
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:06:45.920Z",
+      "reported_commit": "892f1fd23ba813979243ccbea37234bebb303843",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 102927,
+        "sha256": "41bf1865b1ec632fc6240b9f452159d57ce9e3081dd6d8da489b4cc8e9fd422e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12278,
+        "sha256": "43640ac902c11a49b9c4f4f9aa3355bce801152ad5dc307218ee359027b72f34"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "extraction_engine",
+            "advanced_nodes",
+            "governance"
+          ],
+          "working": true,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": false,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "extraction_engine-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-description-780.png",
+              "available": true,
+              "bytes": 160124
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-description-780.txt",
+              "available": true,
+              "bytes": 6757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-tips-780.png",
+              "available": true,
+              "bytes": 145548
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-tips-780.txt",
+              "available": true,
+              "bytes": 2856
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/extraction_engine-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-description-780.png",
+              "available": true,
+              "bytes": 162554
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-description-780.txt",
+              "available": true,
+              "bytes": 5815
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-tips-780.png",
+              "available": true,
+              "bytes": 141826
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-tips-780.txt",
+              "available": true,
+              "bytes": 2849
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/advanced_nodes-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-description-780.png",
+              "available": true,
+              "bytes": 160266
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-description-780.txt",
+              "available": true,
+              "bytes": 4280
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-tips-780.png",
+              "available": true,
+              "bytes": 140903
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-tips-780.txt",
+              "available": true,
+              "bytes": 2854
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-native/governance-tips-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/manifest.json",
+        "available": true,
+        "bytes": 18790,
+        "sha256": "6403e3fcfaf44072e0c0a9a283ebd43677be6cebf8065b50cef9d6851681747a"
+      },
+      "checkpoints": [
+        324
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T03:07:14.324Z",
+      "reported_commit": "892f1fd23ba813979243ccbea37234bebb303843",
+      "reported_source_fingerprint": "5656beeaa57e13d55e9baf7e47bf98239bce03bdccfec98eca85201e3583a2ad",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Current metadata or actual frozen-course projection via synthetic transport. No lab, learner or assessment writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 102927,
+        "sha256": "41bf1865b1ec632fc6240b9f452159d57ce9e3081dd6d8da489b4cc8e9fd422e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12278,
+        "sha256": "43640ac902c11a49b9c4f4f9aa3355bce801152ad5dc307218ee359027b72f34"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleIds": [
+            "foundations",
+            "process_mapping",
+            "workflow_design",
+            "extraction_engine",
+            "multi_step",
+            "advanced_nodes",
+            "validation_qa",
+            "batch_processing",
+            "governance"
+          ],
+          "working": true,
+          "keyboardTipDisclosure": true,
+          "preservedHistoricalTips": false,
+          "courseWrites": [],
+          "assessmentChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "foundations-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-320.png",
+              "available": true,
+              "bytes": 73485
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-320.txt",
+              "available": true,
+              "bytes": 5031
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-320.png",
+              "available": true,
+              "bytes": 60486
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-320.txt",
+              "available": true,
+              "bytes": 2793
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-320.png",
+              "available": true,
+              "bytes": 79237
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-320.txt",
+              "available": true,
+              "bytes": 6382
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-320.png",
+              "available": true,
+              "bytes": 71580
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-320.txt",
+              "available": true,
+              "bytes": 6419
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-320.png",
+              "available": true,
+              "bytes": 84423
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-320.txt",
+              "available": true,
+              "bytes": 4747
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-320.png",
+              "available": true,
+              "bytes": 69837
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-320.txt",
+              "available": true,
+              "bytes": 6813
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-320.png",
+              "available": true,
+              "bytes": 75422
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-320.txt",
+              "available": true,
+              "bytes": 6757
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-320.png",
+              "available": true,
+              "bytes": 63635
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-320.txt",
+              "available": true,
+              "bytes": 2856
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-320.png",
+              "available": true,
+              "bytes": 73672
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-320.txt",
+              "available": true,
+              "bytes": 6682
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-320.png",
+              "available": true,
+              "bytes": 62876
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-320.txt",
+              "available": true,
+              "bytes": 2811
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-320.png",
+              "available": true,
+              "bytes": 72104
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-320.txt",
+              "available": true,
+              "bytes": 5815
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-320.png",
+              "available": true,
+              "bytes": 65542
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-320.txt",
+              "available": true,
+              "bytes": 2849
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-320.png",
+              "available": true,
+              "bytes": 74447
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-320.txt",
+              "available": true,
+              "bytes": 5855
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-320.png",
+              "available": true,
+              "bytes": 60638
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-320.txt",
+              "available": true,
+              "bytes": 2802
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-320.png",
+              "available": true,
+              "bytes": 71896
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-320.txt",
+              "available": true,
+              "bytes": 5909
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-320.png",
+              "available": true,
+              "bytes": 65599
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-320.txt",
+              "available": true,
+              "bytes": 2842
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-320.png",
+              "available": true,
+              "bytes": 76731
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-320.txt",
+              "available": true,
+              "bytes": 4280
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-320.png",
+              "available": true,
+              "bytes": 65193
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-320.txt",
+              "available": true,
+              "bytes": 2854
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-1440.png",
+              "available": true,
+              "bytes": 157359
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-1440.txt",
+              "available": true,
+              "bytes": 5097
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "foundations-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-1440.png",
+              "available": true,
+              "bytes": 65303
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-1440.txt",
+              "available": true,
+              "bytes": 2859
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/foundations-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-1440.png",
+              "available": true,
+              "bytes": 157239
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-1440.txt",
+              "available": true,
+              "bytes": 6448
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "process_mapping-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-1440.png",
+              "available": true,
+              "bytes": 114616
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-1440.txt",
+              "available": true,
+              "bytes": 6485
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/process_mapping-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-1440.png",
+              "available": true,
+              "bytes": 157691
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-1440.txt",
+              "available": true,
+              "bytes": 4813
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "workflow_design-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-1440.png",
+              "available": true,
+              "bytes": 119760
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-1440.txt",
+              "available": true,
+              "bytes": 6879
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/workflow_design-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-1440.png",
+              "available": true,
+              "bytes": 155506
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-1440.txt",
+              "available": true,
+              "bytes": 6823
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "extraction_engine-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-1440.png",
+              "available": true,
+              "bytes": 70815
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-1440.txt",
+              "available": true,
+              "bytes": 2922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/extraction_engine-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-1440.png",
+              "available": true,
+              "bytes": 157575
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-1440.txt",
+              "available": true,
+              "bytes": 6748
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "multi_step-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-1440.png",
+              "available": true,
+              "bytes": 69036
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-1440.txt",
+              "available": true,
+              "bytes": 2877
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/multi_step-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-1440.png",
+              "available": true,
+              "bytes": 162807
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-1440.txt",
+              "available": true,
+              "bytes": 5881
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "advanced_nodes-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-1440.png",
+              "available": true,
+              "bytes": 69576
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-1440.txt",
+              "available": true,
+              "bytes": 2915
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/advanced_nodes-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-1440.png",
+              "available": true,
+              "bytes": 163432
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-1440.txt",
+              "available": true,
+              "bytes": 5921
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-1440.png",
+              "available": true,
+              "bytes": 68482
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-1440.txt",
+              "available": true,
+              "bytes": 2868
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/validation_qa-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-1440.png",
+              "available": true,
+              "bytes": 158263
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-1440.txt",
+              "available": true,
+              "bytes": 5975
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "batch_processing-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-1440.png",
+              "available": true,
+              "bytes": 71011
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-1440.txt",
+              "available": true,
+              "bytes": 2908
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/batch_processing-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-1440.png",
+              "available": true,
+              "bytes": 138045
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-1440.txt",
+              "available": true,
+              "bytes": 4346
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-tips-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-1440.png",
+              "available": true,
+              "bytes": 71081
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-1440.txt",
+              "available": true,
+              "bytes": 2920
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-guidance-2026-10-09/browser-working/governance-tips-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-multi-step-recovery-2026-10-07/connected/manifest.json",
         "available": true,
         "bytes": 54674,
@@ -259000,7 +261524,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1334,
+    "1440x1000": 1370,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -259011,7 +261535,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 467,
+    "320x1000": 503,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -259033,7 +261557,7 @@
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 58,
+    "390x800": 64,
     "390x844": 862,
     "390x850": 276,
     "390x900": 192,

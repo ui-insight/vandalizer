@@ -372,6 +372,8 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             <div className="mb-5">
               <button
                 onClick={() => setShowTips(!showTips)}
+                aria-expanded={showTips}
+                aria-controls={`certification-tips-${module.id}`}
                 className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900"
               >
                 <Lightbulb size={14} className="text-yellow-500" />
@@ -379,7 +381,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 {showTips ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
               {showTips && (
-                <ul className="mt-2 space-y-1.5 pl-5">
+                <ul id={`certification-tips-${module.id}`} className="mt-2 space-y-1.5 pl-5">
                   {module.tips.map((tip, i) => (
                     <li key={i} className="text-sm text-gray-600 list-disc">{tip}</li>
                   ))}

@@ -501,6 +501,150 @@
         "903addf1a6dc1456d8a10fa888bda2cc1796c8cb1ce340aeaf3d726828242271",
         "654187b9a6e795a17190d6d9724b038e025fcc3ada5fd396320e030435570be7"
       ]
+    },
+    {
+      "id": "foundations-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "foundations"
+      ],
+      "title": "Current guidance for Foundations",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original base requires three matching fields, while five- and eight-field enrichment are separate. Example names and amounts are teaching targets, not proof of an executed result; inspect the assigned source and actual output."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "f8f94c7ca79f8b175f8af794a8ca786d461e3413c51f8059f7b735e4387f317b"
+      ]
+    },
+    {
+      "id": "process_mapping-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "process_mapping"
+      ],
+      "title": "Current guidance for Thinking in Workflows",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Repetition alone does not establish suitability. Include source quality, exceptions, review and maintenance costs; use a fictional or authorized example rather than exposing sensitive workplace information."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "801e0a9db7e1e3c15ffc2c92c71cbaeec56dc2e12f3ea90a291d986cc4b00572"
+      ]
+    },
+    {
+      "id": "workflow_design-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "workflow_design"
+      ],
+      "title": "Current guidance for Workflow Design",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Step separation should serve a dependency, reusable result or review boundary. Splitting by default and fixed step counts do not guarantee quality; preserve the context each operation needs."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "459b823c91e932570a92fb7fd65006dbc3378d26e844bc2a7cfff01cf8885e26"
+      ]
+    },
+    {
+      "id": "extraction_engine-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "extraction_engine"
+      ],
+      "title": "Current guidance for Extraction Engine",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original base is 15 fields, with 20- and 25-field enrichment. Allowed values is a category constraint, not source verification. Optional affects validation treatment; multiple possible people do not by themselves justify making a field optional."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "1e3c5dd7de44a44a8142f6e70916e676f43304c423dc176e5b64ff207a0d1bb1"
+      ]
+    },
+    {
+      "id": "multi_step-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "multi_step"
+      ],
+      "title": "Current guidance for Multi-Step Workflows",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The current picker labels are Extractions, Prompts and Format; Format is the Formatter operation in the original criteria. Inspect configured inputs and intermediate results, and preserve unsupported deadlines or obligations as unresolved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "903addf1a6dc1456d8a10fa888bda2cc1796c8cb1ce340aeaf3d726828242271"
+      ]
+    },
+    {
+      "id": "advanced_nodes-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "advanced_nodes"
+      ],
+      "title": "Current guidance for Advanced Nodes",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Deep Analysis uses model reasoning and is not a deterministic calculator. Verify source figures and arithmetic independently. It supplies an internal route for the original advanced-node requirement; preserve the parallel-task requirement and keep dependent operations after their prerequisites."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "5189267c2be9cdd091be1a278148e58af774c2d6f6dd2be3f34ca7547cdd3ce6"
+      ]
+    },
+    {
+      "id": "validation_qa-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "validation_qa"
+      ],
+      "title": "Current guidance for Validation & QA",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Presence and numeric format do not establish the correct amount. Verify expected values against the source and inspect actual evaluation records. Saving a plan or retaining an old score does not validate every later execution."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "e838f782c771af45dc37e18a540991806860f9b59902da51a01b74a27e000b07"
+      ]
+    },
+    {
+      "id": "batch_processing-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "batch_processing"
+      ],
+      "title": "Current guidance for Batch Processing",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Use a suitable saved workflow; Process Mapping does not itself supply one. Reconcile every assigned distinct document with its own result. A terminal batch status can include failures and does not prove accurate output."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "c48bc3143c7f6a88031f6f23a8b2e3e13b23b3e57d0458931d839caf2bff2978"
+      ]
+    },
+    {
+      "id": "governance-module-hints-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "governance"
+      ],
+      "title": "Current guidance for Collaboration & Governance",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Checked denotes examiner review, not production readiness for your use. Inspect measured validation separately. The original course retains its sharing and optional review-star rules; sharing alone does not save course completion. No new staff certification grading queue is created by this guidance."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "eab1f0bf670dd10d12003d5011475a4182cab18c9423664c0caddd47d8663670"
+      ]
     }
   ]
 }
