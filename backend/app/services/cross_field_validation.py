@@ -44,7 +44,15 @@ _AMOUNT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _RANGE_SEPARATOR = re.compile(r"^\s*(?:-|–|—|to|through)\s*$", re.IGNORECASE)
-_CURRENCY_WORDS = re.compile(r"\b(?:usd|dollars?)\b", re.IGNORECASE)
+_CURRENCY_ALIASES = {
+    "usd": "USD", "dollar": "USD", "dollars": "USD",
+    "eur": "EUR", "euro": "EUR", "euros": "EUR",
+    "gbp": "GBP", "pound": "GBP", "pounds": "GBP",
+    "cad": "CAD", "aud": "AUD", "nzd": "NZD", "jpy": "JPY",
+    "chf": "CHF", "cny": "CNY", "inr": "INR",
+}
+_CURRENCY_WORDS = re.compile(r"\b(?:" + "|".join(_CURRENCY_ALIASES) + r")\b", re.IGNORECASE)
+_COUNT_UNITS = re.compile(r"\b(?:days?|weeks?|months?|years?)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -53,6 +61,7 @@ class ParsedNumber:
 
     value: Decimal
     unit: Optional[str] = None
+    currency: Optional[str] = None
 
 
 def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
@@ -60,16 +69,19 @@ def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
 
     Returns ``(parsed, None)`` or ``(None, reason)``. Handles ints/floats,
     "$1,200.50", "12%", accounting negatives "(1,200)", money scales ("$500K",
-    "$1.2 million", "1.5M"), and a single amount inside words ("approx 50",
-    "about $1,000"). A range ("10-20%") or a string with several numbers is not
+    "$1.2 million", "1.5M"). Approximate amounts, inequalities, unsupported
+    qualifiers/scales, a range ("10-20%"), or several numbers are not
     one amount and is rejected rather than replaced by a guess such as the
     midpoint.
     """
     if isinstance(value, bool) or value is None:
         return None, None
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, Decimal)):
         try:
-            return ParsedNumber(Decimal(str(value))), None
+            number = Decimal(str(value))
+            if not number.is_finite():
+                return None, "is not a finite amount"
+            return ParsedNumber(number), None
         except InvalidOperation:
             return None, None
     if not isinstance(value, str):
@@ -83,7 +95,9 @@ def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
         inner, reason = parse_number(m.group(1))
         if inner is None:
             return None, reason
-        return ParsedNumber(-inner.value, inner.unit), None
+        if inner.value < 0:
+            return None, "contains conflicting negative signs"
+        return ParsedNumber(-inner.value, inner.unit, inner.currency), None
 
     matches = list(_AMOUNT_PATTERN.finditer(s))
     if not matches:
@@ -101,6 +115,25 @@ def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
         return None, "contains more than one number"
 
     match = matches[0]
+    if match.group("neg") and match.group("neg2"):
+        return None, "contains conflicting negative signs"
+    currencies = {_CURRENCY_ALIASES[m.group(0).lower()] for m in _CURRENCY_WORDS.finditer(s)}
+    symbol = match.group("cur")
+    if symbol:
+        # Written dollar codes qualify '$'; no implicit FX conversion.
+        if symbol != "$" or not currencies:
+            currencies.add({"$": "USD", "€": "EUR", "£": "GBP"}[symbol])
+        elif not currencies <= {"USD", "CAD", "AUD", "NZD"}:
+            return None, "contains conflicting currency labels"
+    if len(currencies) > 1:
+        return None, "contains conflicting currency labels"
+    remainder = _CURRENCY_WORDS.sub("", s[:match.start()] + s[match.end():])
+    count_units = {m.group(0).lower().rstrip("s") for m in _COUNT_UNITS.finditer(remainder)}
+    remainder = _COUNT_UNITS.sub("", remainder)
+    if remainder.strip(" \t\r\n."):
+        return None, "contains an unsupported scale, unit, or qualifier; give one exact amount"
+    if len(count_units) > 1 or (count_units and (currencies or match.group("pct"))):
+        return None, "contains conflicting units"
     try:
         number = Decimal(match.group("num").replace(",", ""))
     except InvalidOperation:
@@ -113,10 +146,49 @@ def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
 
     unit = None
     if match.group("pct"):
+        if currencies:
+            return None, "contains conflicting units"
         unit = "percent"
-    elif match.group("cur") or _CURRENCY_WORDS.search(s):
+    elif currencies:
         unit = "currency"
-    return ParsedNumber(number, unit), None
+    elif count_units:
+        unit = next(iter(count_units))
+    return ParsedNumber(number, unit, next(iter(currencies), None)), None
+
+
+def _numeric_rule_error(data: dict, rule: dict) -> Optional[str]:
+    """Reject invalid numeric configuration and implicit currency conversions."""
+    field_keys = {
+        "sum_equals": ("target_field",),
+        "range_check": ("field",),
+        "product_equals": ("base_field", "rate_field", "target_field"),
+        "at_most_difference": ("field", "minuend_field"),
+    }
+    kind = rule.get("type")
+    if kind not in field_keys:
+        return None
+    for key in ("tolerance", "min", "max"):
+        value = rule.get(key)
+        if value is None:
+            continue
+        try:
+            number = Decimal(str(value))
+        except InvalidOperation:
+            return f"Invalid {key}: {value!r}"
+        if not number.is_finite() or (key == "tolerance" and number < 0):
+            return f"Invalid {key}: must be finite" + (" and non-negative" if key == "tolerance" else "")
+    fields = [rule.get(key) for key in field_keys[kind]]
+    fields += list(rule.get("source_fields") or []) + list(rule.get("subtrahend_fields") or [])
+    currencies = set()
+    for field in fields:
+        if not field:
+            continue
+        parsed, _ = parse_number(_get_field_value(data, field))
+        if parsed and parsed.currency:
+            currencies.add(parsed.currency)
+    if len(currencies) > 1:
+        return f"Fields mix currencies ({', '.join(sorted(currencies))}); provide amounts in one currency"
+    return None
 
 
 def _try_parse_number(value: Any) -> Optional[float]:
@@ -226,7 +298,8 @@ class CrossFieldValidator:
                 results.append(_result(rule, "unparseable", f"Unknown rule type: {rule_type}"))
                 continue
             try:
-                result = handler(data, rule)
+                numeric_error = _numeric_rule_error(data, rule)
+                result = _result(rule, "unparseable", numeric_error) if numeric_error else handler(data, rule)
                 results.append(result)
             except Exception as e:
                 logger.warning("Cross-field rule %s evaluation error: %s", rule.get("id"), e)

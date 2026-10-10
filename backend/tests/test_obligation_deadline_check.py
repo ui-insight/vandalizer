@@ -88,8 +88,8 @@ def test_a_time_the_source_does_not_give_is_not_added():
 def test_a_missing_year_is_not_invented():
     quote = "Letters of intent are due November 2 at noon Eastern Time."
     assert "without a year" in _rejected("2026-11-02T12:00", quote)
-    # A second source quote that states the year is enough.
-    assert _ok("2026-11-02T12:00", quote + " Program Solicitation NSF 26-512, issued 2026.")
+    # A publication year alone does not establish the deadline's year.
+    assert _rejected("2026-11-02T12:00", quote + " Program Solicitation NSF 26-512, issued 2026.")
 
 
 def test_day_month_and_numeric_forms_carry_their_year():
@@ -114,3 +114,33 @@ def test_an_amendment_is_checked_against_its_own_quote():
 def test_due_text_must_come_from_the_quote():
     assert "copied from the quote" in _rejected("2026-11-19T17:00", NOTICE, due_text="5:00 p.m. Eastern Time")
     assert _ok("2026-11-19T17:00", NOTICE, due_text="5:00 p.m. Pacific Time")["due_text"] == "5:00 p.m. Pacific Time"
+
+
+def test_does_not_borrow_a_time_from_another_deadline():
+    quote = ('Internal approval is November 12, 2026 at noon Pacific Time. '
+             'Sponsor submission is November 19, 2026 at 5:00 p.m. Pacific Time.')
+    assert 'multiple' in _rejected('2026-11-19T12:00', quote)
+
+
+def test_unrelated_year_does_not_establish_the_deadline_year():
+    quote = 'Letters are due November 2 at noon Eastern Time. This program was established in 2026.'
+    assert 'year' in _rejected('2026-11-02T12:00', quote)
+
+
+def test_does_not_add_seconds_the_quote_never_gave():
+    assert 'precision' in _rejected('2026-11-19T17:00:59', NOTICE)
+
+
+def test_does_not_accept_a_different_time_from_due_text():
+    quote = 'Due November 19, 2026 at 5:00 p.m. Pacific Time. Help desk closes at noon Pacific Time.'
+    assert _rejected('2026-11-19T17:00', quote, 'noon Pacific Time')
+
+
+def test_explicit_standard_time_is_not_silently_changed_to_daylight_time():
+    quote = 'Due June 3, 2026 at 5:00 PM PST.'
+    assert _rejected('2026-06-04T00:00:00+00:00', quote)
+    assert _ok('2026-06-04T01:00:00+00:00', quote)['due_at'] == datetime.datetime(2026, 6, 3, 17)
+
+
+def test_invalid_iso_suffix_is_not_discarded():
+    assert _rejected('2026-11-19garbage', 'Due November 19, 2026 at midnight Pacific Time.')

@@ -25,7 +25,8 @@ describe('compliance check summary', () => {
     render(<ToolStatusLine call={call} result={checked({
       rules_checked: 1, documents_checked: 2, all_compliant: true, outcome: 'pass', total_violations: 0,
     })} />)
-    expect(screen.getByText('All 2 documents compliant')).toBeInTheDocument()
+    expect(screen.getByText('Configured rules passed for 2 documents')).toBeInTheDocument()
+    expect(screen.queryByText(/documents compliant/)).toBeNull()
   })
 
   it('still counts violations', () => {

@@ -138,6 +138,19 @@ async def test_a_deadline_given_in_utc_is_saved_and_shown_as_the_source_states_i
     assert row["due_text"] == "5:00 p.m. Pacific Time"
 
 
+async def test_mixed_deadline_quotes_cannot_create_an_inbox_item(mongo_client):
+    owner, _viewer, _project = await _setup()
+    mixed = {**ORIGINAL, "due_at": "2026-11-12T12:00",
+             "sources": ORIGINAL["sources"] + INTERNAL["sources"]}
+    async with await _client(owner) as http:
+        response = await http.post('/api/obligations', json={'project_uuid': 'proj-1', 'items': [mixed]})
+        assert response.status_code == 200
+        result = response.json()
+        assert result['created'] == []
+        assert 'multiple' in result['rejected'][0]['reason']
+        assert (await http.get('/api/obligations')).json()['items'] == []
+
+
 async def test_the_same_item_twice_is_not_added_twice(mongo_client):
     owner, _viewer, project = await _setup()
     (a,) = (await obligation_service.propose(project, owner, [LETTER]))["accepted"]

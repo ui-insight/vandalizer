@@ -397,7 +397,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const violations = (obj.total_violations as number) || 0
       const docs = (obj.documents_checked as number) || 0
       if (obj.all_compliant === true) {
-        return { text: `All ${docs} document${docs !== 1 ? 's' : ''} compliant`, qualityHint }
+        return { text: `Configured rules passed for ${docs} document${docs !== 1 ? 's' : ''}`, qualityHint }
       }
       if (violations === 0) {
         // all_compliant is null: some rule couldn't be confirmed, or not every

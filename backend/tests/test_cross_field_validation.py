@@ -223,7 +223,7 @@ class TestTriStateStatus:
 
 class TestNumberParsing:
     """Hardening that landed with the validation-uplift work — numbers should
-    survive accounting parens, ranges, and "approx X" framings."""
+    preserve accounting signs and leave uncertain amounts unparseable."""
 
     def test_parens_negative(self, validator):
         rule = {"type": "range_check", "field": "x", "min": -2000, "max": 0}
@@ -244,10 +244,10 @@ class TestNumberParsing:
             assert results[0]["status"] == "unparseable", value
             assert "range" in results[0]["message"], value
 
-    def test_approx_prefix(self, validator):
+    def test_approx_prefix_does_not_establish_an_exact_amount(self, validator):
         rule = {"type": "range_check", "field": "x", "min": 0, "max": 100}
         results = validator.validate({"x": "approx 50"}, [rule])
-        assert results[0]["status"] == "pass"
+        assert results[0]["status"] == "unparseable"
 
     def test_ambiguous_two_numbers_is_unparseable(self, validator):
         # "10 of 20" has two numbers — picking the first one is too clever;
@@ -643,7 +643,6 @@ class TestMoneyScaleAndExactness:
             ("($1,200)", "-1200"),
             ("-$1,200.50", "-1200.50"),
             ("USD 1,000", "1000"),
-            ("approx 50", "50"),
             ("5 months", "5"),
         ],
     )
@@ -715,3 +714,31 @@ class TestMoneyScaleAndExactness:
         results = validator.validate({"a": "$100-$200", "b": "$50", "t": "$200"}, [rule])
         assert results[0]["status"] == "unparseable"
         assert "range" in results[0]["message"]
+
+
+class TestExactNumericEvidence:
+    @pytest.mark.parametrize('value', [
+        '$1.2 trillion', '10 lakh', 'at least $500', 'up to $500',
+        'approx 50', 'about $100', '≤100', '100+', '--100',
+        float('inf'), float('-inf'), float('nan'),
+    ])
+    def test_unsupported_or_inexact_values_are_not_exact_amounts(self, value):
+        from app.services.cross_field_validation import parse_number
+        parsed, reason = parse_number(value)
+        assert parsed is None
+        assert reason
+
+    @pytest.mark.parametrize('left,right,total', [
+        ('$100', '€100', '$200'), ('100 USD', '100 CAD', '200 USD'),
+        ('£100', '$100', '£200'),
+    ])
+    def test_mixed_currencies_cannot_pass_a_sum(self, validator, left, right, total):
+        rule = {'type': 'sum_equals', 'source_fields': ['a', 'b'], 'target_field': 't'}
+        result = validator.validate({'a': left, 'b': right, 't': total}, [rule])[0]
+        assert result['status'] == 'unparseable'
+        assert 'currenc' in result['message']
+
+    @pytest.mark.parametrize('tolerance', [float('inf'), float('nan'), -1])
+    def test_invalid_tolerance_does_not_establish_a_pass(self, validator, tolerance):
+        rule = {'type': 'sum_equals', 'source_fields': ['a', 'b'], 'target_field': 't', 'tolerance': tolerance}
+        assert validator.validate({'a': 1, 'b': 2, 't': 100}, [rule])[0]['status'] == 'unparseable'

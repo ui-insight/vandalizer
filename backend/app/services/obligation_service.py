@@ -38,10 +38,8 @@ _DATE_IN_TEXT = re.compile(
     r"|\b(?P<iy>\d{4})-(?P<im>\d{2})-(?P<id>\d{2})\b",
     re.IGNORECASE,
 )
-_YEAR_IN_TEXT = re.compile(r"\b(?:19|20)\d{2}\b")
-
-# Time zones a sponsor deadline is commonly written in. "PST" is often used
-# loosely for Pacific time year-round, so the abbreviations map to the zone.
+# Generic regional time follows daylight-saving rules. Explicit standard or
+# daylight labels keep their stated offset; never silently reinterpret PST as PDT.
 _ZONES = {
     "pacific": "America/Los_Angeles", "pt": "America/Los_Angeles",
     "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles",
@@ -54,12 +52,16 @@ _ZONES = {
     "alaska": "America/Anchorage", "hawaii": "Pacific/Honolulu",
     "utc": "UTC", "gmt": "UTC",
 }
+_FIXED_OFFSETS = {"pst": -8, "pdt": -7, "mst": -7, "mdt": -6,
+                  "cst": -6, "cdt": -5, "est": -5, "edt": -4}
+_STANDARD_OFFSETS = {"pacific": -8, "mountain": -7, "central": -6,
+                     "eastern": -5, "alaska": -9, "hawaii": -10}
 _TIME_IN_TEXT = re.compile(
     r"(?:\b(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>[ap])\.?\s?m\b\.?"
     r"|\b(?P<h24>[01]?\d|2[0-3]):(?P<m24>[0-5]\d)\b"
     r"|\b(?P<word>noon|midnight)\b)"
     r"(?:\s*(?:\(|,)?\s*(?:"
-    r"(?P<zone>pacific|mountain|central|eastern|alaska|hawaii)(?:\s+(?:standard|daylight|prevailing))?\s+time"
+    r"(?P<zone>pacific|mountain|central|eastern|alaska|hawaii)(?:\s+(?P<zone_mode>standard|daylight|prevailing))?\s+time"
     r"|(?P<abbr>pt|pst|pdt|mt|mst|mdt|ct|cst|cdt|et|est|edt|utc|gmt)\b"
     r"|(?P<local>local\s+time|submitter'?s\s+local\s+time)))?",
     re.IGNORECASE,
@@ -108,7 +110,11 @@ def _times_in(text: str) -> list[dict]:
             hour, minute = int(m.group("h24")), int(m.group("m24"))
         name = (m.group("zone") or m.group("abbr") or "").lower()
         zone = _ZONES.get(name) or ("local" if m.group("local") else None)
-        found.append({"hour": hour, "minute": minute, "zone": zone, "text": m.group(0).strip()})
+        offset = _FIXED_OFFSETS.get(name)
+        mode = (m.group("zone_mode") or "").lower()
+        if mode in {"standard", "daylight"}:
+            offset = _STANDARD_OFFSETS[name] + (1 if mode == "daylight" else 0)
+        found.append({"hour": hour, "minute": minute, "zone": zone, "offset": offset, "text": m.group(0).strip()})
     return found
 
 
@@ -135,10 +141,16 @@ def check_deadline(
     if due is None:
         return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
     has_time = len(raw) > 10
+    if due.second or due.microsecond or re.search(r"\b\d{1,2}:\d{2}:\d{2}\b", quotes):
+        return None, "deadline precision finer than a minute cannot be verified by this check"
+    dates = _dates_in(quotes)
+    times = _times_in(quotes)
+    time_keys = {(t['hour'], t['minute'], t['zone'], t['offset']) for t in times}
+    if times and (len(dates) > 1 or len(time_keys) > 1):
+        return None, "the quotes contain multiple dates or times; cite a narrower passage for this deadline so its components cannot be mixed"
 
     stated_time: Optional[dict] = None
     if has_time:
-        times = _times_in(quotes)
         if not times:
             return None, (
                 "the quote states no time of day; give due_at as a date only "
@@ -154,7 +166,8 @@ def check_deadline(
                     "due_at without a UTC offset, as the source writes it"
                 )
             for t in zoned:
-                local = due.astimezone(ZoneInfo(t["zone"]))
+                zone = datetime.timezone(datetime.timedelta(hours=t["offset"])) if t["offset"] is not None else ZoneInfo(t["zone"])
+                local = due.astimezone(zone)
                 if (local.hour, local.minute) == (t["hour"], t["minute"]):
                     due, stated_time = local.replace(tzinfo=None), t
                     break
@@ -172,7 +185,7 @@ def check_deadline(
                     f"the quote does not state {due:%H:%M}; it gives {times[0]['text']}"
                 )
 
-    same_day = [(y, mo, d) for y, mo, d in _dates_in(quotes) if (mo, d) == (due.month, due.day)]
+    same_day = [(y, mo, d) for y, mo, d in dates if (mo, d) == (due.month, due.day)]
     if not same_day:
         return None, f"the quote does not state {due:%B} {due.day}; cite the passage that gives the date"
     years = {y for y, _mo, _d in same_day if y is not None}
@@ -180,15 +193,22 @@ def check_deadline(
         return None, (
             f"the quote states {due:%B} {due.day}, {min(years)}, not {due.year}"
         )
-    if not years and str(due.year) not in _YEAR_IN_TEXT.findall(quotes):
+    if not years:
         return None, (
-            f"the quote gives {due:%B} {due.day} without a year; add a source "
-            f"quote that states {due.year}"
+            f"the quote gives {due:%B} {due.day} without a year; cite a passage "
+            "that explicitly gives the full deadline date, including its year"
         )
 
     text = str(due_text or "").strip()[:120]
     if text and _normalized(text) not in _normalized(quotes):
         return None, "due_text must be copied from the quote; give the time exactly as written"
+    if not has_time and times:
+        return None, "the quote states a time of day; include that time in due_at so it is not lost"
+    if text and stated_time is not None:
+        described = _times_in(text)
+        expected = (stated_time['hour'], stated_time['minute'], stated_time['zone'], stated_time['offset'])
+        if len(described) != 1 or (described[0]['hour'], described[0]['minute'], described[0]['zone'], described[0]['offset']) != expected:
+            return None, "due_text must describe the same verified time and time zone as due_at"
     if not text and stated_time is not None:
         text = stated_time["text"]
     if not has_time:
@@ -201,14 +221,14 @@ def _parse_due(value: Any) -> Optional[datetime.datetime]:
         return value
     if not isinstance(value, str) or not value.strip():
         return None
-    text = value.strip().replace("Z", "+00:00")
+    text = value.strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})?)?", text):
+        return None
+    text = text.replace("Z", "+00:00")
     try:
         return datetime.datetime.fromisoformat(text)
     except ValueError:
-        try:
-            return datetime.datetime.combine(datetime.date.fromisoformat(text[:10]), datetime.time())
-        except ValueError:
-            return None
+        return None
 
 
 def _as_number(value: Any) -> Optional[float]:
