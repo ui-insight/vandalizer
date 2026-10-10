@@ -29,7 +29,8 @@ await context.route('**/api/certification/**', async route => {
   return route.fallback()
 })
 const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
-const noticeTitle = lesson.editorial_notices[0].title
+const noticeTitle = lesson.editorial_notices.find(notice => !process.env.REVIEW_NOTICE_ID || notice.id === process.env.REVIEW_NOTICE_ID)?.title
+assert.ok(noticeTitle)
 async function capture(id, target) {
   await target.scrollIntoViewIfNeeded(); await review.capture(id)
   assert.deepEqual(JSON.parse(await readFile(`${review.out}/${id}.axe.json`, 'utf8')), [])
@@ -84,7 +85,7 @@ try {
     await page.getByRole('textbox', { name: 'Message input', exact: true }).fill('Review this older lesson without version metadata.')
     await page.getByRole('button', { name: 'Send message', exact: true }).click()
     const oldCard = page.locator('.cert-chat-card').last()
-    await oldCard.getByText(/The original course version is unavailable/).waitFor()
+    await oldCard.getByRole('complementary', { name: noticeTitle }).getByText(/The original course version is unavailable/).waitFor()
     await inspect(oldCard, `unversioned-chat-${width}`)
     await inspectHistoricalDiagram(oldCard, `unversioned-chat-${width}`)
     assert.equal(await oldCard.getByRole('button', { name: 'Save my place', exact: true }).count(), 0)

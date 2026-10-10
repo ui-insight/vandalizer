@@ -84,19 +84,30 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'ai_literacy.what-ai-is-genuinely-bad-at',
-        revision: 2,
+        revision: 3,
         title: 'What AI is genuinely bad at',
         objective: 'After this lesson, you\'ll be able to identify AI limitations and avoid common pitfalls in research administration.',
         content: "Honesty about AI's limitations is essential for responsible use in research administration:\n\n• **Judgment calls requiring institutional knowledge** — AI doesn't know your university's internal policies, political dynamics, risk tolerance, or historical context.\n• **Catching its own mistakes** — An LLM cannot reliably self-check. If it extracts the wrong budget figure, it won't flag the error. That's your job.\n• **Math** — LLMs frequently make arithmetic errors. Never trust an LLM to add up budget line items. Use a checked calculator or explicitly recorded human arithmetic. Where code execution is available and authorized, inspect its rule and inputs too. A model explanation is not independent arithmetic evidence.\n• **Novel or unusual document formats** — If a document doesn't follow standard patterns (hand-written notes, unusual layouts, scanned images with poor OCR), extraction quality drops significantly.\n• **Replacing professional judgment on compliance** — AI can flag potential issues, but determining whether a proposal actually meets regulatory requirements requires your expertise.\n\nThe pattern: AI is a powerful first-pass tool. It does the reading; you do the thinking.",
         variant: 'insight',
         knowledgeCheck: {
-          question: 'Which task is AI worst at?',
-          options: [
-            { text: 'Extracting PI names from grant proposals', correct: false, explanation: 'This is actually a strong suit for AI \u2014 it\'s pattern-based extraction from structured documents.' },
-            { text: 'Summarizing progress reports', correct: false, explanation: 'Summarization is one of AI\'s strengths \u2014 it\'s good at condensing text.' },
-            { text: 'Making judgment calls that require institutional knowledge', correct: true, explanation: 'Correct! AI doesn\'t know your institution\'s policies, politics, or historical context. That requires your expertise.' },
-            { text: 'Processing 200 documents in the same format', correct: false, explanation: 'Batch processing with consistent format is ideal for AI \u2014 it handles repetition well.' },
-          ],
+          "question": "A model proposes an eligibility decision using an unstated institutional rule. What should you do?",
+          "options": [
+            {
+              "text": "Accept it because the explanation is fluent.",
+              "correct": false,
+              "explanation": "Fluency does not establish the applicable rule, source evidence or decision authority."
+            },
+            {
+              "text": "Verify the applicable rule and evidence, and keep the decision with the authorized reviewer.",
+              "correct": true,
+              "explanation": "The model can help examine supplied policy context, but it does not create missing evidence or grant itself institutional authority."
+            },
+            {
+              "text": "Run the same prompt repeatedly until the answers agree.",
+              "correct": false,
+              "explanation": "Repeated agreement can preserve an unsupported assumption."
+            }
+          ]
         },
       },
       {
@@ -635,12 +646,31 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'advanced_nodes.code-execution-custom-logic-in-your-pipeline',
-        revision: 2,
+        revision: 3,
         title: "Check calculations with explicit inputs and rules",
         objective: "Record the formula, units and result instead of accepting model assurance about arithmetic.",
         content: "A calculation needs more than a plausible number. Identify each input, its source, unit, period and meaning. Specify the formula and any rounding or inclusion rule before accepting the result. Adding annual direct costs to a full-project total can produce exact arithmetic with the wrong meaning.\n\nUse an available, permitted deterministic calculation route for the arithmetic, such as a checked calculator or calculation tool. Preserve the inputs, formula and result and verify them against the task. A model can help propose the calculation or explain a discrepancy, but a statement that it “checked the math” is not the calculation evidence itself.\n\nVandalizer’s Code Node is a restricted, administrator-controlled capability and is not offered in the standard palette. This lesson does not require learners to enable it or obtain broader permissions. Where code execution is already authorized, inspect the actual code and permitted inputs and test its behavior. Runtime restrictions and a timeout do not establish that the code is correct or appropriate.\n\nIf the assigned workflow cannot perform the needed calculation through an authorized route, record that limitation and keep the claimed check unresolved. Do not replace the missing calculation with a Deep Analysis opinion or fabricate a successful run. Interpretation and calculation can work together, but their evidence is different.\n\n**Practice:** Write a checkable expression for a total using named source amounts. State how you would handle a missing amount or a conflicting period before computing it.",
         variant: 'concept',
-        knowledgeCheck: {"question":"When Code Execution is available and authorized, which task is better handled with deterministic code than a Prompt node?","options":[{"text":"Extracting structured fields from a grant proposal","correct":false,"explanation":"That's what Extraction tasks are for. Code Execution is for logic that requires precision, not pattern recognition."},{"text":"Summarizing a progress report into bullet points","correct":false,"explanation":"Summarization is a Prompt task — it's language work that LLMs do well."},{"text":"Adding up budget line items or computing percentages from extracted numbers","correct":true,"explanation":"Use an explicit calculation rule with checked inputs and inspect the result. A checked calculator or recorded human calculation is a supported alternative when code execution is unavailable."},{"text":"Comparing two documents and identifying differences","correct":false,"explanation":"Document comparison is a Prompt task — it involves language understanding, which is LLM territory."}]},
+        knowledgeCheck: {
+          "question": "A model says the total is correct, but no inputs or formula are preserved. What is missing?",
+          "options": [
+            {
+              "text": "Only a more confident explanation.",
+              "correct": false,
+              "explanation": "Confidence does not establish which amounts or rule were used."
+            },
+            {
+              "text": "The source-linked inputs, units, formula and verified calculation result.",
+              "correct": true,
+              "explanation": "Those details make the calculation independently checkable."
+            },
+            {
+              "text": "An extra Deep Analysis pass to certify the first answer.",
+              "correct": false,
+              "explanation": "More model analysis does not substitute for deterministic calculation evidence."
+            }
+          ]
+        },
       },
       {
         id: 'advanced_nodes.running-tasks-in-parallel',
@@ -714,19 +744,30 @@ export const MODULES: ModuleDefinition[] = [
     lessons: [
       {
         id: 'output_delivery.from-analysis-to-deliverables',
-        revision: 2,
+        revision: 3,
         title: 'From analysis to deliverables',
         objective: 'After this lesson, you\'ll know which output node to use for different types of deliverables.',
         content: "So far, your workflows produce text output that you view in the app. But real research administration often requires deliverables: compliance reports to submit, data exports for spreadsheets, or document packages with multiple files.\n\nVandalizer's output nodes transform your workflow results into downloadable files:\n\n• **Document Renderer** — Generates a markdown or text file from your workflow output.\n• **Data Export** — Exports structured data as JSON or CSV.\n• **Include in deliverables** — Mark the intended output steps. Multiple included step outputs can be bundled as a ZIP; inspect the actual members and missing outputs. This uses the supported download path and does not require a Package Builder node.\n• **Form Filler** — Takes a template with placeholders and fills it with extracted data.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'You need to export extracted data from 50 proposals into a spreadsheet. Which output node is the right choice?',
-          options: [
-            { text: 'Document Renderer \u2014 it produces a formatted text file from workflow output', correct: false, explanation: 'Document Renderer creates a readable document, not structured tabular data. It\'s better for reports you\'d read, not data you\'d analyze in Excel.' },
-            { text: 'Package Builder \u2014 it bundles multiple files into a ZIP', correct: false, explanation: 'Package Builder is for collecting multiple output files together, not for producing spreadsheet-compatible data.' },
-            { text: 'Data Export \u2014 it converts structured data to CSV or JSON', correct: true, explanation: 'Correct! Data Export with CSV format turns your extracted JSON into columns and rows that open directly in Excel or Google Sheets.' },
-            { text: 'Form Filler \u2014 it fills placeholders in a template with extracted values', correct: false, explanation: 'Form Filler is for template-based documents (like filling out a standard form), not for exporting tabular data.' },
-          ],
+          "question": "Which evidence establishes that a generated report is usable?",
+          "options": [
+            {
+              "text": "The run completed and a download link appeared.",
+              "correct": false,
+              "explanation": "The link does not establish that the file opens or contains the required content."
+            },
+            {
+              "text": "The actual file opens and its required reviewed content, references and layout have been checked.",
+              "correct": true,
+              "explanation": "Usability requires inspecting the artifact itself against the task."
+            },
+            {
+              "text": "Its filename ends in PDF.",
+              "correct": false,
+              "explanation": "An extension is not proof of usable content or correct rendering."
+            }
+          ]
         },
       },
       {
@@ -1035,19 +1076,30 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'governance.sharing-with-everyone',
-        revision: 3,
+        revision: 4,
         title: 'Sharing with everyone',
         objective: 'After this lesson, you\'ll know what a "Checked" shared entry does and doesn\'t promise, and how to read one.',
         content: "Sharing with everyone has two halves. You ask to share a workflow; an examiner checks it over and accepts it. A **Checked** badge identifies review status. Inspect the available quality and usage details separately:\n\n1. **Score, when available** — how it did on its measured validation cases, and how many cases that was. Unscored or missing evidence does not establish a pass or a failure.\n2. **Consistency** — whether it gave the same answers across repeated runs.\n3. **Adoption** — how many people already use it.\n4. **When it was last checked** — configured monitoring can re-run a baseline and flag measured changes. Inspect the actual record; no alert is not proof of current correctness.\n\nWhat it does *not* claim: that the output format fits your team, or that it is \"production-ready\" for your process. Those are your calls to make from the numbers — which is why the numbers, not the badge, are the point. A score and adoption history can inform further review, but neither establishes that the workflow fits your sources or intended use.\n\nSubmitting the sharing request supplies the original module’s base activity. Use Check Progress and Complete Module, or inspect the corresponding saved chat result, to establish course completion. Examiner review is separate optional enrichment under the original criteria and does not block the base requirement.",
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What does a "Checked" shared entry actually tell you?',
-          options: [
-            { text: 'The workflow is locked and cannot be edited by other team members', correct: false, explanation: 'Checked is not a lock. Anyone can copy a shared item and edit their copy.' },
-            { text: 'An examiner looked it over, and its score, consistency and adoption are shown so you can judge fit yourself', correct: true, explanation: 'Correct. Checked means someone looked at it and it was measured, not endorsed for every use. The numbers on the entry are what you decide from.' },
-            { text: 'The workflow was created by an admin-level user', correct: false, explanation: 'Any team member can ask to share a workflow with everyone. An examiner looks it over and accepts it based on the workflow\'s quality, not the creator\'s role.' },
-            { text: 'The workflow only uses LLM models approved by your institution', correct: false, explanation: 'Model approval is a separate concern. Checked is about the look-over and the measurements, not the model.' },
-          ],
+          "question": "A shared entry is Checked, but no quality score is available. What does that establish?",
+          "options": [
+            {
+              "text": "Its current output is accurate.",
+              "correct": false,
+              "explanation": "Review status does not supply a missing evaluation or verify the current source and output."
+            },
+            {
+              "text": "An examiner accepted the shared entry; measured quality and suitability still need separate evidence.",
+              "correct": true,
+              "explanation": "Checked identifies review status. Inspect actual evaluation records and your intended use before relying on the workflow."
+            },
+            {
+              "text": "The workflow must have failed validation.",
+              "correct": false,
+              "explanation": "A missing or Unscored result establishes neither a pass nor a failure."
+            }
+          ]
         },
       },
       {
@@ -1066,18 +1118,29 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         id: 'governance.building-a-culture-of-reuse',
-        revision: 2,
+        revision: 3,
         title: 'Building a culture of reuse',
         content: "Reuse starts with a saved artifact whose intended use, source requirements and limitations are clear. Inspect its measured evidence and test an adapted revision before relying on it for a new task.\n\nThis module addresses governance and handoff. Completing it alone does not establish every skill in the course or issue the Vandal Workflow Architect credential. Your saved course progress must satisfy every required module under its own course rules, and the issued certificate records actual completion. Reading this closing lesson is not a completion receipt.\n\nA credential records the course requirements you demonstrated. It does not guarantee future answers, cover every document-heavy process or grant institutional approval authority. Keep source checking, relevant validation and authorized release decisions part of ongoing work.",
         variant: 'insight',
         knowledgeCheck: {
-          question: 'Your workflow passes its validation plan from Module 8. A colleague asks whether that makes it "Checked". What\'s the difference?',
-          options: [
-            { text: 'They are the same thing \u2014 passing validation makes a workflow Checked', correct: false, explanation: 'Validation is a test you run on your own workflow. Checked only appears after you share it with everyone and an examiner accepts it.' },
-            { text: 'Validation is your own test: its cases and the score it gets on them. Checked means you shared it with everyone and an examiner accepted it, and the shared entry shows that score to others', correct: true, explanation: 'Correct. Validation measures the workflow; Checked is what a shared entry carries once an examiner has looked it over. The score on a Checked entry comes from the validation cases.' },
-            { text: 'Checked replaces validation \u2014 once an examiner accepts the workflow, its validation cases no longer matter', correct: false, explanation: 'The cases are where the score on a Checked entry comes from, and monitoring re-runs them to flag a drop. Checked does not retire them.' },
-            { text: 'Checked means an examiner certified the workflow as production-ready for every team', correct: false, explanation: 'Checked makes no production-ready claim. It says the workflow was looked over and measured; whether it fits your process is your call, from the numbers.' },
-          ],
+          "question": "A workflow passes validation on saved cases. Does that make its shared entry Checked?",
+          "options": [
+            {
+              "text": "Yes; validation automatically approves the library review.",
+              "correct": false,
+              "explanation": "Measured validation and examiner acceptance are separate records."
+            },
+            {
+              "text": "No; the result describes the measured cases, while Checked requires the separate sharing review.",
+              "correct": true,
+              "explanation": "Preserve the actual validation evidence and review status. Neither establishes every future result or production readiness."
+            },
+            {
+              "text": "Once Checked, the workflow no longer needs validation after changes.",
+              "correct": false,
+              "explanation": "Recheck changed behavior against suitable cases. Configured monitoring and historical scores do not prove every later output was evaluated."
+            }
+          ]
         },
       },
       {

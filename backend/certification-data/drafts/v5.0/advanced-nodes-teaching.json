@@ -49,7 +49,7 @@
     },
     {
       "id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
-      "revision": 3,
+      "revision": 4,
       "title": "Check calculations with explicit inputs and rules",
       "variant": "concept",
       "objective": "Record the formula, units and result instead of accepting model assurance about arithmetic.",

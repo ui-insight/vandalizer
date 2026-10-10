@@ -49,7 +49,7 @@
     },
     {
       "id": "governance.sharing-with-everyone",
-      "revision": 4,
+      "revision": 5,
       "title": "Separate sharing, review and certification",
       "variant": "insight",
       "objective": "Avoid using publication or a review badge as proof of learner competence or current correctness.",
@@ -133,7 +133,7 @@
     },
     {
       "id": "governance.building-a-culture-of-reuse",
-      "revision": 3,
+      "revision": 4,
       "title": "Preserve earned history when the artifact changes",
       "variant": "concept",
       "objective": "Distinguish earlier achievement from a later revision and an optional course upgrade.",

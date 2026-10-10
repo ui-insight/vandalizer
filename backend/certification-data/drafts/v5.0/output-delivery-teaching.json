@@ -21,7 +21,7 @@
   "replacements": [
     {
       "id": "output_delivery.from-analysis-to-deliverables",
-      "revision": 3,
+      "revision": 4,
       "title": "Inspect the actual deliverable",
       "variant": "concept",
       "objective": "Choose a usable format and verify the generated file rather than trusting its link or filename.",

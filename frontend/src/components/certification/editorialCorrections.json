@@ -449,6 +449,73 @@
       "unversioned_content_sha256": [
         "9d1eb9387c5e572f59e71810d3071e26a2d7d7a81de1b9496d0764acc7c4f7e7"
       ]
+    },
+    {
+      "id": "ai_literacy-practice-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "ai_literacy.what-ai-is-genuinely-bad-at"
+      ],
+      "title": "Current guidance for this preserved practice",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Model suitability depends on the task, supplied context and evidence. A model can help examine an institutional policy supplied to it, but it cannot invent a missing rule or acquire decision authority. Repetition and fluency do not establish correctness; batch size or similar formatting alone does not make a task suitable."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "9d27be03c4b619e384fd49480258a9d9f8a43a22e38aca420abe889969cff9c4"
+      ]
+    },
+    {
+      "id": "advanced_nodes-practice-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "advanced_nodes.code-execution-custom-logic-in-your-pipeline"
+      ],
+      "title": "Current guidance for this preserved practice",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Use source-linked inputs, units, an explicit formula and a checked result to establish arithmetic. A second model pass does not replace that evidence. Method choice is task-specific: code can compare exact text differences, while semantic interpretation needs relevant context and review."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "214389fdd85be16be1d0862476b371370640264f405a6ba94d54305f4278941b"
+      ]
+    },
+    {
+      "id": "output_delivery-practice-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "output_delivery.from-analysis-to-deliverables"
+      ],
+      "title": "Current guidance for this preserved practice",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "A generated link, successful run or filename does not establish a usable deliverable. Open the actual file and check required content, source values, references and layout. Use Data Export only with the structured input it needs; no available Package Builder operation is promised."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "b2ea55ab45cf76677e1eaeba6bbf098fa77adba4473e75e72bb5e7ed8e5185f0"
+      ]
+    },
+    {
+      "id": "governance-practice-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "governance.sharing-with-everyone",
+        "governance.building-a-culture-of-reuse"
+      ],
+      "title": "Current guidance for this preserved practice",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Checked identifies examiner acceptance of a shared entry. A quality score may be missing or Unscored; that does not establish either a pass or a failure. Review status does not prove a current output is accurate or suitable for every use.",
+        "A passed validation describes its measured cases and conditions; it does not automatically approve a library review. Recheck changed behavior. Configured monitoring and historical scores do not establish that every later output was evaluated."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "e8ee10a208c237d02a08cdc345b04b794c1a9a0e93438f7a2299645de20470da",
+        "2ecf76aa1351d15021dadb3e0818d5239fd549676182c28b98298e6b54d9eb15"
+      ]
     }
   ],
   "module_notices": [
