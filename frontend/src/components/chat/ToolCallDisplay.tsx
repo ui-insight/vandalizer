@@ -396,8 +396,13 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (obj.rules_checked === 0) return { text: 'No compliance rules defined', qualityHint: '' }
       const violations = (obj.total_violations as number) || 0
       const docs = (obj.documents_checked as number) || 0
-      if (obj.all_compliant) {
+      if (obj.all_compliant === true) {
         return { text: `All ${docs} document${docs !== 1 ? 's' : ''} compliant`, qualityHint }
+      }
+      if (violations === 0) {
+        // all_compliant is null: some rule couldn't be confirmed, or not every
+        // requested document was read. Never summarize that as compliant.
+        return { text: 'Inconclusive: not every rule could be confirmed', qualityHint }
       }
       return {
         text: `${violations} violation${violations !== 1 ? 's' : ''} across ${docs} document${docs !== 1 ? 's' : ''}`,

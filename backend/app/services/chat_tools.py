@@ -2057,11 +2057,13 @@ async def check_compliance(
     validator = CrossFieldValidator()
     entities = extraction.get("entities") or []
     doc_names = extraction.get("documents") or []
+    all_sources = extraction.get("sources") or []
 
     per_document: list[dict] = []
     total_fail = 0
     for idx, entity in enumerate(entities):
         data = entity if isinstance(entity, dict) else {}
+        entity_sources = all_sources[idx] if idx < len(all_sources) else {}
         results = validator.validate(data, active_rules)
         summary = summarize_results(results)
         total_fail += summary.get("fail", 0)
@@ -2073,29 +2075,117 @@ async def check_compliance(
             for r in results
             if r.get("status") == "fail"
         ]
+        # A rule that couldn't be evaluated, or that passed on a value never
+        # traced to the document, leaves the document unresolved: zero
+        # evaluated checks is not clearance.
+        inconclusive = [
+            {
+                "rule_type": (r.get("rule") or {}).get("type"),
+                "message": r.get("message"),
+            }
+            for r in results
+            if r.get("status") == "unparseable"
+        ]
+        for r in results:
+            if r.get("status") != "pass":
+                continue
+            untraced = _untraced_rule_inputs(r.get("rule") or {}, data, entity_sources)
+            if untraced:
+                inconclusive.append({
+                    "rule_type": (r.get("rule") or {}).get("type"),
+                    "message": (
+                        f"Passed, but on value(s) not traced to the document: "
+                        f"{', '.join(untraced)}"
+                    ),
+                })
+        if summary.get("fail", 0):
+            outcome = "fail"
+        elif inconclusive or not summary.get("pass", 0):
+            outcome = "inconclusive"
+        else:
+            outcome = "pass"
         per_document.append({
             "document": doc_names[idx] if idx < len(doc_names) else f"document {idx + 1}",
-            "compliant": summary.get("fail", 0) == 0,
+            "outcome": outcome,
+            "compliant": {"pass": True, "fail": False}.get(outcome),
             "checks_passed": summary.get("pass", 0),
             "checks_failed": summary.get("fail", 0),
             "checks_unparseable": summary.get("unparseable", 0),
             "violations": violations,
+            "inconclusive": inconclusive,
         })
+
+    outcomes = {d["outcome"] for d in per_document}
+    # The extraction's own coverage notes: documents skipped or unreadable,
+    # entities truncated. Any of them means the requested set wasn't covered.
+    coverage_note = extraction.get("note")
+    if "fail" in outcomes:
+        overall = "fail"
+    elif not per_document or "inconclusive" in outcomes or coverage_note:
+        overall = "inconclusive"
+    else:
+        overall = "pass"
 
     response: dict = {
         "extraction_set": ss.title,
         "rules_checked": len(active_rules),
+        "documents_requested": len(document_uuids),
         "documents_checked": len(per_document),
-        "all_compliant": total_fail == 0,
+        "outcome": overall,
+        "all_compliant": {"pass": True, "fail": False}.get(overall),
         "total_violations": total_fail,
+        "documents_inconclusive": sum(1 for d in per_document if d["outcome"] == "inconclusive"),
+        "scope": (
+            f"Only the {len(active_rules)} rule(s) configured on \"{ss.title}\" "
+            "were evaluated. This is not a review of every sponsor or policy "
+            "requirement."
+        ),
         "results": per_document,
+        "source_coverage": extraction.get("source_coverage"),
     }
+    if overall == "inconclusive":
+        response["note_inconclusive"] = (
+            "Not every rule could be confirmed for every document. Do NOT say "
+            "the documents are compliant; name what was not checked and why."
+        )
+    for key in ("note", "source_note", "validation_stale", "note_validation_stale"):
+        if extraction.get(key):
+            response[key] = extraction[key]
     # Carry the extraction's quality sidecar through (streaming layer strips it
     # before the LLM sees it and renders a badge) so compliance answers also
     # surface how trustworthy the underlying extraction is.
     if extraction.get("quality"):
         response["quality"] = extraction["quality"]
     return response
+
+
+_RULE_FIELD_KEYS = {
+    "sum_equals": ("target_field",),
+    "conditional_required": ("condition_field", "required_field"),
+    "range_check": ("field",),
+    "cross_reference": ("field_a", "field_b"),
+    "date_order": ("field_a", "field_b"),
+}
+
+
+def _untraced_rule_inputs(rule: dict, data: dict, entity_sources: dict) -> list[str]:
+    """Fields a rule read whose non-empty value has no verified source quote."""
+    fields = [rule.get(k) for k in _RULE_FIELD_KEYS.get(rule.get("type"), ())]
+    if rule.get("type") == "sum_equals":
+        fields += list(rule.get("source_fields") or [])
+    lowered_data = {str(k).lower(): v for k, v in data.items()}
+    lowered_sources = {str(k).lower(): v for k, v in (entity_sources or {}).items()}
+    untraced: list[str] = []
+    for field in fields:
+        if not field:
+            continue
+        value = lowered_data.get(str(field).lower())
+        if value in (None, ""):
+            continue
+        src = lowered_sources.get(str(field).lower())
+        if not (isinstance(src, dict) and src.get("verified")):
+            untraced.append(str(field))
+    return untraced
 
 
 # ---------------------------------------------------------------------------
@@ -4501,7 +4591,9 @@ def _describe_obligation(clean: dict) -> str:
     src = clean["sources"][0]
     where = f'{src.document_title}, p. {src.page}' if src.page else src.document_title
     if clean["kind"] == "deadline":
-        when = clean.get("due_text") or f'{clean["due_at"]:%b %-d, %Y}'
+        when = f'{clean["due_at"]:%b %-d, %Y}'
+        if clean.get("due_text"):
+            when += f', {clean["due_text"]}'
         return f'{clean["title"]}: {when} ({where})'
     if clean["kind"] == "limit":
         unit = clean.get("unit") or ""
@@ -4547,6 +4639,10 @@ async def propose_obligations(
             ("sponsor_submission", "internal_routing", "report_due", "other"),
             "due_at" (ISO date or date-time, e.g. "2026-11-19T17:00") and
             "due_text" (the time as written, e.g. "5:00 p.m. Pacific Time").
+            Give due_at as the quote writes it: the stated date, plus the
+            stated time only if the quote gives one, with no UTC offset. Never
+            add a year, time or zone the quotes don't state; if the deadline's
+            quote lacks the year, add a second source quote that states it.
             Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
         project_uuid: The project; defaults to the one open in chat.
         confirmed: Must be true to save; false returns a preview.

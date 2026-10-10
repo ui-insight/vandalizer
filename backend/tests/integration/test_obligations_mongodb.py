@@ -111,6 +111,8 @@ async def test_checked_items_are_saved_and_an_amendment_replaces_the_original(mo
 
 @pytest.mark.parametrize("item,reason", [
     ({**AMENDED, "due_at": "2026-11-20"}, "does not state November 20"),
+    ({**AMENDED, "due_at": "2027-11-19T09:00:00+00:00"}, "not the time the quote states"),
+    ({**AMENDED, "due_at": "2027-11-19T17:00"}, "not 2027"),
     ({**ORIGINAL, "sources": [{"document_uuid": "notice", "page": 3, "quote": ORIGINAL["sources"][0]["quote"]}]}, "not found on page 3"),
     ({**ORIGINAL, "sources": [{"document_uuid": "notice", "quote": ORIGINAL["sources"][0]["quote"]}]}, "give the page"),
     ({**CAP, "limit_value": 150000}, "does not state the limit value"),
@@ -122,6 +124,18 @@ async def test_items_the_documents_do_not_support_are_rejected_with_the_reason(m
     checked = await obligation_service.propose(project, owner, [item])
     assert checked["accepted"] == []
     assert reason in checked["rejected"][0]["reason"]
+
+
+async def test_a_deadline_given_in_utc_is_saved_and_shown_as_the_source_states_it(mongo_client):
+    # 5 p.m. Pacific on Nov 19 is 01:00 UTC on Nov 20. Saved in UTC, the inbox
+    # (which reads the date part of due_at) would have shown Nov 20 (#1013).
+    owner, _viewer, project = await _setup()
+    checked = await obligation_service.propose(project, owner, [{**AMENDED, "due_at": "2026-11-20T01:00:00Z"}])
+    (accepted,) = checked["accepted"]
+    await obligation_service.save_checked(project, owner, accepted["clean"])
+    (row,) = await obligation_service.inbox(owner)
+    assert row["due_at"].startswith("2026-11-19T17:00")
+    assert row["due_text"] == "5:00 p.m. Pacific Time"
 
 
 async def test_the_same_item_twice_is_not_added_twice(mongo_client):

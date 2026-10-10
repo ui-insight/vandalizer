@@ -30,10 +30,38 @@ _MONTHS = {
         start=1,
     ) for m in names
 }
+_MONTH_NAMES = "|".join(sorted(_MONTHS, key=len, reverse=True))
 _DATE_IN_TEXT = re.compile(
-    r"\b(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?\s+(\d{1,2})\b"
-    r"|\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b"
-    r"|\b(\d{4})-(\d{2})-(\d{2})\b",
+    r"\b(?P<mon>" + _MONTH_NAMES + r")\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(?P<year>\d{4})\b)?"
+    r"|\b(?P<day2>\d{1,2})\s+(?P<mon2>" + _MONTH_NAMES + r")\.?,?(?:\s+(?P<year2>\d{4})\b)?"
+    r"|\b(?P<um>\d{1,2})/(?P<ud>\d{1,2})/(?P<uy>\d{2,4})\b"
+    r"|\b(?P<iy>\d{4})-(?P<im>\d{2})-(?P<id>\d{2})\b",
+    re.IGNORECASE,
+)
+_YEAR_IN_TEXT = re.compile(r"\b(?:19|20)\d{2}\b")
+
+# Time zones a sponsor deadline is commonly written in. "PST" is often used
+# loosely for Pacific time year-round, so the abbreviations map to the zone.
+_ZONES = {
+    "pacific": "America/Los_Angeles", "pt": "America/Los_Angeles",
+    "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles",
+    "mountain": "America/Denver", "mt": "America/Denver",
+    "mst": "America/Denver", "mdt": "America/Denver",
+    "central": "America/Chicago", "ct": "America/Chicago",
+    "cst": "America/Chicago", "cdt": "America/Chicago",
+    "eastern": "America/New_York", "et": "America/New_York",
+    "est": "America/New_York", "edt": "America/New_York",
+    "alaska": "America/Anchorage", "hawaii": "Pacific/Honolulu",
+    "utc": "UTC", "gmt": "UTC",
+}
+_TIME_IN_TEXT = re.compile(
+    r"(?:\b(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>[ap])\.?\s?m\b\.?"
+    r"|\b(?P<h24>[01]?\d|2[0-3]):(?P<m24>[0-5]\d)\b"
+    r"|\b(?P<word>noon|midnight)\b)"
+    r"(?:\s*(?:\(|,)?\s*(?:"
+    r"(?P<zone>pacific|mountain|central|eastern|alaska|hawaii)(?:\s+(?:standard|daylight|prevailing))?\s+time"
+    r"|(?P<abbr>pt|pst|pdt|mt|mst|mdt|ct|cst|cdt|et|est|edt|utc|gmt)\b"
+    r"|(?P<local>local\s+time|submitter'?s\s+local\s+time)))?",
     re.IGNORECASE,
 )
 _MAX_ITEMS = 25
@@ -43,17 +71,129 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-def _dates_in(text: str) -> set[tuple[int, int]]:
-    """(month, day) pairs written in *text*: "Nov 19", "11/19/2026", "2026-11-19"."""
-    found: set[tuple[int, int]] = set()
+def _dates_in(text: str) -> set[tuple[Optional[int], int, int]]:
+    """(year or None, month, day) for each date written in *text*:
+    "Nov 19", "November 19, 2026", "19 November 2026", "11/19/2026", "2026-11-19"."""
+    found: set[tuple[Optional[int], int, int]] = set()
     for m in _DATE_IN_TEXT.finditer(text or ""):
-        if m.group(1):
-            found.add((_MONTHS[m.group(1).lower()], int(m.group(2))))
-        elif m.group(3):
-            found.add((int(m.group(3)), int(m.group(4))))
-        elif m.group(6):
-            found.add((int(m.group(7)), int(m.group(8))))
+        if m.group("mon"):
+            year = int(m.group("year")) if m.group("year") else None
+            found.add((year, _MONTHS[m.group("mon").lower()], int(m.group("day"))))
+        elif m.group("mon2"):
+            year = int(m.group("year2")) if m.group("year2") else None
+            found.add((year, _MONTHS[m.group("mon2").lower()], int(m.group("day2"))))
+        elif m.group("um"):
+            year = int(m.group("uy"))
+            found.add((year + 2000 if year < 100 else year, int(m.group("um")), int(m.group("ud"))))
+        elif m.group("iy"):
+            found.add((int(m.group("iy")), int(m.group("im")), int(m.group("id"))))
     return found
+
+
+def _times_in(text: str) -> list[dict]:
+    """Each time of day written in *text*, with its zone when one is stated.
+
+    ``zone`` is an IANA name, ``"local"`` for "local time", or None.
+    """
+    found: list[dict] = []
+    for m in _TIME_IN_TEXT.finditer(text or ""):
+        if m.group("word"):
+            hour, minute = (12, 0) if m.group("word").lower() == "noon" else (0, 0)
+        elif m.group("ap"):
+            hour, minute = int(m.group("h")), int(m.group("m") or 0)
+            if not 1 <= hour <= 12 or minute > 59:
+                continue
+            hour = hour % 12 + (12 if m.group("ap").lower() == "p" else 0)
+        else:
+            hour, minute = int(m.group("h24")), int(m.group("m24"))
+        name = (m.group("zone") or m.group("abbr") or "").lower()
+        zone = _ZONES.get(name) or ("local" if m.group("local") else None)
+        found.append({"hour": hour, "minute": minute, "zone": zone, "text": m.group(0).strip()})
+    return found
+
+
+def _normalized(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[.,()]", "", (text or "").lower())).strip()
+
+
+def check_deadline(
+    due_value: Any, due_text: Any, quotes: str,
+) -> tuple[Optional[dict], Optional[str]]:
+    """Verify a deadline's full date, and any time and zone, against its quotes.
+
+    Returns ``({"due_at", "due_text"}, None)`` or ``(None, reason)``.
+    ``due_at`` is the deadline as the source writes it: the stated date, and
+    the stated time if there is one, in the source's own zone, without an
+    offset. ``due_text`` is the time as written, taken from the quote. Nothing
+    the source doesn't state is filled in: no year, time or zone.
+    """
+    raw = due_value.isoformat() if isinstance(due_value, datetime.datetime) else due_value
+    if not isinstance(raw, str) or not raw.strip():
+        return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
+    raw = raw.strip()
+    due = _parse_due(raw)
+    if due is None:
+        return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
+    has_time = len(raw) > 10
+
+    stated_time: Optional[dict] = None
+    if has_time:
+        times = _times_in(quotes)
+        if not times:
+            return None, (
+                "the quote states no time of day; give due_at as a date only "
+                f"({due:%Y-%m-%d})"
+            )
+        if due.tzinfo is not None:
+            from zoneinfo import ZoneInfo
+
+            zoned = [t for t in times if t["zone"] and t["zone"] != "local"]
+            if not zoned:
+                return None, (
+                    f"the quote gives {times[0]['text']} without a time zone; give "
+                    "due_at without a UTC offset, as the source writes it"
+                )
+            for t in zoned:
+                local = due.astimezone(ZoneInfo(t["zone"]))
+                if (local.hour, local.minute) == (t["hour"], t["minute"]):
+                    due, stated_time = local.replace(tzinfo=None), t
+                    break
+            else:
+                return None, (
+                    f"due_at is not the time the quote states ({zoned[0]['text']})"
+                )
+        else:
+            stated_time = next(
+                (t for t in times if (t["hour"], t["minute"]) == (due.hour, due.minute)),
+                None,
+            )
+            if stated_time is None:
+                return None, (
+                    f"the quote does not state {due:%H:%M}; it gives {times[0]['text']}"
+                )
+
+    same_day = [(y, mo, d) for y, mo, d in _dates_in(quotes) if (mo, d) == (due.month, due.day)]
+    if not same_day:
+        return None, f"the quote does not state {due:%B} {due.day}; cite the passage that gives the date"
+    years = {y for y, _mo, _d in same_day if y is not None}
+    if years and due.year not in years:
+        return None, (
+            f"the quote states {due:%B} {due.day}, {min(years)}, not {due.year}"
+        )
+    if not years and str(due.year) not in _YEAR_IN_TEXT.findall(quotes):
+        return None, (
+            f"the quote gives {due:%B} {due.day} without a year; add a source "
+            f"quote that states {due.year}"
+        )
+
+    text = str(due_text or "").strip()[:120]
+    if text and _normalized(text) not in _normalized(quotes):
+        return None, "due_text must be copied from the quote; give the time exactly as written"
+    if not text and stated_time is not None:
+        text = stated_time["text"]
+    if not has_time:
+        due = datetime.datetime.combine(due.date(), datetime.time())
+    return {"due_at": due, "due_text": text or None}, None
 
 
 def _parse_due(value: Any) -> Optional[datetime.datetime]:
@@ -181,12 +321,10 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
         deadline_type = item.get("deadline_type") or "other"
         if deadline_type not in DEADLINE_TYPES:
             return None, f"deadline_type must be one of {', '.join(DEADLINE_TYPES)}"
-        due = _parse_due(item.get("due_at"))
-        if due is None:
-            return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
-        if (due.month, due.day) not in _dates_in(quotes):
-            return None, f"the quote does not state {due:%B} {due.day}; cite the passage that gives the date"
-        clean.update(deadline_type=deadline_type, due_at=due, due_text=str(item.get("due_text") or "")[:120] or None)
+        checked, reason = check_deadline(item.get("due_at"), item.get("due_text"), quotes)
+        if reason:
+            return None, reason
+        clean.update(deadline_type=deadline_type, **checked)
     elif kind == "limit":
         limit_value = _as_number(item.get("limit_value"))
         observed = _as_number(item.get("observed_value"))

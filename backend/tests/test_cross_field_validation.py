@@ -235,11 +235,14 @@ class TestNumberParsing:
         results = validator.validate({"x": "$1,234.56"}, [rule])
         assert results[0]["status"] == "pass"
 
-    def test_range_uses_midpoint(self, validator):
+    def test_range_is_not_one_amount(self, validator):
+        # A range is not a stated amount; substituting its midpoint would
+        # pass or fail a rule on a number the document never gives (#1013).
         rule = {"type": "range_check", "field": "x", "min": 10, "max": 15}
-        # "10-15" -> midpoint 12.5 -> in [10,15]
-        results = validator.validate({"x": "10-15"}, [rule])
-        assert results[0]["status"] == "pass"
+        for value in ("10-15", "10-20%", "$10,000 to $20,000", "10 – 15"):
+            results = validator.validate({"x": value}, [rule])
+            assert results[0]["status"] == "unparseable", value
+            assert "range" in results[0]["message"], value
 
     def test_approx_prefix(self, validator):
         rule = {"type": "range_check", "field": "x", "min": 0, "max": 100}
@@ -621,3 +624,94 @@ class TestRuleShapeValidation:
 
         ok, _ = validate_rule_shape({"type": "range_check", "field": "x", "min": 0})
         assert ok
+
+
+class TestMoneyScaleAndExactness:
+    """#1013 §3: scaled amounts keep their scale, ranges and multi-number
+    strings are not one amount, and sums use exact decimal arithmetic."""
+
+    @pytest.mark.parametrize(
+        "text, expected",
+        [
+            ("$1.2 million", "1200000"),
+            ("$500K", "500000"),
+            ("500k", "500000"),
+            ("1.5M", "1500000"),
+            ("$2 MM", "2000000"),
+            ("$3 thousand", "3000"),
+            ("$1.25 billion", "1250000000"),
+            ("($1,200)", "-1200"),
+            ("-$1,200.50", "-1200.50"),
+            ("USD 1,000", "1000"),
+            ("approx 50", "50"),
+            ("5 months", "5"),
+        ],
+    )
+    def test_parses_one_amount_with_its_scale(self, text, expected):
+        from decimal import Decimal
+
+        from app.services.cross_field_validation import parse_number
+
+        parsed, reason = parse_number(text)
+        assert reason is None
+        assert parsed is not None and parsed.value == Decimal(expected), text
+
+    @pytest.mark.parametrize(
+        "text, unit",
+        [("$1,000", "currency"), ("1,000 USD", "currency"), ("15%", "percent"),
+         ("15 percent", "percent"), ("42", None)],
+    )
+    def test_keeps_the_unit(self, text, unit):
+        from app.services.cross_field_validation import parse_number
+
+        parsed, _ = parse_number(text)
+        assert parsed is not None and parsed.unit == unit
+
+    @pytest.mark.parametrize("text", ["10 of 20", "Year 1 $100,000", "TBD", "n/a"])
+    def test_ambiguous_strings_are_not_numbers(self, text):
+        from app.services.cross_field_validation import parse_number
+
+        parsed, _ = parse_number(text)
+        assert parsed is None
+
+    def test_correct_scaled_budget_passes(self, validator):
+        # The issue's reproduction: $1.2 million + $300,000 = $1,500,000 used
+        # to fail with a computed sum of 300001.2.
+        rule = {"type": "sum_equals", "source_fields": ["Direct", "Indirect"],
+                "target_field": "Total"}
+        data = {"Direct": "$1.2 million", "Indirect": "$300,000", "Total": "$1,500,000"}
+        results = validator.validate(data, [rule])
+        assert results[0]["status"] == "pass", results[0]["message"]
+
+    def test_wrong_scaled_budget_fails(self, validator):
+        rule = {"type": "sum_equals", "source_fields": ["Direct", "Indirect"],
+                "target_field": "Total"}
+        data = {"Direct": "$1.2 million", "Indirect": "$300K", "Total": "$1,600,000"}
+        results = validator.validate(data, [rule])
+        assert results[0]["status"] == "fail"
+        assert "difference 100000" in results[0]["message"]
+
+    def test_sum_is_exact_not_float(self, validator):
+        # 0.1 + 0.2 != 0.3 in binary floating point; with a zero tolerance the
+        # float version fails a correct sum.
+        rule = {"type": "sum_equals", "source_fields": ["a", "b"],
+                "target_field": "t", "tolerance": 0}
+        results = validator.validate({"a": "$0.10", "b": "$0.20", "t": "$0.30"}, [rule])
+        assert results[0]["status"] == "pass"
+
+    def test_tolerance_is_stated(self, validator):
+        rule = {"type": "sum_equals", "source_fields": ["a", "b"], "target_field": "t"}
+        results = validator.validate({"a": "1", "b": "2", "t": "3"}, [rule])
+        assert "tolerance 0.01" in results[0]["message"]
+
+    def test_mixed_units_are_not_summed(self, validator):
+        rule = {"type": "sum_equals", "source_fields": ["a", "b"], "target_field": "t"}
+        results = validator.validate({"a": "$100", "b": "15%", "t": "$115"}, [rule])
+        assert results[0]["status"] == "unparseable"
+        assert "units" in results[0]["message"]
+
+    def test_range_in_a_sum_is_unparseable(self, validator):
+        rule = {"type": "sum_equals", "source_fields": ["a", "b"], "target_field": "t"}
+        results = validator.validate({"a": "$100-$200", "b": "$50", "t": "$200"}, [rule])
+        assert results[0]["status"] == "unparseable"
+        assert "range" in results[0]["message"]

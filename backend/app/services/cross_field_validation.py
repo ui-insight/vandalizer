@@ -12,7 +12,9 @@ creates false-alarm pressure.
 
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from app.utils.code_sandbox import validate_sandbox_code
@@ -21,66 +23,119 @@ from app.utils.code_sandbox_runner import execute_sandboxed_code
 logger = logging.getLogger(__name__)
 
 
-_NUMBER_FALLBACK_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 _PARENS_NEGATIVE_PATTERN = re.compile(r"^\((.+)\)$")
+
+_SCALES = {
+    "k": Decimal(1_000), "thousand": Decimal(1_000),
+    "m": Decimal(1_000_000), "mm": Decimal(1_000_000),
+    "mil": Decimal(1_000_000), "million": Decimal(1_000_000),
+    "b": Decimal(1_000_000_000), "bn": Decimal(1_000_000_000),
+    "billion": Decimal(1_000_000_000),
+}
+
+# One amount: optional sign/currency, digits (with or without thousands
+# commas), optional scale word or letter, optional percent. The scale must end
+# at a word boundary so "5 months" isn't read as five million.
+_AMOUNT_PATTERN = re.compile(
+    r"(?P<neg>[-−])?\s*(?P<cur>[$€£])?\s*(?P<neg2>[-−])?\s*"
+    r"(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)"
+    r"(?:\s*(?P<scale>thousand|million|billion|mil|bn|mm|k|m|b)\b\.?)?"
+    r"\s*(?P<pct>%|percent\b)?",
+    re.IGNORECASE,
+)
+_RANGE_SEPARATOR = re.compile(r"^\s*(?:-|–|—|to|through)\s*$", re.IGNORECASE)
+_CURRENCY_WORDS = re.compile(r"\b(?:usd|dollars?)\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class ParsedNumber:
+    """An exact amount and its unit ("currency", "percent" or None)."""
+
+    value: Decimal
+    unit: Optional[str] = None
+
+
+def parse_number(value: Any) -> tuple[Optional[ParsedNumber], Optional[str]]:
+    """Parse one exact amount, or say why the value isn't one.
+
+    Returns ``(parsed, None)`` or ``(None, reason)``. Handles ints/floats,
+    "$1,200.50", "12%", accounting negatives "(1,200)", money scales ("$500K",
+    "$1.2 million", "1.5M"), and a single amount inside words ("approx 50",
+    "about $1,000"). A range ("10-20%") or a string with several numbers is not
+    one amount and is rejected rather than replaced by a guess such as the
+    midpoint.
+    """
+    if isinstance(value, bool) or value is None:
+        return None, None
+    if isinstance(value, (int, float)):
+        try:
+            return ParsedNumber(Decimal(str(value))), None
+        except InvalidOperation:
+            return None, None
+    if not isinstance(value, str):
+        return None, None
+    s = value.strip()
+    if not s:
+        return None, None
+
+    m = _PARENS_NEGATIVE_PATTERN.match(s)
+    if m:
+        inner, reason = parse_number(m.group(1))
+        if inner is None:
+            return None, reason
+        return ParsedNumber(-inner.value, inner.unit), None
+
+    matches = list(_AMOUNT_PATTERN.finditer(s))
+    if not matches:
+        return None, None
+    if len(matches) > 1:
+        # The second amount's sign group swallows a hyphen separator
+        # ("10-15", "$100-$200"), so measure up to its currency or digits.
+        second = matches[1]
+        body_start = min(
+            second.start(g) for g in ("cur", "neg2", "num") if second.group(g)
+        )
+        between = s[matches[0].end():body_start]
+        if len(matches) == 2 and _RANGE_SEPARATOR.match(between):
+            return None, "is a range, not a single amount"
+        return None, "contains more than one number"
+
+    match = matches[0]
+    try:
+        number = Decimal(match.group("num").replace(",", ""))
+    except InvalidOperation:
+        return None, None
+    scale = match.group("scale")
+    if scale:
+        number *= _SCALES[scale.lower()]
+    if match.group("neg") or match.group("neg2"):
+        number = -number
+
+    unit = None
+    if match.group("pct"):
+        unit = "percent"
+    elif match.group("cur") or _CURRENCY_WORDS.search(s):
+        unit = "currency"
+    return ParsedNumber(number, unit), None
 
 
 def _try_parse_number(value: Any) -> Optional[float]:
-    """Try to parse a numeric value from various formats.
+    """Float form of :func:`parse_number`, for callers that only compare."""
+    parsed, _reason = parse_number(value)
+    return float(parsed.value) if parsed is not None else None
 
-    Handles: ints/floats, "$1,200.50", "12%", "(1,200)" → -1200,
-    leading words like "approx 50" or "about $1,000" via regex fallback,
-    and ranges like "10-15" → midpoint (12.5) so a range value can still
-    participate in a sum_equals check without being treated as unparseable.
-    """
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if not isinstance(value, str):
-        return None
-    s = value.strip()
-    if not s:
-        return None
 
-    # Parentheses-as-negative accounting notation: "(1,200)" -> -1200
-    m = _PARENS_NEGATIVE_PATTERN.match(s)
-    if m:
-        inner = _try_parse_number(m.group(1))
-        return -inner if inner is not None else None
+def _unparseable_number(field: str, value: Any, reason: Optional[str]) -> str:
+    if reason:
+        return f"Cannot read '{field}' as one amount: {value!r} {reason}"
+    return f"Cannot parse '{field}' as number: {value!r}"
 
-    # Range: "10-15" or "10 to 15" -> midpoint
-    range_match = re.match(
-        r"^\$?\s*(-?\d[\d,\.]*)\s*(?:-|to|–|—)\s*\$?\s*(-?\d[\d,\.]*)\s*%?$",
-        s,
-        flags=re.IGNORECASE,
-    )
-    if range_match:
-        low = _try_parse_number(range_match.group(1))
-        high = _try_parse_number(range_match.group(2))
-        if low is not None and high is not None:
-            return (low + high) / 2.0
 
-    # Strict pass: strip currency/percent/whitespace/commas and try float()
-    cleaned = re.sub(r"[,$\s%]", "", s)
-    try:
-        return float(cleaned)
-    except (ValueError, TypeError):
-        pass
-
-    # Fallback: pick out the first signed decimal from a longer string
-    # ("approx 50", "about $1,000", "around 25%"). Avoids being clever — if
-    # the string contains multiple numbers we bail out, since "10 of 20" is
-    # ambiguous and silently picking the first one would mislead the user.
-    cleaned_for_fallback = re.sub(r"[,$%]", "", s)
-    matches = _NUMBER_FALLBACK_PATTERN.findall(cleaned_for_fallback)
-    if len(matches) == 1:
-        try:
-            return float(matches[0])
-        except (ValueError, TypeError):
-            return None
-
-    return None
+def _fmt(d: Decimal) -> str:
+    text = format(d, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 _DATE_FORMATS = [
@@ -182,34 +237,44 @@ class CrossFieldValidator:
         """Check that source fields sum to target field value."""
         source_fields = rule.get("source_fields", [])
         target_field = rule.get("target_field", "")
-        tolerance = float(rule.get("tolerance", 0.01))
+        try:
+            tolerance = Decimal(str(rule.get("tolerance", "0.01")))
+        except InvalidOperation:
+            return _result(rule, "unparseable", f"Invalid tolerance: {rule.get('tolerance')!r}")
 
-        source_values = []
+        parsed: list[ParsedNumber] = []
         for field in source_fields:
             val = _get_field_value(data, field)
             if _is_empty(val):
                 return _result(rule, "unparseable", f"Source field '{field}' is empty")
-            num = _try_parse_number(val)
+            num, reason = parse_number(val)
             if num is None:
-                return _result(rule, "unparseable", f"Cannot parse '{field}' as number: {val!r}")
-            source_values.append(num)
+                return _result(rule, "unparseable", _unparseable_number(field, val, reason))
+            parsed.append(num)
 
         target_val = _get_field_value(data, target_field)
         if _is_empty(target_val):
             return _result(rule, "unparseable", f"Target field '{target_field}' is empty")
-        target_num = _try_parse_number(target_val)
-        if target_num is None:
-            return _result(rule, "unparseable", f"Cannot parse target '{target_field}' as number: {target_val!r}")
+        target, reason = parse_number(target_val)
+        if target is None:
+            return _result(rule, "unparseable", _unparseable_number(target_field, target_val, reason))
 
-        total = sum(source_values)
-        if abs(total - target_num) <= tolerance:
-            return _result(rule, "pass", f"Sum of {source_fields} = {total}, target '{target_field}' = {target_num}")
-        return _result(
-            rule,
-            "fail",
-            f"Sum of {source_fields} = {total}, target '{target_field}' = {target_num} "
-            f"(difference: {abs(total - target_num):.4f})",
+        units = {p.unit for p in [*parsed, target] if p.unit}
+        if len(units) > 1:
+            return _result(
+                rule, "unparseable",
+                f"Fields mix units ({', '.join(sorted(units))}); a sum across them is meaningless",
+            )
+
+        total = sum((p.value for p in parsed), Decimal(0))
+        difference = abs(total - target.value)
+        detail = (
+            f"Sum of {source_fields} = {_fmt(total)}, target '{target_field}' = "
+            f"{_fmt(target.value)} (tolerance {_fmt(tolerance)})"
         )
+        if difference <= tolerance:
+            return _result(rule, "pass", detail)
+        return _result(rule, "fail", f"{detail}; difference {_fmt(difference)}")
 
     def _validate_conditional_required(self, data: dict, rule: dict) -> dict:
         """If field A = value, field B must exist."""
@@ -246,15 +311,16 @@ class CrossFieldValidator:
         val = _get_field_value(data, field)
         if _is_empty(val):
             return _result(rule, "unparseable", f"'{field}' is empty")
-        num = _try_parse_number(val)
-        if num is None:
-            return _result(rule, "unparseable", f"Cannot parse '{field}' as number: {val!r}")
+        parsed, reason = parse_number(val)
+        if parsed is None:
+            return _result(rule, "unparseable", _unparseable_number(field, val, reason))
+        num = parsed.value
 
-        if min_val is not None and num < float(min_val):
-            return _result(rule, "fail", f"'{field}' = {num} below min {min_val}")
-        if max_val is not None and num > float(max_val):
-            return _result(rule, "fail", f"'{field}' = {num} above max {max_val}")
-        return _result(rule, "pass", f"'{field}' = {num}, in range [{min_val}, {max_val}]")
+        if min_val is not None and num < Decimal(str(min_val)):
+            return _result(rule, "fail", f"'{field}' = {_fmt(num)} below min {min_val}")
+        if max_val is not None and num > Decimal(str(max_val)):
+            return _result(rule, "fail", f"'{field}' = {_fmt(num)} above max {max_val}")
+        return _result(rule, "pass", f"'{field}' = {_fmt(num)}, in range [{min_val}, {max_val}]")
 
     def _validate_cross_reference(self, data: dict, rule: dict) -> dict:
         """Check that field A matches/contains field B."""

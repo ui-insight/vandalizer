@@ -505,6 +505,22 @@ class TestDescribeImageNode:
 
     MULTIMODAL_CFG = {"available_models": [{"name": "gpt-4o", "multimodal": True}]}
 
+    @pytest.fixture(autouse=True)
+    def _offline_dns(self, monkeypatch):
+        """Resolve example.com to a fixed public address so these unit tests
+        don't need network access. The real SSRF validator still runs: IP
+        literals such as 169.254.169.254 resolve without DNS and stay blocked."""
+        import socket
+
+        real = socket.getaddrinfo
+
+        def fake(host, port, *args, **kwargs):
+            if host in ("example.com", "www.example.com"):
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", port))]
+            return real(host, port, *args, **kwargs)
+
+        monkeypatch.setattr("app.utils.url_validation.socket.getaddrinfo", fake)
+
     def _node(self, sys_cfg=None, **data):
         data.setdefault("image_url", "https://example.com/img.png")
         data.setdefault("model", "gpt-4o")
