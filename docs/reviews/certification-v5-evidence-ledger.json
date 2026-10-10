@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
+  "working_head_at_inventory": "78a25cccf6ea80dab4d7c9304ef51a7234285a31",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 63889,
-    "sha256": "4b8ee5fd271d800d7fd1fc51345a3726ca30ae2785abd006ce825ba15ec26fed"
+    "bytes": 64240,
+    "sha256": "73868036b352ea6cbbded91a59eddcdcd114c1af24082aa32662550d8f405dec"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 745946,
-    "sha256": "a51a6f119c5ea3aee55f3dc536984b46eec780ac69f5286bd7b28b2753ae286f"
+    "bytes": 747842,
+    "sha256": "969de80f58f13a6f3cbea378f1136063a6e323e2fb3b038f3e8b56003811e8ba"
   },
   "counts": {
-    "accepted": 69,
-    "open": 93,
+    "accepted": 70,
+    "open": 92,
     "items": 162,
-    "checkpoints": 311,
-    "browser_runs": 469,
-    "recorded_captures_including_diagnostics_and_repeats": 6211,
+    "checkpoints": 312,
+    "browser_runs": 471,
+    "recorded_captures_including_diagnostics_and_repeats": 6231,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -695,8 +695,8 @@
     },
     {
       "id": "C8-M08-01",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach the complete quality vocabulary.** Distinguish Unscored, measured quality, stale evidence, active alerts, successful execution and examiner approval. The learner must explain why a strong template score does not certify the current answer."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach the complete quality vocabulary.** Distinguish Unscored, measured quality, stale evidence, active alerts, successful execution and examiner approval. The learner must explain why a strong template score does not certify the current answer. Accepted at checkpoint 312: explicit status definitions and a combined-state example accompany the existing explanation practice and required historical-score recognition case. Author-assigned ratings, configurable age/configuration staleness and acknowledgment without repair are distinguished; practical repair and live calibration remain separate."
     },
     {
       "id": "C8-M08-02",
@@ -3250,6 +3250,13 @@
       "evidence_directories": [
         "certification-instruction-boundary-teaching-2026-10-09"
       ]
+    },
+    {
+      "number": 312,
+      "title": "Complete quality-status vocabulary without conflating decisions on October 9 2026",
+      "evidence_directories": [
+        "certification-quality-vocabulary-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4686,6 +4693,12 @@
       "available": true,
       "bytes": 444,
       "sha256": "cc8c1f5360006e081ae649f02d96462b2bb2590d1925228090a35098f33fb6fd"
+    },
+    {
+      "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 576,
+      "sha256": "ee9bf9d87e7ccafcc78e3324d6bf125d95673e2f820cb0f8c612aee28b543573"
     },
     {
       "path": "artifacts/visual-review/certification-readers-2026-10-05/checkpoint.json",
@@ -197538,6 +197551,719 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 10182,
+        "sha256": "1d5c6e653e413d8f95c50ad3a25692cb384a306cf40f67b1481fa45229a4f18b"
+      },
+      "checkpoints": [
+        312
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T00:01:28.438Z",
+      "reported_commit": "78a25cccf6ea80dab4d7c9304ef51a7234285a31",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "validation_qa",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "validation_qa.trust-signals-quality-tiers-v5-0",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation_qa-6-reading-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-320.png",
+              "available": true,
+              "bytes": 81372
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-1-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-320.png",
+              "available": true,
+              "bytes": 77838
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-2-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-320.png",
+              "available": true,
+              "bytes": 79959
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-3-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-320.png",
+              "available": true,
+              "bytes": 79519
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-4-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-320.png",
+              "available": true,
+              "bytes": 81006
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-practice-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-320.png",
+              "available": true,
+              "bytes": 67496
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-320.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-feedback-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-feedback-320.png",
+              "available": true,
+              "bytes": 60732
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-feedback-320.txt",
+              "available": true,
+              "bytes": 9466
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-reading-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-1440.png",
+              "available": true,
+              "bytes": 266489
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-1-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-1440.png",
+              "available": true,
+              "bytes": 266489
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-2-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-1440.png",
+              "available": true,
+              "bytes": 266489
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-3-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-1440.png",
+              "available": true,
+              "bytes": 266489
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-3-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-4-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-1440.png",
+              "available": true,
+              "bytes": 266489
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-detail-4-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-practice-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-1440.png",
+              "available": true,
+              "bytes": 174540
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-1440.txt",
+              "available": true,
+              "bytes": 9532
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser/validation_qa-6-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 6702,
+        "sha256": "95a610a45531407bd6c69d68beb98c2b76a9423956cbd2d31a901398bdb72428"
+      },
+      "checkpoints": [
+        312
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T00:01:23.239Z",
+      "reported_commit": "78a25cccf6ea80dab4d7c9304ef51a7234285a31",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "validation_qa",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "validation_qa.trust-signals-quality-tiers-v5-0",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation_qa-6-reading-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-reading-780.png",
+              "available": true,
+              "bytes": 147351
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-reading-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-1-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-1-780.png",
+              "available": true,
+              "bytes": 154828
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-1-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-2-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-2-780.png",
+              "available": true,
+              "bytes": 150383
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-2-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-3-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-3-780.png",
+              "available": true,
+              "bytes": 146367
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-3-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-3-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-detail-4-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-4-780.png",
+              "available": true,
+              "bytes": 153793
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-4-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-detail-4-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-practice-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-practice-780.png",
+              "available": true,
+              "bytes": 114983
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-practice-780.txt",
+              "available": true,
+              "bytes": 9286
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation_qa-6-feedback-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-feedback-780.png",
+              "available": true,
+              "bytes": 102830
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-feedback-780.txt",
+              "available": true,
+              "bytes": 9466
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-quality-vocabulary-2026-10-09/browser-native/validation_qa-6-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-readers-2026-10-05-ui-attempt3/manifest.json",
         "available": true,
         "bytes": 6548,
@@ -240861,7 +241587,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1158,
+    "1440x1000": 1164,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -240882,14 +241608,14 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 616,
+    "320x844": 623,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 158,
+    "390x500": 165,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
