@@ -26,6 +26,7 @@ import { useChat } from '../../hooks/useChat'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { isCertificationWriteResult } from '../../lib/certificationEvents'
 import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
+import { CertificationChatRecovery } from '../certification/CertificationChatRecovery'
 import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useOpenActivity } from '../../hooks/useOpenActivity'
@@ -1387,6 +1388,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </button>
               </div>
             )}
+            <CertificationChatRecovery messages={messages} toolCalls={activeToolCalls} toolResults={toolResults} />
           </div>
         )}
 

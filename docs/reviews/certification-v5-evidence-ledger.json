@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "364338c20cf32194ebfcebead07c1f60ee66b047",
+  "working_head_at_inventory": "73b5f64e29d035c5cd1d0ced5720636dd21a8c1f",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 833792,
-    "sha256": "4b707cf00dd04ca251b9a965907a2efcba962ce57640c4a0f5a42fb469a6507a"
+    "bytes": 836566,
+    "sha256": "9ea9a24ddc4dd23653cb202e3e105e22fb1b46593a5fc8de51c206de5f3ac4b9"
   },
   "counts": {
     "accepted": 86,
     "open": 76,
     "items": 162,
-    "checkpoints": 343,
-    "browser_runs": 642,
-    "recorded_captures_including_diagnostics_and_repeats": 7449,
+    "checkpoints": 344,
+    "browser_runs": 645,
+    "recorded_captures_including_diagnostics_and_repeats": 7466,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3476,6 +3476,13 @@
       "evidence_directories": [
         "certification-submission-matrix-2026-10-10"
       ]
+    },
+    {
+      "number": 344,
+      "title": "Recover a failed course conversation directly into saved learning on October 10 2026",
+      "evidence_directories": [
+        "certification-chat-recovery-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -3826,6 +3833,12 @@
       "available": true,
       "bytes": 310,
       "sha256": "956317fe0ec13997cc2cda1a2924f588a8deacff14137110e35cd306bb8416d6"
+    },
+    {
+      "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 295,
+      "sha256": "355cf08760e848789c08b1862ee45a07fa87a42ba0d3aa72bd53aeaeb9197585"
     },
     {
       "path": "artifacts/visual-review/certification-chat-reward-policy-2026-10-08/checkpoint.json",
@@ -61759,6 +61772,685 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-chat-navigation-2026-10-07/normal-final/historical-revision-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-before/manifest.json",
+        "available": true,
+        "bytes": 1767,
+        "sha256": "2815376d2deab10cdbfbd5e6d70cc13539f742d6a739070b96ec2b4d4b25a1a4"
+      },
+      "checkpoints": [
+        344
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T20:48:27.867Z",
+      "reported_commit": "73b5f64e29d035c5cd1d0ced5720636dd21a8c1f",
+      "reported_source_fingerprint": "e36ea6b228af1ee9e180544c45fc74c425851e95d288d0e98645e82295e08890",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Synthetic unavailable chat model after explicit course kickoff; no provider or course write.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseErrorHasDirectCourseRecovery": false,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-chat-unavailable-before",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-before/course-chat-unavailable-before.png",
+              "available": true,
+              "bytes": 32554
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-before/course-chat-unavailable-before.txt",
+              "available": true,
+              "bytes": 1182
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-before/course-chat-unavailable-before.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/manifest.json",
+        "available": true,
+        "bytes": 9119,
+        "sha256": "d86a99b734dafa92bde2856b68980bc0e5cb7d18bbc350e2ce6b691735f7d8d0"
+      },
+      "checkpoints": [
+        344
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T20:52:50.232Z",
+      "reported_commit": "73b5f64e29d035c5cd1d0ced5720636dd21a8c1f",
+      "reported_source_fingerprint": "4372ef3ad4eac24bdfc0e312d95ddaa0e662998fff29f284bc1b7a887b0e2dea",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Production chat failure recovery with synthetic unavailable/denied/interrupted responses and retained course. No provider, grading or actual learner write.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "case": "start-unavailable",
+          "width": 320,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "continue-denied",
+          "width": 320,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "course-tool-interrupted",
+          "width": 320,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "unrelated-chat",
+          "width": 320,
+          "courseRecovery": false,
+          "freshReadOnlyRefresh": false,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "start-unavailable",
+          "width": 1440,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "continue-denied",
+          "width": 1440,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "course-tool-interrupted",
+          "width": 1440,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        },
+        {
+          "case": "unrelated-chat",
+          "width": 1440,
+          "courseRecovery": false,
+          "freshReadOnlyRefresh": false,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "start-unavailable-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-320.png",
+              "available": true,
+              "bytes": 43082
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-320.txt",
+              "available": true,
+              "bytes": 1326
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "start-unavailable-course-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-320.png",
+              "available": true,
+              "bytes": 90110
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-320.txt",
+              "available": true,
+              "bytes": 5236
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "continue-denied-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-320.png",
+              "available": true,
+              "bytes": 41725
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-320.txt",
+              "available": true,
+              "bytes": 1309
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "continue-denied-course-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-320.png",
+              "available": true,
+              "bytes": 89395
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-320.txt",
+              "available": true,
+              "bytes": 5076
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "course-tool-interrupted-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-320.png",
+              "available": true,
+              "bytes": 48238
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-320.txt",
+              "available": true,
+              "bytes": 1418
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "course-tool-interrupted-course-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-320.png",
+              "available": true,
+              "bytes": 89395
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-320.txt",
+              "available": true,
+              "bytes": 5185
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unrelated-chat-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-320.png",
+              "available": true,
+              "bytes": 30948
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-320.txt",
+              "available": true,
+              "bytes": 1152
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "start-unavailable-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-1440.png",
+              "available": true,
+              "bytes": 59089
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-1440.txt",
+              "available": true,
+              "bytes": 1392
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "start-unavailable-course-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-1440.png",
+              "available": true,
+              "bytes": 188469
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-1440.txt",
+              "available": true,
+              "bytes": 5302
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/start-unavailable-course-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "continue-denied-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-1440.png",
+              "available": true,
+              "bytes": 58997
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-1440.txt",
+              "available": true,
+              "bytes": 1375
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "continue-denied-course-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-1440.png",
+              "available": true,
+              "bytes": 184764
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-1440.txt",
+              "available": true,
+              "bytes": 5142
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/continue-denied-course-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "course-tool-interrupted-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-1440.png",
+              "available": true,
+              "bytes": 66712
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-1440.txt",
+              "available": true,
+              "bytes": 1484
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "course-tool-interrupted-course-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-1440.png",
+              "available": true,
+              "bytes": 184764
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-1440.txt",
+              "available": true,
+              "bytes": 5251
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/course-tool-interrupted-course-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unrelated-chat-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-1440.png",
+              "available": true,
+              "bytes": 47987
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-1440.txt",
+              "available": true,
+              "bytes": 1218
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-final/unrelated-chat-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/manifest.json",
+        "available": true,
+        "bytes": 2433,
+        "sha256": "2238dfbd8a8115c1a7b9ddd8ba4b434912cc6c06aadbfd14fed25d7f4eb223d1"
+      },
+      "checkpoints": [
+        344
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T20:53:28.210Z",
+      "reported_commit": "73b5f64e29d035c5cd1d0ced5720636dd21a8c1f",
+      "reported_source_fingerprint": "4372ef3ad4eac24bdfc0e312d95ddaa0e662998fff29f284bc1b7a887b0e2dea",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Production chat failure recovery with synthetic unavailable/denied/interrupted responses and retained course. No provider, grading or actual learner write.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "case": "start-unavailable",
+          "width": 640,
+          "courseRecovery": true,
+          "freshReadOnlyRefresh": true,
+          "automaticChatRetries": 0,
+          "originalProgressPreserved": true
+        }
+      ],
+      "captures": [
+        {
+          "id": "start-unavailable-error-640",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-error-640.png",
+              "available": true,
+              "bytes": 105345
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-error-640.txt",
+              "available": true,
+              "bytes": 1326
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-error-640.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "start-unavailable-course-640",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-course-640.png",
+              "available": true,
+              "bytes": 219482
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-course-640.txt",
+              "available": true,
+              "bytes": 5236
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-chat-recovery-2026-10-10/browser-native/start-unavailable-course-640.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -322107,7 +322799,7 @@
     "1024x500": 5,
     "1024x900": 34,
     "1440x1000": 1515,
-    "1440x1100": 207,
+    "1440x1100": 214,
     "1440x250": 4,
     "1440x480": 6,
     "1440x500": 11,
@@ -322118,7 +322810,7 @@
     "1440x900": 321,
     "1440x950": 4,
     "320x1000": 606,
-    "320x1100": 362,
+    "320x1100": 371,
     "320x250": 6,
     "320x480": 6,
     "320x500": 281,
@@ -322131,7 +322823,7 @@
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
-    "390x1000": 21,
+    "390x1000": 22,
     "390x1100": 8,
     "390x250": 49,
     "390x480": 3,
