@@ -282,6 +282,16 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
                         }
                         for item in items
                     ]
+                    # The set's cross-field rules travel with it, so the step
+                    # checks its arithmetic in code as a standalone run does.
+                    set_rules = [
+                        r for r in (ss.get("cross_field_rules") or [])
+                        if isinstance(r, dict)
+                    ]
+                    if set_rules:
+                        task_data["cross_field_rules"] = (
+                            list(task_data.get("cross_field_rules") or []) + set_rules
+                        )
                     # UI is mutually exclusive between saved-set and manual fields,
                     # but older workflows may have both persisted. Drop stale manual
                     # fields so the saved set is unambiguously the source of truth.

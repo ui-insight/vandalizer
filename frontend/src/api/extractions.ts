@@ -1068,6 +1068,8 @@ export type CrossFieldRuleType =
   | 'cross_reference'
   | 'date_order'
   | 'custom_expression'
+  | 'product_equals'
+  | 'at_most_difference'
 
 export interface CrossFieldRule {
   id?: string
@@ -1094,6 +1096,17 @@ export interface CrossFieldRule {
   field_b?: string
   match_type?: 'contains' | 'equals'
   expression?: string
+  // product_equals: target_field = base_field × rate_field
+  base_field?: string
+  rate_field?: string
+  // at_most_difference: field ≤ minuend_field − sum(subtrahend_fields)
+  minuend_field?: string
+  subtrahend_fields?: string[]
+  // sum_equals / at_most_difference: an unstated amount counts as 0, and the
+  // result names it
+  missing_as_zero?: boolean
+  // Plain-language name, e.g. from a catalog workflow
+  label?: string
 }
 
 export interface CrossFieldRuleResult {

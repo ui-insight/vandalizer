@@ -2165,14 +2165,21 @@ _RULE_FIELD_KEYS = {
     "range_check": ("field",),
     "cross_reference": ("field_a", "field_b"),
     "date_order": ("field_a", "field_b"),
+    "product_equals": ("base_field", "rate_field", "target_field"),
+    "at_most_difference": ("field", "minuend_field"),
+}
+_RULE_FIELD_LISTS = {
+    "sum_equals": "source_fields",
+    "at_most_difference": "subtrahend_fields",
 }
 
 
 def _untraced_rule_inputs(rule: dict, data: dict, entity_sources: dict) -> list[str]:
     """Fields a rule read whose non-empty value has no verified source quote."""
     fields = [rule.get(k) for k in _RULE_FIELD_KEYS.get(rule.get("type"), ())]
-    if rule.get("type") == "sum_equals":
-        fields += list(rule.get("source_fields") or [])
+    list_key = _RULE_FIELD_LISTS.get(rule.get("type"))
+    if list_key:
+        fields += list(rule.get(list_key) or [])
     lowered_data = {str(k).lower(): v for k, v in data.items()}
     lowered_sources = {str(k).lower(): v for k, v in (entity_sources or {}).items()}
     untraced: list[str] = []

@@ -263,10 +263,26 @@ def _is_empty(value: Any) -> bool:
     return False
 
 
-def _result(rule: dict, status: str, message: str) -> dict:
-    """Build a result dict. Includes `passed` for backward compatibility."""
+_MISSING_WORDS = {"n/a", "na", "none", "not applicable", "not found", "-", "–", "—"}
+
+
+def _assumed_zero_note(fields: list[str]) -> str:
+    if not fields:
+        return ""
+    return f"; counted as 0 because not stated: {', '.join(fields)}"
+
+
+def _result(rule: dict, status: str, message: str, **extra) -> dict:
+    """Build a result dict. Includes `passed` for backward compatibility.
+
+    ``extra`` carries optional detail: ``assumed_zero`` (fields counted as 0
+    because the document didn't state them) and ``computed`` (the value the
+    rule calculated), so a reader can see what the check rested on.
+    """
     passed = status == "pass"
+    extra = {k: v for k, v in extra.items() if v not in (None, [], "")}
     return {
+        **extra,
         "rule": rule,
         "rule_id": rule.get("id"),
         "status": status,  # "pass" | "fail" | "unparseable"
@@ -306,38 +322,72 @@ class CrossFieldValidator:
                 results.append(_result(rule, "unparseable", f"Rule evaluation error: {e}"))
         return results
 
-    def _validate_sum_equals(self, data: dict, rule: dict) -> dict:
-        """Check that source fields sum to target field value."""
-        source_fields = rule.get("source_fields", [])
-        target_field = rule.get("target_field", "")
-        try:
-            tolerance = Decimal(str(rule.get("tolerance", "0.01")))
-        except InvalidOperation:
-            return _result(rule, "unparseable", f"Invalid tolerance: {rule.get('tolerance')!r}")
+    def _read_amounts(
+        self, data: dict, rule: dict, fields: list[str], role: str,
+    ) -> tuple[Optional[list[ParsedNumber]], list[str], Optional[dict]]:
+        """Parse each field as one amount: ``(amounts, assumed_zero, None)`` or
+        ``(None, [], unparseable_result)``.
 
-        parsed: list[ParsedNumber] = []
-        for field in source_fields:
+        With ``missing_as_zero`` on the rule, a field that is empty or says
+        "N/A"/"none" counts as 0 and is listed in ``assumed_zero`` so the
+        result can say which zeros were assumed rather than read.
+        """
+        missing_as_zero = bool(rule.get("missing_as_zero"))
+        amounts: list[ParsedNumber] = []
+        assumed_zero: list[str] = []
+        for field in fields:
             val = _get_field_value(data, field)
-            if _is_empty(val):
-                return _result(rule, "unparseable", f"Source field '{field}' is empty")
+            if _is_empty(val) or (
+                isinstance(val, str) and val.strip().lower() in _MISSING_WORDS
+            ):
+                if missing_as_zero:
+                    assumed_zero.append(field)
+                    amounts.append(ParsedNumber(Decimal(0)))
+                    continue
+                return None, [], _result(rule, "unparseable", f"{role} field '{field}' is empty")
             num, reason = parse_number(val)
             if num is None:
-                return _result(rule, "unparseable", _unparseable_number(field, val, reason))
-            parsed.append(num)
+                return None, [], _result(rule, "unparseable", _unparseable_number(field, val, reason))
+            amounts.append(num)
+        return amounts, assumed_zero, None
 
+    @staticmethod
+    def _tolerance(rule: dict, default: str) -> Optional[Decimal]:
+        try:
+            return Decimal(str(rule.get("tolerance", default)))
+        except InvalidOperation:
+            return None
+
+    @staticmethod
+    def _mixed_units(rule: dict, amounts: list[ParsedNumber]) -> Optional[dict]:
+        units = {p.unit for p in amounts if p.unit}
+        if len(units) > 1:
+            return _result(
+                rule, "unparseable",
+                f"Fields mix units ({', '.join(sorted(units))}); they can't be combined",
+            )
+        return None
+
+    def _validate_sum_equals(self, data: dict, rule: dict) -> dict:
+        """Check that source fields sum to target field value."""
+        source_fields = list(rule.get("source_fields", []))
+        target_field = rule.get("target_field", "")
+        tolerance = self._tolerance(rule, "0.01")
+        if tolerance is None:
+            return _result(rule, "unparseable", f"Invalid tolerance: {rule.get('tolerance')!r}")
+
+        parsed, assumed_zero, error = self._read_amounts(data, rule, source_fields, "Source")
+        if error:
+            return error
         target_val = _get_field_value(data, target_field)
         if _is_empty(target_val):
             return _result(rule, "unparseable", f"Target field '{target_field}' is empty")
         target, reason = parse_number(target_val)
         if target is None:
             return _result(rule, "unparseable", _unparseable_number(target_field, target_val, reason))
-
-        units = {p.unit for p in [*parsed, target] if p.unit}
-        if len(units) > 1:
-            return _result(
-                rule, "unparseable",
-                f"Fields mix units ({', '.join(sorted(units))}); a sum across them is meaningless",
-            )
+        error = self._mixed_units(rule, [*parsed, target])
+        if error:
+            return error
 
         total = sum((p.value for p in parsed), Decimal(0))
         difference = abs(total - target.value)
@@ -345,9 +395,97 @@ class CrossFieldValidator:
             f"Sum of {source_fields} = {_fmt(total)}, target '{target_field}' = "
             f"{_fmt(target.value)} (tolerance {_fmt(tolerance)})"
         )
-        if difference <= tolerance:
-            return _result(rule, "pass", detail)
-        return _result(rule, "fail", f"{detail}; difference {_fmt(difference)}")
+        detail += _assumed_zero_note(assumed_zero)
+        status = "pass" if difference <= tolerance else "fail"
+        if status == "fail":
+            detail += f"; difference {_fmt(difference)}"
+        return _result(rule, status, detail, assumed_zero=assumed_zero, computed=_fmt(total))
+
+    def _validate_product_equals(self, data: dict, rule: dict) -> dict:
+        """Check that ``target_field`` equals ``base_field`` × ``rate_field``.
+
+        For a rate applied to a base, such as indirect costs = F&A rate × MTDC
+        base. A rate written with % (or a bare number over 1, e.g. "55.5") is a
+        percentage; a bare number up to 1 is a fraction. The default tolerance
+        is $1, for rounding to whole dollars.
+        """
+        base_field = rule.get("base_field", "")
+        rate_field = rule.get("rate_field", "")
+        target_field = rule.get("target_field", "")
+        tolerance = self._tolerance(rule, "1")
+        if tolerance is None:
+            return _result(rule, "unparseable", f"Invalid tolerance: {rule.get('tolerance')!r}")
+        amounts, _assumed, error = self._read_amounts(
+            data, {**rule, "missing_as_zero": False},
+            [base_field, rate_field, target_field], "Input",
+        )
+        if error:
+            return error
+        base, rate, target = amounts
+        if rate.unit == "currency":
+            return _result(rule, "unparseable", f"'{rate_field}' is a dollar amount, not a rate")
+        error = self._mixed_units(rule, [base, target])
+        if error:
+            return error
+        rate_note = ""
+        if rate.unit == "percent":
+            factor = rate.value / 100
+        elif rate.value > 1:
+            factor = rate.value / 100
+            rate_note = f" ('{rate_field}' has no % sign; read as {_fmt(rate.value)}%)"
+        else:
+            factor = rate.value
+        expected = base.value * factor
+        difference = abs(expected - target.value)
+        detail = (
+            f"{_fmt(base.value)} × {_fmt(factor * 100)}% = {_fmt(expected.quantize(Decimal('0.01')))}, "
+            f"target '{target_field}' = {_fmt(target.value)} (tolerance {_fmt(tolerance)}){rate_note}"
+        )
+        status = "pass" if difference <= tolerance else "fail"
+        if status == "fail":
+            detail += f"; difference {_fmt(difference.quantize(Decimal('0.01')))}"
+        return _result(rule, status, detail, computed=_fmt(expected.quantize(Decimal("0.01"))))
+
+    def _validate_at_most_difference(self, data: dict, rule: dict) -> dict:
+        """Check that ``field`` ≤ ``minuend_field`` − sum(``subtrahend_fields``).
+
+        An upper bound, not an equation: e.g. an MTDC base can be no more than
+        total direct costs less equipment and participant support. Passing says
+        the value is consistent with those exclusions, not that it is right.
+        """
+        field = rule.get("field", "")
+        minuend_field = rule.get("minuend_field", "")
+        subtrahends = list(rule.get("subtrahend_fields", []))
+        tolerance = self._tolerance(rule, "0.01")
+        if tolerance is None:
+            return _result(rule, "unparseable", f"Invalid tolerance: {rule.get('tolerance')!r}")
+        head, _a, error = self._read_amounts(
+            data, {**rule, "missing_as_zero": False}, [field, minuend_field], "Input",
+        )
+        if error:
+            return error
+        minus, assumed_zero, error = self._read_amounts(data, rule, subtrahends, "Subtracted")
+        if error:
+            return error
+        value, minuend = head
+        error = self._mixed_units(rule, [value, minuend, *minus])
+        if error:
+            return error
+        bound = minuend.value - sum((p.value for p in minus), Decimal(0))
+        detail = (
+            f"'{field}' = {_fmt(value.value)}; '{minuend_field}' less "
+            f"{subtrahends} = {_fmt(bound)}"
+        )
+        detail += _assumed_zero_note(assumed_zero)
+        if value.value <= bound + tolerance:
+            return _result(
+                rule, "pass", detail + " (within the bound; this does not confirm the value)",
+                assumed_zero=assumed_zero, computed=_fmt(bound),
+            )
+        return _result(
+            rule, "fail", f"{detail}; exceeds the bound by {_fmt(value.value - bound)}",
+            assumed_zero=assumed_zero, computed=_fmt(bound),
+        )
 
     def _validate_conditional_required(self, data: dict, rule: dict) -> dict:
         """If field A = value, field B must exist."""

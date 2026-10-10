@@ -159,6 +159,78 @@ INPUT_SOURCE_LABELS = {
 }
 
 
+# Arithmetic an Extraction step's rules computed in code. A later model step
+# gets the results as a labeled section and is told to report them, so a sum
+# or rate check never rests on the model's own arithmetic (#1013 §4).
+RULE_CHECKS_LABEL = "Checks computed by Vandalizer (exact arithmetic; report these, do not recompute)"
+_CHECK_STATUS_LABELS = {"pass": "PASS", "fail": "FAIL", "unparseable": "NOT CHECKED"}
+
+
+def evaluate_rule_checks(rules, entities) -> list[dict]:
+    """Run an Extraction task's cross-field rules on each extracted entity.
+
+    Returns one ``{"entity": i, "label", "results": [...]}`` per entity that
+    any active rule was evaluated on; ``[]`` when there are no rules. Results
+    keep the validator's status, message, computed value and assumed zeros,
+    without the rule's bookkeeping counters.
+    """
+    if not isinstance(rules, list) or not rules:
+        return []
+    active = [
+        r for r in rules
+        if isinstance(r, dict) and r.get("enabled") is not False and not r.get("auto_disabled")
+    ]
+    if not active:
+        return []
+    from app.services.cross_field_validation import CrossFieldValidator
+
+    validator = CrossFieldValidator()
+    items = entities if isinstance(entities, list) else [entities]
+    checks: list[dict] = []
+    for i, entity in enumerate(items):
+        if not isinstance(entity, dict):
+            continue
+        results = []
+        for r in validator.validate(entity, active):
+            rule = r.get("rule") or {}
+            entry = {
+                "rule_type": rule.get("type"),
+                "label": rule.get("label") or rule.get("type"),
+                "status": r.get("status"),
+                "message": r.get("message"),
+            }
+            for key in ("computed", "assumed_zero"):
+                if r.get(key):
+                    entry[key] = r[key]
+            results.append(entry)
+        checks.append({"entity": i, "results": results})
+    return checks
+
+
+def describe_rule_checks(checks) -> str:
+    """Plain-text form of :func:`evaluate_rule_checks` for a model step."""
+    if not isinstance(checks, list) or not checks:
+        return ""
+    lines: list[str] = []
+    many = len(checks) > 1
+    for block in checks:
+        if not isinstance(block, dict):
+            continue
+        if many:
+            lines.append(f"Extracted record {int(block.get('entity', 0)) + 1}:")
+        for r in block.get("results") or []:
+            status = _CHECK_STATUS_LABELS.get(r.get("status"), str(r.get("status")).upper())
+            lines.append(f"- {status} — {r.get('label')}: {r.get('message')}")
+    if not lines:
+        return ""
+    lines.append(
+        "PASS and FAIL were computed exactly from the extracted values. NOT "
+        "CHECKED means an input was missing or not one exact amount; say so, "
+        "and do not supply the arithmetic yourself."
+    )
+    return "\n".join(lines)
+
+
 # Input is a property of the *step*, not of a task: every task in a step is
 # handed a byte-identical copy of the step's payload and they run in parallel
 # (see ``MultiTaskNode.process``). These keys therefore live on the step's
@@ -267,6 +339,9 @@ def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
             if text:
                 sections.append((INPUT_SOURCE_LABELS[src], text))
                 raw_single = payload
+            checks = describe_rule_checks(inputs.get("rule_checks"))
+            if checks:
+                sections.append((RULE_CHECKS_LABEL, checks))
         elif src == "select_document":
             doc = data.get("selected_doc_text") or ""
             if doc:
@@ -611,6 +686,7 @@ class MultiTaskNode(Node):
         fill_report: list[dict] = []
         field_sources: list[dict] = []
         filled_values: dict = {}
+        rule_checks: list[dict] = []
         for result in results:
             if result.get("_approval_pause"):
                 return result
@@ -634,6 +710,8 @@ class MultiTaskNode(Node):
                 entity_sources = []
             if isinstance(result.get("filled_values"), dict):
                 filled_values.update(result["filled_values"])
+            if isinstance(result.get("rule_checks"), list):
+                rule_checks.extend(result["rule_checks"])
             warning = result.get("warning")
             if isinstance(warning, str) and warning:
                 warnings.append(warning)
@@ -685,6 +763,8 @@ class MultiTaskNode(Node):
             out["field_sources"] = field_sources
         if filled_values:
             out["filled_values"] = filled_values
+        if rule_checks:
+            out["rule_checks"] = rule_checks
         return out
 
 
@@ -785,6 +865,8 @@ class ExtractionNode(Node):
                 else:
                     field_sources.append({})
 
+        rule_checks = evaluate_rule_checks(self.data.get("cross_field_rules"), raw_output)
+
         # Label output with the custom task name when set
         if task_label:
             if isinstance(raw_output, list):
@@ -804,6 +886,8 @@ class ExtractionNode(Node):
         # exactly the output shape it had before.
         if any(field_sources):
             out["field_sources"] = field_sources
+        if rule_checks:
+            out["rule_checks"] = rule_checks
         return out
 
 

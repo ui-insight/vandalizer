@@ -406,6 +406,50 @@ async def _patch_superseded_prompts(wf: Workflow, seed_item: dict, meta: dict) -
     return patched
 
 
+async def _patch_catalog_rules(wf: Workflow, seed_item: dict) -> int:
+    """Give a catalog workflow's extraction set the cross-field rules its seed
+    declares (#1013 §4).
+
+    A seed's Extraction task may list ``cross_field_rules``, each with a
+    stable ``id``. They live on the SearchSet the task is linked to, where the
+    workflow run picks them up and the extraction's rules editor shows them.
+    A rule whose id is already on the set is left as it is, so a rule an admin
+    disabled or tuned stays that way; only missing ones are added. Users'
+    copies are never touched. Returns the number of rules added.
+    """
+    from app.services.cross_field_rules import normalize_rules
+
+    if wf.user_id != SYSTEM_USER:
+        return 0
+    wanted: dict[str, list[dict]] = {}
+    for step_data in seed_item.get("steps", []):
+        for task_data in step_data.get("tasks", []):
+            rules = (task_data.get("data") or {}).get("cross_field_rules")
+            if task_data.get("name") == "Extraction" and rules:
+                wanted.setdefault(step_data["name"], []).extend(rules)
+    if not wanted:
+        return 0
+    added = 0
+    for step_id in wf.steps:
+        step = await WorkflowStep.get(step_id)
+        if not step or step.name not in wanted:
+            continue
+        for task_id in step.tasks:
+            task = await WorkflowStepTask.get(task_id)
+            if not task or task.name != "Extraction" or not task.data.get("search_set_uuid"):
+                continue
+            ss = await SearchSet.find_one({"uuid": task.data["search_set_uuid"]})
+            if not ss:
+                continue
+            have = {r.get("id") for r in (ss.cross_field_rules or [])}
+            missing = [r for r in wanted[step.name] if r.get("id") not in have]
+            if missing:
+                ss.cross_field_rules = list(ss.cross_field_rules or []) + normalize_rules(missing)
+                await ss.save()
+                added += len(missing)
+    return added
+
+
 def _is_catalog_kb_query(task_data: dict) -> bool:
     """A seed task that queries a catalog KB, named by its seed id (#1009)."""
     return (
@@ -496,6 +540,9 @@ async def seed_workflow(
         corrected = await _patch_superseded_prompts(existing, item, meta)
         if corrected:
             print(f"    (replaced {corrected} superseded prompt(s))")
+        rules_added = await _patch_catalog_rules(existing, item)
+        if rules_added:
+            print(f"    (added {rules_added} cross-field rule(s))")
 
         changed = _reinstate_verified(existing)
         new_name = item["name"]
@@ -550,6 +597,7 @@ async def seed_workflow(
             if _is_catalog_kb_query(task_data):
                 continue  # attached by attach_catalog_kb_queries once KBs are seeded
             td = dict(task_data.get("data", {}))
+            seed_rules = td.pop("cross_field_rules", None) if task_data["name"] == "Extraction" else None
 
             # Materialise a SearchSet for Extraction tasks with inline searchphrases
             if task_data["name"] == "Extraction" and "searchphrases" in td:
@@ -566,6 +614,9 @@ async def seed_workflow(
                     verified=True,
                     created_at=now,
                 )
+                if seed_rules:
+                    from app.services.cross_field_rules import normalize_rules
+                    ss.cross_field_rules = normalize_rules(seed_rules)
                 await ss.insert()
                 for key in keys:
                     ssi = SearchSetItem(

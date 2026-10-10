@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "38e1def4213255757e2cc5eb98883f959bb11a76",
+  "working_head_at_inventory": "364338c20cf32194ebfcebead07c1f60ee66b047",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 69387,
-    "sha256": "bd72d065c69510b047418e063b212b3afbe043144aad0d580dd1b5d40e28b955"
+    "bytes": 69711,
+    "sha256": "6e2519e82fcfddae73dee2632442a8bbcd4a411e69573ed8d451b2a772f3621d"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 830991,
-    "sha256": "270d8f80825b3eb44746af94a2a7ec05e72424fdeef9e9669042e662a19d95a9"
+    "bytes": 833792,
+    "sha256": "4b707cf00dd04ca251b9a965907a2efcba962ce57640c4a0f5a42fb469a6507a"
   },
   "counts": {
-    "accepted": 85,
-    "open": 77,
+    "accepted": 86,
+    "open": 76,
     "items": 162,
-    "checkpoints": 342,
-    "browser_runs": 641,
-    "recorded_captures_including_diagnostics_and_repeats": 7437,
+    "checkpoints": 343,
+    "browser_runs": 642,
+    "recorded_captures_including_diagnostics_and_repeats": 7449,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -295,8 +295,8 @@
     },
     {
       "id": "C8-CHAT-07",
-      "accepted": false,
-      "requirement": "P1 · Improve: Prevent duplicate submissions.** Disable or deduplicate pending lesson/assessment/completion actions and support server idempotency. Double-clicks, Enter plus click, retries and two tabs cannot create duplicate attempts or XP awards."
+      "accepted": true,
+      "requirement": "P1 · Improve: Prevent duplicate submissions.** Disable or deduplicate pending lesson/assessment/completion actions and support server idempotency. Double-clicks, Enter plus click, retries and two tabs cannot create duplicate attempts or XP awards. Accepted at checkpoint 343: pending action guards, original-request recovery, trusted-evidence/scenario deduplication and required reviewed completion counters cover current chat/panel routes and two-tab persistence. Deliberate changed work remains distinct; coherent deployed workers/indexes remain separate release gates."
     },
     {
       "id": "C8-CHAT-08",
@@ -3469,6 +3469,13 @@
       "evidence_directories": [
         "certification-chat-directions-2026-10-10"
       ]
+    },
+    {
+      "number": 343,
+      "title": "Accept current duplicate-submission protections on October 10 2026",
+      "evidence_directories": [
+        "certification-submission-matrix-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -5415,6 +5422,18 @@
       "available": true,
       "bytes": 995,
       "sha256": "2a5d5cf4629c031c6fc18ecc3b91a98bf2b83756f6cdc1b65d1da0181d716f65"
+    },
+    {
+      "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/source-hashes.json",
+      "available": true,
+      "bytes": 15435,
+      "sha256": "8c9fc668dd9a8524c6319137748f29539f65d335f24182a5416f72d432eccac1"
+    },
+    {
+      "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 323,
+      "sha256": "c60390efdaa5e87ee965713fe6399a5965190f3c1929c9b86104a2eecccb12c7"
     },
     {
       "path": "artifacts/visual-review/certification-support-2026-10-05/checkpoint.json",
@@ -277569,6 +277588,409 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/manifest.json",
+        "available": true,
+        "bytes": 7482,
+        "sha256": "4ac9b902cdb400a3c3f901d95e9ac07aca91b394168c632003c7f06ae543096e"
+      },
+      "checkpoints": [
+        343
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T20:41:42.641Z",
+      "reported_commit": "364338c20cf32194ebfcebead07c1f60ee66b047",
+      "reported_source_fingerprint": "b02abf50d91803c822e7ca5398fb8e31c8f57ebece49628385f3bdcd75f80821",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen frontend and actual authored reflection definition. Synthetic save failure/success; all course writes intercepted. Browser-tab draft restoration and separate server-save presentation.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "draftsSurviveReload": true,
+          "failedSavePreservesChoices": true,
+          "expiredSessionPreservesChoices": true,
+          "expiredRefreshes": 2,
+          "identicalExplicitRetry": true,
+          "serverSaveClearsDraft": true,
+          "storageFailureExplained": true,
+          "allWritesIntercepted": true,
+          "activation": "enter-click",
+          "interceptedSubmissions": 6
+        }
+      ],
+      "captures": [
+        {
+          "id": "reflection-draft-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-320.png",
+              "available": true,
+              "bytes": 83825
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-320.txt",
+              "available": true,
+              "bytes": 8534
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-pending-once-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-320.png",
+              "available": true,
+              "bytes": 90954
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-320.txt",
+              "available": true,
+              "bytes": 8673
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-restored-after-error-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-320.png",
+              "available": true,
+              "bytes": 83888
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-320.txt",
+              "available": true,
+              "bytes": 8543
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-restored-after-expiry-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-320.png",
+              "available": true,
+              "bytes": 83888
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-320.txt",
+              "available": true,
+              "bytes": 8543
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-server-saved-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-320.png",
+              "available": true,
+              "bytes": 91885
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-320.txt",
+              "available": true,
+              "bytes": 6249
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-storage-unavailable-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-320.png",
+              "available": true,
+              "bytes": 84366
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-320.txt",
+              "available": true,
+              "bytes": 8545
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-draft-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-1440.png",
+              "available": true,
+              "bytes": 146291
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-1440.txt",
+              "available": true,
+              "bytes": 8600
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-draft-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-pending-once-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-1440.png",
+              "available": true,
+              "bytes": 121654
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-1440.txt",
+              "available": true,
+              "bytes": 8739
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-pending-once-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-restored-after-error-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-1440.png",
+              "available": true,
+              "bytes": 136153
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-1440.txt",
+              "available": true,
+              "bytes": 8609
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-error-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-restored-after-expiry-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-1440.png",
+              "available": true,
+              "bytes": 136153
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-1440.txt",
+              "available": true,
+              "bytes": 8609
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-restored-after-expiry-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-server-saved-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-1440.png",
+              "available": true,
+              "bytes": 156200
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-1440.txt",
+              "available": true,
+              "bytes": 6315
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-server-saved-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "reflection-storage-unavailable-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-1440.png",
+              "available": true,
+              "bytes": 138624
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-1440.txt",
+              "available": true,
+              "bytes": 8611
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-submission-matrix-2026-10-10/browser-enter-click/reflection-storage-unavailable-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-support-2026-10-05-ui-attempt1/manifest.json",
         "available": true,
         "bytes": 20503,
@@ -321684,7 +322106,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1509,
+    "1440x1000": 1515,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -321695,7 +322117,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 600,
+    "320x1000": 606,
     "320x1100": 362,
     "320x250": 6,
     "320x480": 6,

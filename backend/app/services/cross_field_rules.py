@@ -36,6 +36,8 @@ RULE_TYPES = {
     "cross_reference",
     "date_order",
     "custom_expression",
+    "product_equals",
+    "at_most_difference",
 }
 
 # Auto-demotion thresholds. A rule that the user has marked as a false positive
@@ -101,6 +103,12 @@ def validate_rule_shape(rule: dict) -> tuple[bool, str]:
     elif rule_type == "custom_expression":
         if not rule.get("expression"):
             return False, "custom_expression requires expression"
+    elif rule_type == "product_equals":
+        if not (rule.get("base_field") and rule.get("rate_field") and rule.get("target_field")):
+            return False, "product_equals requires base_field, rate_field and target_field"
+    elif rule_type == "at_most_difference":
+        if not (rule.get("field") and rule.get("minuend_field") and rule.get("subtrahend_fields")):
+            return False, "at_most_difference requires field, minuend_field and subtrahend_fields"
     return True, ""
 
 
@@ -441,4 +449,9 @@ def _rule_dedupe_key(rule: dict) -> tuple:
         return (t, rule.get("field_a"), rule.get("field_b"))
     if t == "custom_expression":
         return (t, rule.get("expression"))
+    if t == "product_equals":
+        return (t, rule.get("base_field"), rule.get("rate_field"), rule.get("target_field"))
+    if t == "at_most_difference":
+        return (t, rule.get("field"), rule.get("minuend_field"),
+                tuple(sorted(rule.get("subtrahend_fields", []))))
     return (t, repr(sorted(rule.items())))

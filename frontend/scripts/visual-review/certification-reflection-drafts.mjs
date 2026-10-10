@@ -69,7 +69,14 @@ try {
       let releaseSave
       blockedSave = new Promise(resolve => { releaseSave = resolve })
       const sent = page.waitForRequest('**/modules/ai_literacy/assessment')
-      await panel.getByRole('button', { name: 'Submit Self-Assessment', exact: true }).evaluate(button => { button.click(); button.click() })
+      const submit = panel.getByRole('button', { name: 'Submit Self-Assessment', exact: true })
+      if (process.env.REVIEW_ACTIVATION === 'enter-click') {
+        await submit.focus()
+        const bounds = await submit.boundingBox()
+        assert.ok(bounds)
+        await page.keyboard.press('Enter')
+        await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+      } else await submit.evaluate(button => { button.click(); button.click() })
       await sent
       const saving = panel.getByRole('button', { name: 'Saving...', exact: true })
       await saving.waitFor()
@@ -112,6 +119,6 @@ try {
   assert.deepEqual(review.errors, [])
   assert.deepEqual([...review.unmatched], [])
   assert.equal(expiredRefreshes, native ? 1 : 2)
-  review.observations.push({ draftsSurviveReload: true, failedSavePreservesChoices: true, expiredSessionPreservesChoices: true, expiredRefreshes, identicalExplicitRetry: true, serverSaveClearsDraft: true, storageFailureExplained: true, allWritesIntercepted: true, interceptedSubmissions: submissions.length })
+  review.observations.push({ draftsSurviveReload: true, failedSavePreservesChoices: true, expiredSessionPreservesChoices: true, expiredRefreshes, identicalExplicitRetry: true, serverSaveClearsDraft: true, storageFailureExplained: true, allWritesIntercepted: true, activation: process.env.REVIEW_ACTIVATION || 'double-click', interceptedSubmissions: submissions.length })
 } catch (error) { await review.capture('blocked', String(error)); throw error }
 finally { await review.flush(); await review.browser.close() }
