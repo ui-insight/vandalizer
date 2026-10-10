@@ -112,6 +112,25 @@ const PANEL_POSITIONS: { mode: PanelMode; label: string }[] = [
 // Main panel component
 // ---------------------------------------------------------------------------
 
+function keepCourseFocusVisible(event: React.FocusEvent<HTMLDivElement>) {
+  const scroller = event.currentTarget
+  const target = event.target
+  if (!(target instanceof HTMLElement) || !scroller.contains(target)) return
+  requestAnimationFrame(() => {
+    if (!scroller.isConnected || document.activeElement !== target || !target.matches(':focus-visible')) return
+    const container = scroller.getBoundingClientRect(), focused = target.getBoundingClientRect()
+    const top = Math.max(0, container.top) + 8
+    const bottom = Math.min(window.innerHeight, container.bottom) - 8
+    if (bottom <= top || focused.height === 0) return
+    // Native focus can leave only the first line of a textarea visible. Keep
+    // the control and its focus ring inside the course's own scrolling pane.
+    const delta = focused.height > bottom - top
+      ? (focused.top < top || focused.top >= bottom ? focused.top - top : 0)
+      : focused.top < top ? focused.top - top : focused.bottom > bottom ? focused.bottom - bottom : 0
+    if (delta) scroller.scrollBy({ top: delta, behavior: 'instant' })
+  })
+}
+
 export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () => Promise<void> }) {
   const { isOpen, mode, closePanel, setMode, progress, course, pendingCompletions, savedWritePendingRefresh, loading, validate, complete, provision, getExercise, submitAssessment, savePosition, refresh, assessmentDestination, consumeAssessmentDestination } = useCertificationPanel()
   const MODULES = course?.modules ?? LEGACY_MODULES
@@ -655,7 +674,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
           </button>
         </div>
 
-        <div ref={moduleScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div ref={moduleScrollRef} onFocusCapture={keepCourseFocusVisible} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2">
             <label className="grid min-w-0 flex-1 gap-1 text-xs text-gray-600 sm:flex sm:items-center">
               <span className="sm:sr-only">Learning panel position</span>

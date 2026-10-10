@@ -273,6 +273,42 @@ async function inspectFormControls(form) {
     assert.ok(control.describedBy.every(Boolean), `${active.name}: instruction references must resolve`)
     if (control.type === 'radio') assert.ok(control.group, `${active.name}: radio choices need a named group`)
   }
+  if (process.env.REVIEW_FOCUS_CONTROLS === '1') {
+    await page.keyboard.press('Tab')
+    const focusChecks = []
+    review.observations.push({ form: active.form, focusChecks, actualScreenReader: false, keyboardOrderClaimed: false })
+    for (const control of await form.locator('input:enabled,textarea:enabled,select:enabled,button:enabled,summary,a[href]').all()) {
+      if (!await control.isVisible()) continue
+      const before = await control.evaluate(el => getComputedStyle(el).boxShadow)
+      await control.focus()
+      if (await control.evaluate(el => !['radio', 'checkbox'].includes(el.type))) {
+        await page.keyboard.press('Shift+Tab')
+        await page.keyboard.press('Tab')
+      }
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)))
+      const result = await control.evaluate((el, previousShadow) => {
+        const r = el.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        const nodes = [el, el.closest('label')].filter(Boolean)
+        const indicators = nodes.map(node => {
+          const style = getComputedStyle(node)
+          return { outline: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor, shadow: style.boxShadow }
+        })
+        return { name: el.getAttribute('aria-label') || [...el.labels || []].map(label => label.textContent.trim()).join(' ').slice(0, 120) || el.textContent.trim().slice(0, 120),
+          tag: el.tagName, type: el.type, focused: document.activeElement === el, keyboardVisible: el.matches(':focus-visible'),
+          bounds: { top: r.top, bottom: r.bottom, left: r.left, right: r.right, viewportHeight: innerHeight },
+          unobscured: !!hit && (el === hit || el.contains(hit)),
+          indicator: indicators.some(style => (style.outline !== 'none' && parseFloat(style.width) > 0)
+            || (style.shadow !== 'none' && style.shadow !== previousShadow)), indicators }
+      }, before)
+      focusChecks.push(result)
+      assert.ok(result.focused && result.keyboardVisible && result.unobscured && result.indicator, `${active.name}: focus is not visible and unobscured: ${JSON.stringify(result)}`)
+      assert.ok(result.bounds.top >= 0 && result.bounds.bottom <= result.bounds.viewportHeight, `${active.name}: focused control must fit vertically in the viewport`)
+      if (active.name === 'expectations' && focusChecks.length === 24) {
+        await review.capture('source-quote-keyboard-focus')
+        assert.deepEqual(JSON.parse(await readFile(`${review.out}/source-quote-keyboard-focus.axe.json`, 'utf8')), [])
+      }
+    }
+  }
   const answer = form.locator('textarea[required]:enabled').first()
   assert.equal(await answer.count(), 1, `${active.name}: required answer exposed`)
   const value = await answer.inputValue()
