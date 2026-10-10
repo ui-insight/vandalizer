@@ -22,7 +22,9 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
  if(!engine)throw new Error('REVIEW_ENGINE must be chromium, firefox or webkit');
  if(browserEngine!=='chromium'&&(process.env.REVIEW_CHROMIUM||process.env.REVIEW_NATIVE_PROFILE_ZOOM==='2'||process.env.REVIEW_BROWSER_ZOOM==='2'))throw new Error('Chrome executable and native-zoom controls require the chromium engine');
  const launchOptions={headless:true,...(process.env.REVIEW_CHROMIUM?{executablePath:process.env.REVIEW_CHROMIUM}:{})};
- const contextOptions={viewport:{width:1440,height:1000},deviceScaleFactor:process.env.REVIEW_ZOOM === '2' ? 2 : 1,reducedMotion:'reduce'};
+ const touch=process.env.REVIEW_TOUCH==='1';
+ if(touch&&(browserEngine==='firefox'||process.env.REVIEW_NATIVE_PROFILE_ZOOM==='2'))throw new Error('Touch review requires Chromium/WebKit without desktop native zoom');
+ const contextOptions={viewport:{width:1440,height:1000},deviceScaleFactor:process.env.REVIEW_ZOOM === '2' ? 2 : 1,reducedMotion:'reduce',...(touch?{hasTouch:true,isMobile:true}:{})};
  let browser,context,zoomWorker;
  const nativeProfileZoom=process.env.REVIEW_NATIVE_PROFILE_ZOOM==='2';
  if(nativeProfileZoom){

@@ -29,14 +29,36 @@ const progress = { ...identity, id: 'qa-draft-teaching', user_id: 'reviewer', mo
 const course = { ...structure, ...identity, versioned: true, prerequisites: Object.fromEntries(modules.map(item => [item.id, []])), modules }
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5292' })
 const { page, context } = review
+const touch = process.env.REVIEW_TOUCH === '1'
+const touchTargets = []
+async function activate(locator) {
+  if (!touch) return locator.click()
+  await locator.scrollIntoViewIfNeeded()
+  const target = await locator.evaluate(el => {
+    const effective = el.matches('input') ? el.labels?.[0] || el : el
+    const r = effective.getBoundingClientRect()
+    return { name: effective.textContent?.trim().slice(0, 100) || el.getAttribute('aria-label'), width: r.width, height: r.height }
+  })
+  assert.ok(target.width >= 24 && target.height >= 24, `Touch target too small: ${JSON.stringify(target)}`)
+  touchTargets.push(target)
+  await locator.tap()
+}
 const nativeZoom = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
 const widths = (process.env.REVIEW_WIDTHS || (nativeZoom ? '640,1440' : '320,390,1440')).split(',').map(Number)
 assert.ok(widths.every(width => Number.isInteger(width) && width >= 320 && width <= 2880))
 const practiceWidth = widths.includes(390) ? 390 : widths[0]
 const writes = []
+const journeyEvents = []
 if (process.env.REVIEW_ACCENT) await context.route('**/api/config/theme', route => route.fulfill({ json: { highlight_color: process.env.REVIEW_ACCENT, ui_radius: '4px', org_name: 'Vandalizer', app_name: 'Vandalizer', logo_data_url: '', icon_data_url: '' } }))
 await context.route('**/api/certification/**', async route => {
   const request = route.request(), path = new URL(request.url()).pathname
+  if (touch && path.endsWith('/journey-events') && request.method() === 'POST') {
+    const body = request.postDataJSON()
+    assert.equal(body.event, 'saved_lesson_displayed')
+    assert.equal(body.enrollment_id, identity.enrollment_id)
+    journeyEvents.push(body.event)
+    return route.fulfill({ json: { recorded: true, assessment_changed: false } })
+  }
   if (path.endsWith('/course')) return route.fulfill({ json: course })
   if (path.endsWith('/progress')) return route.fulfill({ json: progress })
   if (path.endsWith('/credentials')) return route.fulfill({ json: { credentials: [] } })
@@ -55,25 +77,35 @@ await context.route('**/api/certification/**', async route => {
   return route.fallback()
 })
 async function capture(id) {
+  if (touch) assert.equal(await page.locator('[data-cert-panel]').evaluate(el => [...el.querySelectorAll('*')].filter(child => {
+    const style = getComputedStyle(child)
+    return style.animationName !== 'none' || style.transitionDuration.split(',').some(value => parseFloat(value) > 0)
+  }).length), 0, 'Reduced-motion reading has no moving or transitioning course elements')
   await review.capture(id, `${workingTeaching ? 'Current working teaching' : 'Unpublished teaching draft'} in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.`)
   console.log(id)
 }
 try {
+  if (touch) await page.setViewportSize({ width: widths[0], height: 844 })
   await page.goto(review.baseURL + '/certification')
+  if (touch) assert.deepEqual(await page.evaluate(() => ({ touch: navigator.maxTouchPoints > 0, hover: matchMedia('(hover: hover)').matches, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches })), { touch: true, hover: false, reducedMotion: true })
   await page.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
-  await page.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }).click()
+  await activate(page.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }))
   for (const width of widths) {
     await page.setViewportSize({ width, height: nativeZoom ? 1000 : width < 500 ? 844 : 1000 })
     if (nativeZoom) await review.setBrowserZoom(2)
     const readingWidth = await page.evaluate(() => innerWidth)
     for (const [index, lesson] of module.lessons.entries()) {
       if (selectedIds.size && !selectedIds.has(lesson.id)) continue
-      await page.getByRole('button', { name: new RegExp(`^Lesson ${index + 1}:`) }).click()
+      await activate(page.getByRole('button', { name: new RegExp(`^Lesson ${index + 1}:`) }))
       await page.getByText('Place saved across devices.', { exact: true }).waitFor()
+      if (touch) {
+        await activate(page.getByRole('button', { name: 'Save this place', exact: true }))
+        await page.getByText('Place saved across devices.', { exact: true }).waitFor()
+      }
       if (workingTeaching) {
         const closedGlossary = page.locator('[data-cert-panel] details:not([open]) > summary')
         const closedCount = await closedGlossary.count()
-        for (let index = 0; index < closedCount; index++) await closedGlossary.first().click()
+        for (let index = 0; index < closedCount; index++) await activate(closedGlossary.first())
       }
       const heading = page.getByRole('heading', { name: lesson.title, exact: true })
       await heading.evaluate(element => element.scrollIntoView({ block: 'start' }))
@@ -85,6 +117,25 @@ try {
       const breadcrumb = page.getByText(`Module ${module.number}: ${module.title}`, { exact: true }).and(page.locator('span'))
       assert.equal(await breadcrumb.evaluate(element => element.scrollWidth <= element.clientWidth), true, 'The module breadcrumb must wrap without truncation')
       await capture(`${moduleId}-${index + 1}-reading-${width}`)
+      if (touch && process.env.REVIEW_TOUCH_PAN === '1') {
+        const diagram = page.getByRole('region', { name: 'Lesson diagram', exact: true })
+        if (await diagram.count()) {
+          assert.equal(process.env.REVIEW_ENGINE || 'chromium', 'chromium', 'This gesture uses Chromium touch dispatch')
+          await diagram.scrollIntoViewIfNeeded()
+          const box = await diagram.boundingBox()
+          const session = await context.newCDPSession(page)
+          const x = box.x + box.width - 20, y = box.y + box.height / 2
+          await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+          for (let step = 1; step <= 10; step++) {
+            await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - step * 12, y }] })
+          }
+          await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+          await session.detach()
+          await page.waitForFunction(() => document.querySelector('[aria-label="Lesson diagram"]').scrollLeft > 0)
+          review.observations.push({ width, diagramTouchPan: true, scrollLeft: await diagram.evaluate(el => el.scrollLeft) })
+          await capture(`${moduleId}-${index + 1}-touch-diagram-${width}`)
+        }
+      }
       if (process.env.REVIEW_CAPTURE_TEXT) {
         const detail = page.locator('[data-cert-panel] p').filter({ hasText: process.env.REVIEW_CAPTURE_TEXT })
         const count = await detail.count()
@@ -111,15 +162,31 @@ try {
       if (width === practiceWidth) {
         const wrong = lesson.knowledgeCheck.options.find(option => !option.correct)
         const correct = lesson.knowledgeCheck.options.find(option => option.correct)
-        await page.getByRole('radio', { name: wrong.text, exact: true }).check()
-        await page.getByRole('button', { name: 'Check answer', exact: true }).click()
+        const wrongRadio = page.getByRole('radio', { name: wrong.text, exact: true })
+        if (touch) await activate(wrongRadio); else await wrongRadio.check()
+        await activate(page.getByRole('button', { name: 'Check answer', exact: true }))
         await page.getByText(wrong.explanation, { exact: false }).waitFor()
-        await page.getByRole('radio', { name: correct.text, exact: true }).check()
-        await page.getByRole('button', { name: 'Check answer', exact: true }).click()
+        const correctRadio = page.getByRole('radio', { name: correct.text, exact: true })
+        if (touch) await activate(correctRadio); else await correctRadio.check()
+        await activate(page.getByRole('button', { name: 'Check answer', exact: true }))
         await page.getByText(correct.explanation, { exact: false }).scrollIntoViewIfNeeded()
+        if (touch) {
+          const history = page.getByText('Recent practice attempts', { exact: true })
+          await activate(history)
+          assert.equal(await history.evaluate(el => el.parentElement.open), true)
+        }
         await capture(`${moduleId}-${index + 1}-feedback-${width}`)
       }
     }
+  }
+  if (touch) {
+    const savedLesson = module.lessons.find(lesson => lesson.id === progress.learning_position?.lesson_id)
+    assert.ok(savedLesson)
+    await page.reload()
+    await activate(page.getByRole('button', { name: 'Open course without chat', exact: true }))
+    await page.getByRole('heading', { name: savedLesson.title, exact: true }).waitFor()
+    await capture(`${moduleId}-touch-restored`)
+    review.observations.push({ touchEmulation: true, actualMobileKeyboard: false, panelModeSetup: 'Programmatic native select; course actions use tap without hover', touchTargets, restoredLesson: savedLesson.id, journeyEvents })
   }
   assert.deepEqual(writes, [])
   assert.equal(capturedTexts.size, captureTexts.length, 'Every requested teaching detail must be inspected')

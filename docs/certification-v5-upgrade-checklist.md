@@ -2,7 +2,7 @@
 
 Bring **every audited dimension and every module’s Vandalizer 5.0 alignment to at least 8/10**. This checklist turns the [October 2 certification audit](reviews/certification-v5-audit.html) into bounded implementation and acceptance work. The target applies to each area independently; a good desktop score cannot compensate for poor mobile behavior, weak grading or unsafe course updates.
 
-**Implementation started October 2, 2026. 79/162 items complete; 83 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
+**Implementation started October 2, 2026. 80/162 items complete; 82 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
 
 ## Completion rules
 
@@ -85,7 +85,7 @@ Existing document-and-tool composition remains a constraint: preserve the open f
 - [x] **C8-A11Y-07 · P1 · Improve: Make assessment controls accessible.** Associate questions, answer groups, instructions and errors; expose selected and required states. A learner can correct an answer and understand grading feedback without color or pointer input. Accepted at checkpoint 330: current browser inspection covers 149 labeled controls across twenty practical forms, required validation and keyboard correction, combined with retained reflection/scenario/practice and original-feedback return evidence. Native required errors focus their associated answer; transport failures remain distinct from assessment verdicts. Actual screen-reader announcements stay open under A11Y-05.
 - [x] **C8-A11Y-08 · P2 · Improve: Provide alternatives for diagrams and stars.** Diagrams need equivalent explanatory text; star counts, status icons and progress changes need meaningful accessible labels where they carry information. Hide purely decorative icons from the reading order.
 - [x] **C8-A11Y-09 · P1 · Verify: Support actual enlargement.** Check actual 200% browser zoom, enlarged text and narrow-screen reflow. Device pixel ratio alone is insufficient; lesson headings, answer groups and primary actions must remain usable.
-- [ ] **C8-A11Y-10 · P2 · Verify: Support touch and reduced motion.** Controls must have usable target size/spacing and work without hover. Reduced-motion settings preserve status, reading position and completion feedback without essential animated-only cues.
+- [x] **C8-A11Y-10 · P2 · Verify: Support touch and reduced motion.** Controls must have usable target size/spacing and work without hover. Reduced-motion settings preserve status, reading position and completion feedback without essential animated-only cues. Accepted at checkpoint 334: touch-emulated reading, correction, disclosure, diagram panning, saved-place resume, source recovery and completion are verified with reduced motion and retained form/card target evidence. Actual mobile keyboard, assistive technology and supported-browser release verification remain separate gates.
 
 ## Lesson journey and continuity
 
