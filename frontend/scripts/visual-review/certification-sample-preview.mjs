@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createReview } from './harness.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 const exercises = JSON.parse(await readFile('../backend/certification-data/exercises.json', 'utf8'))
 const filename = exercises.foundations.documents[0]
@@ -10,7 +11,10 @@ const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: 
   evidenceMode: 'Frozen frontend and actual authored NSF PDF bytes. Synthetic assigned-source/read-permission responses; all API writes intercepted. Course/chat retention, access recheck and modal keyboard return. No live learner, ingestion, grading or model calls.' })
 const { page, context } = review
 const touch = process.env.REVIEW_TOUCH === '1'
-const activate = locator => touch ? locator.tap() : locator.click()
+const keyboard = process.env.REVIEW_KEYBOARD_ONLY === '1'
+assert.ok(!(touch && keyboard), 'Choose touch or keyboard input')
+const journey = keyboard ? keyboardJourney(review) : null
+const activate = locator => journey ? journey.activate(locator) : touch ? locator.tap() : locator.click()
 const progress = { id: 'sample-preview', user_id: 'reviewer', modules: { foundations: { provisioned_docs: ['sample'] } }, total_xp: 0, level: 'novice', certified: false, certified_at: null }
 let available = true, denyDownload = false, reads = 0, fileReads = 0
 const writes = []
@@ -44,7 +48,7 @@ async function capture(id) {
   console.log(id)
 }
 try {
-  for (const width of native ? [780] : touch ? [320] : [320, 1440]) {
+  for (const width of native ? [780] : touch || keyboard ? [320] : [320, 1440]) {
     await page.setViewportSize({ width, height: native ? 1300 : 650 })
     available = true; denyDownload = false
     await page.goto(review.baseURL + '/?mode=chat&tab=assistant')
@@ -60,7 +64,8 @@ try {
     await panel.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
     await activate(panel.getByRole('button', { name: /^1 Foundations/ }))
     const source = panel.getByRole('button', { name: `View assigned ${filename}`, exact: true })
-    await source.scrollIntoViewIfNeeded(); await source.focus()
+    if (journey) await journey.reach(source)
+    else { await source.scrollIntoViewIfNeeded(); await source.focus() }
     await capture(`assigned-sample-${width}`)
     if (touch) await activate(source); else await page.keyboard.press('Enter')
     const dialog = page.getByRole('dialog', { name: `Assigned sample: ${filename}`, exact: true })

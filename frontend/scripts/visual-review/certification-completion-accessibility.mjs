@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createReview } from './harness.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 const data = new URL('../../../backend/certification-data/', import.meta.url)
 const all = JSON.parse(await readFile(new URL('panel-modules.json', data), 'utf8'))
@@ -12,7 +13,10 @@ const progress = { ...identity, id: 'qa-completion', user_id: 'reviewer', module
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5294', evidenceMode: 'Actual frontend with a synthetic three-module completion response; no real course, credit, migration or issued credential.' })
 const { page, context } = review
 const touch = process.env.REVIEW_TOUCH === '1'
-const activate = locator => touch ? locator.tap() : locator.click()
+const keyboard = process.env.REVIEW_KEYBOARD_ONLY === '1'
+assert.ok(!(touch && keyboard), 'Choose touch or keyboard input')
+const journey = keyboard ? keyboardJourney(review) : null
+const activate = locator => journey ? journey.activate(locator) : touch ? locator.tap() : locator.click()
 const writes = []
 await context.route('**/api/certification/**', async route => {
   const req = route.request(), path = new URL(req.url()).pathname
@@ -41,7 +45,7 @@ async function capture(id) {
   console.log(id)
 }
 try {
-  if (touch) await page.setViewportSize({ width: 320, height: 500 })
+  if (touch || keyboard) await page.setViewportSize({ width: 320, height: 500 })
   await page.goto(review.baseURL + '/certification')
   await page.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
   await activate(page.getByText('Course progress and credential', { exact: true }))
@@ -57,11 +61,12 @@ try {
   assert.equal(await dialog.getByRole('heading', { name: identity.course_title, exact: true }).count(), 1)
   assert.equal(await dialog.getByText(`Course version: ${identity.course_version}`, { exact: true }).count(), 1)
   assert.equal(await dialog.getByRole('img', { name: '2 of 3 stars', exact: true }).count(), 1)
-  for (const width of native ? [640, 780, 1440] : touch ? [320] : [320, 390, 768, 1024, 1440]) {
+  for (const width of native ? [640, 780, 1440] : touch || keyboard ? [320] : [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: native ? 1000 : 500 })
     if (native) await review.setBrowserZoom(2)
     const view = dialog.getByRole('button', { name: 'View Certificate', exact: true })
-    await view.focus()
+    if (journey) await journey.reach(view)
+    else await view.focus()
     assert.equal(await view.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth }), true)
     await page.keyboard.press(tabKey)
     const details = dialog.getByRole('region', { name: 'Completion details', exact: true })

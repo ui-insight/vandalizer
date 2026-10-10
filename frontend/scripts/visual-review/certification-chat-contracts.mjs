@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createReview } from './harness.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 const real = JSON.parse(await readFile(new URL('../../src/components/certification/__fixtures__/chat-tool-contract.json', import.meta.url), 'utf8'))
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5294', evidenceMode: 'Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.' })
 const { page, context, state } = review
+const keyboard = process.env.REVIEW_KEYBOARD_ONLY === '1'
+const journey = keyboard ? keyboardJourney(review) : null
 const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
 const apiCalls = []
 await context.route('**/api/certification/**', async route => { apiCalls.push({ method: route.request().method(), path: new URL(route.request().url()).pathname }); return route.fallback() })
@@ -24,7 +27,7 @@ const valid = [
   ['complete_certification_module', { module_id: 'foundations', title: 'Foundations', stars: 1, xp_earned: 125, total_xp: 125, level: 'apprentice', level_up: true, certified: false }],
 ]
 const extremes = process.env.REVIEW_CARD_EXTREMES === '1'
-const structureOnly = process.env.REVIEW_CARD_STRUCTURE === '1' || extremes
+const structureOnly = process.env.REVIEW_CARD_STRUCTURE === '1' || extremes || keyboard
 if (extremes) {
   for (const [, payload] of valid) {
     payload.title = 'Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team'
@@ -49,7 +52,9 @@ async function send(tool, payload) {
   const id = `contract-${++sequence}`
   state.chatChunks = [{ kind: 'tool_call', tool_name: tool, tool_call_id: id, args: {} }, { kind: 'tool_result', tool_name: tool, tool_call_id: id, content: payload }, { kind: 'text', content: id }]
   await page.getByRole('textbox', { name: 'Message input', exact: true }).fill('Show the saved certification response.')
-  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  const sendButton = page.getByRole('button', { name: 'Send message', exact: true })
+  if (journey) await journey.activate(sendButton)
+  else await sendButton.click()
   await page.getByText(id, { exact: true }).waitFor()
   return page.locator('.agent-tool-result').last()
 }
@@ -84,6 +89,17 @@ try {
       if (native) await review.setBrowserZoom(2)
       assert.equal(await result.locator('.cert-chat-card').count(), 1)
       assert.equal(await result.getByRole('alert').count(), 0)
+      if (journey) {
+        const card = result.locator('.cert-chat-card')
+        for (const control of await card.locator('button:enabled,summary,a[href],input:enabled').all()) {
+          if (!await control.isVisible()) continue
+          await journey.reach(control)
+          if (await control.evaluate(el => el.tagName === 'SUMMARY')) {
+            await journey.activate(control)
+            assert.equal(await control.evaluate(el => el.parentElement.open), true)
+          }
+        }
+      }
       if (extremes) {
         const card = result.locator('.cert-chat-card')
         for (const summary of await card.locator('details:not([open]) > summary').all()) await summary.click()

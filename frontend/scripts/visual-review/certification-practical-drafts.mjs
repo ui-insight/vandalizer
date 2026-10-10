@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createReview } from './harness.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 const data = new URL('../../../backend/certification-data/', import.meta.url)
 const modules = JSON.parse(await readFile(new URL('panel-modules.json', data), 'utf8'))
@@ -144,6 +145,7 @@ const progress = () => ({ ...identity(), id: 'draft-qa', user_id: 'reviewer', mo
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5305', resetStorage: false,
   evidenceMode: switching ? 'Frozen production frontend; synthetic saved-course selection and owned-history fixtures. Explicit UI switch away/return retains original authored drafts; no assessment submissions, executions or credit. Not durable migration evidence.' : 'Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.' })
 const { page, context } = review
+const journey = process.env.REVIEW_KEYBOARD_ONLY === '1' ? keyboardJourney(review) : null
 const writes = []
 await context.route('**/api/certification/**', route => {
   const request = route.request(), path = new URL(request.url()).pathname
@@ -276,14 +278,17 @@ async function inspectFormControls(form) {
   if (process.env.REVIEW_FOCUS_CONTROLS === '1') {
     await page.keyboard.press('Tab')
     const focusChecks = []
-    review.observations.push({ form: active.form, focusChecks, actualScreenReader: false, keyboardOrderClaimed: false })
+    review.observations.push({ form: active.form, focusChecks, actualScreenReader: false, keyboardTraversal: !!journey })
     for (const control of await form.locator('input:enabled,textarea:enabled,select:enabled,button:enabled,summary,a[href]').all()) {
       if (!await control.isVisible()) continue
       const before = await control.evaluate(el => getComputedStyle(el).boxShadow)
-      await control.focus()
-      if (await control.evaluate(el => !['radio', 'checkbox'].includes(el.type))) {
-        await page.keyboard.press('Shift+Tab')
-        await page.keyboard.press('Tab')
+      if (journey) await journey.reach(control)
+      else {
+        await control.focus()
+        if (await control.evaluate(el => !['radio', 'checkbox'].includes(el.type))) {
+          await page.keyboard.press('Shift+Tab')
+          await page.keyboard.press('Tab')
+        }
       }
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)))
       const result = await control.evaluate((el, previousShadow) => {

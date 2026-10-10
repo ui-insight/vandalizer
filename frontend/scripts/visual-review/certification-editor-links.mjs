@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { createReview } from './harness.mjs'
 import { workflow } from './fixtures.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 const data = new URL('../../../backend/certification-data/', import.meta.url)
 const read = async name => JSON.parse(await readFile(new URL(name, data), 'utf8'))
@@ -33,9 +34,12 @@ const course = { ...structure, ...identity, versioned: true, prerequisites: Obje
 const progress = { ...identity, id: 'editor-links', user_id: 'reviewer', modules: {}, total_xp: 0, level: 'novice', certified: false, certified_at: null, learning_position: null }
 const extraction = { uuid: 'e'.repeat(32), title: 'My exact proposal fields', set_type: 'extraction', user_id: 'reviewer', item_count: 1 }
 const workflowId = 'c'.repeat(24)
-const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: 'http://127.0.0.1:5305', resetStorage: false,
+const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5305', resetStorage: false,
   evidenceMode: 'Frozen frontend and authored draft cases. Synthetic owned artifact choices and editor reads. Exact new-tab destinations, original course/chat preservation; no capture, grading, model execution or live learner change.' })
 const { page, context } = review
+const keyboard = process.env.REVIEW_KEYBOARD_ONLY === '1'
+const journey = keyboard ? keyboardJourney(review) : null
+const activate = locator => journey ? journey.activate(locator) : locator.click()
 const writes = [], popupCaptures = [], popupErrors = []
 await context.route('**/api/**', async route => {
   const request = route.request(), url = new URL(request.url()), path = url.pathname
@@ -106,7 +110,7 @@ async function capturePopup(popup, id) {
   console.log(id)
 }
 try {
-  for (const width of native ? [780] : [320, 1440]) {
+  for (const width of native ? [780] : keyboard ? [390] : [320, 1440]) {
     await page.setViewportSize({ width, height: native ? 1800 : 1100 })
     for (const { moduleId, kind, label } of scenarios) {
       await page.goto(review.baseURL + '/?mode=chat&tab=assistant')
@@ -116,20 +120,27 @@ try {
       const originalDraft = await draft.elementHandle()
       await page.evaluate(() => { window.courseEditorSentinel = 'original-course-tab' })
       const opener = page.getByRole('button', { name: 'Open learning panel', exact: true })
-      if (!await opener.isVisible()) await page.getByRole('button', { name: 'Open activity', exact: true }).click()
-      await opener.click()
+      if (!await opener.isVisible()) await activate(page.getByRole('button', { name: 'Open activity', exact: true }))
+      await activate(opener)
       const panel = page.locator('[data-cert-panel]')
       await panel.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
       const module = modules.find(item => item.id === moduleId)
-      await panel.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }).click()
-      await panel.getByRole('button', { name: 'Challenge', exact: true }).click()
-      if (moduleId === 'foundations') await panel.getByRole('button', { name: 'Choose my extraction', exact: true }).click()
+      await activate(panel.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }))
+      await activate(panel.getByRole('button', { name: 'Challenge', exact: true }))
+      if (moduleId === 'foundations') await activate(panel.getByRole('button', { name: 'Choose my extraction', exact: true }))
       const selection = panel.getByRole('combobox', { name: label, exact: true })
       const artifactId = kind === 'extraction' ? extraction.uuid : workflowId
       assert.equal(await panel.getByRole('link', { name: `Open selected ${kind} in a new tab`, exact: true }).count(), 0)
-      await selection.selectOption(artifactId)
+      if (journey) {
+        await journey.reach(selection)
+        await page.keyboard.press('m'); await page.keyboard.press('Tab')
+        review.observations.push({ nativeSelectKeyboard: 'Type the initial of the sole named artifact, then Tab', moduleId,
+          options: await selection.locator('option').evaluateAll(options => options.map(option => ({ value: option.value, disabled: option.disabled }))), value: await selection.inputValue() })
+        assert.equal(await selection.inputValue(), artifactId)
+      } else await selection.selectOption(artifactId)
       const link = panel.getByRole('link', { name: `Open selected ${kind} in a new tab`, exact: true })
-      await link.scrollIntoViewIfNeeded(); await link.focus()
+      if (journey) await journey.reach(link)
+      else { await link.scrollIntoViewIfNeeded(); await link.focus() }
       if (process.env.REVIEW_FOCUS_TRACE === '1') {
         console.log('before-popup-focus', await link.evaluate(element => ({ target: document.activeElement === element, tag: document.activeElement?.tagName, text: document.activeElement?.textContent?.slice(0, 80) })))
         await page.evaluate(() => {
@@ -138,7 +149,8 @@ try {
         })
       }
       await capture(`${moduleId}-editor-link-${width}`)
-      const [popup] = await Promise.all([page.waitForEvent('popup'), link.click()])
+      const [popup] = await Promise.all([page.waitForEvent('popup'), activate(link)])
+      const popupJourney = keyboard ? keyboardJourney({ page: popup, observations: review.observations }) : null
       popup.on('pageerror', error => popupErrors.push(String(error)))
       await popup.setViewportSize({ width, height: native ? 1800 : 1100 })
       await popup.waitForLoadState('domcontentloaded')
@@ -148,7 +160,10 @@ try {
       const input = popup.getByRole('textbox', { name: kind === 'extraction' ? 'Add term to extract' : 'Text to process', exact: true })
       if (width < 1024) {
         const library = popup.getByRole('button', { name: 'Open Library panel', exact: true })
-        if (await library.isVisible()) await library.click()
+        if (await library.isVisible()) {
+          if (popupJourney) await popupJourney.activate(library)
+          else await library.click()
+        }
       }
       await input.fill('Unsent editor note; do not run or save automatically.')
       await input.scrollIntoViewIfNeeded()
@@ -156,9 +171,14 @@ try {
       // The local QA input is deliberately unsent; clear it before choosing the explicit close action.
       await input.fill('')
       const returnAction = popup.getByRole('button', { name: 'Close editor tab and return to course', exact: true })
-      await returnAction.scrollIntoViewIfNeeded(); await returnAction.focus()
+      if (popupJourney) await popupJourney.reach(returnAction)
+      else { await returnAction.scrollIntoViewIfNeeded(); await returnAction.focus() }
       await capturePopup(popup, `${moduleId}-return-action-${width}`)
-      await Promise.all([popup.waitForEvent('close'), returnAction.click()])
+      await Promise.all([popup.waitForEvent('close'), (popupJourney ? popupJourney.activate(returnAction) : returnAction.click()).catch(error => {
+        // Enter can close the target before the keyboard protocol acknowledges
+        // key-up. Only the explicitly observed tab close may settle that race.
+        if (!popup.isClosed()) throw error
+      })])
       assert.equal(await page.evaluate(() => window.courseEditorSentinel), 'original-course-tab')
       assert.equal(await page.evaluate(() => document.hasFocus()), true)
       if (process.env.REVIEW_FOCUS_TRACE === '1') console.log('after-popup-focus', await link.evaluate(element => ({ target: document.activeElement === element, tag: document.activeElement?.tagName, text: document.activeElement?.textContent?.slice(0, 80), trace: window.editorFocusTrace })))

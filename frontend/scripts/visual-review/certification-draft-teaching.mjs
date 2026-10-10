@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createReview } from './harness.mjs'
+import { keyboardJourney } from './keyboard-journey.mjs'
 
 // Synthetic delivery of an unpublished teaching draft, with no lab or credit writes.
 const data = new URL('../../../backend/certification-data/', import.meta.url)
@@ -30,8 +31,12 @@ const course = { ...structure, ...identity, versioned: true, prerequisites: Obje
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5292' })
 const { page, context } = review
 const touch = process.env.REVIEW_TOUCH === '1'
+const keyboard = process.env.REVIEW_KEYBOARD_ONLY === '1'
+assert.ok(!(touch && keyboard), 'Choose touch or keyboard input')
+const journey = keyboard ? keyboardJourney(review) : null
 const touchTargets = []
 async function activate(locator) {
+  if (journey) return journey.activate(locator)
   if (!touch) return locator.click()
   await locator.scrollIntoViewIfNeeded()
   const target = await locator.evaluate(el => {
@@ -52,7 +57,7 @@ const journeyEvents = []
 if (process.env.REVIEW_ACCENT) await context.route('**/api/config/theme', route => route.fulfill({ json: { highlight_color: process.env.REVIEW_ACCENT, ui_radius: '4px', org_name: 'Vandalizer', app_name: 'Vandalizer', logo_data_url: '', icon_data_url: '' } }))
 await context.route('**/api/certification/**', async route => {
   const request = route.request(), path = new URL(request.url()).pathname
-  if (touch && path.endsWith('/journey-events') && request.method() === 'POST') {
+  if ((touch || keyboard) && path.endsWith('/journey-events') && request.method() === 'POST') {
     const body = request.postDataJSON()
     assert.equal(body.event, 'saved_lesson_displayed')
     assert.equal(body.enrollment_id, identity.enrollment_id)
@@ -98,7 +103,7 @@ try {
       if (selectedIds.size && !selectedIds.has(lesson.id)) continue
       await activate(page.getByRole('button', { name: new RegExp(`^Lesson ${index + 1}:`) }))
       await page.getByText('Place saved across devices.', { exact: true }).waitFor()
-      if (touch) {
+      if (touch || keyboard) {
         await activate(page.getByRole('button', { name: 'Save this place', exact: true }))
         await page.getByText('Place saved across devices.', { exact: true }).waitFor()
       }
@@ -163,14 +168,14 @@ try {
         const wrong = lesson.knowledgeCheck.options.find(option => !option.correct)
         const correct = lesson.knowledgeCheck.options.find(option => option.correct)
         const wrongRadio = page.getByRole('radio', { name: wrong.text, exact: true })
-        if (touch) await activate(wrongRadio); else await wrongRadio.check()
+        if (touch || keyboard) await activate(wrongRadio); else await wrongRadio.check()
         await activate(page.getByRole('button', { name: 'Check answer', exact: true }))
         await page.getByText(wrong.explanation, { exact: false }).waitFor()
         const correctRadio = page.getByRole('radio', { name: correct.text, exact: true })
-        if (touch) await activate(correctRadio); else await correctRadio.check()
+        if (touch || keyboard) await activate(correctRadio); else await correctRadio.check()
         await activate(page.getByRole('button', { name: 'Check answer', exact: true }))
         await page.getByText(correct.explanation, { exact: false }).scrollIntoViewIfNeeded()
-        if (touch) {
+        if (touch || keyboard) {
           const history = page.getByText('Recent practice attempts', { exact: true })
           await activate(history)
           assert.equal(await history.evaluate(el => el.parentElement.open), true)
@@ -179,14 +184,14 @@ try {
       }
     }
   }
-  if (touch) {
+  if (touch || keyboard) {
     const savedLesson = module.lessons.find(lesson => lesson.id === progress.learning_position?.lesson_id)
     assert.ok(savedLesson)
     await page.reload()
     await activate(page.getByRole('button', { name: 'Open course without chat', exact: true }))
     await page.getByRole('heading', { name: savedLesson.title, exact: true }).waitFor()
-    await capture(`${moduleId}-touch-restored`)
-    review.observations.push({ touchEmulation: true, actualMobileKeyboard: false, panelModeSetup: 'Programmatic native select; course actions use tap without hover', touchTargets, restoredLesson: savedLesson.id, journeyEvents })
+    await capture(`${moduleId}-${keyboard ? 'keyboard' : 'touch'}-restored`)
+    review.observations.push({ touchEmulation: touch, keyboardActions: keyboard, actualMobileKeyboard: false, panelModeSetup: 'Programmatic native select; course actions use the selected input method', touchTargets, restoredLesson: savedLesson.id, journeyEvents })
   }
   assert.deepEqual(writes, [])
   assert.equal(capturedTexts.size, captureTexts.length, 'Every requested teaching detail must be inspected')
