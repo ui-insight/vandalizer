@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "f05347037290736d21d9660f636cd2ba1a0ca939",
+  "working_head_at_inventory": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 63582,
-    "sha256": "a047665c2bbc607acd0a38184e7ef3ad442fa54593aae03dc194cfbe15cb1e65"
+    "bytes": 63889,
+    "sha256": "4b8ee5fd271d800d7fd1fc51345a3726ca30ae2785abd006ce825ba15ec26fed"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 743732,
-    "sha256": "e934ec7cce38bcb25044e407bdba868e7d9ede40bd14d0ab7893c48e572570c9"
+    "bytes": 745946,
+    "sha256": "a51a6f119c5ea3aee55f3dc536984b46eec780ac69f5286bd7b28b2753ae286f"
   },
   "counts": {
-    "accepted": 68,
-    "open": 94,
+    "accepted": 69,
+    "open": 93,
     "items": 162,
-    "checkpoints": 310,
-    "browser_runs": 465,
-    "recorded_captures_including_diagnostics_and_repeats": 6171,
+    "checkpoints": 311,
+    "browser_runs": 469,
+    "recorded_captures_including_diagnostics_and_repeats": 6211,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -119,6 +119,34 @@
       "rubric_id": "v5.0-competency-draft.1",
       "checkpoints": [
         169
+      ],
+      "scope": "isolated retained QA package; not a published course"
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/package/v5.0-preview-2026-10-09.311/manifest.json",
+        "available": true,
+        "bytes": 10250,
+        "sha256": "26b342f0b9b6357f9db1797714b5ce1cf55eea4f5222cf35efa60d47f38ff96c"
+      },
+      "release_id": "v5.0-preview-2026-10-09.311",
+      "rubric_id": "v5.0-competency-draft.1",
+      "checkpoints": [
+        311
+      ],
+      "scope": "isolated retained QA package; not a published course"
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/package-final/v5.0-preview-2026-10-09.311.2/manifest.json",
+        "available": true,
+        "bytes": 10252,
+        "sha256": "f81946c50605be980887a0f0893c659405ebd6d40cf71623761bdf0a7a8da17c"
+      },
+      "release_id": "v5.0-preview-2026-10-09.311.2",
+      "rubric_id": "v5.0-competency-draft.1",
+      "checkpoints": [
+        311
       ],
       "scope": "isolated retained QA package; not a published course"
     },
@@ -487,8 +515,8 @@
     },
     {
       "id": "C8-CONTENT-07",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach data and instruction boundaries.** Include a source document containing misleading instructions and a proposal to send data outside the intended scope. Learners must recognize that document text cannot authorize actions or override their task."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach data and instruction boundaries.** Include a source document containing misleading instructions and a proposal to send data outside the intended scope. Learners must recognize that document text cannot authorize actions or override their task. Accepted at checkpoint 311: a complete fictional source is packaged and shown inline with its misleading instruction, an explicitly incorrect external-send proposal, a scoped correction and the expected internal result. The unchanged required recognition case rejects treating source text as authorization."
     },
     {
       "id": "C8-CONTENT-08",
@@ -3215,6 +3243,13 @@
       "evidence_directories": [
         "certification-recovery-teaching-2026-10-09"
       ]
+    },
+    {
+      "number": 311,
+      "title": "Controlled source instruction and external-send proposal on October 9 2026",
+      "evidence_directories": [
+        "certification-instruction-boundary-teaching-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4075,6 +4110,12 @@
       "available": true,
       "bytes": 3823,
       "sha256": "b57cd830745d81a1c81a98baf94c7b6addd155982978f8b41857d2c98efb1883"
+    },
+    {
+      "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 700,
+      "sha256": "5e6550cccc7e95f3cc673ea2cdf4675b51141f686586cffbd8c52cb581609d2e"
     },
     {
       "path": "artifacts/visual-review/certification-interruption-acceptance-2026-10-09/source-hashes.json",
@@ -130802,6 +130843,1416 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 9986,
+        "sha256": "f3a132fef49811725584e99f3a3f2178e52df5074e9ee9e18b7198083c7051fb"
+      },
+      "checkpoints": [
+        311
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:58:08.269Z",
+      "reported_commit": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-7-reading-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-320.png",
+              "available": true,
+              "bytes": 84135
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-320.png",
+              "available": true,
+              "bytes": 83826
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-320.png",
+              "available": true,
+              "bytes": 83826
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-320.png",
+              "available": true,
+              "bytes": 85624
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-320.png",
+              "available": true,
+              "bytes": 83890
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-320.png",
+              "available": true,
+              "bytes": 69556
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-320.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-feedback-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-feedback-320.png",
+              "available": true,
+              "bytes": 68834
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-feedback-320.txt",
+              "available": true,
+              "bytes": 9995
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-reading-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-1440.png",
+              "available": true,
+              "bytes": 249029
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-1440.png",
+              "available": true,
+              "bytes": 249029
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-1440.png",
+              "available": true,
+              "bytes": 249029
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-1440.png",
+              "available": true,
+              "bytes": 249439
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-3-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-1440.png",
+              "available": true,
+              "bytes": 224811
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-detail-4-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-1440.png",
+              "available": true,
+              "bytes": 224811
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-1440.txt",
+              "available": true,
+              "bytes": 10061
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser/ai_literacy-7-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/manifest.json",
+        "available": true,
+        "bytes": 10248,
+        "sha256": "a440a05dfc0eaa32439984c4ca58676909d73c81c55a3b2f5094f88b61009ea0"
+      },
+      "checkpoints": [
+        311
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:59:13.925Z",
+      "reported_commit": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            320,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-7-reading-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-320.png",
+              "available": true,
+              "bytes": 84135
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-320.png",
+              "available": true,
+              "bytes": 82184
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-320.png",
+              "available": true,
+              "bytes": 82184
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-320.png",
+              "available": true,
+              "bytes": 84023
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-320.png",
+              "available": true,
+              "bytes": 83890
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-320.png",
+              "available": true,
+              "bytes": 69556
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-320.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-feedback-320",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-feedback-320.png",
+              "available": true,
+              "bytes": 68834
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-feedback-320.txt",
+              "available": true,
+              "bytes": 9826
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-feedback-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-reading-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-1440.png",
+              "available": true,
+              "bytes": 245801
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-1440.png",
+              "available": true,
+              "bytes": 245801
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-1-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-1440.png",
+              "available": true,
+              "bytes": 245801
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-2-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-1440.png",
+              "available": true,
+              "bytes": 246309
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-3-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-1440.png",
+              "available": true,
+              "bytes": 221554
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-detail-4-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-1440",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-1440.png",
+              "available": true,
+              "bytes": 221554
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-1440.txt",
+              "available": true,
+              "bytes": 9892
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-final/ai_literacy-7-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 6518,
+        "sha256": "f0cad59b55c814d210c520632f2d35a00d3472ccc29f78efc3163a354517b95e"
+      },
+      "checkpoints": [
+        311
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:58:05.523Z",
+      "reported_commit": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-7-reading-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-reading-780.png",
+              "available": true,
+              "bytes": 154210
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-reading-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-1-780.png",
+              "available": true,
+              "bytes": 150160
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-1-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-2-780.png",
+              "available": true,
+              "bytes": 146190
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-2-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-3-780.png",
+              "available": true,
+              "bytes": 153416
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-3-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-3-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-4-780.png",
+              "available": true,
+              "bytes": 152617
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-4-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-detail-4-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-practice-780.png",
+              "available": true,
+              "bytes": 129559
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-practice-780.txt",
+              "available": true,
+              "bytes": 9814
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-feedback-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-feedback-780.png",
+              "available": true,
+              "bytes": 105769
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-feedback-780.txt",
+              "available": true,
+              "bytes": 9995
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native/ai_literacy-7-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/manifest.json",
+        "available": true,
+        "bytes": 6780,
+        "sha256": "7feab8d6a786b31b598c5841602cf6f0417b49c9d919705f81f2c2dffea2bd49"
+      },
+      "checkpoints": [
+        311
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-09T23:59:13.438Z",
+      "reported_commit": "292b0a6a0b7cb50cf30e9a719c8b3075fcf1210b",
+      "reported_source_fingerprint": "d71811182669069ea1149235cbec16fb6610eab23f46081f09193cd898be6a63",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/bundle-verification-final.json",
+        "available": true,
+        "bytes": 113759,
+        "sha256": "3f3cf8aacc221173c4a70960e076f26c5543ccf2ac55b7754a7d7d6239b97bbc"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/retained-source-final/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": false,
+          "lessons": [
+            {
+              "id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+              "revision": 4
+            }
+          ],
+          "physicalWidths": [
+            780
+          ],
+          "nativeZoom": 2,
+          "practiceCorrections": 1,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-7-reading-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-reading-780.png",
+              "available": true,
+              "bytes": 154210
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-reading-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-reading-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-1-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-1-780.png",
+              "available": true,
+              "bytes": 145625
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-1-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-2-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-2-780.png",
+              "available": true,
+              "bytes": 143719
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-2-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-2-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-3-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-3-780.png",
+              "available": true,
+              "bytes": 155420
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-3-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-3-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-detail-4-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-4-780.png",
+              "available": true,
+              "bytes": 152617
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-4-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-detail-4-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-practice-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-practice-780.png",
+              "available": true,
+              "bytes": 129559
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-practice-780.txt",
+              "available": true,
+              "bytes": 9645
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-practice-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-7-feedback-780",
+          "note": "Unpublished teaching draft in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-feedback-780.png",
+              "available": true,
+              "bytes": 105769
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-feedback-780.txt",
+              "available": true,
+              "bytes": 9826
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-instruction-boundary-teaching-2026-10-09/browser-native-final/ai_literacy-7-feedback-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-journey-events-2026-10-09/browser/manifest.json",
         "available": true,
         "bytes": 4040,
@@ -239410,7 +240861,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1146,
+    "1440x1000": 1158,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -239431,14 +240882,14 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 602,
+    "320x844": 616,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 144,
+    "390x500": 158,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
