@@ -38,9 +38,9 @@ function GlossaryTerm({ term, definition }: { term: string; definition: string }
     <details className="group py-1.5" style={{ borderBottom: '1px solid #f3f4f6' }}>
       <summary className="flex items-center gap-1.5 cursor-pointer list-none select-none">
         <span className="text-[10px] text-gray-500 inline-block transition-transform group-open:rotate-90">▶</span>
-        <span className="font-semibold text-sm text-gray-900">{term}</span>
+        <span className="font-semibold text-base text-gray-900">{term}</span>
       </summary>
-      <p className="text-sm text-gray-600 leading-relaxed mt-1.5 ml-4">{definition}</p>
+      <p className="text-base text-gray-600 leading-relaxed mt-1.5 ml-4">{definition}</p>
     </details>
   )
 }
@@ -70,32 +70,32 @@ export function LessonContent({ section, practiceScope, manifestSha256 }: { sect
   }, [section.content, keyTerms])
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-[70ch]">
       <div
         className={cn('border-l-4 px-[8px] py-4 sm:p-4', style.border, style.bg)}
         style={{ borderRadius: `0 var(--ui-radius, 12px) var(--ui-radius, 12px) 0` }}
       >
         <div className="flex items-center gap-2 mb-2">
           <Icon size={14} className="text-gray-500 shrink-0" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
             {style.label}
           </span>
         </div>
-        <h4 className="text-sm font-bold text-gray-900 mb-1">{section.title}</h4>
+        <h4 className="text-lg font-bold text-gray-900 mb-1">{section.title}</h4>
         {section.objective && (
-          <p className="text-xs italic text-gray-500 mb-2">{section.objective}</p>
+          <p className="text-sm italic text-gray-500 mb-2">{section.objective}</p>
         )}
         <EditorialCorrection manifestSha256={manifestSha256} lessonId={section.id} content={section.content} />
 
         {keyTerms ? (
-          <div>
+          <div className="cert-lesson-prose">
             {keyTerms.map((kt, i) => (
               <GlossaryTerm key={i} term={kt.term} definition={kt.definition} />
             ))}
           </div>
         ) : (
           <div
-            className="text-sm text-gray-700 leading-relaxed cert-lesson-markdown"
+            className="text-gray-700 cert-lesson-markdown cert-lesson-prose"
             dangerouslySetInnerHTML={{ __html: renderedHtml! }}
           />
         )}

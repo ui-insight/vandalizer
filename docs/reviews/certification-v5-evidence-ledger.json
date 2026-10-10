@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+  "working_head_at_inventory": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 66006,
-    "sha256": "6622864cf94dc33369d2151acf410e0e59d39a5052fbdca885b8da4130eac69c"
+    "bytes": 66389,
+    "sha256": "9cd01b0aa6570321e0a4ccb8d83f41de11bfe676b5cfeebfcc5c0ab0c31b5ee8"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 796694,
-    "sha256": "f074ee117f20f1783e56aa88aebeb1e5492284b2293fd729d06625ebe0bfd6a5"
+    "bytes": 799592,
+    "sha256": "f8f64677ffb9eb096672d33b97bea1e095fe25da2b8014e48e0916de1135b9e3"
   },
   "counts": {
-    "accepted": 76,
-    "open": 86,
+    "accepted": 77,
+    "open": 85,
     "items": 162,
-    "checkpoints": 330,
-    "browser_runs": 564,
-    "recorded_captures_including_diagnostics_and_repeats": 7031,
+    "checkpoints": 331,
+    "browser_runs": 573,
+    "recorded_captures_including_diagnostics_and_repeats": 7131,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -340,8 +340,8 @@
     },
     {
       "id": "C8-VIS-04",
-      "accepted": false,
-      "requirement": "P2 · Improve: Set course typography deliberately.** Use readable body text, clear title/section hierarchy, comfortable line length and spacing. Dense metadata must not compete with the lesson; verify real fonts and enlarged text rather than relying on screenshots at reduced scale."
+      "accepted": true,
+      "requirement": "P2 · Improve: Set course typography deliberately.** Use readable body text, clear title/section hierarchy, comfortable line length and spacing. Dense metadata must not compete with the lesson; verify real fonts and enlarged text rather than relying on screenshots at reduced scale. Accepted at checkpoint 331: measured Public Sans rendering exposed 12px chat-body inheritance and 85ch desktop panel lines. Shared lesson prose now uses 1rem/1.65 spacing and bounded reading width, with distinct headings and smaller metadata. Current/historical reading, all lesson variants and enlargement are verified; short-screen composer and OS keyboard coverage remain VIS-09."
     },
     {
       "id": "C8-VIS-05",
@@ -3383,6 +3383,13 @@
       "evidence_directories": [
         "certification-assessment-controls-2026-10-09"
       ]
+    },
+    {
+      "number": 331,
+      "title": "Repair lesson typography across chat and the panel on October 9 2026",
+      "evidence_directories": [
+        "certification-typography-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -5329,6 +5336,12 @@
       "available": true,
       "bytes": 745,
       "sha256": "3e4beb0180641883caebfb708091c5a9be44242a669830588af9146b6315e878"
+    },
+    {
+      "path": "artifacts/visual-review/certification-typography-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 520,
+      "sha256": "7d0f7fb67db866f736e49ddc4e3e41a89fa1df6153b54aac17ee0f6f659eca77"
     },
     {
       "path": "artifacts/visual-review/certification-upgrade-2026-10-02-accepted/checkpoint.json",
@@ -245780,6 +245793,3665 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/manifest.json",
+        "available": true,
+        "bytes": 9864,
+        "sha256": "427b23b716458253599c8e3db41c07507f4859a86e6d3d029f2101dde9a02aa6"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:13:51.382Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "8b21fc6dfb93acd2931a0381ecb8930b929ee83a7d6645a5fac4c92226161765",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "typography": "panel-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 14,
+          "lineHeight": 22.75,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 30.821022028880172,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "historical-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 12,
+          "lineHeight": 19.2,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 26.968370254447056,
+          "paragraphSpacing": 6
+        },
+        {
+          "typography": "unversioned-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 12,
+          "lineHeight": 19.2,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 26.968370254447056,
+          "paragraphSpacing": 6
+        },
+        {
+          "typography": "panel-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 14,
+          "lineHeight": 22.75,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 85.45828835280412,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "historical-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 12,
+          "lineHeight": 19.2,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 75.72936293673011,
+          "paragraphSpacing": 6
+        },
+        {
+          "typography": "unversioned-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 12,
+          "lineHeight": 19.2,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 75.72936293673011,
+          "paragraphSpacing": 6
+        },
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "governance.sharing-with-everyone",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-correction.png",
+              "available": true,
+              "bytes": 90240
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-correction.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-preservation.png",
+              "available": true,
+              "bytes": 90240
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 75163
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 78498
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 76664
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 78520
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-correction.png",
+              "available": true,
+              "bytes": 200896
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 200896
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 145671
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 183618
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 188521
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 188521
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-before/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 2907,
+        "sha256": "5f72a60498543d860ae0cf9006df91447c6ae774869824b57cebbca44f40e177"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:15:37.018Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "3618452bedd1d0cf651ec66eafbf83df9f8ebfcbea46fef68e39be9c599c3aef",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "blocked",
+          "note": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5332/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5332/\", waiting until \"load\"\u001b[22m\n",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native/blocked.png",
+              "available": true,
+              "bytes": 42592
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native/blocked.txt",
+              "available": true,
+              "bytes": 201
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native/blocked.axe.json",
+              "available": true,
+              "bytes": 380
+            }
+          },
+          "axe_observations": [
+            {
+              "id": "meta-viewport",
+              "node_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/manifest.json",
+        "available": true,
+        "bytes": 7711,
+        "sha256": "88aee225d25b4c26e84bdde4c3e23a8a69c6aace2cd99572a17a86cc3315915e"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:16:51.357Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "73cc3c359fa884a5896890fed1503ff6e8ffb3874078eecbf0f36d521b4c07eb",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135763,
+        "sha256": "23c3cc9259889991f054b4f86747f66dbafafdae8b130d852a02444d2cfa0694"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12152,
+        "sha256": "22e47f4d1218293ce261b0acd9aa06510960b45f052789fee9be9d44a1e3cf81"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "typography": "panel-780",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 34.11907448858074,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "historical-chat-780",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 27.37698192496898,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "unversioned-chat-780",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 27.37698192496898,
+          "paragraphSpacing": 8
+        },
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "governance.sharing-with-everyone",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-correction.png",
+              "available": true,
+              "bytes": 230342
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-correction.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-preservation.png",
+              "available": true,
+              "bytes": 230375
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-preservation.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-780-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-lesson-prose.png",
+              "available": true,
+              "bytes": 227176
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-lesson-prose.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/panel-780-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-correction.png",
+              "available": true,
+              "bytes": 189094
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-correction.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-preservation.png",
+              "available": true,
+              "bytes": 186967
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-780-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-lesson-prose.png",
+              "available": true,
+              "bytes": 186967
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-lesson-prose.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/historical-chat-780-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-correction",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-correction.png",
+              "available": true,
+              "bytes": 188233
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-correction.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-preservation",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-preservation.png",
+              "available": true,
+              "bytes": 186588
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-preservation.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-780-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-lesson-prose.png",
+              "available": true,
+              "bytes": 186588
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-lesson-prose.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-native-final/unversioned-chat-780-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal/manifest.json",
+        "available": true,
+        "bytes": 2908,
+        "sha256": "483c212e942fef625addae8eaed14d0625064feb8054bf17ae9d8c2428525c42"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:15:36.867Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "3618452bedd1d0cf651ec66eafbf83df9f8ebfcbea46fef68e39be9c599c3aef",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "blocked",
+          "note": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5332/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5332/\", waiting until \"load\"\u001b[22m\n",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal/blocked.png",
+              "available": true,
+              "bytes": 19661
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal/blocked.txt",
+              "available": true,
+              "bytes": 201
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal/blocked.axe.json",
+              "available": true,
+              "bytes": 380
+            }
+          },
+          "axe_observations": [
+            {
+              "id": "meta-viewport",
+              "node_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/manifest.json",
+        "available": true,
+        "bytes": 12575,
+        "sha256": "1f6a7708baa5a38a1d6a90c35cbe31dc9325a9222e75e29b33e27bee92b23bbe"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:16:56.685Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "73cc3c359fa884a5896890fed1503ff6e8ffb3874078eecbf0f36d521b4c07eb",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135763,
+        "sha256": "23c3cc9259889991f054b4f86747f66dbafafdae8b130d852a02444d2cfa0694"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12152,
+        "sha256": "22e47f4d1218293ce261b0acd9aa06510960b45f052789fee9be9d44a1e3cf81"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "typography": "panel-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 26.968370254447056,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "historical-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 20.226277690835293,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "unversioned-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 20.226277690835293,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "panel-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 66.321185632252,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "historical-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 56.79702220254759,
+          "paragraphSpacing": 8
+        },
+        {
+          "typography": "unversioned-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 16,
+          "lineHeight": 26.4,
+          "rootFontSize": 16,
+          "loadedPublicSans": true,
+          "widthInCh": 56.79702220254759,
+          "paragraphSpacing": 8
+        },
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "governance.sharing-with-everyone",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-correction.png",
+              "available": true,
+              "bytes": 90243
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-correction.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-preservation.png",
+              "available": true,
+              "bytes": 90243
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-lesson-prose.png",
+              "available": true,
+              "bytes": 96236
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 75163
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 77787
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-lesson-prose.png",
+              "available": true,
+              "bytes": 77787
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 76664
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 77812
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-lesson-prose.png",
+              "available": true,
+              "bytes": 77812
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-correction.png",
+              "available": true,
+              "bytes": 190517
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 190517
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 190517
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/panel-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 180520
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 180520
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 180520
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/historical-chat-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 186151
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 186151
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 185211
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-normal-final/unversioned-chat-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text/manifest.json",
+        "available": true,
+        "bytes": 2908,
+        "sha256": "c090f71435150dce547a69756101dab9400e7fca5866e36f83f3acaced3c877b"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:15:36.867Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "3618452bedd1d0cf651ec66eafbf83df9f8ebfcbea46fef68e39be9c599c3aef",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": null,
+      "verified_bundle": null,
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [],
+      "captures": [
+        {
+          "id": "blocked",
+          "note": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://127.0.0.1:5332/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5332/\", waiting until \"load\"\u001b[22m\n",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text/blocked.png",
+              "available": true,
+              "bytes": 29898
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text/blocked.txt",
+              "available": true,
+              "bytes": 201
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text/blocked.axe.json",
+              "available": true,
+              "bytes": 380
+            }
+          },
+          "axe_observations": [
+            {
+              "id": "meta-viewport",
+              "node_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/manifest.json",
+        "available": true,
+        "bytes": 12583,
+        "sha256": "b25a23c3a48e3ece102f4e85081d5541a2ca069183d0b484b8f933e3d211d30b"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:16:56.660Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "73cc3c359fa884a5896890fed1503ff6e8ffb3874078eecbf0f36d521b4c07eb",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Retained historical package plus actual API/tool correction projection, delivered through synthetic transport. Historical card intentionally omits new notice metadata. No learner or assessment changes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135763,
+        "sha256": "23c3cc9259889991f054b4f86747f66dbafafdae8b130d852a02444d2cfa0694"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12152,
+        "sha256": "22e47f4d1218293ce261b0acd9aa06510960b45f052789fee9be9d44a1e3cf81"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "typography": "panel-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 13.484185127223528,
+          "paragraphSpacing": 16
+        },
+        {
+          "typography": "historical-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 10.113138845417646,
+          "paragraphSpacing": 16
+        },
+        {
+          "typography": "unversioned-chat-320",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 10.113138845417646,
+          "paragraphSpacing": 16
+        },
+        {
+          "typography": "panel-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 60.88313890776684,
+          "paragraphSpacing": 16
+        },
+        {
+          "typography": "historical-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 25.74253524288128,
+          "paragraphSpacing": 16
+        },
+        {
+          "typography": "unversioned-chat-1440",
+          "family": "\"Public Sans Variable\", \"Public Sans\", Arial, sans-serif",
+          "fontSize": 32,
+          "lineHeight": 52.8,
+          "rootFontSize": 32,
+          "loadedPublicSans": true,
+          "widthInCh": 25.74253524288128,
+          "paragraphSpacing": 16
+        },
+        {
+          "courseWrites": [],
+          "originalBodyPreserved": true,
+          "historicalCardHasNoticeMetadata": false,
+          "exactManifest": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "lessonId": "governance.sharing-with-everyone",
+          "unversionedTextMatchedWithoutInferringCourse": true,
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "panel-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-correction.png",
+              "available": true,
+              "bytes": 69228
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-correction.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-preservation.png",
+              "available": true,
+              "bytes": 70765
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-preservation.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-lesson-prose.png",
+              "available": true,
+              "bytes": 70642
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 9798
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-correction.png",
+              "available": true,
+              "bytes": 41142
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-correction.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-preservation.png",
+              "available": true,
+              "bytes": 48884
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-lesson-prose.png",
+              "available": true,
+              "bytes": 44897
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 6194
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-correction",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-correction.png",
+              "available": true,
+              "bytes": 41140
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-correction.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-preservation",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-preservation.png",
+              "available": true,
+              "bytes": 48884
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-preservation.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-320-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-lesson-prose.png",
+              "available": true,
+              "bytes": 44903
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-lesson-prose.txt",
+              "available": true,
+              "bytes": 11693
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-320-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-correction.png",
+              "available": true,
+              "bytes": 185804
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-correction.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-preservation.png",
+              "available": true,
+              "bytes": 185804
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-preservation.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "panel-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 218899
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 9864
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/panel-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-correction.png",
+              "available": true,
+              "bytes": 121869
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 131145
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "historical-chat-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 125648
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 6260
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/historical-chat-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-correction",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-correction.png",
+              "available": true,
+              "bytes": 117374
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-correction.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-correction.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-preservation",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-preservation.png",
+              "available": true,
+              "bytes": 131129
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-preservation.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-preservation.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "unversioned-chat-1440-lesson-prose",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-lesson-prose.png",
+              "available": true,
+              "bytes": 125632
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-lesson-prose.txt",
+              "available": true,
+              "bytes": 11759
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-text-final/unversioned-chat-1440-lesson-prose.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/manifest.json",
+        "available": true,
+        "bytes": 14521,
+        "sha256": "c3b5da807889cd991155f5cd112d0852da8e9100bf6b924c6130ab61943cca38"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:17:27.709Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "cc4f6d37e6120acc8e181032fda0aec1412adfe89ac317a2e1381bbffc5aa6d1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135763,
+        "sha256": "23c3cc9259889991f054b4f86747f66dbafafdae8b130d852a02444d2cfa0694"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12152,
+        "sha256": "22e47f4d1218293ce261b0acd9aa06510960b45f052789fee9be9d44a1e3cf81"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "ai_literacy.what-is-an-llm-really",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.what-ai-is-genuinely-bad-at",
+              "revision": 3
+            },
+            {
+              "id": "ai_literacy.worked-example-monday-morning-12-proposals",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.glossary-review",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            390,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 2,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-3-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-320.png",
+              "available": true,
+              "bytes": 81002
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-320.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-320.png",
+              "available": true,
+              "bytes": 67531
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-320.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-320.png",
+              "available": true,
+              "bytes": 91136
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-320.txt",
+              "available": true,
+              "bytes": 6343
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-320.png",
+              "available": true,
+              "bytes": 74241
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-320.txt",
+              "available": true,
+              "bytes": 6343
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-320.png",
+              "available": true,
+              "bytes": 81132
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-320.txt",
+              "available": true,
+              "bytes": 5624
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-320.png",
+              "available": true,
+              "bytes": 87081
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-320.txt",
+              "available": true,
+              "bytes": 5738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-390.png",
+              "available": true,
+              "bytes": 93619
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-390.txt",
+              "available": true,
+              "bytes": 6818
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-390.png",
+              "available": true,
+              "bytes": 68996
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-390.txt",
+              "available": true,
+              "bytes": 6818
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-feedback-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-feedback-390.png",
+              "available": true,
+              "bytes": 73307
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-feedback-390.txt",
+              "available": true,
+              "bytes": 7020
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-feedback-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-390.png",
+              "available": true,
+              "bytes": 102897
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-390.txt",
+              "available": true,
+              "bytes": 6359
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-390.png",
+              "available": true,
+              "bytes": 85704
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-390.txt",
+              "available": true,
+              "bytes": 6359
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-feedback-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-feedback-390.png",
+              "available": true,
+              "bytes": 89174
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-feedback-390.txt",
+              "available": true,
+              "bytes": 6611
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-feedback-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-390.png",
+              "available": true,
+              "bytes": 91179
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-390.txt",
+              "available": true,
+              "bytes": 5632
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-390.png",
+              "available": true,
+              "bytes": 99293
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-390.txt",
+              "available": true,
+              "bytes": 5738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-1440.png",
+              "available": true,
+              "bytes": 176249
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-1440.txt",
+              "available": true,
+              "bytes": 7308
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-1440.png",
+              "available": true,
+              "bytes": 176249
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-1440.txt",
+              "available": true,
+              "bytes": 7308
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-3-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-1440.png",
+              "available": true,
+              "bytes": 182418
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-1440.txt",
+              "available": true,
+              "bytes": 6861
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-1440.png",
+              "available": true,
+              "bytes": 182418
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-1440.txt",
+              "available": true,
+              "bytes": 6861
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-5-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-1440.png",
+              "available": true,
+              "bytes": 181459
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-1440.txt",
+              "available": true,
+              "bytes": 5698
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-8-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-1440.png",
+              "available": true,
+              "bytes": 172289
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-1440.txt",
+              "available": true,
+              "bytes": 5804
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants/ai_literacy-9-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/manifest.json",
+        "available": true,
+        "bytes": 14521,
+        "sha256": "68a1c2793c6828b28a09127afea1876ad24215340b27ac564d5b5b335cca12fb"
+      },
+      "checkpoints": [
+        331
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:17:27.699Z",
+      "reported_commit": "18a6096b7a9bb71956964d86a7635fadb98ff1cf",
+      "reported_source_fingerprint": "cc4f6d37e6120acc8e181032fda0aec1412adfe89ac317a2e1381bbffc5aa6d1",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135763,
+        "sha256": "23c3cc9259889991f054b4f86747f66dbafafdae8b130d852a02444d2cfa0694"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-typography-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12152,
+        "sha256": "22e47f4d1218293ce261b0acd9aa06510960b45f052789fee9be9d44a1e3cf81"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "moduleId": "ai_literacy",
+          "workingTeaching": true,
+          "lessons": [
+            {
+              "id": "ai_literacy.what-is-an-llm-really",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.what-ai-is-genuinely-bad-at",
+              "revision": 3
+            },
+            {
+              "id": "ai_literacy.worked-example-monday-morning-12-proposals",
+              "revision": 2
+            },
+            {
+              "id": "ai_literacy.glossary-review",
+              "revision": 2
+            }
+          ],
+          "physicalWidths": [
+            320,
+            390,
+            1440
+          ],
+          "nativeZoom": 1,
+          "practiceCorrections": 2,
+          "unexpectedWrites": [],
+          "creditAwarded": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "ai_literacy-3-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-320.png",
+              "available": true,
+              "bytes": 62916
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-320.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-320.png",
+              "available": true,
+              "bytes": 52630
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-320.txt",
+              "available": true,
+              "bytes": 6794
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-320.png",
+              "available": true,
+              "bytes": 61697
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-320.txt",
+              "available": true,
+              "bytes": 6343
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-320.png",
+              "available": true,
+              "bytes": 54638
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-320.txt",
+              "available": true,
+              "bytes": 6343
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-320.png",
+              "available": true,
+              "bytes": 60006
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-320.txt",
+              "available": true,
+              "bytes": 5624
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-320",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-320.png",
+              "available": true,
+              "bytes": 53309
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-320.txt",
+              "available": true,
+              "bytes": 5738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-390.png",
+              "available": true,
+              "bytes": 79497
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-390.txt",
+              "available": true,
+              "bytes": 6818
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-390.png",
+              "available": true,
+              "bytes": 59885
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-390.txt",
+              "available": true,
+              "bytes": 6818
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-feedback-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-feedback-390.png",
+              "available": true,
+              "bytes": 66991
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-feedback-390.txt",
+              "available": true,
+              "bytes": 7020
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-feedback-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-390.png",
+              "available": true,
+              "bytes": 76287
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-390.txt",
+              "available": true,
+              "bytes": 6359
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-390.png",
+              "available": true,
+              "bytes": 63149
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-390.txt",
+              "available": true,
+              "bytes": 6359
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-feedback-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-feedback-390.png",
+              "available": true,
+              "bytes": 76766
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-feedback-390.txt",
+              "available": true,
+              "bytes": 6611
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-feedback-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-390.png",
+              "available": true,
+              "bytes": 73641
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-390.txt",
+              "available": true,
+              "bytes": 5632
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-390",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-390.png",
+              "available": true,
+              "bytes": 69569
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-390.txt",
+              "available": true,
+              "bytes": 5738
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-390.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-1440.png",
+              "available": true,
+              "bytes": 207544
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-1440.txt",
+              "available": true,
+              "bytes": 7308
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-3-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-1440.png",
+              "available": true,
+              "bytes": 106796
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-1440.txt",
+              "available": true,
+              "bytes": 7308
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-3-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-1440.png",
+              "available": true,
+              "bytes": 215692
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-1440.txt",
+              "available": true,
+              "bytes": 6861
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-5-practice-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-1440.png",
+              "available": true,
+              "bytes": 132810
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-1440.txt",
+              "available": true,
+              "bytes": 6861
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-5-practice-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-8-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-1440.png",
+              "available": true,
+              "bytes": 209050
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-1440.txt",
+              "available": true,
+              "bytes": 5698
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-8-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-9-reading-1440",
+          "note": "Current working teaching in actual production frontend. Synthetic position persistence; no lab, model execution or graded assessment tested.",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-1440.png",
+              "available": true,
+              "bytes": 195671
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-1440.txt",
+              "available": true,
+              "bytes": 5804
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-typography-2026-10-09/browser-variants-text/ai_literacy-9-reading-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-upgrade-2026-10-02-accepted/manifest.json",
         "available": true,
         "bytes": 11383,
@@ -272463,7 +276135,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1451,
+    "1440x1000": 1487,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -272474,7 +276146,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 568,
+    "320x1000": 594,
     "320x1100": 235,
     "320x250": 6,
     "320x480": 6,
@@ -272484,7 +276156,7 @@
     "320x650": 55,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 790,
+    "320x844": 802,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
@@ -272496,8 +276168,8 @@
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 82,
-    "390x844": 862,
+    "390x800": 92,
+    "390x844": 878,
     "390x850": 276,
     "390x900": 192,
     "720x250": 2,

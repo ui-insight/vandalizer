@@ -1255,6 +1255,12 @@ html {
 }
 
 /* Lesson markdown content styles */
+.cert-lesson-prose {
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
 .cert-lesson-markdown p {
   margin-bottom: 0.5rem;
 }

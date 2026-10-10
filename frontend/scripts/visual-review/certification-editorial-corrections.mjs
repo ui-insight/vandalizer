@@ -43,6 +43,26 @@ async function inspect(scope, prefix) {
   await capture(prefix + '-correction', notice.getByText(noticeTitle, { exact: true }))
   await capture(prefix + '-preservation', notice.getByText(/Your saved course, assessment requirements and earned credit are preserved/))
   assert.ok((await scope.innerText()).includes(process.env.REVIEW_ORIGINAL_TEXT || 'Every result carries a quality score'))
+  if (process.env.REVIEW_TYPOGRAPHY === '1') {
+    const metrics = await scope.locator('.cert-lesson-markdown, .chat-markdown').first().evaluate(element => {
+      const style = getComputedStyle(element), canvas = document.createElement('canvas'), context = canvas.getContext('2d')
+      context.font = `${style.fontSize} ${style.fontFamily}`
+      const paragraph = element.querySelector('p') || element
+      return { family: style.fontFamily, fontSize: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight),
+        rootFontSize: parseFloat(getComputedStyle(document.documentElement).fontSize),
+        loadedPublicSans: [...document.fonts].some(font => font.family.includes('Public Sans') && font.status === 'loaded'),
+        widthInCh: paragraph.getBoundingClientRect().width / context.measureText('0').width,
+        paragraphSpacing: parseFloat(getComputedStyle(paragraph).marginBottom) }
+    })
+    review.observations.push({ typography: prefix, ...metrics })
+    if (process.env.REVIEW_TYPOGRAPHY_BASELINE !== '1') {
+      assert.ok(metrics.loadedPublicSans)
+      assert.ok(metrics.fontSize >= metrics.rootFontSize, 'Lesson body must use at least the root text size')
+      assert.ok(metrics.lineHeight >= metrics.fontSize * 1.5)
+      assert.ok(metrics.widthInCh <= 75, 'Desktop lesson text needs bounded line length')
+    }
+    await capture(prefix + '-lesson-prose', scope.locator('.cert-lesson-markdown, .chat-markdown').first().locator('p').first())
+  }
 }
 async function inspectHistoricalDiagram(scope, prefix) {
   const diagram = scope.getByRole('region', { name: 'Lesson diagram', exact: true })
