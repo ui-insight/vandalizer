@@ -32,6 +32,31 @@
 .cert-lesson-position { grid-column: 2; }
 .cert-procedure > li::marker { font-weight: 700; }
 .cert-procedure > li > .chat-markdown > p { margin: 0; }
+/* Preserve room for course reading when enlarged text wraps a narrow composer.
+   Text keeps its chosen size; icon controls keep a 44px target without rem-sized
+   icons and padding creating extra toolbar rows. Menus remain outside clipping. */
+@container chat (max-width: 360px) {
+  .chat-pane:has(.cert-chat-card) .chat-composer-editor { padding: 8px; }
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls { gap: 6px; padding: 4px; }
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls > button,
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls > div > button {
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    padding: 6px;
+    gap: 4px;
+  }
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls > .h-8.w-8 { width: 44px; height: 44px; }
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls > button > svg,
+  .chat-pane:has(.cert-chat-card) .chat-composer-controls > div > button > svg { width: 16px; height: 16px; }
+  .chat-pane:has(.cert-chat-card) .chat-composer [role="menu"] {
+    min-width: 0;
+    width: min(240px, calc(100cqw - 48px));
+    max-height: min(320px, 50dvh);
+    overflow-y: auto;
+  }
+}
 @media (max-width: 640px) {
   .cert-chat-message { padding: 8px !important; }
   .cert-chat-card fieldset { padding: 8px; }

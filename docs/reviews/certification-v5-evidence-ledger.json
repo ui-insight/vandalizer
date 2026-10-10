@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "b5037c5b56b7cd49f9aed2d5bece66586a6639ca",
+  "working_head_at_inventory": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 67445,
-    "sha256": "87b1ffff69ee3a9660eaa8fc701a4ae71bbff74584e46d9cd64fdf630e57346f"
+    "bytes": 67779,
+    "sha256": "4a50d0629f70e850c7c6e52dd283e56b020bb3fc59ef7ee8268f954324642632"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 808018,
-    "sha256": "157abc14418724204e87acde6cabe13ef45bbb7b6fe6eda4d5260cf30e5c21df"
+    "bytes": 811658,
+    "sha256": "7a85bf69da57ed7ccafb888cff657854264c273db5d1da5243fc9bd64a3459c8"
   },
   "counts": {
-    "accepted": 80,
-    "open": 82,
+    "accepted": 81,
+    "open": 81,
     "items": 162,
-    "checkpoints": 334,
-    "browser_runs": 582,
-    "recorded_captures_including_diagnostics_and_repeats": 7190,
+    "checkpoints": 335,
+    "browser_runs": 590,
+    "recorded_captures_including_diagnostics_and_repeats": 7230,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -335,8 +335,8 @@
     },
     {
       "id": "C8-VIS-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Eliminate nested clipping.** Inspect actual card, transcript and pane bounds as well as page width. Long titles, criteria, errors, field names and buttons must remain visible or deliberately scrollable within a named region."
+      "accepted": true,
+      "requirement": "P1 · Fix: Eliminate nested clipping.** Inspect actual card, transcript and pane bounds as well as page width. Long titles, criteria, errors, field names and buttons must remain visible or deliberately scrollable within a named region. Accepted at checkpoint 335: long titles, URLs, field names and large XP remain inside nested chat bounds; retained panel/form checks and named diagram scrolling are reconciled. Course-scoped composer spacing and bounded menus restore reading room without shrinking text. Actual mobile keyboard/short-screen acceptance remains VIS-09."
     },
     {
       "id": "C8-VIS-04",
@@ -3411,6 +3411,14 @@
       "evidence_directories": [
         "certification-touch-2026-10-10"
       ]
+    },
+    {
+      "number": 335,
+      "title": "Restore course reading room and verify nested content bounds on October 10 2026",
+      "evidence_directories": [
+        "certification-browser-support-2026-10-10",
+        "certification-nested-bounds-2026-10-10"
+      ]
     }
   ],
   "source_records": [
@@ -4601,6 +4609,12 @@
       "available": true,
       "bytes": 12354,
       "sha256": "84e02caf7f1d180ec91481f578c77a39c804741f7eeeec5e62681328c204f59d"
+    },
+    {
+      "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/checkpoint.json",
+      "available": true,
+      "bytes": 977,
+      "sha256": "44f986f4711296cd3c21f3bc8f94d7426e72859fe0081dd4d6da78403f293191"
     },
     {
       "path": "artifacts/visual-review/certification-outcome-completion-2026-10-07/checkpoint.json",
@@ -194393,6 +194407,1999 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/manifest.json",
+        "available": true,
+        "bytes": 31295,
+        "sha256": "ef3cace1ef298162ca1f7f493d396515d3ab06157ac33c406848b14b7fc6dd06"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T18:44:57.536Z",
+      "reported_commit": "ff1be2affc488a04b52b42a481b4e52fb00dc7c7",
+      "reported_source_fingerprint": "f971b5703402c879e5cb7a1e797c156d6fc04eeca8b1597c42a37516bb339b9e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135736,
+        "sha256": "e46eb73871a4af55413c581e166602ace2034b80550d73c04e0d9064b57e6ef6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12125,
+        "sha256": "7a1a18fef954a2e575c1a777cc69539f2096d27a7e3356d93926b04f52b508d3"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Course progress\" [level=3]\n  - text: apprentice · 999,999,999 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n  - button \"Start with Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: 999999999 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group:\n    - text: Exercise instructions · 1 step · 1 expected fields\n    - list:\n      - listitem:\n        - paragraph:\n          - text: Inspect\n          - link \"https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\":\n            - /url: https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\n          - text: before accepting the proposed value.\n    - heading \"Expected fields\" [level=4]\n    - text: unbroken_field_identifier_sourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesource\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Cross-institutional source evidence and applicable program requirements — Met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n    - listitem: Cross-institutional source evidence and applicable program requirements — Not met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 999,999,999 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Course progress\" [level=3]\n  - text: apprentice · 999,999,999 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n  - button \"Start with Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: 999999999 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group:\n    - text: Exercise instructions · 1 step · 1 expected fields\n    - list:\n      - listitem:\n        - paragraph:\n          - text: Inspect\n          - link \"https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\":\n            - /url: https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\n          - text: before accepting the proposed value.\n    - heading \"Expected fields\" [level=4]\n    - text: unbroken_field_identifier_sourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesource\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Cross-institutional source evidence and applicable program requirements — Met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n    - listitem: Cross-institutional source evidence and applicable program requirements — Not met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 999,999,999 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "semanticCardCases": 5,
+          "headings": true,
+          "namedProgress": true,
+          "moduleAndCheckLists": true,
+          "originalRolelessVerdicts": true,
+          "actualCertificationWrites": 0,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "valid-0-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-320.png",
+              "available": true,
+              "bytes": 69134
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-320.txt",
+              "available": true,
+              "bytes": 4396
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-320.png",
+              "available": true,
+              "bytes": 51825
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-320.txt",
+              "available": true,
+              "bytes": 4275
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-320.png",
+              "available": true,
+              "bytes": 65400
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-320.txt",
+              "available": true,
+              "bytes": 5294
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-320.png",
+              "available": true,
+              "bytes": 72187
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-320.txt",
+              "available": true,
+              "bytes": 2677
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-320.png",
+              "available": true,
+              "bytes": 61378
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-320.txt",
+              "available": true,
+              "bytes": 1855
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-0-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-1440.png",
+              "available": true,
+              "bytes": 209668
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-1440.txt",
+              "available": true,
+              "bytes": 4462
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-0-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-1440.png",
+              "available": true,
+              "bytes": 162553
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-1440.txt",
+              "available": true,
+              "bytes": 4309
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-1-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-1440.png",
+              "available": true,
+              "bytes": 198632
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-1440.txt",
+              "available": true,
+              "bytes": 5360
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-2-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-1440.png",
+              "available": true,
+              "bytes": 129490
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-1440.txt",
+              "available": true,
+              "bytes": 2711
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-3-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-1440.png",
+              "available": true,
+              "bytes": 86076
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-1440.txt",
+              "available": true,
+              "bytes": 1890
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-before/valid-4-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/manifest.json",
+        "available": true,
+        "bytes": 16509,
+        "sha256": "bb5c79cb3dbcd6f5fe0f1d78e8053fe09c985c1e433c273d0ab7ec0cff434dbf"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:10:44.013Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "b0c49588878e128217b1ec9bc68d338fec802076eac70febfed162ed52d50de3",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136608,
+        "sha256": "840a6b2269dbd91d5424c01acdf8e056e899bdc087d9019c50054dffa670eaee"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/bundle-verification.json",
+        "available": true,
+        "bytes": 12112,
+        "sha256": "4accc26841f89c64ab7148c40599cd9ae05b62cdd228c220752bea4711c29322"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Course progress\" [level=3]\n  - text: apprentice · 999,999,999 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n  - button \"Start with Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: 999999999 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group:\n    - text: Exercise instructions · 1 step · 1 expected fields\n    - list:\n      - listitem:\n        - paragraph:\n          - text: Inspect\n          - link \"https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\":\n            - /url: https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\n          - text: before accepting the proposed value.\n    - heading \"Expected fields\" [level=4]\n    - text: unbroken_field_identifier_sourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesource\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Cross-institutional source evidence and applicable program requirements — Met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n    - listitem: Cross-institutional source evidence and applicable program requirements — Not met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 999,999,999 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "semanticCardCases": 5,
+          "headings": true,
+          "namedProgress": true,
+          "moduleAndCheckLists": true,
+          "originalRolelessVerdicts": true,
+          "actualCertificationWrites": 0,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "valid-0-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-0-normal-320.png",
+              "available": true,
+              "bytes": 48459
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-0-normal-320.txt",
+              "available": true,
+              "bytes": 4396
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-0-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-1-normal-320.png",
+              "available": true,
+              "bytes": 41252
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-1-normal-320.txt",
+              "available": true,
+              "bytes": 4275
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-1-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-2-normal-320.png",
+              "available": true,
+              "bytes": 44797
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-2-normal-320.txt",
+              "available": true,
+              "bytes": 5294
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-2-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-3-normal-320.png",
+              "available": true,
+              "bytes": 53154
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-3-normal-320.txt",
+              "available": true,
+              "bytes": 2677
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-3-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-4-normal-320.png",
+              "available": true,
+              "bytes": 42145
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-4-normal-320.txt",
+              "available": true,
+              "bytes": 1855
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-final/valid-4-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/manifest.json",
+        "available": true,
+        "bytes": 31325,
+        "sha256": "81c7ad78b5ec5d243d6b3c18605490e0324c94e6c246159b2e51f189f8906cfc"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T18:49:57.475Z",
+      "reported_commit": "ff1be2affc488a04b52b42a481b4e52fb00dc7c7",
+      "reported_source_fingerprint": "f971b5703402c879e5cb7a1e797c156d6fc04eeca8b1597c42a37516bb339b9e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Actual production frontend with exported real teaching payloads and synthetic malformed tool responses. No model, grading, persisted course write or external message.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135736,
+        "sha256": "e46eb73871a4af55413c581e166602ace2034b80550d73c04e0d9064b57e6ef6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12125,
+        "sha256": "7a1a18fef954a2e575c1a777cc69539f2096d27a7e3356d93926b04f52b508d3"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Course progress\" [level=3]\n  - text: apprentice · 999,999,999 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n  - button \"Start with Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: 999999999 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group:\n    - text: Exercise instructions · 1 step · 1 expected fields\n    - list:\n      - listitem:\n        - paragraph:\n          - text: Inspect\n          - link \"https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\":\n            - /url: https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\n          - text: before accepting the proposed value.\n    - heading \"Expected fields\" [level=4]\n    - text: unbroken_field_identifier_sourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesource\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Cross-institutional source evidence and applicable program requirements — Met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n    - listitem: Cross-institutional source evidence and applicable program requirements — Not met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "longContentBounds": true
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 320,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 999,999,999 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_progress",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Course progress\" [level=3]\n  - text: apprentice · 999,999,999 XP\n  - progressbar \"Course modules completed\"\n  - text: 0/11 modules complete\n  - list:\n    - listitem:\n      - img \"Next module\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n    - listitem:\n      - img \"Not completed\"\n      - text: Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team 999999999 XP\n  - button \"Start with Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\""
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: 999999999 XP\n  - 'complementary \"Original exercise guidance and limits: AI Literacy\"':\n    - paragraph: \"Original exercise guidance and limits: AI Literacy\"\n    - paragraph: The original course version is unavailable. This correction matches the preserved module description; it does not identify a historical course version.\n    - paragraph: The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.\n    - paragraph: This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.\n    - paragraph: Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.\n  - button \"Start the lessons (9)\"\n  - button \"Answer the reflection questions\"\n  - group:\n    - text: Exercise instructions · 1 step · 1 expected fields\n    - list:\n      - listitem:\n        - paragraph:\n          - text: Inspect\n          - link \"https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\":\n            - /url: https://example.test/source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-source-context-\n          - text: before accepting the proposed value.\n    - heading \"Expected fields\" [level=4]\n    - text: unbroken_field_identifier_sourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesourcesource\n  - heading \"Passing requirements\" [level=4]\n  - img \"3 of 3 stars\"\n  - text: Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "get_certification_lesson",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Lesson 1/9 · AI Literacy\n  - paragraph: After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.\n  - complementary \"Correction to historical course and control guidance\":\n    - paragraph: Correction to historical course and control guidance\n    - paragraph: The original course version is unavailable. This correction matches the preserved lesson text; it does not identify a historical course version.\n    - paragraph: Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.\n    - paragraph: The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.\n    - paragraph: Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.\n    - paragraph: Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence.\n    - paragraph: Issued 2026-10-09. Your saved course, assessment requirements and earned credit are preserved.\n  - paragraph: Before any tools or terminology, the big picture.\n  - paragraph:\n    - strong: What AI is\n    - text: — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n  - paragraph:\n    - strong: Why it’s suddenly everywhere\n    - text: \"— in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\"\n  - paragraph:\n    - strong: Why it matters for research administration\n    - text: — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n  - paragraph:\n    - strong: How this course helps\n    - text: — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.\n  - paragraph: This saved card is available to read. Open the learning panel for the current course lessons.\n  - button \"Open learning panel\""
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "check_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- group:\n  - heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team\" [level=3]\n  - text: Module requirements met\n  - img \"1 of 3 stars\"\n  - list:\n    - listitem: Cross-institutional source evidence and applicable program requirements — Met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n    - listitem: Cross-institutional source evidence and applicable program requirements — Not met — The saved evidence needs review at https://example.test/original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_original_source_\n  - button \"Complete the module\""
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 1440,
+          "longContentBounds": true
+        },
+        {
+          "tool": "complete_certification_module",
+          "width": 1440,
+          "accessibleStructure": "- paragraph: Research administration certification — source review, documented decisions, recovery and responsible delivery\n- heading \"Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team complete\" [level=3]\n- img \"1 of 3 stars\"\n- text: +125 XP · 999,999,999 XP total ·\n- strong: level up — apprentice!\n- button \"What's next?\""
+        },
+        {
+          "semanticCardCases": 5,
+          "headings": true,
+          "namedProgress": true,
+          "moduleAndCheckLists": true,
+          "originalRolelessVerdicts": true,
+          "actualCertificationWrites": 0,
+          "actualModelCalls": 0
+        }
+      ],
+      "captures": [
+        {
+          "id": "valid-0-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-320.png",
+              "available": true,
+              "bytes": 38537
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-320.txt",
+              "available": true,
+              "bytes": 4396
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-320.png",
+              "available": true,
+              "bytes": 36781
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-320.txt",
+              "available": true,
+              "bytes": 4275
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-320.png",
+              "available": true,
+              "bytes": 37911
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-320.txt",
+              "available": true,
+              "bytes": 5294
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-320.png",
+              "available": true,
+              "bytes": 39001
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-320.txt",
+              "available": true,
+              "bytes": 2677
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-320.png",
+              "available": true,
+              "bytes": 34713
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-320.txt",
+              "available": true,
+              "bytes": 1855
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-0-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-1440.png",
+              "available": true,
+              "bytes": 129242
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-1440.txt",
+              "available": true,
+              "bytes": 4462
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-0-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-1-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-1440.png",
+              "available": true,
+              "bytes": 133838
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-1440.txt",
+              "available": true,
+              "bytes": 4341
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-1-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-2-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-1440.png",
+              "available": true,
+              "bytes": 136378
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-1440.txt",
+              "available": true,
+              "bytes": 5360
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-2-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-3-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-1440.png",
+              "available": true,
+              "bytes": 148107
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-1440.txt",
+              "available": true,
+              "bytes": 2743
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-3-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "valid-4-normal-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-1440.png",
+              "available": true,
+              "bytes": 121395
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-1440.txt",
+              "available": true,
+              "bytes": 1922
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/browser-text/valid-4-normal-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/manifest.json",
+        "available": true,
+        "bytes": 4336,
+        "sha256": "17d6fabf06ca3c39c9c79571338d30edb1ee14462af07d8f5b450cffb71f027b"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:05:59.614Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "2465f226b4e727b3314d4f7ec8dc9768bc96ad5ebc9af77d0f03aa21cb7f6294",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Certification reading space, composer targets and preserved unsent draft. Synthetic chat response; no actual message, model, course or grade write. Text enlargement is not an OS keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136608,
+        "sha256": "840a6b2269dbd91d5424c01acdf8e056e899bdc087d9019c50054dffa670eaee"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/bundle-verification.json",
+        "available": true,
+        "bytes": 12112,
+        "sha256": "4accc26841f89c64ab7148c40599cd9ae05b62cdd228c220752bea4711c29322"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [
+        "GET /api/obligations",
+        "GET /api/reviews"
+      ],
+      "recorded_observations": [
+        {
+          "rootFontSize": "32px",
+          "readingHeight": 293,
+          "composerHeight": 272,
+          "textSize": "32px",
+          "controls": [
+            {
+              "name": "Add",
+              "width": 99.609375,
+              "height": 46
+            },
+            {
+              "name": "Choose chat model: review-model",
+              "width": 59.1875,
+              "height": 46
+            },
+            {
+              "name": "",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Export conversation",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Send message",
+              "width": 44,
+              "height": 44
+            }
+          ]
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-and-unsent-question",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/course-and-unsent-question.png",
+              "available": true,
+              "bytes": 40058
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/course-and-unsent-question.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/course-and-unsent-question.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "attachment-menu",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/attachment-menu.png",
+              "available": true,
+              "bytes": 47361
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/attachment-menu.txt",
+              "available": true,
+              "bytes": 5150
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/attachment-menu.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "model-picker",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/model-picker.png",
+              "available": true,
+              "bytes": 41800
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/model-picker.txt",
+              "available": true,
+              "bytes": 5202
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/model-picker.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'GET /api/obligations',\n+   'GET /api/reviews'\n+ ]\n- []\n",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/blocked.png",
+              "available": true,
+              "bytes": 39953
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/blocked.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-after/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/manifest.json",
+        "available": true,
+        "bytes": 3362,
+        "sha256": "bf160b7943e251ed82a1c5256d7109ccfc260c3973f808d4232ced17f9008e2c"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:00:36.034Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "0bc561078429ca3f2dacb29b87a773b17b64be10c3662d906b8a587b3323e724",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Certification reading space, composer targets and preserved unsent draft. Synthetic chat response; no actual message, model, course or grade write. Text enlargement is not an OS keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135736,
+        "sha256": "e46eb73871a4af55413c581e166602ace2034b80550d73c04e0d9064b57e6ef6"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-card-structure-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12125,
+        "sha256": "7a1a18fef954a2e575c1a777cc69539f2096d27a7e3356d93926b04f52b508d3"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "rootFontSize": "32px",
+          "readingHeight": 103,
+          "composerHeight": 462,
+          "textSize": "32px",
+          "controls": [
+            {
+              "name": "Add",
+              "width": 155.609375,
+              "height": 50
+            },
+            {
+              "name": "Choose chat model: review-model",
+              "width": 84,
+              "height": 50
+            },
+            {
+              "name": "",
+              "width": 56,
+              "height": 56
+            },
+            {
+              "name": "Export conversation",
+              "width": 56,
+              "height": 56
+            },
+            {
+              "name": "Send message",
+              "width": 56,
+              "height": 56
+            }
+          ]
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-and-unsent-question",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/course-and-unsent-question.png",
+              "available": true,
+              "bytes": 37210
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/course-and-unsent-question.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/course-and-unsent-question.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "blocked",
+          "note": "AssertionError [ERR_ASSERTION]: Attachment menu remains visible\n\nfalse !== true\n",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": true,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/blocked.png",
+              "available": true,
+              "bytes": 37366
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/blocked.txt",
+              "available": true,
+              "bytes": 5150
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-before/blocked.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/manifest.json",
+        "available": true,
+        "bytes": 3886,
+        "sha256": "51475673e7fefe9c4988698027bd5053b60e1aaf930a200cbb1111da7cd54380"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:10:21.258Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "b0c49588878e128217b1ec9bc68d338fec802076eac70febfed162ed52d50de3",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Certification reading space, composer targets and preserved unsent draft. Synthetic chat response; no actual message, model, course or grade write. Text enlargement is not an OS keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136608,
+        "sha256": "840a6b2269dbd91d5424c01acdf8e056e899bdc087d9019c50054dffa670eaee"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/bundle-verification.json",
+        "available": true,
+        "bytes": 12112,
+        "sha256": "4accc26841f89c64ab7148c40599cd9ae05b62cdd228c220752bea4711c29322"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "rootFontSize": "16px",
+          "readingHeight": 208.5,
+          "composerHeight": 178,
+          "textSize": "16px",
+          "controls": [
+            {
+              "name": "Add",
+              "width": 76.8046875,
+              "height": 44
+            },
+            {
+              "name": "Choose chat model: review-model",
+              "width": 80.59375,
+              "height": 44
+            },
+            {
+              "name": "",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Export conversation",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Send message",
+              "width": 44,
+              "height": 44
+            }
+          ]
+        },
+        {
+          "unsentDraftPreserved": true,
+          "attachmentAndModelControlsReachable": true,
+          "actualMobileKeyboard": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-and-unsent-question",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/course-and-unsent-question.png",
+              "available": true,
+              "bytes": 95326
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/course-and-unsent-question.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/course-and-unsent-question.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "attachment-menu",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/attachment-menu.png",
+              "available": true,
+              "bytes": 98589
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/attachment-menu.txt",
+              "available": true,
+              "bytes": 5150
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/attachment-menu.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "model-picker",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/model-picker.png",
+              "available": true,
+              "bytes": 66281
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/model-picker.txt",
+              "available": true,
+              "bytes": 5202
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-native/model-picker.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/manifest.json",
+        "available": true,
+        "bytes": 3985,
+        "sha256": "0e836cea693eba83aaab4587b161ca8029e21445925ed7c1c89176578f8d3fa8"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:08:26.319Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "0aaf9a755199bca2d070af53c4418d3be86dcde2e5d76f8b9dff79bff7525b92",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Certification reading space, composer targets and preserved unsent draft. Synthetic chat response; no actual message, model, course or grade write. Text enlargement is not an OS keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136608,
+        "sha256": "840a6b2269dbd91d5424c01acdf8e056e899bdc087d9019c50054dffa670eaee"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/bundle-verification.json",
+        "available": true,
+        "bytes": 12112,
+        "sha256": "4accc26841f89c64ab7148c40599cd9ae05b62cdd228c220752bea4711c29322"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "rootFontSize": "16px",
+          "readingHeight": 552.5,
+          "composerHeight": 178,
+          "textSize": "16px",
+          "controls": [
+            {
+              "name": "Add",
+              "width": 76.8125,
+              "height": 44
+            },
+            {
+              "name": "Choose chat model: review-model",
+              "width": 70.59375,
+              "height": 44
+            },
+            {
+              "name": "",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Scroll to bottom",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Export conversation",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Send message",
+              "width": 44,
+              "height": 44
+            }
+          ]
+        },
+        {
+          "unsentDraftPreserved": true,
+          "attachmentAndModelControlsReachable": true,
+          "actualMobileKeyboard": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-and-unsent-question",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/course-and-unsent-question.png",
+              "available": true,
+              "bytes": 64560
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/course-and-unsent-question.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/course-and-unsent-question.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "attachment-menu",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/attachment-menu.png",
+              "available": true,
+              "bytes": 66716
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/attachment-menu.txt",
+              "available": true,
+              "bytes": 5150
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/attachment-menu.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "model-picker",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/model-picker.png",
+              "available": true,
+              "bytes": 59889
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/model-picker.txt",
+              "available": true,
+              "bytes": 5202
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-normal/model-picker.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/manifest.json",
+        "available": true,
+        "bytes": 3879,
+        "sha256": "4a475420a6c2180284b08e57cf3ad7d58760f86cec9b18713ae05c2b3a35b2fd"
+      },
+      "checkpoints": [
+        335
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T19:08:26.328Z",
+      "reported_commit": "d54a30a8e835dfcfeb362d0c036a62bf044600fa",
+      "reported_source_fingerprint": "0aaf9a755199bca2d070af53c4418d3be86dcde2e5d76f8b9dff79bff7525b92",
+      "reported_fixture_fingerprint": "b1365f55f0f11376f8c8e3208761c9d45bc3ba0e7a4f6e0ec5e27983bc327e9e",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 2,
+      "reported_scope": "Certification reading space, composer targets and preserved unsent draft. Synthetic chat response; no actual message, model, course or grade write. Text enlargement is not an OS keyboard.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/retained-source.json",
+        "available": true,
+        "bytes": 136608,
+        "sha256": "840a6b2269dbd91d5424c01acdf8e056e899bdc087d9019c50054dffa670eaee"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/bundle-verification.json",
+        "available": true,
+        "bytes": 12112,
+        "sha256": "4accc26841f89c64ab7148c40599cd9ae05b62cdd228c220752bea4711c29322"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "rootFontSize": "32px",
+          "readingHeight": 293,
+          "composerHeight": 272,
+          "textSize": "32px",
+          "controls": [
+            {
+              "name": "Add",
+              "width": 99.609375,
+              "height": 46
+            },
+            {
+              "name": "Choose chat model: review-model",
+              "width": 59.1875,
+              "height": 46
+            },
+            {
+              "name": "",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Export conversation",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "Send message",
+              "width": 44,
+              "height": 44
+            }
+          ]
+        },
+        {
+          "unsentDraftPreserved": true,
+          "attachmentAndModelControlsReachable": true,
+          "actualMobileKeyboard": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "course-and-unsent-question",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/course-and-unsent-question.png",
+              "available": true,
+              "bytes": 40058
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/course-and-unsent-question.txt",
+              "available": true,
+              "bytes": 4960
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/course-and-unsent-question.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "attachment-menu",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/attachment-menu.png",
+              "available": true,
+              "bytes": 47361
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/attachment-menu.txt",
+              "available": true,
+              "bytes": 5150
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/attachment-menu.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "model-picker",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 844
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/model-picker.png",
+              "available": true,
+              "bytes": 41800
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/model-picker.txt",
+              "available": true,
+              "bytes": 5202
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-nested-bounds-2026-10-10/reading-verified/model-picker.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-outcome-selection-2026-10-07/connected/manifest.json",
         "available": true,
         "bytes": 24068,
@@ -278655,7 +280662,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1492,
+    "1440x1000": 1502,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -278676,14 +280683,14 @@
     "320x650": 60,
     "320x700": 45,
     "320x800": 12,
-    "320x844": 817,
+    "320x844": 844,
     "320x850": 24,
     "320x900": 340,
     "320x950": 6,
     "390x1000": 21,
     "390x250": 43,
     "390x480": 3,
-    "390x500": 268,
+    "390x500": 271,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,

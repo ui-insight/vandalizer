@@ -23,7 +23,26 @@ const valid = [
   ['check_certification_module', { module_id: 'foundations', title: 'Foundations', passed: true, stars: 1, checks: [{ name: 'Required run', passed: true, detail: 'Output saved' }, { name: 'Optional enrichment', passed: false, detail: 'Review the extra source context' }] }],
   ['complete_certification_module', { module_id: 'foundations', title: 'Foundations', stars: 1, xp_earned: 125, total_xp: 125, level: 'apprentice', level_up: true, certified: false }],
 ]
-const structureOnly = process.env.REVIEW_CARD_STRUCTURE === '1'
+const extremes = process.env.REVIEW_CARD_EXTREMES === '1'
+const structureOnly = process.env.REVIEW_CARD_STRUCTURE === '1' || extremes
+if (extremes) {
+  for (const [, payload] of valid) {
+    payload.title = 'Cross-institutional source verification, ambiguous program requirements and supervised delivery for a multidisciplinary research administration team'
+    payload.course_title = 'Research administration certification — source review, documented decisions, recovery and responsible delivery'
+    if ('total_xp' in payload) payload.total_xp = 999999999
+    if ('xp' in payload) payload.xp = 999999999
+    for (const module of payload.modules || []) {
+      module.title = payload.title
+      module.xp = 999999999
+    }
+    if (payload.expected_fields) payload.expected_fields = ['unbroken_field_identifier_' + 'source'.repeat(20)]
+    if (payload.instructions) payload.instructions = ['Inspect https://example.test/' + 'source-context-'.repeat(15) + ' before accepting the proposed value.']
+    for (const check of payload.checks || []) {
+      check.name = 'Cross-institutional source evidence and applicable program requirements'
+      check.detail = 'The saved evidence needs review at https://example.test/' + 'original_source_'.repeat(15)
+    }
+  }
+}
 let sequence = 0
 async function send(tool, payload) {
   await page.goto(review.baseURL, { waitUntil: 'domcontentloaded' })
@@ -42,7 +61,9 @@ async function capture(id, target) {
   console.log(id)
 }
 try {
-  for (const width of native ? [780] : structureOnly ? [320, 1440] : [320, 390, 1440]) {
+  const widths = process.env.REVIEW_WIDTHS ? process.env.REVIEW_WIDTHS.split(',').map(Number) : native ? [780] : structureOnly ? [320, 1440] : [320, 390, 1440]
+  assert.ok(widths.every(width => Number.isInteger(width) && width >= 320 && width <= 2880))
+  for (const width of widths) {
     await page.setViewportSize({ width, height: native ? 1000 : width < 500 ? 844 : 1000 })
     for (const [index, [tool, payload]] of (structureOnly ? [] : bad).entries()) {
       const result = await send(tool, payload)
@@ -63,6 +84,25 @@ try {
       if (native) await review.setBrowserZoom(2)
       assert.equal(await result.locator('.cert-chat-card').count(), 1)
       assert.equal(await result.getByRole('alert').count(), 0)
+      if (extremes) {
+        const card = result.locator('.cert-chat-card')
+        for (const summary of await card.locator('details:not([open]) > summary').all()) await summary.click()
+        const clipped = await card.evaluate(root => {
+          const bounds = root.getBoundingClientRect(), problems = []
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+          while (walker.nextNode()) {
+            const node = walker.currentNode
+            if (!node.textContent.trim() || node.parentElement.closest('svg')) continue
+            const scroll = node.parentElement.closest('[role="region"]')
+            if (scroll && ['auto', 'scroll'].includes(getComputedStyle(scroll).overflowX)) continue
+            const range = document.createRange(); range.selectNodeContents(node)
+            for (const rect of range.getClientRects()) if (rect.width && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1)) problems.push(node.textContent.slice(0, 90))
+          }
+          return problems
+        })
+        assert.deepEqual(clipped, [], `Nested card text outside bounds: ${tool}`)
+        review.observations.push({ tool, width, longContentBounds: true })
+      }
       if (structureOnly) {
         const card = result.locator('.cert-chat-card')
         assert.ok(await card.getByRole('heading', { level: 3 }).count())
@@ -78,7 +118,7 @@ try {
         review.observations.push({ tool, width, accessibleStructure: await card.ariaSnapshot() })
       }
       if (tool === 'check_certification_module') {
-        assert.equal(await result.getByText('"Foundations" — module requirements met; review check details', { exact: true }).count(), 1)
+        assert.equal(await result.getByText(`"${payload.title}" — module requirements met; review check details`, { exact: true }).count(), 1)
         assert.equal(await result.getByText(/all checks passed/i).count(), 0)
       }
       await capture(`valid-${index}-${native ? 'native200' : 'normal'}-${width}`, result.locator('.cert-chat-card'))

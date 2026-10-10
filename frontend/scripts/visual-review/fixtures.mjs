@@ -25,6 +25,8 @@ export async function installFixtures(context, state = {empty:false, first:false
   else if(p==='/api/config/version') data={version:'5.0.0',environment:'development',deployment_label:'Visual review'};
   else if(p==='/api/config/features') data={m365_enabled:false};
   else if(p==='/api/reviews/count') data={count:0};
+  else if(p==='/api/reviews' && req.method()==='GET') data={reviews:[]};
+  else if(p==='/api/obligations' && req.method()==='GET') data={inbox_hidden:false,items:[]};
   else if(p==='/api/certification/progress') data={id:'cert-review',user_id:'reviewer',modules:{},total_xp:0,level:'novice',certified:false,certified_at:null,last_activity_date:null};
   else if(p==='/api/certification/selection-status') data={read_only:true,current_enrollment_id:null,pending:null};
   else if(p==='/api/certification/journey-events' && route.request().method()==='POST') {

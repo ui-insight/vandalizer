@@ -215,7 +215,7 @@ export function ChatInput({
       <p id={helpId} className="sr-only">{isStreaming ? 'Enter queues your message for the current conversation.' : 'Enter sends your message.'} Shift+Enter adds a new line.</p>
       {/* Ask question container */}
       <div
-        className="flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
+        className="chat-composer-editor flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
         style={{ backgroundColor: '#19191913' }}
       >
         {/* Text input area */}
@@ -245,7 +245,7 @@ export function ChatInput({
         </div>
 
         {/* Controls toolbar — min-w-0 lets children shrink instead of overflowing on narrow screens */}
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-1 px-1">
+        <div className="chat-composer-controls flex min-w-0 flex-wrap items-center gap-1.5 pt-1 px-1">
           {/* + Add button */}
           <div ref={addMenuRef} className="relative">
             <button
