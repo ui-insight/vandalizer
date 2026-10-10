@@ -167,6 +167,40 @@ async def test_historical_module_notice_reaches_exercise_and_tutor_without_rewri
         assert matched[0]['identity_basis'] == 'preserved_module_description'
         assert corrections.module_notices_for('f' * 64, module_id, text) == []
     assert package.json('exercises.json')[module_id] == original
-    if path := os.environ.get('CERTIFICATION_MODULE_EXPORT'):
+    if (path := os.environ.get('CERTIFICATION_MODULE_EXPORT')) and module_id == os.environ.get('CERTIFICATION_MODULE_EXPORT_TARGET', module_id):
         Path(path).write_text(json.dumps({'course': {**package.summary(), 'modules': public_modules(package),
             **package.json('course-structure.json')}, 'module': chat, 'exercise': exercise}, indent=2) + '\n')
+
+
+@pytest.mark.asyncio
+async def test_current_exercise_editorial_changes_preserve_original_requirements_and_tutor_delivery(monkeypatch):
+    from app.services import certification_service
+    from app.services.chat_tools import get_certification_module
+    package = CourseCatalog().load(VERSION, preview=True)
+    current = json.loads((corrections.SOURCE.parent / 'exercises.json').read_text())
+    modules = json.loads((corrections.SOURCE.parent / 'panel-modules.json').read_text())
+    original = package.json('exercises.json')
+    monkeypatch.setattr(certification_service, '_EXERCISES', current)
+    monkeypatch.setattr(certification_service, 'get_progress_dict', AsyncMock(return_value={'modules': {}}))
+    token = _operation.set(None)
+    projected = {}
+    try:
+        for module in modules:
+            module_id = module['id']
+            assert {key: value for key, value in current[module_id].items() if key not in {'overview', 'instructions', 'chat_instructions'}} == {
+                key: value for key, value in original[module_id].items() if key not in {'overview', 'instructions', 'chat_instructions'}}
+            exercise = certification_service.get_exercise(module_id)
+            chat = await get_certification_module(SimpleNamespace(deps=SimpleNamespace(user_id='user1')), module_id)
+            assert chat.get('error') is None
+            assert chat['instructions'] == current[module_id]['chat_instructions']
+            assert chat['star_criteria'] == original[module_id]['star_criteria']
+            assert chat['editorial_notices'] == exercise['editorial_notices']
+            notice_id = module_id + '-exercise-guidance-2026-10-09.1'
+            assert notice_id in {notice['id'] for notice in chat['editorial_notices']}
+            assert all(notice['identity_basis'] == 'preserved_module_description' for notice in chat['editorial_notices'])
+            projected[module_id] = chat
+    finally:
+        _operation.reset(token)
+    if path := os.environ.get('CERTIFICATION_CURRENT_EXERCISE_EXPORT'):
+        Path(path).write_text(json.dumps({'course': {**package.summary(), **package.json('course-structure.json'), 'modules': modules},
+            'exercises': current, 'tools': projected}, indent=2) + '\n')

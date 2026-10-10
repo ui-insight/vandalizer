@@ -645,6 +645,230 @@
       "unversioned_content_sha256": [
         "eab1f0bf670dd10d12003d5011475a4182cab18c9423664c0caddd47d8663670"
       ]
+    },
+    {
+      "id": "ai_literacy-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "ai_literacy"
+      ],
+      "title": "Original exercise guidance and limits: AI Literacy",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original reflection rubric checks that all three answers are present. It does not judge their correctness or establish the new course’s assessed outcomes.",
+        "This module has 9 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "018cd4a3dbfb8400ca79991f229de6194f08c35dd88d9afcde59baaa34e71496",
+        "7b84e0b9621bad7244a1b643f540d8f5cf9a753ceb478e2a30d4f726ca674cb0",
+        "dcea51d6ef3386df85ae4c66860d3dbc4b35243b0794dd09ed0155ba4ced727c",
+        "2b90c665ccc9807020f2d63aad00f5b0b3cab59945771828679111fdb78b81a9"
+      ]
+    },
+    {
+      "id": "foundations-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "foundations"
+      ],
+      "title": "Original exercise guidance and limits: Foundations",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original check uses field-name matches and execution metadata, which can come from different owned artifacts. It does not verify extracted values against this assigned document. Its three-, five- and eight-field tiers are preserved; the eight-field counter does not prove the named enrichment fields or source accuracy.",
+        "This module has 6 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "b6ab27a94547847fb27f8fd9cdbc2e802329222855f25b0b7a007ab8c20580fc",
+        "f8f94c7ca79f8b175f8af794a8ca786d461e3413c51f8059f7b735e4387f317b",
+        "c87ee65771f90ec3496687c2fc714ced2a172518eb7a4786981a4b584b95492f"
+      ]
+    },
+    {
+      "id": "process_mapping-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "process_mapping"
+      ],
+      "title": "Original exercise guidance and limits: Thinking in Workflows",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original reflection rubric checks that all four answers are present. It does not assess the quality of the process map or establish the new course’s outcomes.",
+        "This module has 7 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "801e0a9db7e1e3c15ffc2c92c71cbaeec56dc2e12f3ea90a291d986cc4b00572",
+        "cf2da33cd3ac0d0944412d2d94299d26bb307764f121bccbaceccc293a1a1805",
+        "b74b1d37188cfedcad9b13c24b1280266437350d2bc985ed19850ce3e169a52c"
+      ]
+    },
+    {
+      "id": "workflow_design-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "workflow_design"
+      ],
+      "title": "Original exercise guidance and limits: Workflow Design",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original reflection rubric checks that all four answers are present. It does not assess an executed architecture or establish the new course’s outcomes.",
+        "This module has 8 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "459b823c91e932570a92fb7fd65006dbc3378d26e844bc2a7cfff01cf8885e26",
+        "e2316c7ebc78628a3898bfc6263be0a4a54f853376fed17fc9c73c5cd230485d",
+        "951c8f5852ffe98fb9bc6bfef55bdb88327b786dd875c644fcf44598786d75bc"
+      ]
+    },
+    {
+      "id": "extraction_engine-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "extraction_engine"
+      ],
+      "title": "Original exercise guidance and limits: Extraction Engine",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original stars use counts of unique field names across owned extraction artifacts: 15, 20 and 25. They do not establish that one assigned extraction ran accurately, that budget categories are correct, or that Optional and Allowed values were configured. Preserve the original criteria and check actual source-supported work separately.",
+        "This module has 6 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "15440dc8b7f8131aee16170ecdce67a0b1cd1246ba50349da6c027ba4b1e2ac9",
+        "1e3c5dd7de44a44a8142f6e70916e676f43304c423dc176e5b64ff207a0d1bb1",
+        "6e44ffca5f8d0d8d7f70a0dcfa8de9f63b927163b45ac33b63afdea661c627a2",
+        "ac4272b9a196012843a82c1aca712108be199e3fea5fd93a6594b9747b51afbf"
+      ]
+    },
+    {
+      "id": "multi_step-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "multi_step"
+      ],
+      "title": "Original exercise guidance and limits: Multi-Step Workflows",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original base checks a workflow with at least three steps containing Extraction, Prompt and Formatter. Higher-step and task-type counters can include other workflows; the top star checks five task types although the preserved description says four. It does not verify source values or connected execution. Do not add unrelated tasks to chase this discrepancy; equivalent assessment remains a separately reviewed change.",
+        "This module has 6 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the actual assigned source and saved configuration. Proposed work, saved work, execution, source-supported results and course completion are separate states. Original passing requirements and earned credit are preserved."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "654187b9a6e795a17190d6d9724b038e025fcc3ada5fd396320e030435570be7",
+        "903addf1a6dc1456d8a10fa888bda2cc1796c8cb1ce340aeaf3d726828242271",
+        "9156f3024c62c2275e898a281e9f78cfdefd51e5170db46614f7bddf046bc674"
+      ]
+    },
+    {
+      "id": "advanced_nodes-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "advanced_nodes"
+      ],
+      "title": "Original exercise guidance and limits: Advanced Nodes",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original check counts available advanced task types and parallel tasks across owned workflows. It does not establish that those tasks executed together on the assigned budget or that arithmetic is correct. Deep Analysis is the Research operation named in older instructions; keep source checks and independently checked calculations distinct.",
+        "This module has 6 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Use the current Deep Analysis label for the older Research operation. Model analysis does not verify arithmetic; a dependent operation must wait for the evidence it needs."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "5189267c2be9cdd091be1a278148e58af774c2d6f6dd2be3f34ca7547cdd3ce6",
+        "7f5ea0ff449dd5c9b8b8d9958c331632ebb6f81a859f1cdee506b9cca4244127",
+        "8351c1a8ab9191633a809a487741fcf1a0613abcd51799f794cd3bffdca6d5e2"
+      ]
+    },
+    {
+      "id": "output_delivery-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "output_delivery"
+      ],
+      "title": "Original exercise guidance and limits: Output & Delivery",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original check uses configured output types and workflow execution metadata, which can come from different workflows. Its ZIP criterion uses marked deliverable steps on a run workflow. It does not inspect actual downloaded files or their accuracy. Open the real output and ZIP members before claiming a usable deliverable.",
+        "This module has 5 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Inspect the input shape required by the chosen output task: a CSV export cannot be assumed to recover structured rows after a prose summary. Inspect actual files and ZIP members, and keep generation separate from authorized delivery."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "56c16d0189e19e384e4b1ccfb542281250ae94b4702b6548a82451d9a60eff1b",
+        "854e4df1f1991c0446f4d0d656a17c091b49cc7f468467f6d0c0f6f329d82267",
+        "a540fef75bd6aef317485833f12009ed17aa05468b665cb8ffd7c678d4350fa9"
+      ]
+    },
+    {
+      "id": "validation_qa-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "validation_qa"
+      ],
+      "title": "Original exercise guidance and limits: Validation & QA",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original check uses plan/check counts or saved test-case counts and run metadata. It does not establish source accuracy, representative coverage or a passing evaluation of the current revision. Its two-, five- and eight-check tiers remain original participation requirements, not proof of the new course’s outcomes.",
+        "This module has 8 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Inspect source-checked expectations, current evaluation details and actual score availability. Adding cases can lower a score, and saving a case does not itself repair an extraction. Internal tool names in old instructions are not controls you must find."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "60de4bc3339760375396bb8f2436163ab98be319b3ca488f6523b0a4d074248e",
+        "91136fb35a8ab2f3068240ecf2218a221d64e2be50026ba61ce54b0751d2613e",
+        "e838f782c771af45dc37e18a540991806860f9b59902da51a01b74a27e000b07",
+        "de12954c7c9cb9a0063e7069fd998dd6a7ffc4d193b899e708818cf4b1380b90"
+      ]
+    },
+    {
+      "id": "batch_processing-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "batch_processing"
+      ],
+      "title": "Original exercise guidance and limits: Batch Processing",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original check uses recorded batch rows or successful extraction activity and size thresholds of three, five and ten. These counters do not establish distinct assigned sources, correct values or complete source coverage. Reconcile each actual input and result independently.",
+        "This module has 6 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "The workflow control is Run per document with the actual selected count. Inspect distinct source identities and per-item results; preserve successful work and verify a repair before a targeted retry."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "aa507f36b22ea0872c61b52ed3a16542d82da60c182162756aef9d5f2fe3b332",
+        "c48bc3143c7f6a88031f6f23a8b2e3e13b23b3e57d0458931d839caf2bff2978",
+        "9ffd026989b0e9f4b02300f5c1c6c3eab1e8cba255b694f856ef6e6ab4d3fd8f"
+      ]
+    },
+    {
+      "id": "governance-exercise-guidance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "governance"
+      ],
+      "title": "Original exercise guidance and limits: Collaboration & Governance",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original base checks that a sharing request exists, including a request later declined. Optional stars use examiner acceptance or preserved verified status; no new staff certification queue is required. Sharing is distinct from saving module completion, and reviewer status does not establish production readiness.",
+        "This module has 7 lessons in its displayed list. Use current Learn, Challenge and saved completion controls; earlier lesson counts and automatic-completion claims are not authoritative.",
+        "Sharing creates a request, not a course-completion receipt. Keep optional examiner review separate from the original base requirement. Import success is not proof of portability; inspect dependencies and test the permitted imported revision."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "89907f62a4b61d44e57fec629e1b166b79359d3a837e80f408d782146b011186",
+        "9652be6c9a3167e405e7e18f9d3236fad2acb58fdbe4fc2f05b836af44f3b944",
+        "eab1f0bf670dd10d12003d5011475a4182cab18c9423664c0caddd47d8663670",
+        "afde1f3f429f6dbedfd42cc8ebb0fda53993e8191e216919bdd73670b7eb492c"
+      ]
     }
   ]
 }

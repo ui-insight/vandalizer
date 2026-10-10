@@ -23,7 +23,11 @@ await context.route('**/api/certification/**', async route => {
   return route.fallback()
 })
 const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
-const title = fixture.module.editorial_notices[0].title
+const moduleId = fixture.module.module_id
+const module = identity.modules.find(item => item.id === moduleId)
+assert.ok(module)
+const title = fixture.module.editorial_notices.find(note => !process.env.REVIEW_NOTICE_ID || note.id === process.env.REVIEW_NOTICE_ID)?.title
+assert.ok(title)
 async function capture(scope, id) {
   const note = scope.getByRole('complementary', { name: title })
   await note.getByText(title, { exact: true }).scrollIntoViewIfNeeded()
@@ -39,7 +43,7 @@ try {
     if (native) await review.setBrowserZoom(2)
     const panel = page.locator('[data-cert-panel]')
     await panel.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
-    await panel.getByRole('button', { name: /^5 Multi-Step Workflows/ }).click()
+    await panel.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }).click()
     await capture(panel, `learn-${width}`)
     await panel.getByRole('button', { name: 'Challenge', exact: true }).click()
     assert.equal(await panel.getByText(fixture.exercise.star_criteria['3'], { exact: true }).count(), 1)
@@ -55,14 +59,14 @@ try {
       await page.getByRole('textbox', { name: 'Message input', exact: true }).fill('Review the original module requirements.')
       await page.getByRole('button', { name: 'Send message', exact: true }).click()
       const card = page.locator('.cert-chat-card').last()
-      if (unknown) await card.getByText(/original course version is unavailable/).waitFor()
+      if (unknown) await card.getByRole('complementary', { name: title }).getByText(/original course version is unavailable/).waitFor()
       await card.getByText(fixture.exercise.star_criteria['3'], { exact: true }).waitFor()
       assert.equal(await card.getByText(fixture.exercise.star_criteria['3'], { exact: true }).count(), 1)
       await capture(card, `${id}-module-${width}`)
     }
   }
   assert.deepEqual(writes, []); assert.deepEqual(review.errors, []); assert.deepEqual([...review.unmatched], [])
-  review.observations.push({ courseWrites: writes, originalCriteriaPreserved: true, assessedRulesChanged: false, moduleId: 'multi_step',
+  review.observations.push({ courseWrites: writes, originalCriteriaPreserved: true, assessedRulesChanged: false, moduleId,
     unknownOverviewMatchedWithoutInferringCourse: true })
 } catch (error) { await review.capture('blocked', String(error)); throw error }
 finally { await review.flush(); await review.browser.close() }
