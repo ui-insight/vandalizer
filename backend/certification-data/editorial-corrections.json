@@ -355,6 +355,32 @@
         "69fcec7f6a48e416d180607f6ff276617a7734883ebc68a54d48fac89a604cc2",
         "d81bc8b0ef16d23b8c070668a744239c445b24105b0687079ac5f0bb4d011d1a"
       ]
+    },
+    {
+      "id": "validation-retesting-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "validation_qa.why-validation-matters",
+        "validation_qa.building-effective-validation-plans",
+        "validation_qa.validation-as-a-safety-net",
+        "validation_qa.glossary-review"
+      ],
+      "title": "Current guidance on validation evidence and retesting",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "A nonempty field, valid format or repeated value does not establish source accuracy. Check the relevant source and the intended meaning of the field. Expected values and model-evaluator explanations need review; unavailable or skipped checks are not demonstrated passes.",
+        "A validation plan describes checks; saving it does not automatically validate every later execution. Source identity, source suitability and execution configuration affect what the result establishes. Validation can expose these failures without acting as an access-control or authorization boundary.",
+        "Use representative ordinary, difficult, ambiguous and missing-value cases with source-checked expectations. Keep some cases separate from prompt tuning. More checks or a high score do not establish complete coverage, and an unresolved value must not be invented merely to fill a field.",
+        "Recheck after changes to fields, sources, prompts, structure, strategy or model configuration. Preserve the original failure, saved change and new execution. Retest the failure and representative regression cases, and explain changes to the test set. Removing difficult cases is not evidence of a better workflow.",
+        "Quality history records measured conditions; its existence or an absence of alerts does not prove every current output was checked. Inspect actual run identities, available checks and relevant source evidence before relying on a result. This guidance adds no new grading requirements to your original course."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "e28dcdd3d26619479cb8e280669670188aad70fe9a2753c3fe632311ec1ce0cd",
+        "db1cbb5e114b612c552285079add5253e263394f039873b63f40d62a335d5ce9",
+        "55e5e1b39aaeee39168e816821149db6e1afc3a3a0ead2bd910eae60d87000e1",
+        "653cd0a5cd8233fdffecaec7181e9f2eecf8e97a34205734b7da4442722d246c"
+      ]
     }
   ],
   "module_notices": [

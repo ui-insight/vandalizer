@@ -976,67 +976,57 @@
     "lessons": [
       {
         "id": "validation_qa.why-validation-matters",
-        "revision": 1,
+        "revision": 2,
         "title": "Why validation matters",
         "objective": "After this lesson, you'll understand why validation is essential before deploying a workflow for production use.",
-        "content": "An extraction workflow that works on one document might fail on the next. Different document layouts, writing styles, or terminology can cause the LLM to miss fields or return incorrect values.\n\nValidation lets you define what \"correct\" looks like for your workflow, test it against sample documents, and track reliability over time.",
+        "content": "A workflow can return well-formed output and still extract the wrong amount, omit a qualification or invent a deadline. Validation needs an explicit account of what correct output means for the intended use.\n\nCheck completeness, structure and meaning separately. A nonempty budget field establishes presence. A numeric format establishes shape. Neither establishes that the value is the full project budget rather than one year's request. That requires comparison with the relevant source and the field's definition.\n\nConsistency measures agreement across repeated results. A workflow that returns the same wrong value every time can be highly consistent. Extraction accuracy compares results with saved expected values; those expectations must first be checked against the source. An incorrect expected value can reward an incorrect extraction.\n\nWorkflow checks can use a model evaluator to judge saved output and supplied source context. Treat its explanations as reviewable judgments, not independent proof. Inspect decisive source passages, intermediate results and any unavailable or skipped checks. A technical inability to evaluate is not a demonstrated pass or a learner failure.\n\n**Practice:** A result is valid JSON and repeats the same budget three times. Identify what remains unknown before using that budget.",
         "variant": "concept",
         "knowledge_check": {
-          "question": "What is the primary purpose of a validation plan?",
+          "question": "A budget value is identical in three runs. What has that established?",
           "options": [
             {
-              "text": "To prevent users from accidentally running a workflow on the wrong document type",
+              "text": "The budget is correct.",
               "correct": false,
-              "explanation": "That's a permissions or UI concern. Validation plans are about output quality, not access control."
+              "explanation": "Agreement does not establish which source amount the field should contain."
             },
             {
-              "text": "To define what correct output looks like, test it against samples, and track reliability over time",
+              "text": "The observed runs agree; accuracy still needs a checked expected value and source.",
               "correct": true,
-              "explanation": "Correct! A validation plan defines correctness, tests against known documents, and builds a quality history you can track over time."
+              "explanation": "Repeatability and source accuracy answer different questions."
             },
             {
-              "text": "To automatically fix extraction errors before they reach the user",
+              "text": "The current result needs no further review.",
               "correct": false,
-              "explanation": "Validation detects problems — it doesn't fix them. You use the results to improve your extraction configuration."
-            },
-            {
-              "text": "To comply with institutional data governance requirements",
-              "correct": false,
-              "explanation": "Validation is about workflow quality, not regulatory compliance. It helps you trust your workflow's output."
+              "explanation": "Structure and repetition do not prove meaning or suitability."
             }
           ]
         }
       },
       {
         "id": "validation_qa.building-effective-validation-plans",
-        "revision": 1,
+        "revision": 2,
         "title": "Building effective validation plans",
         "objective": "After this lesson, you'll be able to design a validation plan that catches the most important failure modes.",
-        "content": "Good validation plans check multiple dimensions of quality:\n\n• **Completeness** — Did the workflow extract all expected fields?\n• **Accuracy** — Do extracted values match the known-correct values?\n• **Format** — Are dates in the right format? Are numbers parsed correctly?\n• **Consistency** — When run multiple times, does the workflow produce the same results?\n\nStart with 2-3 high-value checks and expand as you gain confidence.",
+        "content": "Begin with the decisions the workflow supports and the errors that would matter. Turn those risks into specific checks with a stated input, expected behavior and evidence. \"The report looks good\" is too vague; \"the total uses the full project period and preserves the currency\" can expose a concrete error.\n\nUse representative inputs that differ in the ways the workflow will encounter: layout, terminology, length, missing fields and ambiguous values. Include a difficult case, an absent value and an ordinary case. Do not invent a value to fill a missing-field test. State the allowed missing or unresolved behavior explicitly.\n\nFor known-answer cases, verify expected values in the source before saving them. An automatically proposed answer is a draft. Include the relevant passage and interpretation, such as the difference between an annual amount and a total award. A required field can legitimately be unresolved when the source does not establish it; the workflow should expose that limitation.\n\nKeep some representative cases separate from the examples used to tune prompts. After a repair, test those held-out cases as well as the original failure. Repeatedly tuning against the same easy examples can improve their score without improving general use.\n\nA larger test count can improve coverage only if the cases exercise meaningful differences. The scoring system's sample-size adjustment is not a certificate that three cases cover your domain. Plan execution cost and repetitions around the uncertainty you need to investigate.\n\n**Practice:** Design one normal case, one ambiguous-amount case and one missing-value case. Explain the different failure each would detect.",
         "variant": "concept",
         "diagram": "validation-plan-example",
         "knowledge_check": {
-          "question": "A good validation plan checks two foundational dimensions of quality. What are they?",
+          "question": "Which addition most improves a budget extractor test set?",
           "options": [
             {
-              "text": "Speed (tokens per second) and cost (dollars per run)",
+              "text": "Three copies of the same easy document.",
               "correct": false,
-              "explanation": "Those are performance metrics, not quality dimensions. A fast, cheap workflow that extracts the wrong data is useless."
+              "explanation": "Duplicate cases add little evidence about different failure modes."
             },
             {
-              "text": "Completeness (all fields extracted) and accuracy (values are correct)",
+              "text": "Different layouts and an ambiguous annual-versus-total amount, with source-checked expectations.",
               "correct": true,
-              "explanation": "Correct! Completeness checks that nothing was missed. Accuracy checks that what was extracted is actually right."
+              "explanation": "Representative differences test the interpretation that matters."
             },
             {
-              "text": "Model version and prompt version",
+              "text": "The model's latest outputs saved as expected values without review.",
               "correct": false,
-              "explanation": "Those are configuration metadata. Quality checks what the workflow actually produces, not what configuration it uses."
-            },
-            {
-              "text": "Document count and processing time",
-              "correct": false,
-              "explanation": "Those are throughput metrics. Validation is about output quality, not volume or speed."
+              "explanation": "That can turn the same mistake into the supposed correct answer."
             }
           ]
         }
@@ -1051,10 +1041,10 @@
       },
       {
         "id": "validation_qa.validation-as-a-safety-net",
-        "revision": 1,
+        "revision": 2,
         "title": "Validation as a safety net",
         "objective": "After this lesson, you'll understand when to re-run validation and why it should be set up before a workflow goes into production.",
-        "content": "The best time to set up validation is before you need it. When you change your Extraction fields, update a prompt, or when the underlying LLM model is updated, your workflow's behavior might change. If you have a validation plan, you can re-run it immediately to check for regressions.",
+        "content": "A saved validation plan describes checks; it does not by itself enforce them on every future execution. A green historical score remains evidence about the measured inputs, saved results and conditions of that validation.\n\nRecheck after changing field meaning, source selection, prompts, workflow structure, extraction strategy or model configuration. A new document family may also require new cases even when the workflow is unchanged. Keep the old failure and run identity so a later improvement can be traced to an actual change.\n\nUse the first failing case to diagnose the problem. Inspect where the wrong value entered the chain and whether the test itself is justified. Do not weaken a correct check merely to restore a green score. If the expected answer was wrong, correct it with source evidence and record why the evaluation changed.\n\nRerun both the original failing case and other representative cases after the repair. Check that downstream reports retain uncertainty and that previously correct fields remain correct. Separate changes to the workflow from changes to the test set when explaining a score difference.\n\nQuality history, age indicators and regression alerts can direct attention to measured changes. Their presence depends on actual validation records and configured monitoring. An absence of alerts does not establish that every current result has been checked. Review the current run before relying on it.\n\n**Practice:** A score rises after two difficult cases are removed. Explain why that alone is not evidence of a better workflow.",
         "variant": "insight"
       },
       {
@@ -1083,10 +1073,10 @@
       },
       {
         "id": "validation_qa.glossary-review",
-        "revision": 1,
+        "revision": 2,
         "title": "Glossary & Review",
         "objective": "",
-        "content": "Validation Plan — The definition of \"correct\" for your workflow. You've now built one: a list of checks that specify what good output looks like. This is what separates a workflow you trust from one you hope works.\n\nValidation Input — The sample documents or text you test your workflow against. Good validation inputs are representative — they should reflect the range of documents the workflow will encounter in production.\n\nValidation Run — An execution of your workflow against validation inputs, automatically graded against your plan. Each run adds a data point to your quality history.\n\nQuality History — A log of validation run scores over time. This is how you detect regressions: if a score drops after you change a field name or update a model, quality history shows you exactly when.\n\nImprovement Suggestions — LLM-generated recommendations for improving extraction accuracy based on which checks failed and why. A starting point for iteration, not a final answer.",
+        "content": "**Validation plan:** saved checks that define expected behavior. A plan must match the current workflow and be applied to actual results; saving it does not validate every future run.\n\n**Expected value:** a source-checked answer for a particular case and field. Model-proposed values require review. A skipped or unconfirmed field is not verified ground truth.\n\n**Accuracy and consistency:** agreement with expectations and agreement across repeated outputs. Consistently wrong output remains wrong. Correct shape and nonempty fields are also distinct from correct meaning.\n\n**Representative coverage:** cases that exercise the relevant range of inputs and failures. A fixed number of cases or a high score cannot establish that all important cases are covered. Held-out cases help check whether a repair generalizes beyond the examples used to tune it.\n\n**Validation result and history:** recorded evaluations under particular conditions. Inspect which executions, models, inputs and plan were assessed. A stale plan, unavailable check or old execution limits what the result can establish.\n\n**Repair and regression check:** a documented change followed by new execution and evaluation of both the original failure and other representative cases. Preserve the earlier evidence and explain any test-set changes.\n\n**Practice:** Trace a meaningful failure to its source evidence, describe a repair and identify the retest that would establish whether it worked. Keep earlier results and explain one remaining coverage limitation. This reading exercise does not change the requirements displayed for your saved course.",
         "variant": "key-terms"
       }
     ]

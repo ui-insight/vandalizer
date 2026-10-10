@@ -21,7 +21,7 @@
   "replacements": [
     {
       "id": "validation_qa.why-validation-matters",
-      "revision": 2,
+      "revision": 3,
       "title": "Test what the result needs to prove",
       "variant": "concept",
       "objective": "Separate correct structure, repeatability and source-supported meaning.",
@@ -49,7 +49,7 @@
     },
     {
       "id": "validation_qa.building-effective-validation-plans",
-      "revision": 2,
+      "revision": 3,
       "title": "Build checks that expose meaningful failures",
       "variant": "concept",
       "objective": "Choose representative cases and source-checked expectations rather than chasing a test count.",
@@ -105,7 +105,7 @@
     },
     {
       "id": "validation_qa.validation-as-a-safety-net",
-      "revision": 2,
+      "revision": 3,
       "title": "Recheck after changes and preserve the comparison",
       "variant": "concept",
       "objective": "Use validation as an active regression practice with clear evidence limits.",
@@ -217,7 +217,7 @@
     },
     {
       "id": "validation_qa.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Review evidence, coverage and retesting",
       "variant": "key-terms",
       "objective": "Connect validation terminology to a defensible decision about a real run.",
