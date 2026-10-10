@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "09256ac69a2abf31095d79c097e1c28f03d1db3b",
+  "working_head_at_inventory": "ab18ba8217731c312a1b37ae6e62b5ddc4a7e668",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 64848,
-    "sha256": "225d4f4a190bdbd950048b4f24df38dbc4badebf881e6db242b865a969a44521"
+    "bytes": 65228,
+    "sha256": "feaf074e019cb42060d59e3e1de9b890d54c971a0bd743a693f1858a3b7f0de4"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 789387,
-    "sha256": "45103016da251b26c3033350cbe0534ff2dd14693e54450618042d384cd0148a"
+    "bytes": 791643,
+    "sha256": "db21b981e810ee0c3cad2cddb12ef5c0b80dafc504b13415ca8ff292feac615d"
   },
   "counts": {
-    "accepted": 73,
-    "open": 89,
+    "accepted": 74,
+    "open": 88,
     "items": 162,
-    "checkpoints": 327,
-    "browser_runs": 550,
-    "recorded_captures_including_diagnostics_and_repeats": 6999,
+    "checkpoints": 328,
+    "browser_runs": 552,
+    "recorded_captures_including_diagnostics_and_repeats": 7004,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -520,8 +520,8 @@
     },
     {
       "id": "C8-CONTENT-08",
-      "accepted": false,
-      "requirement": "P2 · Fix: Align copy with current controls and counts.** Reconcile lesson counts, node names, star descriptions, available actions and realistic time estimates. Remove unexplained internal tool names and unsupported time-saving claims from learner copy."
+      "accepted": true,
+      "requirement": "P2 · Fix: Align copy with current controls and counts.** Reconcile lesson counts, node names, star descriptions, available actions and realistic time estimates. Remove unexplained internal tool names and unsupported time-saving claims from learner copy. Accepted at checkpoint 328: source-reviewed teaching, lab/module/exercise guidance, dated preserved-course corrections and formative feedback now match current supported controls and disclose original rubric limits. Tier completion no longer claims an unearned course credential. This accepts copy accuracy; legacy rubric equivalence and live V5 assessment remain separate gates."
     },
     {
       "id": "C8-CONTENT-09",
@@ -3362,6 +3362,13 @@
       "evidence_directories": [
         "certification-practice-copy-2026-10-09"
       ]
+    },
+    {
+      "number": 328,
+      "title": "Bound tier celebrations to confirmed course status and accept copy alignment on October 9 2026",
+      "evidence_directories": [
+        "certification-milestone-copy-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4462,6 +4469,12 @@
       "available": true,
       "bytes": 456,
       "sha256": "a03eb4b3013551137d2f3822918050cabe20a8bb0ce53e5a36dcacb5c210fd14"
+    },
+    {
+      "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 449,
+      "sha256": "7173e8f12be0231f7d98704de13e0d3b6b6bf383c1cec33b5a39f7abab23f455"
     },
     {
       "path": "artifacts/visual-review/certification-mobile-width-2026-10-07/checkpoint.json",
@@ -161498,6 +161511,258 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 3739,
+        "sha256": "bcaced92721dff933bfa33b2cf49540b3e700a2c00513a2be58c345fab5a637e"
+      },
+      "checkpoints": [
+        328
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:03:29.733Z",
+      "reported_commit": "ab18ba8217731c312a1b37ae6e62b5ddc4a7e668",
+      "reported_source_fingerprint": "a42604301f185c21d84e85a8e7cf1b1262c16537383a8f46d6ab4920f12c634e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual frontend with preserved certification-claim tier copy, all tier modules complete but one course module outstanding. Synthetic completion only; no actual credit or credential.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "completedModules": 3,
+          "totalModules": 4,
+          "tierCompleted": true,
+          "certified": false,
+          "preservedTierMessageSuppressed": "You've earned your certification! You can design, validate, scale, and govern AI workflows.",
+          "completionWrites": 1,
+          "modalTabContainment": true,
+          "realCreditOrCredential": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "module-progress-before-completion",
+          "note": "",
+          "viewport": {
+            "width": 720,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 720,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/module-progress-before-completion.png",
+              "available": true,
+              "bytes": 123449
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/module-progress-before-completion.txt",
+              "available": true,
+              "bytes": 5263
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/module-progress-before-completion.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "completion-focus-native200-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 500
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/completion-focus-native200-780.png",
+              "available": true,
+              "bytes": 63769
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/completion-focus-native200-780.txt",
+              "available": true,
+              "bytes": 2882
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-native/completion-focus-native200-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/manifest.json",
+        "available": true,
+        "bytes": 4170,
+        "sha256": "226f09649df8a93b9d7e8a413c3a83e7e75a7ba48853d7cc1a81294b7ccc655b"
+      },
+      "checkpoints": [
+        328
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:03:30.401Z",
+      "reported_commit": "ab18ba8217731c312a1b37ae6e62b5ddc4a7e668",
+      "reported_source_fingerprint": "a42604301f185c21d84e85a8e7cf1b1262c16537383a8f46d6ab4920f12c634e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Actual frontend with preserved certification-claim tier copy, all tier modules complete but one course module outstanding. Synthetic completion only; no actual credit or credential.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "completedModules": 3,
+          "totalModules": 4,
+          "tierCompleted": true,
+          "certified": false,
+          "preservedTierMessageSuppressed": "You've earned your certification! You can design, validate, scale, and govern AI workflows.",
+          "completionWrites": 1,
+          "modalTabContainment": true,
+          "realCreditOrCredential": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "module-progress-before-completion",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/module-progress-before-completion.png",
+              "available": true,
+              "bytes": 107304
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/module-progress-before-completion.txt",
+              "available": true,
+              "bytes": 5329
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/module-progress-before-completion.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "completion-focus-short-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 500
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-320.png",
+              "available": true,
+              "bytes": 26947
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-320.txt",
+              "available": true,
+              "bytes": 2882
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "completion-focus-short-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 500
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-1440.png",
+              "available": true,
+              "bytes": 50828
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-1440.txt",
+              "available": true,
+              "bytes": 2948
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/browser-normal/completion-focus-short-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-mobile-width-2026-10-07/large-text/manifest.json",
         "available": true,
         "bytes": 25535,
@@ -269165,11 +269430,11 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1449,
+    "1440x1000": 1450,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
-    "1440x500": 10,
+    "1440x500": 11,
     "1440x650": 36,
     "1440x700": 28,
     "1440x800": 12,
@@ -269180,7 +269445,7 @@
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
-    "320x500": 274,
+    "320x500": 275,
     "320x550": 24,
     "320x600": 12,
     "320x650": 55,
@@ -269193,7 +269458,7 @@
     "390x1000": 21,
     "390x250": 37,
     "390x480": 3,
-    "390x500": 262,
+    "390x500": 263,
     "390x550": 24,
     "390x600": 288,
     "390x650": 52,
@@ -269203,7 +269468,7 @@
     "390x850": 276,
     "390x900": 192,
     "720x250": 2,
-    "720x500": 188,
+    "720x500": 189,
     "720x550": 24,
     "720x600": 12,
     "768x1000": 8,

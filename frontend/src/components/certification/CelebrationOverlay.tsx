@@ -98,7 +98,7 @@ export function CelebrationOverlay({
               Tier Complete
             </p>
             <h2 className="text-xl font-bold text-gray-900 mb-3">{tierCelebration.tierName} Complete!</h2>
-            <p className="text-sm text-gray-600 mb-2">{tierCelebration.message}</p>
+            <p className="text-sm text-gray-600 mb-2">You have completed the modules in this tier. Continue with the remaining course requirements to earn your certification.</p>
           </>
         ) : (
           <>

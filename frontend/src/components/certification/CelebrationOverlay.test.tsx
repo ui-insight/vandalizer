@@ -22,6 +22,17 @@ it('does not invent a module count for a historical completion without course id
   expect(screen.queryByText(/all 11 modules/)).not.toBeInTheDocument()
 })
 
+it('does not turn preserved tier celebration copy into a credential before course completion', () => {
+  render(<CelebrationOverlay result={{ ...result, certified: false }} onDismiss={() => {}}
+    tierCelebration={{ tierName: 'Architect', message: "You've earned your certification!" }} />)
+  expect(screen.getByRole('dialog', { name: 'Module complete' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Architect Complete!' })).toBeInTheDocument()
+  expect(screen.getByText(/Continue with the remaining course requirements/)).toBeInTheDocument()
+  expect(screen.queryByText("You've earned your certification!")).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'View Certificate' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+})
+
 it('shows outcome completion without legacy enrichment stars and preserves the pinned level name', () => {
   render(<CelebrationOverlay result={{ ...result, level: 'validated', level_up: true, validation: { ...result.validation, assessment_kind: 'selected_outcome_validation' } }} onDismiss={() => {}} />)
   expect(screen.queryByRole('img', { name: /stars/ })).toBeNull()
