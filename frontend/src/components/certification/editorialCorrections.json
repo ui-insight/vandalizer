@@ -64,6 +64,39 @@
         "9f10f2efde339ce232a6a8d04b7816d55ff81d6f8e7c5315cb51378611c64adf",
         "f5f204aadefdfc777436945c715877ddd082623fea39ec98f5da459481e0f9ac"
       ]
+    },
+    {
+      "id": "course-controls-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "governance.building-a-culture-of-reuse",
+        "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+        "workflow_design.designing-for-your-reviewer",
+        "workflow_design.chat-driven-workflow-design-v5-0",
+        "workflow_design.glossary-review",
+        "output_delivery.from-analysis-to-deliverables",
+        "output_delivery.glossary-review",
+        "governance.glossary-review"
+      ],
+      "title": "Correction to historical course and control guidance",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Completing Governance alone or reading its closing lesson does not issue the credential. Every required module must satisfy its preserved course rules; saved progress and the issued certificate establish actual completion. A credential does not guarantee future outputs or grant institutional approval authority.",
+        "The course is self-paced. Earlier fixed module durations, rapid-review targets and promised time savings were not established by measured learner performance. Allow time for source checks, repairs and assessed work.",
+        "Inspect the actual saved workflow, selected inputs and step or task input settings. A chat proposal does not prove the right configuration was saved. Place a required approval before its dependent action, and inspect reviewer and timeout behavior; a written instruction alone is not a runtime pause.",
+        "Use the supported Include in deliverables download path for multiple outputs and inspect the resulting ZIP members. No future Package Builder node is promised. Inspect export contents and portability warnings, resolve permitted local dependencies after import and test the imported revision. Review status and measured validation are separate evidence."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "2ecf76aa1351d15021dadb3e0818d5239fd549676182c28b98298e6b54d9eb15",
+        "2628bfae8df85f3e854f8ecb26b13bb04c38745dc800e32da1923808b15e63b8",
+        "9ebd1202f5612f7d4fd4d93fdf10a0e9f363e218d3e82aff3ac9e75b4c86957a",
+        "f840a2c00ed60af2bdb88d68da9335493d0bec43afd32606574232a7a9a5e05d",
+        "3eeb52efcc402e1b3842e293df4567d3a4c79e175ed002d854fe9e1fcfab9a68",
+        "b2ea55ab45cf76677e1eaeba6bbf098fa77adba4473e75e72bb5e7ed8e5185f0",
+        "896ef31ef324090392b74b342f4bf4a6fb9d6ef40304988892a158985dcf79cb",
+        "cbc344ef1b93d59a127a0ab044983b44894eb26dd2440eb967a7cbdbce9ceb5d"
+      ]
     }
   ]
 }

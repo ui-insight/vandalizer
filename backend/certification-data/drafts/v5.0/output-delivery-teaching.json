@@ -21,7 +21,7 @@
   "replacements": [
     {
       "id": "output_delivery.from-analysis-to-deliverables",
-      "revision": 2,
+      "revision": 3,
       "title": "Inspect the actual deliverable",
       "variant": "concept",
       "objective": "Choose a usable format and verify the generated file rather than trusting its link or filename.",
@@ -133,7 +133,7 @@
     },
     {
       "id": "output_delivery.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Review artifact and delivery evidence",
       "variant": "key-terms",
       "objective": "Distinguish rendering, filling, packaging, release and confirmed handoff.",

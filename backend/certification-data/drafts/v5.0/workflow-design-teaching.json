@@ -77,7 +77,7 @@
     },
     {
       "id": "workflow_design.designing-for-your-reviewer",
-      "revision": 2,
+      "revision": 3,
       "title": "Design the output for the reviewer’s decision",
       "variant": "insight",
       "objective": "Separate source facts, interpretation, uncertainty and review status.",
@@ -217,7 +217,7 @@
     },
     {
       "id": "workflow_design.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Review the design and its evidence",
       "variant": "key-terms",
       "objective": "Explain the data path, implemented review boundary and output requirements.",

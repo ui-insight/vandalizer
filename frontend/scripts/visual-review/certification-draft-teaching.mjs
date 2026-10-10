@@ -70,6 +70,11 @@ try {
       if (selectedIds.size && !selectedIds.has(lesson.id)) continue
       await page.getByRole('button', { name: new RegExp(`^Lesson ${index + 1}:`) }).click()
       await page.getByText('Place saved across devices.', { exact: true }).waitFor()
+      if (workingTeaching) {
+        const closedGlossary = page.locator('[data-cert-panel] details:not([open]) > summary')
+        const closedCount = await closedGlossary.count()
+        for (let index = 0; index < closedCount; index++) await closedGlossary.first().click()
+      }
       const heading = page.getByRole('heading', { name: lesson.title, exact: true })
       await heading.evaluate(element => element.scrollIntoView({ block: 'start' }))
       const navigation = page.getByRole('navigation', { name: 'Lessons in this module', exact: true })

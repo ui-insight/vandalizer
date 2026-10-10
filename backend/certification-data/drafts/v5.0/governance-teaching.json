@@ -133,7 +133,7 @@
     },
     {
       "id": "governance.building-a-culture-of-reuse",
-      "revision": 2,
+      "revision": 3,
       "title": "Preserve earned history when the artifact changes",
       "variant": "concept",
       "objective": "Distinguish earlier achievement from a later revision and an optional course upgrade.",
@@ -189,7 +189,7 @@
     },
     {
       "id": "governance.glossary-review",
-      "revision": 3,
+      "revision": 4,
       "title": "Review accountable reuse and earned evidence",
       "variant": "key-terms",
       "objective": "Explain the boundaries among access, measured quality, learner decisions and completion.",
