@@ -41,8 +41,14 @@ def _load_exercises() -> dict:
 
 
 def get_exercise(module_id: str) -> dict | None:
-    exercises = _load_exercises()
-    return exercises.get(module_id)
+    exercise = _load_exercises().get(module_id)
+    if exercise is None:
+        return None
+    from .certification_versions.editorial_corrections import module_notices_for
+    operation = current_operation()
+    notices = module_notices_for(operation.package.manifest_sha256 if operation else None,
+                                 module_id, exercise.get('overview'))
+    return {**exercise, 'editorial_notices': notices} if notices else exercise
 
 
 # Lesson content + self-assessment questions, exported from the panel's

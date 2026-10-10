@@ -15,6 +15,7 @@ import { renderMarkdown } from './markdown'
 import './certification-cards.css'
 import { ChatCertificateAccess } from './ChatCertificateAccess'
 import { ChatLessonReader } from './ChatLessonReader'
+import { EditorialCorrection } from '../certification/EditorialCorrection'
 import { ChatModuleLessons } from './ChatModuleLessons'
 import { hasOutcomeAssessment } from '../../lib/certificationAssessment'
 import { isCourseProgressionPolicy } from '../../lib/certificationPayload'
@@ -245,6 +246,8 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
         </span>
       </div>
 
+      <EditorialCorrection moduleId={String(content.module_id ?? '')}
+        manifestSha256={typeof content.manifest_sha256 === 'string' ? content.manifest_sha256 : undefined} content={overview} />
       {overview && (
         <div className="chat-markdown" style={{ lineHeight: 1.55, marginBottom: instructions.length ? 8 : 0 }} dangerouslySetInnerHTML={{ __html: renderMarkdown(overview) }} />
       )}

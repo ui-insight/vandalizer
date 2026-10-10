@@ -138,3 +138,31 @@ def test_invalid_module_corrections_are_rejected(change):
         notice['module_ids'] = ['']
     with pytest.raises(ValidationError):
         corrections.EditorialNotices.model_validate(data)
+
+
+@pytest.mark.asyncio
+async def test_historical_star_notice_reaches_exercise_and_tutor_without_rewriting_criteria(monkeypatch):
+    from app.services import certification_service
+    from app.services.chat_tools import get_certification_module
+    package = CourseCatalog().load(VERSION, preview=True)
+    original = package.json('exercises.json')['multi_step']
+    module = next(row for row in public_modules(package) if row['id'] == 'multi_step')
+    token = _operation.set(CourseOperation('user1', package, SimpleNamespace(enrollment_id='a' * 32), False))
+    monkeypatch.setattr(certification_service, 'get_progress_dict', AsyncMock(return_value={'modules': {}}))
+    try:
+        exercise = certification_service.get_exercise('multi_step')
+        chat = await get_certification_module(SimpleNamespace(deps=SimpleNamespace(user_id='user1')), 'multi_step')
+    finally:
+        _operation.reset(token)
+    assert chat.get('error') is None
+    assert chat['editorial_notices'] == exercise['editorial_notices'] == module['editorialNotices']
+    assert chat['star_criteria'] == exercise['star_criteria'] == original['star_criteria']
+    assert {key: value for key, value in exercise.items() if key != 'editorial_notices'} == original
+    for text in [module['description'], original['overview']]:
+        matched = corrections.module_notices_for(None, 'multi_step', text)
+        assert matched[0]['identity_basis'] == 'preserved_module_description'
+        assert corrections.module_notices_for('f' * 64, 'multi_step', text) == []
+    assert package.json('exercises.json')['multi_step'] == original
+    if path := os.environ.get('CERTIFICATION_MODULE_EXPORT'):
+        Path(path).write_text(json.dumps({'course': {**package.summary(), 'modules': public_modules(package),
+            **package.json('course-structure.json')}, 'module': chat, 'exercise': exercise}, indent=2) + '\n')

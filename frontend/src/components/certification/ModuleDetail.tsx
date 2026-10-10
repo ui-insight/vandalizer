@@ -212,6 +212,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
 
       {/* Tab content */}
       <div className={module.validationAssessment || module.batchAssessment || module.governanceAssessment || module.connectedWorkflowAssessment ? "p-[8px] sm:p-6" : "p-4 sm:p-6"}>
+        {tab === 'challenge' && <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />}
         {tab === 'learn' ? (
           <div className="mx-auto max-w-3xl space-y-4">
             <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />

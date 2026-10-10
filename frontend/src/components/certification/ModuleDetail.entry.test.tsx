@@ -55,3 +55,14 @@ it('places the historical credential correction before the preserved module desc
   expect(notice.compareDocumentPosition(original) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(props.onComplete).not.toHaveBeenCalled()
 })
+
+it('keeps the historical star discrepancy visible after opening the challenge', () => {
+  render(<ModuleDetail {...props} exercise={{ ...exercise, documents: [] }} module={{ ...legacy, id: 'multi_step' }} courseIdentity={{
+    enrollment_id: 'selected', course_version: 'legacy-2026-10-02.1',
+    manifest_sha256: '54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195',
+  }} />)
+  expect(screen.getByRole('complementary', { name: 'Known limitation in historical star guidance' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Challenge' }))
+  expect(screen.getByRole('complementary', { name: 'Known limitation in historical star guidance' })).toBeInTheDocument()
+  expect(props.onComplete).not.toHaveBeenCalled()
+})

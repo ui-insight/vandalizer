@@ -49,7 +49,7 @@
     },
     {
       "id": "multi_step.the-prompt-node-reasoning-over-data",
-      "revision": 2,
+      "revision": 3,
       "title": "Write bounded instructions for interpretation",
       "variant": "concept",
       "objective": "Separate supported facts, inferences and unresolved questions in a Prompt step.",
@@ -105,7 +105,7 @@
     },
     {
       "id": "multi_step.design-principle-separate-reading-from-reasoning",
-      "revision": 2,
+      "revision": 3,
       "title": "Separate concerns when it improves review",
       "variant": "insight",
       "objective": "Choose reviewable boundaries without assuming more steps always improve quality.",
@@ -133,7 +133,7 @@
     },
     {
       "id": "multi_step.worked-example-watching-data-flow-through-three-steps",
-      "revision": 2,
+      "revision": 3,
       "title": "Find an unsupported inference in the chain",
       "variant": "walkthrough",
       "objective": "Trace a deadline claim back to its actual inputs and repair the missing evidence.",

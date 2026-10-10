@@ -5484,6 +5484,8 @@ async def get_certification_module(
     assessment decisions for the learner. Legacy requirements remain pinned.
     The instructions field contains learner-visible steps. Follow separate
     agent_guidance for assistant-specific coaching and evidence boundaries.
+    Apply editorial_notices when explaining historical limitations; a notice
+    does not replace the saved grading rule or grant additional credit.
 
     Args:
         context: The call context.
@@ -5537,6 +5539,7 @@ async def get_certification_module(
         "lesson_titles": [les["title"] for les in lessons.get("lessons", [])],
         "expected_fields": exercise.get("expected_fields", []),
         "star_criteria": exercise.get("star_criteria", {}),
+        "editorial_notices": exercise.get("editorial_notices", []),
         "sample_documents": exercise.get("documents", []),
         "provisioned_docs": data.get("provisioned_docs", []),
         # Old reflection keys must never redirect a competency enrollment

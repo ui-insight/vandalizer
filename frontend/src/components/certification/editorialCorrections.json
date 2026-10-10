@@ -125,6 +125,33 @@
         "770429042ecd03cda5af95c8dd2be9861be7fcc397dc36e32dae75224bb79e08",
         "a8a232a35c2e337d99b2c0956b2039cda208dc538d81b6c87b4c75061a53d94c"
       ]
+    },
+    {
+      "id": "connected-evidence-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "multi_step.how-steps-chain-together",
+        "multi_step.the-prompt-node-reasoning-over-data",
+        "multi_step.design-principle-separate-reading-from-reasoning",
+        "multi_step.worked-example-watching-data-flow-through-three-steps",
+        "multi_step.glossary-review"
+      ],
+      "title": "Current guidance on connected inputs and supported conclusions",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "A step receives its configured sources, which may include the preceding output, workflow documents or a selected document. Tasks normally use the step input but can have an explicit override. Inspect the saved settings and actual intermediate results rather than assuming every step sees only its predecessor or all workspace documents.",
+        "Extraction is useful when fixed fields preserve the context needed downstream; it is not required before every Prompt. More steps do not guarantee better answers. A written reviewer checkpoint does not itself pause execution; configure and test the actual approval boundary when an action must wait.",
+        "The original worked chain is illustrative, not evidence of your assigned run. Its example amount and precise reporting date are not answer keys for the assigned subaward. Check the assigned source and required budget scope. Reporting frequency alone may not establish the first due date; comparison with an institutional standard requires the actual reference rule.",
+        "Prompt, Formatter and post-process instructions can introduce unsupported claims or remove uncertainty. Check each saved result against its inputs and source. Preserve failed history and successful outputs before recovery; a canceled or lost chat reply does not undo executed work."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "90cff127d06d4caf19d5f4d25e5cb3a1e63730bcb84ea03e1eeef807ed50e2e6",
+        "e5385a62ad52c002bf5c5643df1b8a5c97c147f4df6d10fb16b73e16621117dc",
+        "a2575e53d4632566fce5c29a02dfffb59261ceaffb9b4a07d85a354404da9c00",
+        "dd4bac997a3b99eb114d87aaba3207b5bc4e59c468288853d43c6de49cbebd68",
+        "79b03003c3db0037f6733f6fcdb2f3c76cd52b70fd2d90e8c9fe47b1b6d4220a"
+      ]
     }
   ],
   "module_notices": [
@@ -158,6 +185,24 @@
       "assessment_changed": false,
       "unversioned_content_sha256": [
         "7b84e0b9621bad7244a1b643f540d8f5cf9a753ceb478e2a30d4f726ca674cb0"
+      ]
+    },
+    {
+      "id": "module-multi-step-stars-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "multi_step"
+      ],
+      "title": "Known limitation in historical star guidance",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original three-star description says four task types, but this course version’s saved grading rule requires at least five task types and counts them across the learner’s workflows. The description and grading rule therefore disagree. Those historical counts do not establish one correctly executed workflow or a verified output.",
+        "Do not add unrelated tasks or unnecessary steps simply to pursue an optional star. This notice does not introduce a replacement grading rule, award stars or change required module completion. Existing requirements and earned credit remain preserved. A supported equivalent assessment still requires a separately reviewed course amendment or optional new course release."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "903addf1a6dc1456d8a10fa888bda2cc1796c8cb1ce340aeaf3d726828242271",
+        "654187b9a6e795a17190d6d9724b038e025fcc3ada5fd396320e030435570be7"
       ]
     }
   ]

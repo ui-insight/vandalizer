@@ -107,3 +107,13 @@ it('keeps historical diagrams keyboard reachable while disabling practice and co
   expect(state.open).toHaveBeenCalledOnce()
   expect(state.send).not.toHaveBeenCalled()
 })
+
+it('shows the historical star limitation alongside unchanged module criteria', () => {
+  render(<CertModuleCard content={{ ...identity, enrollment_id: 'previous', module_id: 'multi_step',
+    manifest_sha256: '54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195',
+    title: 'Multi-Step Workflows', overview: 'Original overview',
+    star_criteria: { '3': 'Build a 5+ step workflow using 4+ different task types' } }} />)
+  expect(screen.getByRole('complementary', { name: 'Known limitation in historical star guidance' })).toBeInTheDocument()
+  expect(screen.getByText('Build a 5+ step workflow using 4+ different task types')).toBeInTheDocument()
+  expect(state.send).not.toHaveBeenCalled()
+})

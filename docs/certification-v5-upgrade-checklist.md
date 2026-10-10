@@ -2,7 +2,7 @@
 
 Bring **every audited dimension and every module’s Vandalizer 5.0 alignment to at least 8/10**. This checklist turns the [October 2 certification audit](reviews/certification-v5-audit.html) into bounded implementation and acceptance work. The target applies to each area independently; a good desktop score cannot compensate for poor mobile behavior, weak grading or unsafe course updates.
 
-**Implementation started October 2, 2026. 62/162 items complete; 100 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
+**Implementation started October 2, 2026. 72/162 items complete; 90 remain open.** Track checkpoints, evidence, decisions and resume instructions in the [implementation progress log](certification-v5-implementation-progress.md). Existing functionality can satisfy a verification item when current evidence demonstrates it. Checklist progress does not itself publish a course, migrate learners or raise the audit grades. Keep the original audit as the baseline.
 
 ## Completion rules
 

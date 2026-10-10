@@ -670,67 +670,57 @@
     "lessons": [
       {
         "id": "multi_step.how-steps-chain-together",
-        "revision": 1,
+        "revision": 2,
         "title": "How steps chain together",
         "objective": "After this lesson, you'll understand how data flows between steps in a multi-step workflow.",
-        "content": "A multi-step workflow forms a pipeline where each step's output becomes the next step's input. The workflow engine executes steps in order (technically, in topological order of a directed acyclic graph, or DAG).\n\nFor example, a 3-step workflow might work like this:\n• Step 1 (Extraction): Pulls structured fields from the document → outputs JSON.\n• Step 2 (Prompt): Receives that JSON and asks the LLM to analyze it → outputs analysis text.\n• Step 3 (Format): Takes the analysis and formats it into a clean report → outputs final document.\n\nEach step can see the output of the step before it, creating a chain of increasingly refined output.",
+        "content": "A workflow connects operations, but the diagram alone does not establish their input data. Inspect the saved input-source settings and the outputs of an actual run. A later step cannot safely rely on a clause that was omitted from the material it received.\n\nThe available source choices include Step Input (the immediately preceding output), Workflow Documents and Selected Document. The engine can combine configured sources into labeled sections; it does not automatically combine every earlier result or supply all files in your workspace. A simple chain commonly passes the previous output forward, while the document trigger supplies the workflow documents. Verify the saved choices instead of assuming that every workflow uses those defaults.\n\nInput normally belongs to the step. Tasks within that step receive the step’s payload, with advanced task overrides available for cases that need a different source. Keep those distinctions visible when tracing a design. An operation’s name is not proof of its configured input.\n\nFor each step, identify the source, the requested transformation and the output the next step needs. Then inspect those same boundaries in the saved run. Check document identity as well as the content: a plausible result from an unrelated source does not establish correct chaining.\n\n**Practice:** A deadline-analysis step receives only a terms table, but the reporting exception is in a paragraph omitted from that table. Identify the missing input before running the analysis.",
         "variant": "concept",
         "diagram": "workflow-result-example",
         "knowledge_check": {
-          "question": "What does a step receive as input by default?",
+          "question": "A deadline step needs a clause absent from its received table. What should you do?",
           "options": [
             {
-              "text": "The original uploaded document, regardless of step position",
+              "text": "Assume the step can see every document uploaded to the workspace.",
               "correct": false,
-              "explanation": "After step 1, the input source switches to the previous step's output, not the original document."
+              "explanation": "Workspace presence does not establish that the step received the source."
             },
             {
-              "text": "The output of the previous step",
+              "text": "Inspect and correct the configured inputs so the required clause is available, then verify the run.",
               "correct": true,
-              "explanation": "Correct! Each step's default input source is \"step_input\": the output of the step before it in the chain."
+              "explanation": "Data must be supplied through the configured source choices and checked in execution."
             },
             {
-              "text": "All outputs from every previous step, combined into one",
+              "text": "Rename the step to include the clause title.",
               "correct": false,
-              "explanation": "Steps receive their immediate predecessor's output by default, not a combined history of all prior steps."
-            },
-            {
-              "text": "A fresh, empty context with only the system prompt",
-              "correct": false,
-              "explanation": "Steps are connected; each one builds on the previous step's work."
+              "explanation": "A name does not change the data supplied to the step."
             }
           ]
         }
       },
       {
         "id": "multi_step.the-prompt-node-reasoning-over-data",
-        "revision": 1,
+        "revision": 2,
         "title": "The Prompt node: reasoning over data",
         "objective": "After this lesson, you'll know when to use an Extraction task vs. a Prompt task and why the distinction matters.",
-        "content": "The Prompt node is one of the most powerful tools in your workflow. It sends the previous step's output to the LLM along with your custom prompt, and returns the LLM's response.\n\nUse it to:\n• Summarize extracted data\n• Compare and analyze\n• Generate recommendations\n• Transform formats\n\nThe key insight is that extraction gives you structured data, and prompts let you reason over that data.\n\nA Prompt does not need an Extraction in front of it. As the first step it receives the workflow's documents directly; later in a chain, set the step's input source to **Workflow Documents** or **Selected Document** to hand it the whole file. For a short or context-heavy document that is often the better design — this module's lab uses Extraction first because its terms are fixed fields the lab checks one by one, and the lab exists to practise chaining steps.",
+        "content": "A Prompt step interprets the context supplied to it. It can summarize terms, compare a value with a supplied rule or explain a discrepancy. It cannot establish an institutional policy, missing clause or authorization merely because its instruction asks for a confident answer.\n\nDescribe the task, relevant inputs, expected output and limits. For the subaward exercise, request an obligation list with the responsible party, triggering condition, deadline wording and supporting passage. Require uncertain dates or ambiguous responsibility to remain unresolved. If an exact date must be calculated, supply the applicable rule and starting event and check that calculation separately.\n\nA useful instruction distinguishes source statements from interpretations. For example: “Use only the supplied agreement and reference rule. Quote the term supporting each obligation. Label an inference, identify missing information, and do not invent our institution’s standard policy.” A citation must still be checked for both source identity and actual support.\n\nA Prompt can receive document context directly when that suits the task. Extraction is useful when defined fields preserve what the interpretation needs, but it is not mandatory before every prompt. Choose the route that keeps necessary context reviewable, and test a case where omitted context would change the answer.\n\n**Practice:** Replace “tell me if this agreement complies” with a bounded question and the exact evidence needed to answer it.",
         "variant": "concept",
         "knowledge_check": {
-          "question": "What's the key difference between an Extraction task and a Prompt task?",
+          "question": "The agreement states quarterly reporting but supplies no institutional comparison policy. What should the analysis say?",
           "options": [
             {
-              "text": "Extraction is faster; Prompt produces more detailed output",
+              "text": "Quarterly reporting is stricter than the institution’s normal schedule.",
               "correct": false,
-              "explanation": "Speed isn't the defining difference. The distinction is about what kind of operation you're performing."
+              "explanation": "That comparison requires a supplied policy or other authorized reference."
             },
             {
-              "text": "Extraction pulls structured fields from a document; Prompt reasons over data with a custom instruction",
+              "text": "Report the supported obligation and identify that the comparison policy is missing.",
               "correct": true,
-              "explanation": "Correct! Use Extraction to get structured data out of a document. Use Prompt to analyze, summarize, or reason over that data."
+              "explanation": "The step can distinguish a source fact from a comparison it cannot establish."
             },
             {
-              "text": "Extraction only works on PDFs; Prompt works on any text format",
+              "text": "Choose a likely institutional standard from general knowledge.",
               "correct": false,
-              "explanation": "Both task types work on text — the difference is in the operation, not the document format."
-            },
-            {
-              "text": "Extraction supports Thinking Mode; Prompt does not",
-              "correct": false,
-              "explanation": "Both task types can use Thinking Mode. The distinction is about extraction vs. reasoning, not about model settings."
+              "explanation": "A plausible policy is not evidence for this task."
             }
           ]
         }
@@ -745,26 +735,26 @@
       },
       {
         "id": "multi_step.design-principle-separate-reading-from-reasoning",
-        "revision": 1,
+        "revision": 2,
         "title": "Design principle: separate reading from reasoning",
         "objective": "",
-        "content": "*You've seen this principle before in Module 3 — that's intentional. Spaced repetition builds retention. Let's revisit it and see how it applies when chaining multiple steps.*\n\nA common mistake is trying to do everything in one big prompt. Instead, separate reading (getting the facts out of the document) from reasoning (drawing conclusions from those facts). This makes each step simpler, more reliable, and easier to debug. If your final output is wrong, you can check: did the reading step get the right data? Or did the reasoning step misinterpret it? This separation is what makes workflows more reliable than one-shot prompting.\n\nThe principle is *separation of concerns*, not \"Extraction goes first.\" For a long document with fixed fields, the reading step is an Extraction task. For a short or context-heavy document, the reading step can be a Prompt that takes the whole file — the important part is that the step that reads and the step that judges are not the same step.",
+        "content": "Separating source reading, interpretation and presentation can make an error easier to locate. It does not guarantee a better answer than a simpler route. Each extra boundary can lose context, change meaning or add resource use.\n\nUse a separate extraction when fixed fields are useful and preserve the evidence needed downstream. A short or context-dependent task may be better served by a focused Prompt over the relevant document. The important question is whether the chosen design makes its inputs, assumptions and results inspectable. Do not add steps only to match a diagram from another use case.\n\nDecide where a substantive check belongs. An intermediate table might need source verification before it becomes the basis for analysis. A recommendation might need a reviewer decision before an external action. A lesson telling you to inspect the table is not an implemented runtime pause; configure and test an approval boundary when continued execution must wait.\n\nCompare designs using representative cases, including missing context and conflicting terms. Record observed differences in accuracy, unresolved issues and resource use. If a simple route preserves the required evidence and meets the task, extra stages need a specific justification.\n\n**Practice:** Name one boundary that would help diagnose an error in your subaward task and one extra step that would add no useful check.",
         "variant": "insight"
       },
       {
         "id": "multi_step.worked-example-watching-data-flow-through-three-steps",
-        "revision": 1,
+        "revision": 2,
         "title": "Worked example: watching data flow through three steps",
         "objective": "",
-        "content": "The subaward pipeline from this module’s lab, with the actual baton-passes visible.\n\n**Step 1 — Extraction** reads the agreement and outputs labeled fields:\nParties = University of Idaho; Boise State University · Total = $148,500 · Period = 09/01/2025–08/31/2027 · Reports due = quarterly · Deliverables = sensor data + annual analysis.\n\n**Step 2 — Prompt** receives those fields (not the 40-page PDF) with the instruction “Analyze these subaward terms; flag obligations and deadlines.” It outputs a short analysis: quarterly reporting is tighter than our standard semi-annual; first report due 12/31/2025; deliverables assign data ownership ambiguously.\n\n**Step 3 — Formatter** turns that analysis into the compliance summary’s house format: a header, a terms table, a numbered obligations list.\n\nTwo things to notice: each step’s output is exactly the next step’s input — and each step got a *simpler, cleaner* job than “read this agreement and write a summary” in one leap. That’s why chained steps beat one giant prompt.",
+        "content": "Consider an illustrative subaward chain. The extraction returns parties, project period and the phrase “quarterly reports.” The Prompt then states a precise first-report date and says that the schedule is stricter than the institution’s standard. The Formatter presents both claims in a polished obligations table.\n\nTrace those claims backward. A reporting frequency alone may not establish a deadline without the starting event, due-date convention and applicable exception. The comparison with an institutional standard requires that reference policy. If those inputs were not supplied, the Prompt has gone beyond the available evidence. Formatting the claims does not make them better supported.\n\nRepair the relevant boundary. Preserve the exact reporting clause and any exception, supply an authorized reference rule when comparison is part of the task, and constrain the Prompt to distinguish supported terms from unresolved questions. Do not invent a missing rule just to complete the example. Inspect the saved change and rerun the assigned document.\n\nCompare the new intermediate analysis with the source before inspecting the final summary. Then verify that the Formatter retained the uncertainty and supporting context instead of turning a qualified statement into a definitive date or compliance conclusion. Record your decision to accept, revise or leave the result unresolved.\n\n**Practice:** Write the evidence you would need to establish the first reporting deadline, without calculating or inventing it from the frequency alone.",
         "variant": "walkthrough"
       },
       {
         "id": "multi_step.glossary-review",
-        "revision": 1,
+        "revision": 2,
         "title": "Glossary & Review",
         "objective": "",
-        "content": "Input Source — Controls what data a step receives. You've now seen \"step_input\" in action — the default that passes each step's output to the next. Other options let you inject a specific document or all workflow documents at any point in the chain.\n\nPrompt Node — The reasoning engine in your pipeline. It takes the previous step's output and your custom instruction, and returns the LLM's analysis. You used it to transform extracted JSON into a compliance summary.\n\nFormat Node — Transforms structured data into formatted text (markdown, plain text). Use it when you want a human-readable report from raw extracted data without writing a custom prompt.\n\nPost-process Prompt — An optional final LLM call on any node's output. Use it to clean up or lightly reformat results without adding a full extra step to your pipeline.",
+        "content": "**Input source:** The saved context supplied to a step. Step Input means the immediately preceding output; Workflow Documents rereads the source. Inspect task overrides as well as the step configuration.\n\n**Intermediate output:** A saved result at a workflow boundary. It helps locate an omission or unsupported claim. An intact connection does not establish that the interpretation is correct.\n\n**Prompt and Formatter:** Model transformations of supplied context. Check facts, citations and uncertainty after each transformation, including any post-process prompt. A polished result is not independent source verification.\n\n**Connected execution:** One approved revision, assigned source, intermediate results and final output. A diagram or collection of unrelated runs cannot replace that evidence.\n\n**Recovery:** Inspect the saved run and successful outputs before repeating work. A lost chat reply does not establish that execution failed. Stop or cancellation is not rollback. Do not repeat completed external actions to obtain a cleaner run history.",
         "variant": "key-terms"
       }
     ]
