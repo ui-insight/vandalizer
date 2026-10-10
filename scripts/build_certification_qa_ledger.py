@@ -84,13 +84,30 @@ def run_row(root, path, checkpoint_ids=()):
     }
 
 
+def checked_items(checklist_text, progress_text):
+    """Treat checked requirements as authoritative; reject contradictory summaries."""
+    items = [{'id': match[2], 'accepted': match[1] == 'x', 'requirement': match[3].strip()}
+             for match in re.finditer(r'^- \[([ x])\] \*\*(C8-[A-Z0-9]+-\d+) · (.+)$', checklist_text, re.M)]
+    if not items or len({item['id'] for item in items}) != len(items):
+        raise ValueError('Checklist must contain nonempty, unique acceptance item IDs')
+    accepted = sum(item['accepted'] for item in items)
+    expected = (accepted, len(items), len(items) - accepted)
+    for label, text, pattern in [
+        ('Checklist', checklist_text, r'(\d+)/(\d+) items complete; (\d+) remain open\.'),
+        ('Progress', progress_text, r'\*\*Accepted items:\*\* (\d+)/(\d+)\. \*\*Remaining:\*\* (\d+)\.'),
+    ]:
+        summary = re.search(pattern, text)
+        if summary is None or tuple(map(int, summary.groups())) != expected:
+            raise ValueError(f'{label} summary disagrees with checked items: expected {accepted}/{len(items)} accepted and {expected[2]} open')
+    return items
+
+
 def build(root):
     checklist = root / 'docs/certification-v5-upgrade-checklist.md'
     progress = root / 'docs/certification-v5-implementation-progress.md'
     report = root / 'docs/reviews/certification-v5-audit.html'
-    items = [{'id': match[2], 'accepted': match[1] == 'x', 'requirement': match[3].strip()}
-             for match in re.finditer(r'^- \[([ x])\] \*\*(C8-[A-Z0-9]+-\d+) · (.+)$', checklist.read_text(), re.M)]
     text = progress.read_text()
+    items = checked_items(checklist.read_text(), text)
     checkpoints = []
     by_directory = {}
     for match in re.finditer(r'^### Checkpoint (\d+) (.+)\n([\s\S]*?)(?=^### Checkpoint |\Z)', text, re.M):

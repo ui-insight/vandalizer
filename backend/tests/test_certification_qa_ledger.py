@@ -59,3 +59,27 @@ def test_capture_markup_is_escaped_in_the_searchable_report():
     assert '<script>example</script>' not in html
     assert '1 of 2 checklist items accepted; 1 open' in html
     assert 'Reported fingerprint only' in html
+
+
+def test_acceptance_counts_come_from_unique_checked_items():
+    checklist = '1/2 items complete; 1 remain open.\n- [x] **C8-QA-01 · Complete\n- [ ] **C8-QA-02 · Pending\n'
+    progress = '**Accepted items:** 1/2. **Remaining:** 1.'
+    assert [item['accepted'] for item in ledger.checked_items(checklist, progress)] == [True, False]
+
+
+@pytest.mark.parametrize('failure', ['checklist_count', 'progress_count', 'missing_summary', 'duplicate', 'empty'])
+def test_tracking_drift_is_rejected_before_evidence_generation(failure):
+    checklist = '1/2 items complete; 1 remain open.\n- [x] **C8-QA-01 · Complete\n- [ ] **C8-QA-02 · Pending\n'
+    progress = '**Accepted items:** 1/2. **Remaining:** 1.'
+    if failure == 'checklist_count':
+        checklist = checklist.replace('1/2', '0/2')
+    elif failure == 'progress_count':
+        progress = progress.replace('1/2', '0/2')
+    elif failure == 'missing_summary':
+        progress = 'No current counts'
+    elif failure == 'duplicate':
+        checklist = checklist.replace('C8-QA-02', 'C8-QA-01')
+    else:
+        checklist = '0/0 items complete; 0 remain open.'
+    with pytest.raises(ValueError, match='summary disagrees|unique acceptance item IDs'):
+        ledger.checked_items(checklist, progress)

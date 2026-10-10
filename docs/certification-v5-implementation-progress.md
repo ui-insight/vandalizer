@@ -6,9 +6,9 @@ Implement the [162-item upgrade checklist](certification-v5-upgrade-checklist.md
 
 - **Authorization:** the user requested that implementation begin on October 2, 2026.
 - **Accepted items:** 72/162. **Remaining:** 90. C8-VIS-05 was reopened and revalidated after repairing the panel renderer; see checkpoint 11. Item count measures acceptance work, not percentage of engineering effort or achieved quality.
-- **Current milestone:** focused course operations and maintenance. The optional bridge/whole-module credit transfer journey is locally verified through 300; version-specific saved-state reporting and automated product-change review triggers are locally verified at 301, with bounded learner journey observations at 302.
-- **Last accepted checklist item:** C8-M03-01 and C8-M04-01 at checkpoint 313. Latest verified checkpoints are 20–317; the numbered log preserves earlier acceptances, implementation details and evidence.
-- **Next task:** reconcile the remaining acceptance queue against delivered evidence, then finish outstanding copy and interaction gaps. The historical star discrepancy is now disclosed; its equivalent-assessment gate remains open. The baseline QA-script fingerprint gap is recorded at 306; it does not block independent teaching work. Deployment configuration changes also need recorded compatibility review evidence. Production equivalence policy, bridge observation, actual cohort reconciliation and live grading calibration remain open; live calibration stays deferred.
+- **Current milestone:** correct supported teaching and reconcile acceptance evidence. Historical guidance and current copy are verified through 317; optional transfer and maintenance foundations remain locally verified through 301. Release verification and representative learner observations remain separate gates.
+- **Last accepted checklist item:** C8-M03-01 and C8-M04-01 at checkpoint 313. Latest verified checkpoints are 20–318; the numbered log preserves earlier acceptances, implementation details and evidence.
+- **Next task:** finish the remaining batch/output/governance copy audit, then consolidate outstanding interaction acceptance against existing evidence. The historical star discrepancy is now disclosed; its equivalent-assessment gate remains open. The baseline QA-script fingerprint gap is recorded at 306; it does not block independent teaching work. Deployment configuration changes also need recorded compatibility review evidence. Production equivalence policy, bridge observation, actual cohort reconciliation and live grading calibration remain open; live calibration stays deferred.
 - **Verified foundations:** immutable course/enrollment/credential history and fenced completion recovery; 74 unpublished lesson replacements across all eleven modules; 17 recognition scenarios covering all five scenario-choice outcomes; saved lab inputs and execution, authenticated learner decisions, automatic-review receipts and technical recovery; read-only course comparison, synthetic cohort inventory, saved-feedback delivery and applied execution settings. Details and evidence remain in the numbered checkpoints below.
 - **Unfinished release gates:** release verification for all 33 outcomes, calibrated live grading, complete learner practical delivery, actual cohort reconciliation and rollout, full-course graduation with live providers, and full accessibility/learner observation. No 8/10 reassessment or release-ready claim has been made.
 - **Current blockers:** no blocker for independent teaching/versioning work; the practical review policy is resolved as automatic-only with LLM assistance permitted and no staff queue. The user selected optional upgrades on October 2, 2026. Live-model calibration is deferred at the user’s request on October 5/6 so independent work can continue overnight. It remains a release gate; live deployment/model configuration has not been rechecked while calibration is deferred. Subsequent persistence work uses explicitly isolated QA MongoDB, not the application database. Do not keep requesting environment details while this gate is deferred. Independent work continues. Migration, screen-reader and learner-observation gates remain open.
@@ -23,7 +23,7 @@ Implement the [162-item upgrade checklist](certification-v5-upgrade-checklist.md
 
 The user explicitly retained the upgrade bridge, fair credit transfer, focused course-health reporting, maintenance checks and useful administration. Do not remove these outcomes to make the backlog smaller. Consolidate implementation and verification into learner journeys; avoid repeated full-course captures for a local copy change. The 162-item audit remains the acceptance ledger, not 162 separate development projects.
 
-1. **Current correction batch:** direct course entry with no model and accurate creation-preview/Unscored teaching (295–296).
+1. **Current corrections:** source/approval/recovery teaching and historical guidance (305–317), followed by the remaining batch/output/governance copy audit.
 2. **Existing-learner upgrade:** optional bridge and explicit outcome-equivalence rules; retained original credentials/progress; automatic grading; no routine staff queue. Unknown legacy history must not become inferred 5.0 credit. Separate read-only eligibility from authorized, durable credit application.
 3. **Operational maintenance:** use existing administration surfaces and focused version-specific failure reporting; product changes trigger course compatibility checks.
 4. **Consolidated release verification:** complete learner journeys, actual practical outputs, grading rejection cases, accessibility, publication/recovery and actual-cohort reconciliation. Deferred live calibration remains a stated gate, not replaced by fixture evidence.
@@ -60,15 +60,17 @@ Dependencies determine sequence; milestone labels do not override individual che
 
 ## Immediate work queue
 
-| Order | Items | Completion condition |
-| --- | --- | --- |
-| 1 | C8-JOURNEY-01/02/03 and C8-VERSION-04 | Connect identity-based server resume to chat and panel, with read-position state separate from assessed credit. |
-| 2 | C8-VERSION-03/09/12 | Finish enrollment-aware home, support, engagement and administrator behavior; define completed/transferred/abandoned lifecycle effects. |
-| 3 | C8-VERSION-05/07/08 | Durable assessed attempts, restart reconciliation and immutable credential issuance/retrieval. |
-| 4 | C8-MIGRATE-02 through C8-MIGRATE-07/09/11 | Preserve source records, preview outcome-based equivalence and explicitly activate the optional upgrade; rehearse restart and rollback. |
-| 5 | C8-DEF-01 through C8-DEF-05 and module outcomes | Refine the proposed outcome contract and build a genuinely updated 5.0 course/rubric as a separate draft. |
+This is the current queue, replacing the October 2 sequence. Checked items do not return to the queue merely because their original milestone is unfinished. Consolidate checks by learner journey; reuse retained evidence when source and behavior are unchanged.
 
-The grade-summary contradiction can be investigated immediately, but changing what earns credit must respect the course-version milestone. A cosmetic wording change does not close the underlying grading items.
+| Order | Items | Concrete remaining work and dependency |
+| --- | --- | --- |
+| 1 | C8-CONTENT-08; related M05-04 and VERSION-06 | Finish batch/output/governance wording against actual controls. Historical star mismatch is disclosed but needs a separately reviewed equivalent-assessment/support decision; a notice does not close it. |
+| 2 | Open CHAT/VIS/A11Y interaction items and QA-08/10 | Reconcile existing state coverage, then exercise only missing or changed interactions. Keep real persistence, mobile keyboard and actual assistive-technology evidence distinct from fixture rendering. |
+| 3 | MIGRATE-02/03/06/08/09/10; VERSION-06/11/12; OPS-01/02/03/06/07 | Reuse implemented continuation/transfer/operations checks. Remaining acceptance needs actual cohort reconciliation, reviewed equivalence/support policy, operational evidence and coherent release configuration. No automatic reset, routine staff grading or publication is authorized. |
+| 4 | Practical module outcomes; GRADE-04/09/10/12; QA-04/05/06 | Execute and inspect actual course work and calibrate automatic review when the user resumes the deferred live-model gate. Mocked engine success and synthetic grading cannot close these items. Continue independent work while deferred. |
+| 5 | QA-07/09/11/12/13/14 and associated accessibility requirements | Complete release-wide coverage, actual screen-reader/learner observations, issued downloads and operational rehearsal; then regrade all six dimensions and eleven modules. Do not infer 8/10 from the acceptance count. |
+
+The checklist retains all 90 open acceptance requirements. These groups consolidate work; they do not defer or remove valuable scope. Ask for missing access, decisions or observations only when the dependent work is concrete and independent work cannot progress.
 
 ## Completed checkpoints
 
@@ -3982,3 +3984,12 @@ A module notice explains the historical four-versus-five-task-type discrepancy a
 **Verification:** 59 backend correction/preview/tool-result plus 24 workflow input/override cases, 40 frontend cases and six exporter cases pass. Targeted lint, export parity, isolated TypeScript and production build pass. Fifty-nine final captures cover current teaching, historical lesson cards, module/challenge notices and unknown-history cards, including native 200% enlargement. Bounds, axe, page-error and unexpected-write checks pass. Enlarged challenge guidance and the narrow unsupported-deadline example were inspected. An initial module-card harness asserted before streaming finished; waiting for the criteria fixes that harness race, with its diagnostic run retained. The certification tool function matches the proposed scoped commit; unrelated knowledge-base edits remain excluded.
 
 **Evidence:** `artifacts/visual-review/certification-multistep-copy-2026-10-09/{source-review.json,content-preservation.json,tool-scope-verification.json,backend.log,workflow-contracts.log,frontend.log,exporter.log,bundle-verification.json,browser-working,browser-working-native,browser-stars-final,browser-stars-native,browser-history,checkpoint.json}`. Synthetic transport omits the exercise’s lab-document list solely to inspect challenge copy without provisioning; it preserves the actual criteria. No real lab, model, learner, original course, publication or deployment changed. Extraction fixes are locally committed as `eb9dbba0`; continue the consolidated acceptance review after this checkpoint.
+### Checkpoint 318 Reconcile tracker summaries and the active queue on October 9 2026
+
+**Status:** Tracking repair complete; no acceptance item newly closed. Counts remain 72/162 accepted and 90 open.
+
+The evidence generator now rejects missing or contradictory checklist/progress headlines and duplicate acceptance IDs before generating a report. Checked items remain authoritative. This catches the stale 62/162 checklist headline discovered at 317 rather than allowing the searchable ledger and prose to disagree. Twelve inventory tests pass, including count drift, missing summaries and duplicate IDs; Ruff passes. Original audit grades and capture evidence are untouched.
+
+The active queue now replaces the obsolete October 2 task order and groups the remaining work by concrete dependencies: remaining control/copy corrections, missing interaction evidence, transition/release operations, deferred live practical grading, and actual accessibility/learner/release observations. Implemented mechanisms, acceptance and release verification remain separate. All 90 open requirements remain in scope; no staff grading queue or new deadline is introduced.
+
+**Evidence:** `artifacts/visual-review/certification-tracking-reconciliation-2026-10-09/{tests.log,checkpoint.json}`. The multi-step batch is locally committed as `8b2e73c7`. Continue the remaining copy audit without rerunning unchanged whole-course captures.

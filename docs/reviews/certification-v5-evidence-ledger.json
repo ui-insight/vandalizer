@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "eb9dbba0f073e7bb5405e75b41ba15141535f7bc",
+  "working_head_at_inventory": "8b2e73c7ded3a6a560a4ef16572468a7ebe8ad2d",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,14 +11,14 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 761577,
-    "sha256": "385abe65d5c232a25826296bc2c8593b1eea3503ca3b9f6a8334aef1a9ec4be2"
+    "bytes": 764032,
+    "sha256": "5b9350d5c971b5f53c3f2bd424a93aa4afb260d0b3100554524a421beeb1b9fe"
   },
   "counts": {
     "accepted": 72,
     "open": 90,
     "items": 162,
-    "checkpoints": 317,
+    "checkpoints": 318,
     "browser_runs": 496,
     "recorded_captures_including_diagnostics_and_repeats": 6453,
     "baseline_selected_captures": 151
@@ -3292,6 +3292,13 @@
       "evidence_directories": [
         "certification-multistep-copy-2026-10-09"
       ]
+    },
+    {
+      "number": 318,
+      "title": "Reconcile tracker summaries and the active queue on October 9 2026",
+      "evidence_directories": [
+        "certification-tracking-reconciliation-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -5136,6 +5143,12 @@
       "available": true,
       "bytes": 334,
       "sha256": "107716b47f9147a67a93bf07f1398e050b77124dba18ef75514ffe1ab0f52af0"
+    },
+    {
+      "path": "artifacts/visual-review/certification-tracking-reconciliation-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 298,
+      "sha256": "15f0706333e948a4398d73f3e6ae7a3b091ca9015977b0854b5ff51aad2bc40b"
     },
     {
       "path": "artifacts/visual-review/certification-transition-executions-2026-10-05/checkpoint.json",
