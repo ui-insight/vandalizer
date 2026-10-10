@@ -49,7 +49,7 @@
     },
     {
       "id": "process_mapping.finding-the-repetition",
-      "revision": 2,
+      "revision": 3,
       "title": "Define scope before delegating",
       "variant": "concept",
       "objective": "Name inputs, output, exclusions and exception conditions in a task brief.",
@@ -77,7 +77,7 @@
     },
     {
       "id": "process_mapping.the-ai-suitability-test",
-      "revision": 2,
+      "revision": 3,
       "title": "Match each operation to its evidence",
       "variant": "insight",
       "objective": "Separate source interpretation, deterministic computation and accountable judgment.",
@@ -105,7 +105,7 @@
     },
     {
       "id": "process_mapping.walkthrough-mapping-a-real-process",
-      "revision": 2,
+      "revision": 3,
       "title": "Map an intake task with a real stop point",
       "variant": "walkthrough",
       "objective": "Place review before the decision or release that depends on it.",
@@ -133,7 +133,7 @@
     },
     {
       "id": "process_mapping.common-processes-that-become-workflows",
-      "revision": 2,
+      "revision": 3,
       "title": "Compare candidates without assuming automation",
       "variant": "concept",
       "objective": "Evaluate potential tasks by output, evidence, review effort and maintenance.",
@@ -161,7 +161,7 @@
     },
     {
       "id": "process_mapping.worked-example-mapping-progress-report-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Worked example: an internal progress-report review",
       "variant": "walkthrough",
       "objective": "Create a bounded map with evidence, an exception path and an accountable handoff.",
@@ -189,7 +189,7 @@
     },
     {
       "id": "process_mapping.glossary-review",
-      "revision": 2,
+      "revision": 3,
       "title": "Review a process map before building",
       "variant": "key-terms",
       "objective": "Check that a map connects inputs, operations, evidence, decisions and exceptions.",

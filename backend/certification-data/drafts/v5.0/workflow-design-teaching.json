@@ -133,7 +133,7 @@
     },
     {
       "id": "workflow_design.when-to-split-when-to-combine",
-      "revision": 2,
+      "revision": 3,
       "title": "Split steps where inspection or decisions need it",
       "variant": "insight",
       "objective": "Balance useful intermediate evidence with configuration and maintenance effort.",
@@ -161,7 +161,7 @@
     },
     {
       "id": "workflow_design.worked-example-designing-subaward-intake",
-      "revision": 2,
+      "revision": 3,
       "title": "Worked example: a subaward review brief",
       "variant": "walkthrough",
       "objective": "Design a bounded comparison that preserves source context and waits for release review.",

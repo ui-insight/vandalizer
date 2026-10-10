@@ -278,6 +278,83 @@
         "73a5f714208e58c59248055ec908d9a22ff7865f8cb1187333fc1e7f6149e4d2",
         "c3f867a8e52ea0ee053dcd66ae2aed66b06be738e79ff1efd531ae4366e5ef92"
       ]
+    },
+    {
+      "id": "process-mapping-design-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "process_mapping.from-one-workflow-to-many",
+        "process_mapping.finding-the-repetition",
+        "process_mapping.the-ai-suitability-test",
+        "process_mapping.walkthrough-mapping-a-real-process",
+        "process_mapping.common-processes-that-become-workflows",
+        "process_mapping.worked-example-mapping-progress-report-review",
+        "process_mapping.glossary-review"
+      ],
+      "title": "Current guidance on process fit and review boundaries",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original 80/20 and 70/30 work splits, fixed step counts and implied automation savings are illustrative, not measured performance. Repetition is one consideration; source quality, review cost, exceptions and maintenance matter too. A rare complex task can still benefit from a reusable process, and a frequent simple task may need only bounded chat or extraction.",
+        "Choose a method by the evidence it must produce. Code needs checked inputs and a correct formula. A Code Execution suggestion does not make a restricted capability available; use an authorized deterministic or independently checked route when appropriate. Model-based formatting and analysis still need review.",
+        "Define allowed inputs, intended outputs, excluded actions and a stopping condition before delegating. Place the authorized reviewer before the consequential action. A process-map box or prompt instruction does not itself enforce an approval pause; end the automated portion before that action if a real pause cannot be verified.",
+        "The progress-report example is a training map, not permission to enter a sponsor portal or contact anyone. Keep preparation, institutional judgment and actual delivery distinct. Use fictional examples when a real workplace process would expose sensitive information."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "091282bbc144d0e3e417c3f73cedd926eb08cdc9b71df0cff09a6ed9c1cb0b26",
+        "6c9ae219087b87745610355c7acc032555d6439d52f2020361f1322cb4c63de1",
+        "bd2d30885664e5569b766ee451d2b0b609a832f54bbb42ae70bce312e0e61be3",
+        "0369b8a57b7ec3b75763a139646e81b95798ed36e98421dc634836313050ddc3",
+        "4fb90a733c24e4109e6da908857ea5f210437324497ef17f3888f990c2ad8f10",
+        "0e74d11a3972d2b35480ca7b308b1afac9fa7ad2a8f65fb19e3356298afc9e16",
+        "eaa85f557543ea21f02935efcba979798850e4468cae87855e5c44befdc0d3f2"
+      ]
+    },
+    {
+      "id": "workflow-design-design-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "workflow_design.the-extract-reason-deliver-pattern",
+        "workflow_design.walkthrough-designing-a-compliance-review-pipeline",
+        "workflow_design.when-to-split-when-to-combine",
+        "workflow_design.worked-example-designing-subaward-intake"
+      ],
+      "title": "Current guidance on workflow fit and implemented approvals",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Extract, reason and deliver is one design pattern, not a measured universal best method. A focused Prompt can read an appropriate source directly; an Extraction is useful when its fields preserve the context needed downstream. Neither shortening the input nor adding steps guarantees better results, and the original reference to teams getting better answers was not supporting performance evidence.",
+        "Inspect the saved input source for each step and any task override. Supply required reference terms as well as source facts; do not assume every earlier file or result is available automatically. Check intermediate results and preserve uncertainty through formatting.",
+        "Confirming artifact creation, confirming execution and deciding a paused workflow review are different actions. Place and test a real Approval step before any dependent consequential operation. Review timeout behavior and actual approve/reject outcomes; a written checkpoint is not a runtime pause.",
+        "Approval records a decision and requests resumption; inspect the subsequent status rather than assuming completion. Rejection does not undo earlier effects. Revising a workflow does not rewrite an earlier run, and canceling a proposed action is not the same as rejecting a review, stopping execution or rollback. Preserve existing results before any justified new run."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "f264ded43275d3e243c68963dafd71c2abfbfaebffcb6a0508148c251e2a2f93",
+        "bd08b4f7257fbdd80a7f2bffc4b5f21460344a36ef9844069ed805434a7a90b0",
+        "3994af65d0162bbe0ab5c9fb9b81110e2d4353760c5a7a7e644389f48ef32c6c",
+        "278e1fd2237e63f6c2b0bbf2a052d03ad88233de2459cfc3cb294c8a254d62a7"
+      ]
+    },
+    {
+      "id": "advanced-nodes-design-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "advanced_nodes.beyond-extraction-and-prompts",
+        "advanced_nodes.running-tasks-in-parallel"
+      ],
+      "title": "Current guidance on available nodes and parallel dependencies",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Available node types depend on the current editor, role and configuration; a fixed count in the original lesson is not a capability guarantee. Choose an operation for the task and inspect its actual output. Deep Analysis uses model analysis and synthesis, not deterministic arithmetic or independent source verification.",
+        "The original course retains its advanced-node and parallel-task requirements. An available internal Deep Analysis route avoids unnecessary external credentials; keep exact calculations independently checked. Code Execution remains restricted. Any change to those requirements must be explicit and preserve earned credit.",
+        "Tasks in one step can execute concurrently but do not automatically receive a sibling’s newly produced result. They normally share the step input unless an override is configured. An action that depends on a completed check or approval must wait for it; do not place the dependent send beside the check and assume ordering.",
+        "Inspect every task result, its labels and warnings. A sibling failure does not roll back an already completed external action. Preserve results and establish actual effects before retrying. Keep passwords and API keys out of prompts, chat, screenshots and submitted evidence."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "69fcec7f6a48e416d180607f6ff276617a7734883ebc68a54d48fac89a604cc2",
+        "d81bc8b0ef16d23b8c070668a744239c445b24105b0687079ac5f0bb4d011d1a"
+      ]
     }
   ],
   "module_notices": [
