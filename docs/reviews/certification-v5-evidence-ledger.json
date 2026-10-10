@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "8eb342c43247bcb973d1470a3c0a8b576ecd0401",
+  "working_head_at_inventory": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 65581,
-    "sha256": "174a4bdc76ac919cd170f24e7d7455249942f4178f98871569999f61d20b9bf3"
+    "bytes": 66006,
+    "sha256": "6622864cf94dc33369d2151acf410e0e59d39a5052fbdca885b8da4130eac69c"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 793854,
-    "sha256": "a0ab71e1c6c77d43fc6ff7691b0b4ab62d7b0b3812e77e5e3be8798db0f6ec17"
+    "bytes": 796694,
+    "sha256": "f074ee117f20f1783e56aa88aebeb1e5492284b2293fd729d06625ebe0bfd6a5"
   },
   "counts": {
-    "accepted": 75,
-    "open": 87,
+    "accepted": 76,
+    "open": 86,
     "items": 162,
-    "checkpoints": 329,
-    "browser_runs": 553,
-    "recorded_captures_including_diagnostics_and_repeats": 7011,
+    "checkpoints": 330,
+    "browser_runs": 564,
+    "recorded_captures_including_diagnostics_and_repeats": 7031,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -415,8 +415,8 @@
     },
     {
       "id": "C8-A11Y-07",
-      "accepted": false,
-      "requirement": "P1 · Improve: Make assessment controls accessible.** Associate questions, answer groups, instructions and errors; expose selected and required states. A learner can correct an answer and understand grading feedback without color or pointer input."
+      "accepted": true,
+      "requirement": "P1 · Improve: Make assessment controls accessible.** Associate questions, answer groups, instructions and errors; expose selected and required states. A learner can correct an answer and understand grading feedback without color or pointer input. Accepted at checkpoint 330: current browser inspection covers 149 labeled controls across twenty practical forms, required validation and keyboard correction, combined with retained reflection/scenario/practice and original-feedback return evidence. Native required errors focus their associated answer; transport failures remain distinct from assessment verdicts. Actual screen-reader announcements stay open under A11Y-05."
     },
     {
       "id": "C8-A11Y-08",
@@ -3376,6 +3376,13 @@
       "evidence_directories": [
         "certification-focus-reconciliation-2026-10-09"
       ]
+    },
+    {
+      "number": 330,
+      "title": "Accept accessible assessment controls and keyboard correction on October 9 2026",
+      "evidence_directories": [
+        "certification-assessment-controls-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -3498,6 +3505,12 @@
       "available": true,
       "bytes": 1526,
       "sha256": "0a34cc3bcf03570b20a557ca28e779deeb84a0e4c846e172e00c084c33bbf464"
+    },
+    {
+      "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 354,
+      "sha256": "2b3b1560a148de99ecce63beb28c2ec4719a7d23fa61fec1eb890030d317a966"
     },
     {
       "path": "artifacts/visual-review/certification-assessment-delivery-2026-10-06/checkpoint.json",
@@ -20900,6 +20913,2678 @@
             },
             "axe": {
               "path": "artifacts/visual-review/certification-arithmetic-guidance-2026-10-09/browser-working-native-final/advanced_nodes-5-detail-1-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-batch/manifest.json",
+        "available": true,
+        "bytes": 3650,
+        "sha256": "4a7950af4c42736dbbebd628f90be26e415373c874e5b897ef902b3eb706bbe0"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:49.542Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Save batch recovery interpretation",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Reconcile every assigned document with its original or linked retry result. Explain the original failure, preserved successful items, actual source quality, remaining exceptions and pilot limitations. Distinguish terminal coverage from successful usable results.My original explanation of the complete batch inventory, preserved successes and selected recovery receipt.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "batch-interpretation"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "batch-interpretation-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-batch/batch-interpretation-controls-320.png",
+              "available": true,
+              "bytes": 87353
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-batch/batch-interpretation-controls-320.txt",
+              "available": true,
+              "bytes": 9400
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-batch/batch-interpretation-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/manifest.json",
+        "available": true,
+        "bytes": 20937,
+        "sha256": "e3349245a45dbc1b2cc1a8613b22f8413a559f2e6e433a5025a649dae8699272"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:18.144Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Record budget calculations",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Arithmetic methodExplicit learner arithmeticRecorded deterministic arithmetic",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Weather station array amount (USD)",
+              "describedBy": [],
+              "group": "Weather station array"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Weather station array"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Weather station array",
+              "describedBy": [],
+              "group": "Weather station array"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Weather station arrayOriginal unfinished exact source quotation.",
+              "describedBy": [],
+              "group": "Weather station array"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Weather station arrayOriginal unfinished explanation of the source amount.",
+              "describedBy": [],
+              "group": "Weather station array"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Soil measurement system amount (USD)",
+              "describedBy": [],
+              "group": "Soil measurement system"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Soil measurement system"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Soil measurement system",
+              "describedBy": [],
+              "group": "Soil measurement system"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Soil measurement systemSoil CO2 flux measurement system: $12,000",
+              "describedBy": [],
+              "group": "Soil measurement system"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Soil measurement systemI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Soil measurement system"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Drone with sensor amount (USD)",
+              "describedBy": [],
+              "group": "Drone with sensor"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Drone with sensor"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Drone with sensor",
+              "describedBy": [],
+              "group": "Drone with sensor"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Drone with sensorDJI Matrice 350 RTK drone with multispectral sensor: $15,000",
+              "describedBy": [],
+              "group": "Drone with sensor"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Drone with sensorI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Drone with sensor"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Senior Personnel amount (USD)",
+              "describedBy": [],
+              "group": "Senior Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Senior Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Senior Personnel",
+              "describedBy": [],
+              "group": "Senior Personnel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Senior PersonnelSenior Personnel $43,333",
+              "describedBy": [],
+              "group": "Senior Personnel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Senior PersonnelI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Senior Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Other Personnel amount (USD)",
+              "describedBy": [],
+              "group": "Other Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Other Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Other Personnel",
+              "describedBy": [],
+              "group": "Other Personnel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Other PersonnelOther Personnel $139,800",
+              "describedBy": [],
+              "group": "Other Personnel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Other PersonnelI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Other Personnel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Fringe Benefits amount (USD)",
+              "describedBy": [],
+              "group": "Fringe Benefits"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Fringe Benefits"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Fringe Benefits",
+              "describedBy": [],
+              "group": "Fringe Benefits"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Fringe BenefitsFringe Benefits $38,291",
+              "describedBy": [],
+              "group": "Fringe Benefits"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Fringe BenefitsI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Fringe Benefits"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Equipment amount (USD)",
+              "describedBy": [],
+              "group": "Equipment"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Equipment"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Equipment",
+              "describedBy": [],
+              "group": "Equipment"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for EquipmentEquipment $45,000",
+              "describedBy": [],
+              "group": "Equipment"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of EquipmentI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Equipment"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Travel amount (USD)",
+              "describedBy": [],
+              "group": "Travel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Travel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Travel",
+              "describedBy": [],
+              "group": "Travel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for TravelTravel $40,000",
+              "describedBy": [],
+              "group": "Travel"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of TravelI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Travel"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Supplies amount (USD)",
+              "describedBy": [],
+              "group": "Supplies"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Supplies"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Supplies",
+              "describedBy": [],
+              "group": "Supplies"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for SuppliesSupplies $26,000",
+              "describedBy": [],
+              "group": "Supplies"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of SuppliesI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Supplies"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Subaward amount (USD)",
+              "describedBy": [],
+              "group": "Subaward"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Subaward"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Subaward",
+              "describedBy": [],
+              "group": "Subaward"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for SubawardSubaward $185,000",
+              "describedBy": [],
+              "group": "Subaward"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of SubawardI checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Subaward"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Indirect Costs (estimated) amount (USD)",
+              "describedBy": [],
+              "group": "Indirect Costs (estimated)"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "This input remains unresolved",
+              "describedBy": [],
+              "group": "Indirect Costs (estimated)"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page for Indirect Costs (estimated)",
+              "describedBy": [],
+              "group": "Indirect Costs (estimated)"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Source quotation for Indirect Costs (estimated)Indirect Costs (estimated) $25,376",
+              "describedBy": [],
+              "group": "Indirect Costs (estimated)"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your check of Indirect Costs (estimated)I checked the named source row and amount.",
+              "describedBy": [],
+              "group": "Indirect Costs (estimated)"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": false,
+              "disabled": false,
+              "label": "Equipment subtotal result (USD; leave blank if unresolved)",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": false,
+              "disabled": false,
+              "label": "Seven listed direct categories result (USD; leave blank if unresolved)",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": false,
+              "disabled": false,
+              "label": "Listed summary including estimated indirect cost result (USD; leave blank if unresolved)",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain what these additions establish and what remains unresolvedOriginal learner explanation of what these additions establish and the source limits that remain unresolved.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Capture budget workflow",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": true,
+              "disabled": false,
+              "label": "Owned budget workflowChoose a saved workflowOwned budget review · version 1",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Which available operation will handle interpretation, and which permitted route will check arithmetic? Explain their different evidence, identify any unavailable capability and the supported alternative, and bound the saved design to the assigned source and internal draft.My original explanation of the interpretation method and recorded arithmetic for this exact calculation and workflow revision.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "budget-calculation",
+            "budget-method"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "budget-calculation-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-calculation-controls-320.png",
+              "available": true,
+              "bytes": 95439
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-calculation-controls-320.txt",
+              "available": true,
+              "bytes": 18033
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-calculation-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "budget-method-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-method-controls-320.png",
+              "available": true,
+              "bytes": 105552
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-method-controls-320.txt",
+              "available": true,
+              "bytes": 8745
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget/budget-method-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget-review/manifest.json",
+        "available": true,
+        "bytes": 4336,
+        "sha256": "2727ca50e4f42a4fcda24368326ce6e9ba08015ec9e34e56e4fd5167097d12a6"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:34.180Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Review budget results",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Open your three saved calculations and the actual intermediate/final results. Explain the named source inputs, units, formulas and numerical comparisons. Which claims do the calculations support, which source statements disagree, and which period or policy conclusions remain unresolved? A final number or model assurance alone is insufficient.My original learner explanation for calculation_review on this exact saved budget run.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Use the saved revision and actual task receipts to explain which operations are independent and which require earlier results. Show where the final memo receives each required branch and calculation record. Identify any missing result or unsafe parallel claim, preserve unresolved work, and explain the boundary before a dependent action.My original learner explanation for dependency_review on this exact saved budget run.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "budget-interpretation"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "budget-interpretation-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget-review/budget-interpretation-controls-320.png",
+              "available": true,
+              "bytes": 95216
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget-review/budget-interpretation-controls-320.txt",
+              "available": true,
+              "bytes": 7976
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-budget-review/budget-interpretation-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/manifest.json",
+        "available": true,
+        "bytes": 7910,
+        "sha256": "6b5e3b0400be3e18a38c45346c862dfe96521fdb06d3a921d2eaaf6957042f08"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:09:53.537Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Correct the proposed capstone scope",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Identify what is wrong with the proposed document scope, audience, sponsor send and recurring trigger. State your exact corrected source scope and private destination, what remains disabled, how you would stop and inspect an unintended ongoing action, and why an agent claim cannot record your approval.My original learner correction rejecting broad access, external sends and recurring automation.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Record the original source finding",
+          "controls": [
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Actual unsupported Funds Obligated to Date value",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Award notice page",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact award notice page quoteOriginal award notice quote entered by the learner.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Issued amendment page",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact issued amendment page quoteOriginal issued amendment quote entered by the learner.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain the actual mismatch and the instruction change you will testMy original explanation of the observed mismatch and planned bounded repair.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Inspect and decide capstone memo release",
+          "controls": [
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "I opened and inspected this exact downloaded memo.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Memo release choiceHold · do not deliverApprove learner-only private handoff",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain whether these exact memo bytes may be released to this learner-only private inbox. Cite the corrected revision and complete source checks, accountable owner, intended use, known limits and review/change route. Explain why neither a real sponsor send, broad sharing nor an enabled recurring action is authorized.My original release rationale for this exact memo and learner-only private training destination.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "correction",
+            "finding",
+            "release"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "correction-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/correction-controls-320.png",
+              "available": true,
+              "bytes": 113365
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/correction-controls-320.txt",
+              "available": true,
+              "bytes": 10487
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/correction-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "finding-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/finding-controls-320.png",
+              "available": true,
+              "bytes": 84025
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/finding-controls-320.txt",
+              "available": true,
+              "bytes": 11167
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/finding-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "release-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/release-controls-320.png",
+              "available": true,
+              "bytes": 105325
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/release-controls-320.txt",
+              "available": true,
+              "bytes": 10766
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-capstone/release-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/manifest.json",
+        "available": true,
+        "bytes": 8355,
+        "sha256": "cb5564f1bb4f4c4a142bf50202dbd865a06ae2ecc382ab326d4e11c07672113c"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:19.059Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Compare actual connected runs",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Compare the connection repairIdentify the original and corrected owned runs and revisions. Describe the incorrect Formatter input and saved connection change, then compare the actual corrected reasoning and final results. Cite the intermediate/final evidence you inspected; do not claim the authored example is an execution.My original explanation of the two exact connected results and the bounded configuration change.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Check facts and interpretationCheck the corrected intermediate and final summary against the assigned subaward. Identify sourced facts, derived statements with assumptions and interpretation. Show how distinct reporting terms and unresolved questions were preserved, and identify any unsupported claim you removed or kept unresolved.My original explanation distinguishing supported source facts from interpretations and unverified conclusions.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Inspect your stopped run and choose recovery",
+          "controls": [
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Extraction",
+              "describedBy": [],
+              "group": "First failed stage"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Reasoning",
+              "describedBy": [],
+              "group": "First failed stage"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Formatter",
+              "describedBy": [],
+              "group": "First failed stage"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "No confirmed failure; the outcome is unknown",
+              "describedBy": [],
+              "group": "First failed stage"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Original run, successful output and failed-stage evidence",
+              "describedBy": [],
+              "group": "What work should remain intact?"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Replace the original history with the next run",
+              "describedBy": [],
+              "group": "What work should remain intact?"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Keep only the successful extraction as the completed deliverable",
+              "describedBy": [],
+              "group": "What work should remain intact?"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Resume Reasoning in place in this screen",
+              "describedBy": [],
+              "group": "Supported next action"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Prepare and separately approve a new internal run",
+              "describedBy": [],
+              "group": "Supported next action"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Restart all stages, including any completed external writes",
+              "describedBy": [],
+              "group": "Supported next action"
+            },
+            {
+              "tag": "INPUT",
+              "type": "radio",
+              "required": true,
+              "disabled": false,
+              "label": "Release the successful prefix as the finished result",
+              "describedBy": [],
+              "group": "Supported next action"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain the evidence and recovery limitsMy original learner explanation of the saved stopped run: preserve the successful prefix and separately approve any new internal execution.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "connected-comparison",
+            "connected-recovery"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "connected-comparison-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-comparison-controls-320.png",
+              "available": true,
+              "bytes": 103498
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-comparison-controls-320.txt",
+              "available": true,
+              "bytes": 8986
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-comparison-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "connected-recovery-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-recovery-controls-320.png",
+              "available": true,
+              "bytes": 98328
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-recovery-controls-320.txt",
+              "available": true,
+              "bytes": 12026
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-comparison/connected-recovery-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/manifest.json",
+        "available": true,
+        "bytes": 4926,
+        "sha256": "dc2b6ca677d8db28dcb40cc6e975bc24f9e78addb1741da8c127fb3522f0b5ce"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:18.123Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Approve or hold connected run",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": true,
+              "disabled": false,
+              "label": "Scope choiceChoose approve or holdApprove this revision and assigned sourceHold this run",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your scope choiceMy original connected workflow scope choice for the exact assigned source and saved plan.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Save validation repair interpretation",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Identify the actual original value mismatch, the saved field change and why it addresses that failure. Compare the complete unchanged suite before and after, including previously passing cases and explicit absence. Cite both actual receipts and explain unresolved limitations.My original learner explanation of the complete retest and remaining limitations.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "connected-scope",
+            "validation-interpretation"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "connected-scope-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/connected-scope-controls-320.png",
+              "available": true,
+              "bytes": 102181
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/connected-scope-controls-320.txt",
+              "available": true,
+              "bytes": 9232
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/connected-scope-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "validation-interpretation-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/validation-interpretation-controls-320.png",
+              "available": true,
+              "bytes": 89917
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/validation-interpretation-controls-320.txt",
+              "available": true,
+              "bytes": 8730
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-connected/validation-interpretation-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/manifest.json",
+        "available": true,
+        "bytes": 14684,
+        "sha256": "1a0036ac00181298bea0d52945e80d06ae75add94e4f6e49602b4ecba46b254c"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:09:53.490Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Save representative test expectations",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NSF · Principal Investigator"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NSF · Principal Investigator"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NSF · Principal Investigator"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quoteOriginal source quote entered by the learner",
+              "describedBy": [],
+              "group": "NSF · Principal Investigator"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NSF · Principal Investigator"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NSF · Total Project Budget"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NSF · Total Project Budget"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NSF · Total Project Budget"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quote",
+              "describedBy": [],
+              "group": "NSF · Total Project Budget"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NSF · Total Project Budget"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NSF · Named Co-PI"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NSF · Named Co-PI"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NSF · Named Co-PI"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quote",
+              "describedBy": [],
+              "group": "NSF · Named Co-PI"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NSF · Named Co-PI"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NIH · Principal Investigator"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NIH · Principal Investigator"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NIH · Principal Investigator"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quote",
+              "describedBy": [],
+              "group": "NIH · Principal Investigator"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NIH · Principal Investigator"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NIH · Total Project Budget"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NIH · Total Project Budget"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NIH · Total Project Budget"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quote",
+              "describedBy": [],
+              "group": "NIH · Total Project Budget"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NIH · Total Project Budget"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Expectation typeKnown valueExplicit absence",
+              "describedBy": [],
+              "group": "NIH · Named Co-PI"
+            },
+            {
+              "tag": "INPUT",
+              "type": "text",
+              "required": true,
+              "disabled": false,
+              "label": "Expected value",
+              "describedBy": [],
+              "group": "NIH · Named Co-PI"
+            },
+            {
+              "tag": "INPUT",
+              "type": "number",
+              "required": true,
+              "disabled": false,
+              "label": "Source page",
+              "describedBy": [],
+              "group": "NIH · Named Co-PI"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Exact source quote",
+              "describedBy": [],
+              "group": "NIH · Named Co-PI"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this source supports the value or absence",
+              "describedBy": [],
+              "group": "NIH · Named Co-PI"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain how both complete sources and your checked expected values cover typical extraction, annual-versus-project budget ambiguity and an unnamed role. Cite the source support, explain explicit absence and identify what this suite cannot establish.Original learner explanation of representative coverage and limitations.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Write the accountable capstone memo",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Intended useOriginal learner-authored private training use.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Supported inputs and source scope",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Known limitationsOriginal learner-authored source and workflow limits.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Change and review route · distinguish real-world review roles from certification staff",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Explain your complete capstone supervision",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Trace your scope correction, actual bad result, source finding, repaired complete rerun and release decision to their saved records. Distinguish the disclosed first no-write failure from the confirmed same-bytes private retry, state what was preserved and what remains unproven, and explain when a changed artifact needs new evidence and review.Original learner-authored explanation of supervision and recovery.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "expectations",
+            "memo",
+            "supervision"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "expectations-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/expectations-controls-320.png",
+              "available": true,
+              "bytes": 80598
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/expectations-controls-320.txt",
+              "available": true,
+              "bytes": 10124
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/expectations-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "memo-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/memo-controls-320.png",
+              "available": true,
+              "bytes": 76875
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/memo-controls-320.txt",
+              "available": true,
+              "bytes": 10912
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/memo-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "supervision-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/supervision-controls-320.png",
+              "available": true,
+              "bytes": 86811
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/supervision-controls-320.txt",
+              "available": true,
+              "bytes": 10940
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-general/supervision-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/manifest.json",
+        "available": true,
+        "bytes": 7980,
+        "sha256": "30c9fba2f59a26ecf5f6317601fbfbcc38e52804877d7a51c4801277f8e17e21"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:51.859Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Inspect files and approve release",
+          "controls": [
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "I opened progress-report.pdf and inspected its actual contents.",
+              "describedBy": [],
+              "group": "Your inspection of progress-report.pdf"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Usability of progress-report.pdfNot resolved yetNeeds repairUsable after inspection",
+              "describedBy": [],
+              "group": "Your inspection of progress-report.pdf"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "What you checked in progress-report.pdfMy original learner observation of this exact generated file.",
+              "describedBy": [],
+              "group": "Your inspection of progress-report.pdf"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "I opened progress-summary.csv and inspected its actual contents.",
+              "describedBy": [],
+              "group": "Your inspection of progress-summary.csv"
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Usability of progress-summary.csvNot resolved yetNeeds repairUsable after inspection",
+              "describedBy": [],
+              "group": "Your inspection of progress-summary.csv"
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "What you checked in progress-summary.csvMy original learner observation of this exact generated file.",
+              "describedBy": [],
+              "group": "Your inspection of progress-summary.csv"
+            },
+            {
+              "tag": "INPUT",
+              "type": "checkbox",
+              "required": false,
+              "disabled": false,
+              "label": "I opened the actual ZIP bundle and checked every member.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Open both files and the actual run bundle. Explain whether they are readable and complete, compare their key values and source references, distinguish Year 2 and cumulative spending, and preserve missing information or conflicting claims. Identify any required repair before release.My original inspection explanation of the exact files and private learner-only release scope.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Review the exact file identities, private training destination, learner-only audience and data scope. Explain your approve or hold choice, reject the broader proposed sharing, and identify what would require a fresh review and approval.My original inspection explanation of the exact files and private learner-only release scope.",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Release choiceHold for correctionApprove private-inbox release",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Explain delivery outcome",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Inspect the original failed handoff and any explicit recovery receipt. Distinguish generated files, attempted delivery and confirmed private destination write. Explain your targeted recovery, what was not rerun, and any uncertainty that still prevents a successful-delivery claim.My original explanation of the controlled failed handoff: no private copy or external delivery is confirmed.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "output-inspection",
+            "output-interpretation"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "output-inspection-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-inspection-controls-320.png",
+              "available": true,
+              "bytes": 94946
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-inspection-controls-320.txt",
+              "available": true,
+              "bytes": 10680
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-inspection-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "output-interpretation-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-interpretation-controls-320.png",
+              "available": true,
+              "bytes": 95943
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-interpretation-controls-320.txt",
+              "available": true,
+              "bytes": 6465
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-output/output-interpretation-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-process/manifest.json",
+        "available": true,
+        "bytes": 4730,
+        "sha256": "caaa6a54bcd19c586169f344f3416bd138aef5748ba6e14324a5fbe474e3b0d7"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:32.987Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Your process design",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Working method and rationale",
+              "describedBy": [
+                "Compare a fitting method for each of the three situations, then justify the method or bounded combination you select for the monthly review. Address input consistency, repetition, required output and human judgment. Explain what a project or automation would add if you use one."
+              ],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Corrected process map",
+              "describedBy": [
+                "Save an ordered map naming each operation, its inputs and outputs, the responsible agent or human, and evidence available for inspection. Identify and correct the flawed proposal. Show what must wait for the reviewer, what the reviewer examines, and how unresolved items stop or return for correction. Describe the correction in your own decision."
+              ],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Bounded task brief",
+              "describedBy": [
+                "Write the bounded task brief: name the exact fictional inputs, intended result, excluded actions, stopping condition and exception path. State what the agent may prepare and what it may not decide or release. Do not submit real private documents or claim this design has executed."
+              ],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "process-design"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "process-design-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-process/process-design-controls-320.png",
+              "available": true,
+              "bytes": 93224
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-process/process-design-controls-320.txt",
+              "available": true,
+              "bytes": 6275
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-process/process-design-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/manifest.json",
+        "available": true,
+        "bytes": 5055,
+        "sha256": "ada892f27d8406675d83c15b0923ce257e35dc80ad98eae4dbfc0db922b6c93d"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:09:50.897Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Approve complete validation suite",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Scope choiceHold · do not runApprove this exact suite",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Why this scope is appropriateMy original learner-authored scope explanation for both complete cases.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "form": "Approve or hold the exact capstone extraction",
+          "controls": [
+            {
+              "tag": "SELECT",
+              "type": "select-one",
+              "required": false,
+              "disabled": false,
+              "label": "Execution choiceHold · do not runApprove this exact extraction",
+              "describedBy": [],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Explain your execution scope choiceMy original learner-authored approval for the exact internal diagnostic extraction only.",
+              "describedBy": [],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "validation-scope",
+            "governance-scope"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "validation-scope-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/validation-scope-controls-320.png",
+              "available": true,
+              "bytes": 92283
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/validation-scope-controls-320.txt",
+              "available": true,
+              "bytes": 6619
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/validation-scope-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-scope-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/governance-scope-controls-320.png",
+              "available": true,
+              "bytes": 107030
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/governance-scope-controls-320.txt",
+              "available": true,
+              "bytes": 9385
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-scope/governance-scope-controls-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-workflow/manifest.json",
+        "available": true,
+        "bytes": 4799,
+        "sha256": "57578072544ec0f27bea5a810595a416887cca4009df01b7a007db079629f44e"
+      },
+      "checkpoints": [
+        330
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T04:10:32.987Z",
+      "reported_commit": "4dadfc9c3d133428861693cb2b5e02287ebc0309",
+      "reported_source_fingerprint": "f2f413f661fbfc36057ecb2383e1ddc711b3b00a15b8b1ef0c3dc259a868374c",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/retained-source.json",
+        "available": true,
+        "bytes": 135615,
+        "sha256": "8c4daa298b6791c8670e42876cc3a862871994a1afa9efd3a14516a9e047d77e"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-milestone-copy-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12143,
+        "sha256": "1685f176ef16f76210ace5dff0451da571adb6ce71b372fa2759248938fe6fa2"
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "form": "Your workflow design decisions",
+          "controls": [
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Trace the saved data flow",
+              "describedBy": [
+                "Using the selected saved workflow revision, trace one reported milestone or spending fact from its assigned source through the configured operations to the internal draft. Identify actual input-source settings and necessary narrative context. Justify your task choices, including any simpler route, and identify the map you chose."
+              ],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Correction and approval boundary",
+              "describedBy": [
+                "Identify the destination and approval errors in the supplied flawed proposal. Explain the correction visible in this saved workflow revision and confirm that your approval is only for this inspected design. What must remain outside the automated portion and what would need a separate later authorization?"
+              ],
+              "group": null
+            },
+            {
+              "tag": "TEXTAREA",
+              "type": "textarea",
+              "required": true,
+              "disabled": false,
+              "label": "Evidence and review path",
+              "describedBy": [
+                "Explain where this saved design retains source and intermediate evidence, how unresolved issues stay visible, and what stops or waits when a required report or fact is missing or conflicting. Name the fictional reviewer decision and distinguish intended design behavior from a tested execution."
+              ],
+              "group": null
+            }
+          ],
+          "nativeRequiredErrorFocused": true,
+          "keyboardCorrection": true,
+          "submissions": 0
+        },
+        {
+          "inspectedForms": [
+            "workflow-design-approval"
+          ],
+          "noAutomaticSubmissions": true,
+          "modelRequests": 0,
+          "credit": 0,
+          "actualAssistiveTechnology": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "workflow-design-approval-controls-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1100
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-workflow/workflow-design-approval-controls-320.png",
+              "available": true,
+              "bytes": 92617
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-workflow/workflow-design-approval-controls-320.txt",
+              "available": true,
+              "bytes": 7869
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-assessment-controls-2026-10-09/browser-workflow/workflow-design-approval-controls-320.axe.json",
               "available": true,
               "bytes": 2
             }
@@ -269790,7 +272475,7 @@
     "1440x900": 321,
     "1440x950": 4,
     "320x1000": 568,
-    "320x1100": 215,
+    "320x1100": 235,
     "320x250": 6,
     "320x480": 6,
     "320x500": 275,

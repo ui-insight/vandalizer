@@ -141,7 +141,7 @@ const summary = other => ({ ...identity(other), total_xp: 0, completed_modules: 
 
 const course = () => ({ ...structure, ...identity(), versioned: true, prerequisites: Object.fromEntries(modules.map(m => [m.id, []])), modules: modules.map(m => m.id === active.moduleId ? { ...m, [active.property]: active.listing.case } : m) })
 const progress = () => ({ ...identity(), id: 'draft-qa', user_id: 'reviewer', modules: {}, total_xp: 0, level: 'novice', certified: false, certified_at: null, learning_position: null })
-const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: 'http://127.0.0.1:5305', resetStorage: false,
+const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL || 'http://127.0.0.1:5305', resetStorage: false,
   evidenceMode: switching ? 'Frozen production frontend; synthetic saved-course selection and owned-history fixtures. Explicit UI switch away/return retains original authored drafts; no assessment submissions, executions or credit. Not durable migration evidence.' : 'Frozen production frontend; synthetic owned-history API fixtures. Tab-local practical drafts across reload/navigation with zero submissions, execution, grading or credit.' })
 const { page, context } = review
 const writes = []
@@ -259,8 +259,33 @@ async function snap(id, form) {
   console.log(id)
 }
 const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
+const inspectControls = process.env.REVIEW_ASSESSMENT_CONTROLS === '1'
+async function inspectFormControls(form) {
+  const controls = await form.locator('input,textarea,select').evaluateAll(elements => elements.map(element => ({
+    tag: element.tagName, type: element.type, required: element.required, disabled: element.disabled,
+    label: [...element.labels || []].map(label => label.textContent.trim()).join(' '),
+    describedBy: (element.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean).map(id => document.getElementById(id)?.textContent?.trim() || null),
+    group: element.closest('fieldset')?.querySelector('legend')?.textContent?.trim() || null,
+  })))
+  assert.ok(controls.length, `${active.name}: controls must be present`)
+  for (const control of controls) {
+    assert.ok(control.label, `${active.name}: each control needs its associated label`)
+    assert.ok(control.describedBy.every(Boolean), `${active.name}: instruction references must resolve`)
+    if (control.type === 'radio') assert.ok(control.group, `${active.name}: radio choices need a named group`)
+  }
+  const answer = form.locator('textarea[required]:enabled').first()
+  assert.equal(await answer.count(), 1, `${active.name}: required answer exposed`)
+  const value = await answer.inputValue()
+  await answer.fill('')
+  assert.equal(await answer.evaluate(element => element.reportValidity()), false)
+  assert.equal(await answer.evaluate(element => element === document.activeElement), true)
+  await page.keyboard.insertText(value + ' Keyboard correction retained.')
+  assert.equal(await answer.inputValue(), value + ' Keyboard correction retained.')
+  await page.keyboard.press('Tab')
+  review.observations.push({ form: active.form, controls, nativeRequiredErrorFocused: true, keyboardCorrection: true, submissions: 0 })
+}
 try {
-  for (const width of native ? [780] : [320, 1440]) {
+  for (const width of native ? [780] : inspectControls ? [320] : [320, 1440]) {
     await page.setViewportSize({ width, height: native ? 1800 : 1100 })
     for (const scenario of scenarios) {
       active = scenario
@@ -274,6 +299,11 @@ try {
       if (active.checkbox) await form.getByRole('checkbox').check()
       if (active.choice) await form.getByRole('combobox', { name: active.choice, exact: true }).selectOption('approve')
       for (const [label, value] of Object.entries(active.fields)) await form.getByRole('textbox', { name: label, exact: true }).first().fill(value)
+      if (inspectControls) {
+        await inspectFormControls(form)
+        await snap(`${active.name}-controls-${width}`, form)
+        continue
+      }
       await snap(`${active.name}-draft-${width}`, form)
       if (switching) {
         const draftsBefore = await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage).filter(([key]) => (key.startsWith('cert-course-draft:') || key.startsWith('certification-process-draft:')))))
@@ -311,6 +341,8 @@ try {
   } else assert.deepEqual(writes, [])
   assert.deepEqual(review.errors, [])
   assert.deepEqual([...review.unmatched], [])
-  review.observations.push({ restoredDrafts: scenarios.map(s => s.name), noAutomaticSubmissions: true, storageFailureExplained: true, modelRequests: 0, credit: 0, optionalCourseSwitches: switching ? writes.length : 0, selectionFixtureOnly: switching })
+  review.observations.push(inspectControls
+    ? { inspectedForms: scenarios.map(s => s.name), noAutomaticSubmissions: true, modelRequests: 0, credit: 0, actualAssistiveTechnology: false }
+    : { restoredDrafts: scenarios.map(s => s.name), noAutomaticSubmissions: true, storageFailureExplained: true, modelRequests: 0, credit: 0, optionalCourseSwitches: switching ? writes.length : 0, selectionFixtureOnly: switching })
 } catch (error) { await review.capture('blocked', String(error)); throw error }
 finally { await review.flush(); await review.browser.close() }
