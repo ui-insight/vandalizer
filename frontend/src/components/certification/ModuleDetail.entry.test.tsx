@@ -42,3 +42,16 @@ it('does not imply an outcome assessment has never started or uses a three-star 
   expect(screen.getByText('Challenge: Complete')).toBeInTheDocument()
   expect(screen.getAllByRole('img', { name: '2 of 3 stars' })).toHaveLength(2)
 })
+
+it('places the historical credential correction before the preserved module description', () => {
+  const description = 'Complete this and you earn your credential.'
+  const module = { ...legacy, id: 'governance', description }
+  render(<ModuleDetail {...props} module={module} courseIdentity={{
+    enrollment_id: 'selected', course_version: 'legacy-2026-10-02.1',
+    manifest_sha256: '54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195',
+  }} />)
+  const notice = screen.getByRole('complementary', { name: 'Current guidance on earning the credential' })
+  const original = screen.getByText(description)
+  expect(notice.compareDocumentPosition(original) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(props.onComplete).not.toHaveBeenCalled()
+})

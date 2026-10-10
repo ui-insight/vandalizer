@@ -19,6 +19,7 @@ import type { ModuleDefinition, CertExercise, OutcomeCompletionSelection } from 
 import { ICON_MAP } from './constants'
 import { SelfAssessment, MODULE_ASSESSMENTS } from './SelfAssessment'
 import { LessonStepper } from './LessonStepper'
+import { EditorialCorrection } from './EditorialCorrection'
 import { ScenarioAssessment } from './ScenarioAssessment'
 import { PracticalReview } from './PracticalReview'
 import { ProcessDesign } from './ProcessDesign'
@@ -213,6 +214,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
       <div className={module.validationAssessment || module.batchAssessment || module.governanceAssessment || module.connectedWorkflowAssessment ? "p-[8px] sm:p-6" : "p-4 sm:p-6"}>
         {tab === 'learn' ? (
           <div className="mx-auto max-w-3xl space-y-4">
+            <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />
             <p className="text-sm text-gray-700 mb-2">{module.description}</p>
 
             {/* Assignment makes directions available; it does not prove readiness. */}

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "8148432e48a099bdd3111af5632392903408ca2a",
+  "working_head_at_inventory": "6c13a1ffee1d5f28f3ea30ba5839501c46e4f8ca",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,16 +11,16 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 753529,
-    "sha256": "e972a18fda2c405c536bcbd813c2917354f9750919162c6ac8014303d976dc0e"
+    "bytes": 755477,
+    "sha256": "ef4a02e3b9107c5b11b1865db5968d39502e0821d476c19ce0f4f8ee10137d66"
   },
   "counts": {
     "accepted": 72,
     "open": 90,
     "items": 162,
-    "checkpoints": 314,
-    "browser_runs": 481,
-    "recorded_captures_including_diagnostics_and_repeats": 6304,
+    "checkpoints": 315,
+    "browser_runs": 483,
+    "recorded_captures_including_diagnostics_and_repeats": 6316,
     "baseline_selected_captures": 151
   },
   "baseline": {
@@ -3271,6 +3271,13 @@
       "evidence_directories": [
         "certification-remaining-copy-2026-10-09"
       ]
+    },
+    {
+      "number": 315,
+      "title": "Show historical corrections before module descriptions on October 9 2026",
+      "evidence_directories": [
+        "certification-module-corrections-2026-10-09"
+      ]
     }
   ],
   "source_records": [
@@ -4335,6 +4342,12 @@
       "available": true,
       "bytes": 328,
       "sha256": "61d80b66d0591ad78452f45c6e8587d56355e3ba32f85e2e9e5684584920992a"
+    },
+    {
+      "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/checkpoint.json",
+      "available": true,
+      "bytes": 680,
+      "sha256": "88382f6d24fdb6da74bdea3426ec22ccd52e82b0fb775e1274a78cc7969bd75d"
     },
     {
       "path": "artifacts/visual-review/certification-module-readiness-2026-10-07/checkpoint.json",
@@ -147961,6 +147974,466 @@
     },
     {
       "manifest": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/manifest.json",
+        "available": true,
+        "bytes": 6728,
+        "sha256": "de152f6ead6536a3ec3a7388ddbf0ca9b7d9ca6c9cf020f62ad7a6a073d30e7c"
+      },
+      "checkpoints": [
+        315
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T00:19:28.414Z",
+      "reported_commit": "6c13a1ffee1d5f28f3ea30ba5839501c46e4f8ca",
+      "reported_source_fingerprint": "db8db45f68a2053d27ddaba5d15dda97517b065241c10c1d5465fc146a5e0a4e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 1,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen course with actual read-only API correction projection; synthetic transport, no learner writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12438,
+        "sha256": "1006b18db8926e7ee3d647c181826657fd3bb8dd37ca9e89722c8af4deb5a92a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "preservedDescriptions": true,
+          "correctionsBeforeDescriptions": true,
+          "manifestSha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "moduleIds": [
+            "governance",
+            "ai_literacy"
+          ],
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "governance-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-320.png",
+              "available": true,
+              "bytes": 82896
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-320.txt",
+              "available": true,
+              "bytes": 5615
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-preserved-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-320.png",
+              "available": true,
+              "bytes": 82973
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-320.txt",
+              "available": true,
+              "bytes": 5615
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-guidance-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-320.png",
+              "available": true,
+              "bytes": 81205
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-320.txt",
+              "available": true,
+              "bytes": 7358
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-preserved-description-320",
+          "note": "",
+          "viewport": {
+            "width": 320,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 320,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-320.png",
+              "available": true,
+              "bytes": 92109
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-320.txt",
+              "available": true,
+              "bytes": 7358
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-320.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-1440.png",
+              "available": true,
+              "bytes": 135931
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-1440.txt",
+              "available": true,
+              "bytes": 5681
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-preserved-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-1440.png",
+              "available": true,
+              "bytes": 135931
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-1440.txt",
+              "available": true,
+              "bytes": 5681
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/governance-preserved-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-guidance-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-1440.png",
+              "available": true,
+              "bytes": 136609
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-1440.txt",
+              "available": true,
+              "bytes": 7424
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-guidance-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-preserved-description-1440",
+          "note": "",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "devicePixelRatio": 1,
+          "visualViewportScale": 1,
+          "pageWidth": 1440,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-1440.png",
+              "available": true,
+              "bytes": 136609
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-1440.txt",
+              "available": true,
+              "bytes": 7424
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser/ai_literacy-preserved-description-1440.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/manifest.json",
+        "available": true,
+        "bytes": 4968,
+        "sha256": "821d4bc46b9b1d78878697b159010c0f4fd8f0e4ba416b1aece7328984c4c56a"
+      },
+      "checkpoints": [
+        315
+      ],
+      "baseline_run": false,
+      "captured_at": "2026-10-10T00:19:45.728Z",
+      "reported_commit": "6c13a1ffee1d5f28f3ea30ba5839501c46e4f8ca",
+      "reported_source_fingerprint": "db8db45f68a2053d27ddaba5d15dda97517b065241c10c1d5465fc146a5e0a4e",
+      "reported_fixture_fingerprint": "3d3a106baf430368077a9614290c398a843fd520ba40deb45dc4f977f05c7f77",
+      "reported_build_mode": "production",
+      "browser": "chromium",
+      "browser_version": "154.0.8037.99",
+      "native_profile_zoom": 2,
+      "reported_zoom_equivalent": 1,
+      "reported_text_scale": 1,
+      "reported_scope": "Frozen course with actual read-only API correction projection; synthetic transport, no learner writes.",
+      "verified_build_manifest": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/bundle-verification.json",
+        "available": true,
+        "bytes": 12438,
+        "sha256": "1006b18db8926e7ee3d647c181826657fd3bb8dd37ca9e89722c8af4deb5a92a"
+      },
+      "verified_bundle": {
+        "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/retained-source/frontend/dist",
+        "available": true
+      },
+      "recorded_errors": [],
+      "recorded_unmatched_routes": [],
+      "recorded_observations": [
+        {
+          "courseWrites": [],
+          "preservedDescriptions": true,
+          "correctionsBeforeDescriptions": true,
+          "manifestSha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+          "moduleIds": [
+            "governance",
+            "ai_literacy"
+          ],
+          "assessedRequirementsChanged": false
+        }
+      ],
+      "captures": [
+        {
+          "id": "governance-guidance-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-guidance-780.png",
+              "available": true,
+              "bytes": 184802
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-guidance-780.txt",
+              "available": true,
+              "bytes": 5615
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-guidance-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "governance-preserved-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-preserved-description-780.png",
+              "available": true,
+              "bytes": 197974
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-preserved-description-780.txt",
+              "available": true,
+              "bytes": 5615
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/governance-preserved-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-guidance-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-guidance-780.png",
+              "available": true,
+              "bytes": 161414
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-guidance-780.txt",
+              "available": true,
+              "bytes": 7358
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-guidance-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        },
+        {
+          "id": "ai_literacy-preserved-description-780",
+          "note": "",
+          "viewport": {
+            "width": 390,
+            "height": 800
+          },
+          "devicePixelRatio": 2,
+          "visualViewportScale": 1,
+          "pageWidth": 390,
+          "diagnostic_capture": false,
+          "assets": {
+            "image": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-preserved-description-780.png",
+              "available": true,
+              "bytes": 228776
+            },
+            "accessible_snapshot": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-preserved-description-780.txt",
+              "available": true,
+              "bytes": 7358
+            },
+            "axe": {
+              "path": "artifacts/visual-review/certification-module-corrections-2026-10-09/browser-native/ai_literacy-preserved-description-780.axe.json",
+              "available": true,
+              "bytes": 2
+            }
+          },
+          "axe_observations": []
+        }
+      ]
+    },
+    {
+      "manifest": {
         "path": "artifacts/visual-review/certification-multi-step-recovery-2026-10-07/connected/manifest.json",
         "available": true,
         "bytes": 54674,
@@ -244307,7 +244780,7 @@
     "1024x1000": 10,
     "1024x500": 5,
     "1024x900": 34,
-    "1440x1000": 1182,
+    "1440x1000": 1186,
     "1440x1100": 207,
     "1440x250": 4,
     "1440x480": 6,
@@ -244318,7 +244791,7 @@
     "1440x850": 43,
     "1440x900": 321,
     "1440x950": 4,
-    "320x1000": 405,
+    "320x1000": 409,
     "320x1100": 215,
     "320x250": 6,
     "320x480": 6,
@@ -244340,7 +244813,7 @@
     "390x600": 288,
     "390x650": 52,
     "390x700": 28,
-    "390x800": 38,
+    "390x800": 42,
     "390x844": 862,
     "390x850": 276,
     "390x900": 192,

@@ -11,7 +11,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .grading import grade, selected_outcome_completion_available
 from .writes import progress_filter
-from .editorial_corrections import notices_for
+from .editorial_corrections import module_notices_for, notices_for
 
 
 def public_modules(package):
@@ -21,6 +21,8 @@ def public_modules(package):
     modules = []
     for module in package.json('panel-modules.json'):
         item = {**module, 'assessment': lessons[module['id']].get('assessment')}
+        if notices := module_notices_for(package.manifest_sha256, module['id']):
+            item['editorialNotices'] = notices
         item['lessons'] = [{**lesson, **({'editorialNotices': notices} if notices else {})}
                            for lesson in module['lessons']
                            for notices in [notices_for(package.manifest_sha256, lesson.get('id'))]]

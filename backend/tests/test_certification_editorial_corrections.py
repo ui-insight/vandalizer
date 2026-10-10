@@ -98,3 +98,43 @@ def test_unavailable_corrections_do_not_silently_deliver_uncorrected_guidance(tm
             corrections.notices_for('a' * 64, 'module.lesson')
     finally:
         corrections._load.cache_clear()
+
+
+@pytest.mark.parametrize('module_id', ['governance', 'ai_literacy'])
+def test_module_notices_preserve_original_description_and_require_exact_identity(module_id):
+    package = CourseCatalog().load(VERSION, preview=True)
+    original_bytes = package.artifact_bytes
+    original = next(row for row in package.json('panel-modules.json') if row['id'] == module_id)
+    rendered = next(row for row in public_modules(package) if row['id'] == module_id)
+    notice = next(row for row in corrections._load().module_notices if module_id in row.module_ids)
+    assert notice.manifest_sha256 == package.manifest_sha256
+    assert notice.unversioned_content_sha256 == [hashlib.sha256(original['description'].encode()).hexdigest()]
+    assert rendered['description'] == original['description']
+    assert rendered['editorialNotices'] == corrections.module_notices_for(package.manifest_sha256, module_id)
+    assert rendered['editorialNotices'][0]['identity_basis'] == 'course_manifest'
+    assert set(rendered['editorialNotices'][0]) == {'id', 'issued_at', 'title', 'paragraphs', 'assessment_changed', 'identity_basis'}
+    assert corrections.module_notices_for(None, module_id) == []
+    assert corrections.module_notices_for('f' * 64, module_id, original['description']) == []
+    assert corrections.module_notices_for(package.manifest_sha256, 'foreign') == []
+    assert corrections.module_notices_for(None, module_id, original['description'] + ' changed') == []
+    matched = corrections.module_notices_for(None, module_id, original['description'])
+    assert matched[0]['identity_basis'] == 'preserved_module_description'
+    matched[0]['paragraphs'].clear()
+    assert corrections.module_notices_for(None, module_id, original['description'])[0]['paragraphs']
+    assert package.artifact_bytes == original_bytes
+
+
+@pytest.mark.parametrize('change', ['assessment', 'duplicate_id', 'duplicate_target', 'empty_target'])
+def test_invalid_module_corrections_are_rejected(change):
+    data = json.loads(corrections.SOURCE.read_text())
+    notice = data['module_notices'][0]
+    if change == 'assessment':
+        notice['assessment_changed'] = True
+    elif change == 'duplicate_id':
+        notice['id'] = data['notices'][0]['id']
+    elif change == 'duplicate_target':
+        notice['module_ids'] *= 2
+    else:
+        notice['module_ids'] = ['']
+    with pytest.raises(ValidationError):
+        corrections.EditorialNotices.model_validate(data)

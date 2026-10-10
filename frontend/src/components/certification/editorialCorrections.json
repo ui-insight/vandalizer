@@ -98,5 +98,39 @@
         "cbc344ef1b93d59a127a0ab044983b44894eb26dd2440eb967a7cbdbce9ceb5d"
       ]
     }
+  ],
+  "module_notices": [
+    {
+      "id": "module-governance-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "governance"
+      ],
+      "title": "Current guidance on earning the credential",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Completing Governance alone does not issue the Vandal Workflow Architect credential. Every required module must satisfy its original course rules. Use your saved course progress and issued certificate to establish actual completion; reading this module is not a completion receipt."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "eab1f0bf670dd10d12003d5011475a4182cab18c9423664c0caddd47d8663670"
+      ]
+    },
+    {
+      "id": "module-ai_literacy-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "module_ids": [
+        "ai_literacy"
+      ],
+      "title": "Current guidance on course pace",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "This course is self-paced. Fixed module times in the original description were not established by measured learner performance. Allow time for reading, source checking, repairs and assessed work, and return to your saved reading place when needed."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "7b84e0b9621bad7244a1b643f540d8f5cf9a753ceb478e2a30d4f726ca674cb0"
+      ]
+    }
   ]
 }
