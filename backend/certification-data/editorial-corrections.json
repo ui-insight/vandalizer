@@ -381,6 +381,74 @@
         "55e5e1b39aaeee39168e816821149db6e1afc3a3a0ead2bd910eae60d87000e1",
         "653cd0a5cd8233fdffecaec7181e9f2eecf8e97a34205734b7da4442722d246c"
       ]
+    },
+    {
+      "id": "foundations-lab-controls-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "foundations.build-your-first-workflow"
+      ],
+      "title": "Current controls for the original foundations lab",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "Use Library → New → New Workflow, then the Extractions task. Set Up Lab prepares the assigned sample only when its resulting status confirms readiness. Preserve the original three-field base and separate enrichment criteria.",
+        "Inspect selected, fixed and project inputs before Run. Some configurations have valid input without a manually selected document; read the current input hint. Check actual run results against the assigned source."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "2dccce0cfc6e4ebe99e863cf5002ef1b0a2b0fdcf3f34c1eaa1646292b8d1146"
+      ]
+    },
+    {
+      "id": "extraction_engine-lab-controls-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "extraction_engine.build-a-comprehensive-extraction"
+      ],
+      "title": "Current controls for the original extraction engine lab",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The original base requires at least 15 relevant fields; optional field-count enrichment is separate. Use precise instructions and source-supported meaning, not extra meaningless fields to satisfy a counter.",
+        "Allowed values constrains categories but does not prove a value is supported. Optional changes validation treatment, not source truth; multiple people alone do not make a field optional. Save and inspect settings, then verify an actual retest after repair."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "4c1a543004b7a31422a4758b8f8806fbf76754f550cda10d78209d66dc79a1c8"
+      ]
+    },
+    {
+      "id": "multi_step-lab-controls-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "multi_step.build-a-3-step-analysis-workflow"
+      ],
+      "title": "Current controls for the original multi step lab",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The current task picker labels are Extractions, Prompts and Format; Format is the Formatter operation in the original three-step course. Preserve that saved three-step requirement.",
+        "Inspect each step input and task override, connect the intended results and verify intermediate output. A later step cannot be assumed to recover omitted source context, and formatting must preserve uncertainty."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "027bf797e588865af1058ab1c21ba27423ec4963062094808b62579173271a76"
+      ]
+    },
+    {
+      "id": "batch_processing-lab-controls-2026-10-09.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "batch_processing.run-your-first-batch"
+      ],
+      "title": "Current controls for the original batch processing lab",
+      "issued_at": "2026-10-09",
+      "paragraphs": [
+        "The editor labels the batch checkbox Run per document followed by the selected run count. It appears for multiple selected documents; choose the three distinct assigned samples and inspect all configured input sources before Run.",
+        "Inspect every item and its source identity. Batch Complete can include failures. Preserve successful outputs; verify the repair and use only affected inputs for a justified new run. One selected document uses a normal run; retain its relationship to the original batch failure."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "9d1eb9387c5e572f59e71810d3071e26a2d7d7a81de1b9496d0764acc7c4f7e7"
+      ]
     }
   ],
   "module_notices": [

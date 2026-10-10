@@ -77,7 +77,7 @@
     },
     {
       "id": "multi_step.build-a-3-step-analysis-workflow",
-      "revision": 2,
+      "revision": 3,
       "title": "Run and inspect the assigned three-step analysis",
       "variant": "walkthrough",
       "objective": "Verify one saved Extraction, Prompt and Formatter chain on the assigned subaward.",

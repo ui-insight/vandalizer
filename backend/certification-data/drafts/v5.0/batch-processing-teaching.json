@@ -105,7 +105,7 @@
     },
     {
       "id": "batch_processing.run-your-first-batch",
-      "revision": 2,
+      "revision": 3,
       "title": "Run and reconcile the assigned three-document batch",
       "variant": "walkthrough",
       "objective": "Preserve exact input coverage, per-item review and targeted recovery evidence.",

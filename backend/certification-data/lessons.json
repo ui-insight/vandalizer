@@ -215,10 +215,10 @@
       },
       {
         "id": "foundations.build-your-first-workflow",
-        "revision": 1,
+        "revision": 2,
         "title": "Build your first workflow",
         "objective": "After this lesson, you'll be ready to run your first extraction workflow on a real document.",
-        "content": "When you start the lab exercise, here's what you'll do:\n\n1. Click **Set Up Lab** (the button at the top of this module) to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like \"Grant Proposal Extractor\", and add a description such as \"Extracts key details from grant proposals\".\n4. Add a step and give it a name, like \"Extract Grant Details\". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction — for example: \"Principal Investigator\", \"Funding Amount\", \"Sponsoring Agency\".\n7. Select the sample NSF proposal in the file browser — tick the checkbox next to its name (opening the file in the viewer also selects it). **The Run button stays greyed out until a document is selected**; its tooltip says what’s missing.\n8. Click **Run** and review the extracted results in the output panel.",
+        "content": "Use the original course's assigned sample and saved challenge criteria. Its base requires at least three fields; five- and eight-field enrichment remain separate.\n\n1. Click **Set Up Lab** above the module content when offered. Check the resulting lab status and open the assigned NSF proposal; a setup request alone does not establish that the sample is ready.\n2. In **Library**, open **New** and choose **New Workflow**. Give it a clear name, such as \"Grant Proposal Extractor\", and a description of its intended input and output.\n3. Add a step and choose **Extractions** for its task. Select or create the extraction template and inspect the saved field definitions.\n4. Add at least three fields for the original base requirement, such as Principal Investigator, Funding Amount and Sponsoring Agency. Define what each value means, including currency and period for an amount.\n5. Select the assigned sample using its document checkbox. Inspect the workflow's configured source scope, including any fixed documents or project inputs, before running. The Run control's input hint explains missing input; some configurations can run without a manual document selection.\n6. Click **Run**, inspect the actual run status and review its output against the assigned source. A saved workflow, selected file or successful execution does not establish that the extracted values are correct.",
         "variant": "walkthrough"
       },
       {
@@ -605,10 +605,10 @@
       },
       {
         "id": "extraction_engine.build-a-comprehensive-extraction",
-        "revision": 1,
+        "revision": 2,
         "title": "Build a comprehensive extraction",
         "objective": "",
-        "content": "1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically — e.g., personnel fields together, budget fields together.\n3. For any categorical field (status, type, category), open the field and fill in the **Allowed values** setting with the list of valid options.\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add Allowed values for any fields that extracted poorly.",
+        "content": "Keep the original course's saved challenge requirements: its base asks for an extraction with at least 15 fields. Additional field-count enrichment does not replace source accuracy.\n\n1. Create or expand the assigned extraction to at least 15 relevant fields. Cover the requested sections without adding meaningless fields solely to increase the count.\n2. Use precise field names and extraction instructions to distinguish budget categories, periods and personnel roles. Arrange related fields together for readability; order alone does not guarantee a particular runtime grouping.\n3. For a genuinely categorical field, open its settings and enter the supported categories in **Allowed values**. Commit the edit and inspect the saved setting. A permitted category is not proof that the source supports the returned answer.\n4. Use **Optional** when absence is legitimate under the field's meaning. This setting affects validation treatment; it cannot prove an unresolved value is absent from the document. Multiple possible people do not by themselves make a personnel field optional.\n5. Run on the assigned readable source and inspect each relevant result and supporting passage. Preserve missing or ambiguous values explicitly.\n6. Repair the specific field definition or source problem, save the change and run again. Compare the new output with both the original failure and source before claiming improvement.",
         "variant": "walkthrough"
       },
       {
@@ -712,10 +712,10 @@
       },
       {
         "id": "multi_step.build-a-3-step-analysis-workflow",
-        "revision": 1,
+        "revision": 2,
         "title": "Build a 3-step analysis workflow",
         "objective": "",
-        "content": "1. Create a new workflow and add 3 steps.\n2. Step 1 — Add an Extraction task. Select an Extraction with fields relevant to your document.\n3. Step 2 — Add a Prompt task. Write a prompt that analyzes the extracted data.\n4. Step 3 — Add a Formatter task. Write a template that structures the final output.\n5. Select a document and run the workflow. Observe how data flows through each step.\n6. Review each step's output individually using the step-by-step output panel.",
+        "content": "Build the original course's three-step workflow on its assigned subaward document. Keep its saved challenge and optional star requirements; the guidance below does not change them.\n\n1. Add three steps to a new workflow. For the first, choose **Extractions**, then select an extraction template with relevant parties, terms and amounts.\n2. For the second, choose **Prompts** and write bounded instructions to analyze those extracted facts. Require explicit uncertainty for obligations or deadlines the source does not establish.\n3. For the third, choose **Format** and write the desired report template. This is the Formatter operation named in the original course.\n4. Inspect each step's input settings and any task override. Connect the second step to the intended first-step result and the third to the intended analysis. Do not assume a step can recover source context that was omitted earlier.\n5. Select the assigned document, confirm the complete input scope and run the saved workflow.\n6. Review the recorded intermediate and final outputs against the source. Check that formatting preserves qualifications and does not turn an unresolved obligation into a confident instruction.",
         "variant": "walkthrough"
       },
       {
@@ -1163,10 +1163,10 @@
       },
       {
         "id": "batch_processing.run-your-first-batch",
-        "revision": 1,
+        "revision": 2,
         "title": "Run your first batch",
         "objective": "",
-        "content": "1. Ensure you have a workflow that works reliably on a single document.\n2. Upload at least 3 documents of the same type to your workspace.\n3. Select all 3 documents, then open your workflow.\n4. Choose \"Batch\" mode.\n5. Start the batch. Watch the real-time progress.\n6. When complete, review the results for each document.\n7. If any failed, inspect the error, fix the issue, and re-run just the failed documents.",
+        "content": "Use the original course's three assigned sample proposals. Preserve its three-document requirement and inspect each distinct input and result.\n\n1. Prepare the assigned samples and test the workflow on a representative input before submitting the batch. A single success does not establish reliability across all documents.\n2. Select the three distinct assigned documents in the Library, then open the intended workflow. Check any fixed document or project scope so unrelated sources are not included.\n3. In the workflow's input controls, select **Run per document (3 runs)**. The control appears when more than one document is selected and uses the actual selected count. This is the per-document batch option described by this course.\n4. Click **Run** and retain the batch identity and intended input list. Queued jobs may finish in a different order.\n5. Inspect every item's status and reconcile its document identity with the assigned list. An aggregate **Batch Complete** can include failed items; terminal status alone does not establish accurate results.\n6. Review the returned PI names and other required values against each source. Preserve successful results and unresolved exceptions.\n7. For a failed item, inspect the saved error, repair and verify the input or configuration, then select only the affected document for a justified new run. Check prior effects before retrying. A single selected document uses a normal run; keep its result linked in your evidence to the original batch failure.",
         "variant": "walkthrough"
       },
       {
