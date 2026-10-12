@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { HomeTaskShortcuts } from './HomeTaskShortcuts'
 
@@ -34,5 +34,18 @@ describe('home task preparation', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(prepare).not.toHaveBeenCalled()
+  })
+})
+
+describe('keyboard (#1014 item 53)', () => {
+  it('returns focus to the task button when its dialog closes with Escape', async () => {
+    render(<HomeTaskShortcuts documents={[{ uuid: 'd1', title: 'Award notice.pdf' }]} onPrepare={vi.fn()} />)
+    const opener = screen.getByRole('button', { name: 'Check a budget' })
+    opener.focus()
+    fireEvent.click(opener)
+    const dialog = await screen.findByRole('dialog', { name: 'Check a budget' })
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(opener).toHaveFocus())
   })
 })
