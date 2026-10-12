@@ -47,6 +47,15 @@ FOUNDATIONS_SOURCE = {
 }
 
 
+# NIH repair lab: (expected value or None for absent, line that shows it).
+EXTRACTION_SOURCE = {
+    'Total Budget': ('1250000', 'Total Budget: $1,250,000'),
+    'Postdoctoral Fellow Name': (None, 'TBD'),
+    'Human Subjects': ('No', 'Human Subjects: No'),
+    'Vertebrate Animals': ('Yes', 'Vertebrate Animals: Yes - Mouse model (Mus musculus)'),
+}
+
+
 def live_runtime():
     config = json.loads(Path(LIVE_CONFIG).read_text())
     if sum(model.get('name') == LIVE_MODEL for model in config.get('available_models', [])) != 1:
@@ -164,3 +173,57 @@ async def test_foundations_live_extraction_is_checked_by_the_learner_and_graded_
         assert assessment['status'] == 'requirements_supported', assessment
     else:
         assert assessment['status'] == 'revision_required', assessment
+
+
+@pytest.mark.parametrize('behavior', ['honest', 'careless'])
+async def test_extraction_repair_live_run_is_checked_by_the_learner_and_graded_by_the_live_reviewer(repo, tmp_path, monkeypatch, behavior):
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    # Every shared lab helper now prepares and executes against the live model.
+    monkeypatch.setattr(base, 'LAB_RUNTIME', runtime_config)
+    _, _, document, _, snapshot, run = await base.extraction_repair_fixture(repo, enrolled=(learner, package))
+    assert all(quote in document.raw_text for _, quote in EXTRACTION_SOURCE.values())
+    await base.submit_repair_decision(repo, learner, package, base.repair_decision_submission(package, run))
+    run = await base.execute_lab(repo, learner, package, snapshot['uuid'], run['run_id'])
+    assert run['state'] == 'completed', run.get('result')
+    phrase = {field['title']: field['searchphrase'] for field in snapshot['artifact']['fields']}
+    output = run['result']['entities'][0]
+
+    checks, matched = [], {}
+    for field, (truth, quote) in EXTRACTION_SOURCE.items():
+        produced = output.get(phrase[field])
+        absent = produced in (None, '') or normalized(produced) in ('none', 'null', 'tbd', 'n/a')
+        matched[field] = absent if truth is None else normalized(produced) == normalized(truth)
+        checks.append({'field': field, 'decision': 'supported' if matched[field] else 'unsupported',
+            'checked_value': '' if produced is None else str(produced), 'source_document_id': document.uuid,
+            'source_quote': quote,
+            'reason': ('The output matches the quoted line of the assigned source.' if matched[field] and truth is not None else
+                       'The source lists only TBD, so the value is correctly left absent.' if matched[field] else
+                       f'The assigned source says "{quote}", which the output does not match.')})
+    if behavior == 'careless':
+        # Falls for the annual-allocation trap the repair case is built around.
+        budget = next(check for check in checks if check['field'] == 'Total Budget')
+        budget.update(decision='supported', checked_value='304000',
+                      reason='The budget table shows the amount, so the total is correct.')
+    body = base.repair_decision_submission(package, run, 'repair_values', document)
+    honest = behavior == 'honest' and all(matched.values())
+    body.update(choice='accept' if honest or behavior == 'careless' else 'repair', value_checks=checks,
+                reason='I compared each repaired value with the assigned NIH source before deciding.')
+    await base.submit_repair_decision(repo, learner, package, body, 'repair_values')
+
+    prepared = await prepare_live_review(repo, learner, package, run['run_id'], runtime_config)
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record(f'extraction_engine-{behavior}', {'run_state': run['state'],
+        'output': {field: output.get(phrase[field]) for field in EXTRACTION_SOURCE}, 'field_matches': matched,
+        'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+    if behavior == 'careless' or not all(matched.values()):
+        assert assessment['status'] == 'revision_required', assessment
+    else:
+        assert assessment['status'] == 'requirements_supported', assessment
