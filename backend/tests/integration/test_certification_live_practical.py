@@ -258,3 +258,65 @@ async def test_thin_design_answers_are_sent_back_by_the_live_reviewer(repo, tmp_
     assert assessment['credit_awarded'] is False
     unmet = [item for item in assessment['outcomes'] if item['verdict'] != 'supported']
     assert unmet and all(len(item['revision_instruction']) >= 10 for item in unmet)
+
+
+async def run_connected_revision(repo, fixture, runtime_config):
+    from app.services.certification_versions.connected_workflow_execution import ConnectedWorkflowExecution
+    from app.services.certification_versions.connected_workflow_preparation import ConnectedWorkflowPreparation
+    from app.services.certification_versions.runtime import CourseOperation
+    learner, package = fixture[:2]
+    capture_body = fixture[7]
+    capture_body['request_id'] = uuid4().hex
+    snapshot = await base.capture_connected(repo, fixture)
+    async with repo.write_boundary(learner.user_id, learner.uuid, operation='prepare_connected_workflow') as progress:
+        planned = await ConnectedWorkflowPreparation().prepare(CourseOperation(learner.user_id, package, progress, True),
+            base.connected_plan_body(snapshot), runtime_config, actor_user_id=learner.user_id, default_model=LIVE_MODEL)
+    await base.submit_connected_scope(repo, fixture, base.connected_scope_body(planned))
+    approved = await ConnectedWorkflowExecution().get(learner.user_id, planned['run_id'])
+    return await base.dispatch_connected(repo, fixture, base.connected_execution_body(approved), config=runtime_config)
+
+
+@pytest.mark.parametrize('behavior', ['honest', 'careless'])
+async def test_multi_step_live_runs_compare_a_broken_and_repaired_connection(repo, tmp_path, monkeypatch, behavior):
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+    monkeypatch.setattr(base, 'connected_workflow_fixture', partial(base.connected_workflow_fixture, enrolled=(learner, package)))
+    fixture = await base.connected_workflow_fixture(repo)
+    tasks = fixture[5]
+    # The authored flaw: the Formatter rereads the source instead of the reasoning result.
+    tasks[2].data['input_sources'] = ['workflow_documents']
+    await tasks[2].save()
+    original = await run_connected_revision(repo, fixture, runtime_config)
+    if behavior == 'honest':
+        tasks[2].data['input_sources'] = ['step_input']
+        await tasks[2].save()
+    # A careless learner reruns without repairing the connection.
+    corrected = await run_connected_revision(repo, fixture, runtime_config)
+    assert original['state'] == corrected['state'] == 'completed', (original.get('result'), corrected.get('result'))
+
+    try:
+        saved = await base.submit_connected_review(repo, fixture, base.connected_review_body(original, corrected))
+    except Exception as refused:
+        assert behavior == 'careless', refused
+        record('multi_step-careless', {'refused_at': 'submit_connected_review', 'reason': str(refused)[:300]})
+        return
+    prepared = await base.prepare_connected_assessment(repo, fixture, saved['uuid'])
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record(f'multi_step-{behavior}', {'states': [original['state'], corrected['state']],
+        'final_outputs': [str(run['result'].get('final_output'))[:600] for run in (original, corrected)],
+        'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'deterministic': [(item['outcome_id'], item['passed']) for item in assessment.get('deterministic_outcomes', [])],
+        'credit_awarded': assessment['credit_awarded']})
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+    connected = next(item for item in assessment['deterministic_outcomes'] if item['outcome_id'] == 'multi_step.connected_execution')
+    if behavior == 'careless':
+        assert assessment['status'] == 'revision_required' and assessment['passed'] is False, assessment
+    else:
+        assert connected['passed'] is True
+        assert assessment['status'] == 'requirements_supported', assessment
