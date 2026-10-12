@@ -462,6 +462,8 @@ export interface QualityStatus {
   stale: boolean
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
+  /** A catalog author's rating with no measurement behind it; status is unvalidated. */
+  tier_asserted?: string | null
 }
 
 export function getQualityStatus(uuid: string) {

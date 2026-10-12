@@ -1757,6 +1757,17 @@ async def get_extraction_quality_status(
             "regression_pending_review": False,
         }
 
+    # A catalog tier with no score and no run behind it is the author's claim,
+    # not a measurement (#1013 §5): report the item as unvalidated and pass
+    # the claim separately so the card can say whose rating it is.
+    if not latest and meta and meta.quality_score is None:
+        return {
+            "status": "unvalidated", "score": None, "tier": None,
+            "tier_asserted": meta.quality_tier,
+            "config_changed": False, "stale": False, "last_validated_at": None,
+            "regression_pending_review": bool(meta.regression_pending_review),
+        }
+
     score = meta.quality_score if meta else latest.get("score") if latest else None
     tier = meta.quality_tier if meta else None
     last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else

@@ -58,6 +58,7 @@ import type { QualityStatus } from '../../api/extractions'
 import { relativeTime } from '../../utils/time'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { assertedTierNote } from '../../lib/qualityLabels'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -2042,6 +2043,11 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
             Run validation to check extraction reliability
           </div>
+                        {assertedTierNote(status.tier_asserted) && (
+                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                            {assertedTierNote(status.tier_asserted)}
+                          </div>
+                        )}
         </div>
       </div>
     )

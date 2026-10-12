@@ -1,3 +1,5 @@
+import { assertedTierNote } from '../../lib/qualityLabels'
+
 const tierColors: Record<string, { bg: string; text: string; border: string }> = {
   excellent: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
   good: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
@@ -49,7 +51,7 @@ export function QualityBadge({
   const catalog = variant === 'catalog'
   const baseLabel = tierLabel
     ? asserted
-      ? `Rated ${tierLabel} by its author · not yet checked here`
+      ? assertedTierNote(tier)
       : `${catalog ? 'Checked' : 'Quality:'} ${catalog ? '· ' : ''}${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
     : catalog ? 'Not yet checked here' : 'Unvalidated'
   const label = regressionPending ? 'Regression pending review' : baseLabel

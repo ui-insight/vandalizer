@@ -82,6 +82,7 @@ import type { ReviewDetail } from '../../api/reviews'
 import { ColdStartHero } from '../shared/ColdStartHero'
 import { TermDef } from '../shared/TermDef'
 import { splitFieldTerms } from '../../utils/extractionTerms'
+import { assertedTierNote } from '../../lib/qualityLabels'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -1038,6 +1039,11 @@ export function WorkflowEditorPanel() {
                         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                           Run validation to check workflow output quality
                         </div>
+                        {assertedTierNote(qualityStatus.tier_asserted) && (
+                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                            {assertedTierNote(qualityStatus.tier_asserted)}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => setActiveTab('validate')}
