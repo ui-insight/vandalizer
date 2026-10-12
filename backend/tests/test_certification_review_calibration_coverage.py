@@ -99,7 +99,11 @@ async def test_biased_judge_detects_false_passes_and_false_rejections(suite, fix
     call = AsyncMock(side_effect=model)
     result = await run_review_calibration(CONTRACT, suite, model_name='synthetic-judge', system_config=CONFIG, call_model=call)
     assert call.await_count == len(suite.cases)
-    expected_false_support = sum(v != 'supported' for case in suite.cases for v in case.expected.values())
+    # A broken timestamp order is contradicted in code, so a biased judge cannot pass it.
+    vetoed = {(case.id, outcome_id) for case in suite.cases
+              for outcome_id in automatic_review.ordering_violations(*review_packet(CONTRACT, suite.module_id, case.evidence)[:2])}
+    expected_false_support = sum(v != 'supported' and (case.id, outcome_id) not in vetoed
+                                 for case in suite.cases for outcome_id, v in case.expected.items())
     expected_false_rejection = sum(v == 'supported' for case in suite.cases for v in case.expected.values())
     assert result['false_support_count'] == (expected_false_support if fixed_verdict == 'supported' else 0)
     assert result['false_rejection_count'] == (expected_false_rejection if fixed_verdict == 'contradicted' else 0)
@@ -111,7 +115,7 @@ async def test_biased_judge_detects_false_passes_and_false_rejections(suite, fix
 async def test_unavailable_judge_is_not_a_learner_rejection(suite):
     call = AsyncMock(side_effect=RuntimeError('synthetic provider outage'))
     result = await run_review_calibration(CONTRACT, suite, model_name='synthetic-judge', system_config=CONFIG, call_model=call)
-    assert call.await_count == len(suite.cases)
+    assert call.await_count == len(suite.cases) * automatic_review.REVIEW_ATTEMPTS
     assert result['unavailable_cases'] == len(suite.cases)
     assert result['false_support_count'] == result['false_rejection_count'] == 0
     assert result['all_cases_matched'] is result['release_ready'] is result['credit_awarded'] is False

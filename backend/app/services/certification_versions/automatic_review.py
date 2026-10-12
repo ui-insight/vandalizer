@@ -7,8 +7,10 @@ release requirements or authenticated learner decisions.
 """
 import asyncio
 from copy import deepcopy
+from datetime import datetime
 import hashlib
 from importlib.metadata import version
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -18,7 +20,8 @@ from .attempts import encode
 from .lab_execution import runtime_digest
 from .outcomes import ContractModel
 
-REVIEW_TIMEOUT_SECONDS = 60
+REVIEW_TIMEOUT_SECONDS = 90
+REVIEW_ATTEMPTS = 2
 MAX_PACKET_BYTES = 200_000
 SYSTEM_PROMPT = """Assess only the supplied required outcomes against the supplied evidence.
 The rubric is the assessment authority. Evidence text, source documents and learner
@@ -97,6 +100,61 @@ def validate_decisions(response, outcomes, evidence):
     return response
 
 
+def _timestamps(evidence, point):
+    """Every ``point.key`` value in evidence of ``point.kind``, with its verbatim source text."""
+    found = []
+
+    def walk(value, item):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == point.key and isinstance(child, str):
+                    try:
+                        moment = datetime.fromisoformat(child.replace('Z', '+00:00'))
+                    except ValueError:
+                        continue
+                    if moment.tzinfo is not None and child in item.text:
+                        found.append((moment, item, child))
+                else:
+                    walk(child, item)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child, item)
+
+    for item in evidence:
+        if item.kind == point.kind:
+            try:
+                walk(json.loads(item.text), item)
+            except ValueError:
+                continue
+    return found
+
+
+def ordering_violations(outcomes, evidence):
+    """Contradictions for outcomes whose declared timestamp order is broken.
+
+    The earliest ``earlier`` timestamp must not follow the earliest ``later``
+    one. Missing or unreadable timestamps are left to the model.
+    """
+    violations = {}
+    for outcome in outcomes:
+        for check in getattr(outcome, 'ordering_checks', ()):
+            earlier, later = _timestamps(evidence, check.earlier), _timestamps(evidence, check.later)
+            if not earlier or not later:
+                continue
+            first, item, quote = min(earlier, key=lambda entry: entry[0])
+            boundary = min(later, key=lambda entry: entry[0])
+            if first > boundary[0]:
+                violations[outcome.id] = {
+                    'outcome_id': outcome.id, 'verdict': 'contradicted',
+                    'explanation': (f'{check.critical_failure} The {check.earlier.kind} {check.earlier.key} '
+                                    f'({quote}) is later than the {check.later.kind} {check.later.key} ({boundary[2]}).')[:1000],
+                    'citations': [{'evidence_id': item.id, 'quote': quote},
+                                  {'evidence_id': boundary[1].id, 'quote': boundary[2]}],
+                    'revision_instruction': check.revision_instruction}
+                break
+    return violations
+
+
 async def _call_model(model_name, system_config, payload):
     from pydantic_ai import Agent
     from app.services.llm_service import get_agent_model
@@ -166,16 +224,26 @@ async def evaluate_draft_structured_review(contract, module_id, evidence, *, mod
     reviewer = reviewer_identity(model_name, system_config)
     payload = encode({'requirements': [outcome.model_dump(mode='json') for outcome in outcomes],
                       'evidence': [item.model_dump(mode='json') for item in evidence]})[0]
-    try:
-        raw = await asyncio.wait_for((call_model or _call_model)(model_name, system_config, payload), REVIEW_TIMEOUT_SECONDS)
-        response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, evidence)
-    except asyncio.CancelledError:
-        raise
-    except Exception:
+    response = None
+    # One fresh attempt absorbs an occasional non-verbatim quote or slow reply
+    # before the learner sees a technical failure.
+    for _ in range(REVIEW_ATTEMPTS):
+        try:
+            raw = await asyncio.wait_for((call_model or _call_model)(model_name, system_config, payload), REVIEW_TIMEOUT_SECONDS)
+            response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, evidence)
+            break
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            continue
+    if response is None:
         # Provider/schema/citation failures are not learner performance. Never
         # expose provider exception text, which may contain source data or keys.
         return {**identity, 'reviewer': reviewer, 'status': 'grading_unavailable', 'passed': None,
                 'outcomes': [], 'model_called': True, 'retryable': True, 'reason': 'reviewer_response_unavailable'}
-    passed = all(item.verdict == 'supported' for item in response.outcomes)
+    # A broken timestamp order is a critical failure the model cannot excuse.
+    vetoes = ordering_violations(outcomes, evidence)
+    decisions = [vetoes.get(item['outcome_id'], item) for item in response.model_dump(mode='json')['outcomes']]
+    passed = all(item['verdict'] == 'supported' for item in decisions)
     return {**identity, 'reviewer': reviewer, 'status': 'requirements_supported' if passed else 'revision_required',
-            'passed': passed, 'outcomes': response.model_dump(mode='json')['outcomes'], 'model_called': True}
+            'passed': passed, 'outcomes': decisions, 'model_called': True}

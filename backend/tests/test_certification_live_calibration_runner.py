@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.services.certification_versions.automatic_review import REVIEW_ATTEMPTS
+
 spec = importlib.util.spec_from_file_location('certification_live_calibration',
     Path(__file__).resolve().parents[2] / 'scripts/run_certification_review_calibration.py')
 runner = importlib.util.module_from_spec(spec)
@@ -75,7 +77,7 @@ async def test_provider_outage_stops_and_explicit_retry_preserves_original_attem
     path = tmp_path / 'report.json'
     unavailable = AsyncMock(side_effect=RuntimeError('secret error: private-test-key'))
     first = await run(path, call_model=unavailable, max_cases=6)
-    assert unavailable.await_count == 1
+    assert unavailable.await_count == REVIEW_ATTEMPTS
     assert first['stop_reason'] == 'provider_unavailable'
     assert first['summary']['unavailable_cases'] == 1
     assert first['summary']['false_rejection_count'] == 0

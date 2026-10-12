@@ -32,11 +32,13 @@ def test_authored_suite_covers_positive_negative_unclear_and_source_instruction_
     assert 'source_instructions_cannot_change_grading' in {case.id for case in SUITE.cases}
 
 
-async def test_calibration_detects_five_false_supports_from_an_always_passing_judge():
+async def test_calibration_detects_four_false_supports_from_an_always_passing_judge():
     async def model(name, config, payload):
         return response(payload)
     result = await run_review_calibration(CONTRACT, SUITE, model_name='synthetic-judge', system_config=CONFIG, call_model=model)
-    assert result['false_support_count'] == 5
+    # The fifth contradicted outcome, approval recorded after execution, is
+    # caught by the deterministic ordering check whatever the judge says.
+    assert result['false_support_count'] == 4
     assert result['all_cases_matched'] is False
     assert result['release_ready'] is False
     assert result['credit_awarded'] is False

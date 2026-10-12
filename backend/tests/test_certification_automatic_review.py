@@ -113,6 +113,63 @@ async def test_invalid_model_output_is_a_retryable_grader_problem_not_a_learner_
     assert result['outcomes'] == []
 
 
+async def test_one_invalid_response_is_retried_before_reporting_a_technical_failure():
+    bad = decisions()
+    bad['outcomes'][0]['citations'][0]['quote'] = 'Fields stitched together from several places.'
+    model = AsyncMock(side_effect=[bad, decisions()])
+    result = await review(model=model)
+    assert result['status'] == 'requirements_supported'
+    assert model.await_count == 2
+    model = AsyncMock(side_effect=[bad, bad, decisions()])
+    result = await review(model=model)
+    assert result['status'] == 'grading_unavailable'
+    assert model.await_count == 2
+
+
+def timed_packet(approved_at, started_at):
+    evidence = packet()
+    texts = {'learner_decision': {'scope_review': {'approved_at': approved_at, 'approved_document_id': 'doc-A'}},
+             'execution_receipt': {'run_id': 'run-A', 'started_at': started_at, 'status': 'completed'}}
+    for item in evidence:
+        if item['kind'] in texts:
+            item['text'] = json.dumps(texts[item['kind']])
+    assert {item['kind'] for item in evidence} >= set(texts)
+    return evidence
+
+
+async def test_approval_recorded_after_execution_is_contradicted_even_when_the_model_supports_it():
+    evidence = timed_packet('2026-01-02T10:02:00Z', '2026-01-02T10:01:00Z')
+    result = await review(evidence, AsyncMock(return_value=decisions(evidence)))
+    assert result['status'] == 'revision_required'
+    assert result['passed'] is False
+    scoped = next(item for item in result['outcomes'] if item['outcome_id'] == 'foundations.scoped_proposal')
+    assert scoped['verdict'] == 'contradicted'
+    assert {c['quote'] for c in scoped['citations']} == {'2026-01-02T10:02:00Z', '2026-01-02T10:01:00Z'}
+    assert 'before you start the run' in scoped['revision_instruction']
+    others = [item for item in result['outcomes'] if item['outcome_id'] != 'foundations.scoped_proposal']
+    assert others and all(item['verdict'] == 'supported' for item in others)
+
+
+@pytest.mark.parametrize('approved_at, started_at', [
+    ('2026-01-02T10:00:00Z', '2026-01-02T10:01:00Z'),
+    ('2026-01-02T10:01:00Z', '2026-01-02T10:01:00Z'),
+    ('2026-01-02T10:02:00', '2026-01-02T10:01:00Z'),
+    ('not a time', '2026-01-02T10:01:00Z'),
+])
+async def test_ordering_check_leaves_timely_or_unreadable_approval_to_the_model(approved_at, started_at):
+    evidence = timed_packet(approved_at, started_at)
+    result = await review(evidence, AsyncMock(return_value=decisions(evidence)))
+    assert result['status'] == 'requirements_supported'
+
+
+def test_ordering_check_must_enforce_a_declared_critical_failure():
+    raw = json.loads((DRAFT / 'outcomes.json').read_text())
+    outcome = next(o for m in raw['modules'] for o in m['outcomes'] if o['id'] == 'foundations.scoped_proposal')
+    outcome['ordering_checks'][0]['critical_failure'] = 'A failure the rubric never declared.'
+    with pytest.raises(ValidationError):
+        OutcomeContract.model_validate(raw)
+
+
 async def test_provider_exception_does_not_expose_source_or_credentials_or_send_to_staff():
     result = await review(model=AsyncMock(side_effect=RuntimeError('private-key and private source text')))
     assert result['status'] == 'grading_unavailable'

@@ -176,7 +176,21 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "ordering_checks": [
+            {
+              "earlier": {
+                "kind": "learner_decision",
+                "key": "approved_at"
+              },
+              "later": {
+                "kind": "execution_receipt",
+                "key": "started_at"
+              },
+              "critical_failure": "Approve a run on a different document or record approval only after execution.",
+              "revision_instruction": "Review and approve the corrected document and workspace before you start the run, then run the extraction again so your approval covers that execution."
+            }
+          ]
         },
         {
           "id": "foundations.executed_extraction",

@@ -19,6 +19,19 @@ class CalibrationCase(ContractModel):
     reason: str = Field(min_length=10)
 
 
+class OrderingPoint(ContractModel):
+    kind: str = Field(min_length=1, max_length=80)
+    key: str = Field(pattern=r'^[a-z][a-z0-9_]*_at$')
+
+
+class OrderingCheck(ContractModel):
+    """A timestamp order the grader enforces in code rather than leaving to the model."""
+    earlier: OrderingPoint
+    later: OrderingPoint
+    critical_failure: str = Field(min_length=10)
+    revision_instruction: str = Field(min_length=10, max_length=1000)
+
+
 class Outcome(ContractModel):
     id: str = Field(pattern=r'^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$')
     statement: str = Field(min_length=20)
@@ -32,12 +45,15 @@ class Outcome(ContractModel):
     calibration: tuple[CalibrationCase, ...] = Field(min_length=2)
     teaching_status: Literal['revision_required', 'authored']
     assessment_status: Literal['not_implemented', 'implemented', 'verified']
+    ordering_checks: tuple[OrderingCheck, ...] = ()
 
     @model_validator(mode='after')
     def validate_cases(self):
         ids = [case.id for case in self.calibration]
         if len(ids) != len(set(ids)) or not {'pass', 'fail'} <= {case.expected for case in self.calibration}:
             raise ValueError('Every outcome needs unique passing and failing calibration cases')
+        if any(check.critical_failure not in self.critical_failures for check in self.ordering_checks):
+            raise ValueError('An ordering check must enforce one of the outcome critical failures')
         if len(self.lesson_ids) != len(set(self.lesson_ids)):
             raise ValueError('Repeated lesson reference')
         return self
