@@ -243,7 +243,9 @@ async def test_full_course_requires_all_original_outcomes_and_graduates_once(rep
                 selection['scenario_attempt_id'] = uuid4().hex
                 await base.submit_scenario(repo, learner, package, bank,
                     {q.id: q.correct_choice_id for q in bank.questions}, selection['scenario_attempt_id'])
-            params = {'enrollment_id': learner.uuid, 'request_id': uuid4().hex}
+            # Completion is fenced on the attempt counter the learner reviewed.
+            reviewed_attempts = (await repo.read_progress(learner.user_id, learner.uuid)).modules.get(module.id, {}).get('attempts', 0)
+            params = {'enrollment_id': learner.uuid, 'request_id': uuid4().hex, 'expected_attempts': reviewed_attempts}
             body = {'consent': 'complete_selected_saved_outcomes', **selection}
             endpoint = f'/certification/modules/{module.id}/complete'
             if module.id == 'governance':
