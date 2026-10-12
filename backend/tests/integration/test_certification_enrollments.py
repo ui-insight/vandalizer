@@ -1751,6 +1751,8 @@ def add_scenario_fixture_course(repo):
     manifest = json.loads((directory / 'manifest.json').read_text())
     for name in ('outcomes.json', *scenario_paths):
         manifest['artifacts'][name] = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+    # Required-outcome credit has a single completion threshold.
+    manifest['maximum_stars'] = 1
     (directory / 'manifest.json').write_text(json.dumps(manifest))
     path = repo.catalog.root / 'registry.json'
     registry = json.loads(path.read_text())
@@ -5266,7 +5268,10 @@ async def test_repair_http_complete_owned_flow_and_original_history(versioned_ru
     assert module['repairAssignment']['baseline']['provenance'] == 'authored_flawed_example_not_an_execution'
     assert 'expectations' not in json.dumps(module['repairAssignment'])
     chat = await chat_tools.get_certification_module(SimpleNamespace(deps=SimpleNamespace(user_id=source.user_id)), 'extraction_engine')
-    assert chat['instructions'] == package.json('exercises.json')['extraction_engine']['chat_instructions']
+    # New-course cards show the learner's procedure; chat wording guides the agent.
+    exercise = package.json('exercises.json')['extraction_engine']
+    assert chat['instructions'] == exercise['instructions']
+    assert chat['agent_guidance'] == exercise['chat_instructions']
     assert len(chat['expected_fields']) == 4 and chat['star_criteria'] == {}
     before = (await repo.read_progress(source.user_id, source.uuid)).model_dump(mode='json')
     app = FastAPI()
