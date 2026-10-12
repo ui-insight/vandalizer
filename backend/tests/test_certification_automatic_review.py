@@ -113,17 +113,13 @@ async def test_invalid_model_output_is_a_retryable_grader_problem_not_a_learner_
     assert result['outcomes'] == []
 
 
-async def test_one_invalid_response_is_retried_before_reporting_a_technical_failure():
+async def test_an_invalid_response_is_a_technical_failure_without_an_automatic_second_call():
     bad = decisions()
     bad['outcomes'][0]['citations'][0]['quote'] = 'Fields stitched together from several places.'
     model = AsyncMock(side_effect=[bad, decisions()])
     result = await review(model=model)
-    assert result['status'] == 'requirements_supported'
-    assert model.await_count == 2
-    model = AsyncMock(side_effect=[bad, bad, decisions()])
-    result = await review(model=model)
     assert result['status'] == 'grading_unavailable'
-    assert model.await_count == 2
+    assert model.await_count == 1
 
 
 def timed_packet(approved_at, started_at):

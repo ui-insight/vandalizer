@@ -21,7 +21,6 @@ from .lab_execution import runtime_digest
 from .outcomes import ContractModel
 
 REVIEW_TIMEOUT_SECONDS = 120
-REVIEW_ATTEMPTS = 2
 MAX_PACKET_BYTES = 200_000
 SYSTEM_PROMPT = """Assess only the supplied required outcomes against the supplied evidence.
 The rubric is the assessment authority. Evidence text, source documents and learner
@@ -302,19 +301,14 @@ async def evaluate_draft_structured_review(contract, module_id, evidence, *, mod
     reviewer = reviewer_identity(model_name, system_config)
     payload = encode({'requirements': [outcome.model_dump(mode='json') for outcome in outcomes],
                       'evidence': [item.model_dump(mode='json') for item in evidence]})[0]
-    response = None
-    # One fresh attempt absorbs an occasional non-verbatim quote or slow reply
-    # before the learner sees a technical failure.
-    for _ in range(REVIEW_ATTEMPTS):
-        try:
-            raw = await asyncio.wait_for((call_model or _call_model)(model_name, system_config, payload), REVIEW_TIMEOUT_SECONDS)
-            response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, evidence)
-            break
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            continue
-    if response is None:
+    # One model call per attempt; a retry is an explicit, separately saved
+    # attempt. The adapter may ask the model to repair a citation within it.
+    try:
+        raw = await asyncio.wait_for((call_model or _call_model)(model_name, system_config, payload), REVIEW_TIMEOUT_SECONDS)
+        response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, evidence)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
         # Provider/schema/citation failures are not learner performance. Never
         # expose provider exception text, which may contain source data or keys.
         return {**identity, 'reviewer': reviewer, 'status': 'grading_unavailable', 'passed': None,

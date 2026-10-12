@@ -118,7 +118,7 @@ async def test_biased_judge_detects_false_passes_and_false_rejections(suite, fix
 async def test_unavailable_judge_is_not_a_learner_rejection(suite):
     call = AsyncMock(side_effect=RuntimeError('synthetic provider outage'))
     result = await run_review_calibration(CONTRACT, suite, model_name='synthetic-judge', system_config=CONFIG, call_model=call)
-    assert call.await_count == len(suite.cases) * automatic_review.REVIEW_ATTEMPTS
+    assert call.await_count == len(suite.cases)
     assert result['unavailable_cases'] == len(suite.cases)
     assert result['false_support_count'] == result['false_rejection_count'] == 0
     assert result['all_cases_matched'] is result['release_ready'] is result['credit_awarded'] is False
