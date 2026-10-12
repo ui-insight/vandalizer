@@ -49,7 +49,10 @@ async def test_completion_never_reopens_an_incompatible_enrollment(versioned_run
     else:
         monkeypatch.setattr(CredentialRepository, 'persist', changed_after)
     context = SimpleNamespace(deps=SimpleNamespace(user_id=user_id))
-    result = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid)
+    # Completion is fenced on the attempt counter the learner reviewed.
+    reviewed = (await repository.read_progress(user_id, enrollment.uuid)).modules.get('ai_literacy', {}).get('attempts', 0)
+    result = await chat_tools.complete_certification_module(context, 'ai_literacy', enrollment_id=enrollment.uuid,
+                                                            expected_attempts=reviewed)
     assert 'enrollment changed' in result['error']
     assert (await repository.current(user_id)).state == state
     pending = await repository.read_progress(user_id, enrollment.uuid)
