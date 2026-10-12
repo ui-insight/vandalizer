@@ -111,6 +111,18 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const unsupportedFiguresRef = useRef<string[]>([])
   const silenceInferencesRef = useRef<string[]>([])
 
+  /** Drop the streaming turn's live display and release Stop's handle. */
+  const clearLiveTurn = useCallback(() => {
+    abortRef.current = null
+    setIsStreaming(false)
+    setStreamingContent('')
+    setThinkingContent('')
+    setThinkingDuration(null)
+    setActiveToolCalls([])
+    setToolResults([])
+    setSegments([])
+  }, [])
+
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
       if (isLoadingHistory) return
@@ -193,6 +205,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
 
       const controller = new AbortController()
       abortRef.current = controller
+      // Opening another conversation detaches this stream (abortRef moves on)
+      // without aborting it, so the server still finishes this turn in its own
+      // conversation. Nothing a detached stream does may touch the open chat.
+      const ownsView = () => abortRef.current === controller
 
       try {
         const result = await streamChat(
@@ -200,6 +216,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           documentUuids,
           activityId,
           (chunk: StreamChunk) => {
+            if (!ownsView()) return
             if (chunk.kind === 'text') {
               streamingRef.current += chunk.content
               // Strip any residual think tags the backend parser missed
@@ -337,11 +354,12 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           controller.signal,
           projectUuid,
           identity => {
-            if (controller.signal.aborted || abortRef.current !== controller) return
+            if (controller.signal.aborted || !ownsView()) return
             setConversationUuid(identity.conversationUuid)
             setActivityId(identity.activityId)
           },
         )
+        if (!ownsView()) return
 
         setConversationUuid(result.conversationUuid)
         setActivityId(result.activityId)
@@ -349,6 +367,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         // Add assistant message from accumulated stream
         commitAssistantMessage()
       } catch (e) {
+        if (!ownsView()) return
         const wasAborted =
           (e instanceof DOMException && e.name === 'AbortError') ||
           (e instanceof Error && e.name === 'AbortError')
@@ -366,18 +385,19 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           setErrorDetails({ message: friendly })
         }
       } finally {
-        abortRef.current = null
-        setIsStreaming(false)
-        setStreamingContent('')
-        setThinkingContent('')
-        setThinkingDuration(null)
-        setActiveToolCalls([])
-        setToolResults([])
-        setSegments([])
+        if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, conversationUuid, isLoadingHistory],
+    [activityId, conversationUuid, isLoadingHistory, clearLiveTurn],
   )
+
+  /** Hand the view over to another conversation. The in-flight stream keeps
+   * running server-side and its turn is saved there; it just stops writing
+   * into this hook's state. */
+  const detachLiveTurn = useCallback(() => {
+    clearLiveTurn()
+    setQueuedMessages([])
+  }, [clearLiveTurn])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -385,8 +405,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
 
   const loadHistory = useCallback(async (uuid: string) => {
     const version = ++historyLoadVersion.current
+    detachLiveTurn()
     setIsLoadingHistory(true)
     setError(null)
+    setErrorDetails(null)
     setActivityId(null)
     setConversationUuid(uuid)
     setMessages([])
@@ -406,22 +428,16 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     } finally {
       if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }
-  }, [])
+  }, [detachLiveTurn])
 
   const reset = useCallback(() => {
     historyLoadVersion.current += 1
+    detachLiveTurn()
     setIsLoadingHistory(false)
     setMessages([])
-    setStreamingContent('')
-    setThinkingContent('')
-    setThinkingDuration(null)
-    setIsStreaming(false)
     setConversationUuid(null)
     setActivityId(null)
     setError(null)
-    setActiveToolCalls([])
-    setToolResults([])
-    setSegments([])
     setErrorDetails(null)
     setContextTokens(0)
     setContextMode('full')
@@ -431,8 +447,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setContextMeter(null)
     setCompactionStatus(null)
     setPlanTasks(null)
-    setQueuedMessages([])
-  }, [])
+  }, [detachLiveTurn])
 
   const clearError = useCallback(() => {
     setError(null)
