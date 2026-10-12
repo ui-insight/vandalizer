@@ -17,26 +17,38 @@ import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAutomationActivity } from '../../hooks/useAutomationActivity'
 import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, activeRightTab, setActiveRightTab } = useWorkspace()
+  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, activeRightTab, setActiveRightTab, sendChatMessage } = useWorkspace()
+  // Certification opens in chat: whichever entry point asked (the /certification
+  // URL, rail badge, account menu, a stale course card) queued its kickoff
+  // message on the certification context; send it here, in chat mode.
+  const certification = useCertificationPanelOptional()
+  const certChatRequest = certification?.chatRequest ?? null
+  const consumeCertChatRequest = certification?.consumeChatRequest
+  useEffect(() => {
+    if (!certChatRequest || !consumeCertChatRequest) return
+    consumeCertChatRequest(certChatRequest.nonce)
+    setWorkspaceMode('chat')
+    sendChatMessage(certChatRequest.message)
+  }, [certChatRequest, consumeCertChatRequest, setWorkspaceMode, sendChatMessage])
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
-  const activityNavigating = useRef<'workspace' | 'certification' | null>(null)
-  const openActivity = () => { activityNavigating.current = null; setActivityOpen(true) }
+  const activityNavigating = useRef(false)
+  const openActivity = () => { activityNavigating.current = false; setActivityOpen(true) }
   useEffect(() => {
     if (activityOpen || !activityNavigating.current) return
     const frame = requestAnimationFrame(() => {
-      const destination = activityNavigating.current === 'certification' ? '[data-cert-panel]' : '[aria-label="Tools and assistant"]'
-      document.querySelector<HTMLElement>(destination)?.focus({ preventScroll: true })
+      document.querySelector<HTMLElement>('[aria-label="Tools and assistant"]')?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
   }, [activityOpen])
@@ -253,7 +265,7 @@ export function WorkspaceLayout() {
               <X className="h-4 w-4" />
             </button>
           )}
-          <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={destination => { activityNavigating.current = destination ?? 'workspace'; setActivityOpen(false) }} />
+          <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={() => { activityNavigating.current = true; setActivityOpen(false) }} />
         </div>
         </FocusTrap>
       </div>

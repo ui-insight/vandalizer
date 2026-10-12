@@ -1,15 +1,22 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import { useCertification } from '../hooks/useCertification'
+import { certificationChatEntry } from '../lib/certificationChat'
 import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PendingCompletion, OutcomeCompletionSelection } from '../types/certification'
 
 export type PanelMode = 'floating' | 'fullscreen' | 'docked-left' | 'docked-right' | 'docked-bottom'
 export interface AssessmentDestination { nonce: number; moduleId: string; enrollmentId: string; manifestSha256: string }
+export interface CertificationChatRequest { nonce: number; message: string }
 
 interface CertificationPanelContextValue {
   // Panel UI state
   isOpen: boolean
   mode: PanelMode
   openPanel: () => void
+  // Open the course in chat: queue the start/continue kickoff message for the
+  // workspace chat to send. Entry points outside the workspace navigate to '/'.
+  openInChat: () => void
+  chatRequest: CertificationChatRequest | null
+  consumeChatRequest: (nonce: number) => void
   openAssessment: (moduleId: string, enrollmentId: string, manifestSha256: string) => void
   assessmentDestination: AssessmentDestination | null
   consumeAssessmentDestination: (nonce: number) => void
@@ -74,13 +81,23 @@ export function CertificationPanelProvider({ children }: { children: ReactNode }
     try { localStorage.setItem(STORAGE_KEY, m) } catch {}
   }, [])
 
+  const [chatRequest, setChatRequest] = useState<CertificationChatRequest | null>(null)
+  const chatSequence = useRef(0)
+  const openInChat = useCallback(() => {
+    setIsOpen(false)
+    setChatRequest({ nonce: ++chatSequence.current, message: certificationChatEntry(cert.progress, cert.course).message })
+  }, [cert.progress, cert.course])
+  const consumeChatRequest = useCallback((nonce: number) => {
+    setChatRequest(current => current?.nonce === nonce ? null : current)
+  }, [])
+
   const openPanel = useCallback(() => { setIsOpen(true) }, [])
   const closePanel = useCallback(() => { setIsOpen(false) }, [])
   const togglePanel = useCallback(() => { setIsOpen(prev => !prev) }, [])
 
   return (
     <CertificationPanelContext.Provider value={{
-      isOpen, mode, openPanel, openAssessment, assessmentDestination, consumeAssessmentDestination, closePanel, togglePanel, setMode,
+      isOpen, mode, openPanel, openInChat, chatRequest, consumeChatRequest, openAssessment, assessmentDestination, consumeAssessmentDestination, closePanel, togglePanel, setMode,
       ...cert,
     }}>
       {children}

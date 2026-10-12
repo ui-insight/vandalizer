@@ -226,7 +226,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
   return (
     <CardShell content={content} footer={staleCard && <div className="mt-3 space-y-2">
       <p className="text-sm text-gray-700">These saved instructions are not bound to your selected course. Open the current course before preparing or assessing work.</p>
-      {certification && <CardButton label="Open current course" onClick={() => certification.openPanel()} />}
+      {certification && <CardButton label="Open current course" onClick={() => certification.openInChat()} />}
     </div>}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
@@ -463,7 +463,7 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
           <div style={{ marginTop: 'var(--workspace-space-8)' }}>
             {stale ? <>
               <p className="mb-2 text-sm text-gray-700">This saved result belongs to an earlier or unavailable course selection.</p>
-              {certification && <CardButton label="Open current course" onClick={() => certification.openPanel()} />}
+              {certification && <CardButton label="Open current course" onClick={() => certification.openInChat()} />}
             </> : <CardButton
               subtle
               label="What's next?"

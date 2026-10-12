@@ -2,13 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { CertCheckCard, CertCompletionCard, CertProgressCard, CertModuleCard, CertLessonCard } from './CertificationCards'
 
-const state = vi.hoisted(() => ({ enrollment: 'current', courseAvailable: true, progressDigest: 'a'.repeat(64), refresh: vi.fn(), send: vi.fn(), open: vi.fn() }))
+const state = vi.hoisted(() => ({ enrollment: 'current', courseAvailable: true, progressDigest: 'a'.repeat(64), refresh: vi.fn(), send: vi.fn(), open: vi.fn(), inChat: vi.fn() }))
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ sendChatMessage: state.send }) }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanelOptional: () => ({
     progress: { enrollment_id: state.enrollment, course_version: 'original', manifest_sha256: state.progressDigest, modules: {} },
     course: state.courseAvailable ? { enrollment_id: state.enrollment, course_version: 'original', manifest_sha256: 'a'.repeat(64), modules: [{ id: 'foundations' }] } : null,
-    refresh: state.refresh, openPanel: state.open,
+    refresh: state.refresh, openPanel: state.open, openInChat: state.inChat,
   }),
 }))
 const identity = { enrollment_id: 'current', course_version: 'original', manifest_sha256: 'a'.repeat(64) }
@@ -65,13 +65,14 @@ it.each(['missing-course', 'mismatched-progress'])('keeps unavailable progress a
   expect(state.send).not.toHaveBeenCalled()
 })
 
-it('preserves original completion identity and opens the selected course without a chat prompt', () => {
+it('preserves original completion identity and opens the selected course in chat', () => {
   render(<CertCompletionCard content={{ ...identity, enrollment_id: 'previous', title: 'Foundations', course_title: 'Original course', certified: false }} />)
   expect(screen.getByText('Original course')).toBeInTheDocument()
   expect(screen.getByText('Course version: original')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: "What's next?" })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Open current course' }))
-  expect(state.open).toHaveBeenCalledOnce()
+  expect(state.inChat).toHaveBeenCalledOnce()
+  expect(state.open).not.toHaveBeenCalled()
   expect(state.send).not.toHaveBeenCalled()
 })
 

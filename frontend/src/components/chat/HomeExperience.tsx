@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { ActiveAlertItem, OnboardingStatus, RecentActivityItem } from '../../api/config'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspaceTour } from '../../contexts/WorkspaceTourContext'
 import { ConceptStrip } from './ConceptTip'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
@@ -27,28 +28,8 @@ import './home-work.css'
  */
 function useCertificationCta(): { label: string; message: string } | null {
   const cert = useCertificationPanelOptional()
-  const progress = cert?.progress ?? null
-  if (progress?.certified) return null
-  const moduleIds = progress?.module_ids ?? cert?.course?.modules.map(module => module.id)
-  const selectedModules = moduleIds
-    ? moduleIds.map(id => progress?.modules[id])
-    : Object.values(progress?.modules ?? {})
-  const completedCount = selectedModules.filter(module => module?.completed).length
-  // Eleven is the unversioned continuation course only. Versioned metadata
-  // supplies both membership and the denominator for the selected course.
-  const total = progress?.modules_total ?? cert?.course?.modules.length ?? 11
-  const hasSavedWork = completedCount > 0 || !!progress?.learning_position || !!progress?.pending_completions?.length
-    || selectedModules.some(module => module?.scenario_attempt_id || module?.self_assessment || module?.provisioned_docs?.length)
-  if (hasSavedWork) {
-    return {
-      label: `Continue certification (${completedCount}/${total})`,
-      message: 'Continue my certification — show my progress and the next module.',
-    }
-  }
-  return {
-    label: 'Start the certification course',
-    message: 'Start the Vandalizer certification course — show me where to begin.',
-  }
+  const entry = certificationChatEntry(cert?.progress, cert?.course)
+  return entry.certified ? null : entry
 }
 
 function CertificationHomeActions({ disabled, onSendMessage }: { disabled?: boolean; onSendMessage: (message: string) => void }) {

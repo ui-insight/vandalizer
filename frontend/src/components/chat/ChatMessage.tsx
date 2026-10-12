@@ -5,6 +5,7 @@ import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText, AlertTr
 import { submitChatFeedback } from '../../api/feedback'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
+import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
@@ -172,12 +173,12 @@ export function ChatMessage({
     const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (!target) return
     const route = routeActionClick(target.getAttribute('data-action'), target.textContent || '')
-    // The certification course now runs in chat (cert tools + cards) — start
-    // it in the conversation. The floating panel remains the fallback when
-    // this message has no send pathway.
+    // The certification course runs in chat (cert tools + cards) — start or
+    // continue it in this conversation, or via the workspace chat when this
+    // message has no send pathway.
     if (route.kind === 'cert') {
-      if (onSendMessage) onSendMessage('Start the Vandalizer certification course — show me where to begin.')
-      else certPanel.openPanel()
+      if (onSendMessage) onSendMessage(certificationChatEntry(certPanel.progress, certPanel.course).message)
+      else certPanel.openInChat()
     }
     else if (route.kind === 'files') setWorkspaceMode('files')
     // Improvised action buttons (create-kb, build-workflow, …) have no dedicated

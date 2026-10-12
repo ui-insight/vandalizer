@@ -100,13 +100,13 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: (destination?: 'certification') => void }) {
+export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: () => void }) {
   const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid, openWorkflowId, openExtractionId } = useWorkspace()
   const { activities, loading, error, refresh, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { togglePanel, progress } = useCertificationPanel()
+  const { openInChat, progress } = useCertificationPanel()
   const confirm = useConfirm()
   const deletePending = useRef(false)
   const [deleting, setDeleting] = useState(false)
@@ -357,8 +357,8 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
       <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
         <button
           type="button"
-          aria-label="Open learning panel"
-          onClick={() => { onNavigate?.('certification'); togglePanel() }}
+          aria-label="Open certification in chat"
+          onClick={() => { onNavigate?.(); openInChat() }}
           title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
           style={{

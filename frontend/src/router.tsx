@@ -39,20 +39,25 @@ const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Present = lazy(() => import('./pages/present/Present'))
 
-// Certification is now a dockable panel — this redirect opens it from old bookmarks
+// Certification runs in chat — /certification (old bookmarks, emails, links)
+// opens the workspace chat and starts or continues the course there.
 function CertificationRedirect() {
-  const { openPanel, setMode } = useCertificationPanel()
+  const { openPanel, openInChat, setMode } = useCertificationPanel()
   const navigate = useNavigate()
   useEffect(() => {
-    // The panel's pop-out button opens this route in a fresh window; without
-    // this it would inherit whatever docked mode the origin window last used
-    // and show the whole workspace with a floating panel instead of the course.
-    if (new URLSearchParams(window.location.search).get('panel') === 'fullscreen') setMode('fullscreen')
-    openPanel()
+    // The learning panel's pop-out button opens this route in a fresh window
+    // with ?panel=fullscreen; that one still shows the panel, full screen.
+    const popOut = new URLSearchParams(window.location.search).get('panel') === 'fullscreen'
+    if (popOut) {
+      setMode('fullscreen')
+      openPanel()
+    } else {
+      openInChat()
+    }
     navigate({
       to: '/',
       search: {
-        mode: undefined,
+        mode: popOut ? undefined : 'chat',
         tab: undefined,
         workflow: undefined,
         extraction: undefined,

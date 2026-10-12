@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { CertModuleCard } from './CertificationCards'
 
-const state = vi.hoisted(() => ({ context: null as unknown, send: vi.fn(), open: vi.fn(), assess: vi.fn() }))
+const state = vi.hoisted(() => ({ context: null as unknown, send: vi.fn(), open: vi.fn(), inChat: vi.fn(), assess: vi.fn() }))
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ sendChatMessage: state.send }) }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => state.context }))
 const identity = { enrollment_id: 'selected', course_version: '5-preview', manifest_sha256: 'a'.repeat(64) }
@@ -10,7 +10,7 @@ const card = { ...identity, module_id: 'foundations', title: 'Foundations', samp
 const module = { id: 'foundations', decisionPrompts: [{}] }
 function context() {
   return { course: { ...identity, modules: [module], prerequisites: { foundations: [] as string[] } },
-    progress: { ...identity, modules: {} }, openPanel: state.open, openAssessment: state.assess }
+    progress: { ...identity, modules: {} }, openPanel: state.open, openInChat: state.inChat, openAssessment: state.assess }
 }
 beforeEach(() => { vi.clearAllMocks(); state.context = context() })
 
@@ -29,7 +29,8 @@ it.each(['enrollment_id', 'course_version', 'manifest_sha256', 'module_id'])('ke
   const open = screen.getByRole('button', { name: 'Open current course' })
   expect(open).toBeEnabled()
   fireEvent.click(open)
-  expect(state.open).toHaveBeenCalledOnce()
+  expect(state.inChat).toHaveBeenCalledOnce()
+  expect(state.open).not.toHaveBeenCalled()
   expect(state.send).not.toHaveBeenCalled()
 })
 

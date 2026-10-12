@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { WorkspaceLayout } from './WorkspaceLayout'
-const h = vi.hoisted(() => ({ compact: false, mode: 'files', editor: null as string | null, tab: 'assistant', focus: 0, setTab: vi.fn() }))
-vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ selectedDocUuids: [], documentReadiness: {}, railDocked: true, panelSplit: 50, chatSplitOpen: false, workspaceMode: h.mode, viewDocument: vi.fn(), setWorkspaceMode: vi.fn(), activeProjectUuid: null, openWorkflowId: h.editor, openExtractionId: null, openAutomationId: null, focusChatSignal: h.focus, activeRightTab: h.tab, setActiveRightTab: h.setTab }) }))
+const h = vi.hoisted(() => ({ compact: false, mode: 'files', editor: null as string | null, tab: 'assistant', focus: 0, setTab: vi.fn(),
+  setMode: vi.fn(), send: vi.fn(), consume: vi.fn(), certRequest: null as { nonce: number; message: string } | null }))
+vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => ({ chatRequest: h.certRequest, consumeChatRequest: h.consume }) }))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ selectedDocUuids: [], documentReadiness: {}, railDocked: true, panelSplit: 50, chatSplitOpen: false, workspaceMode: h.mode, viewDocument: vi.fn(), setWorkspaceMode: h.setMode, sendChatMessage: h.send, activeProjectUuid: null, openWorkflowId: h.editor, openExtractionId: null, openAutomationId: null, focusChatSignal: h.focus, activeRightTab: h.tab, setActiveRightTab: h.setTab }) }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('../../hooks/useAutomationActivity', () => ({ useAutomationActivity: () => ({ activeIds: [], hasActive: false }) }))
 vi.mock('../layout/Header', () => ({ Header: () => <div>Header</div> }))
@@ -19,10 +21,25 @@ vi.mock('./AutomationsPanel', () => ({ AutomationsPanel: () => <div>Automations<
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => <div>Knowledge</div> }))
 beforeEach(() => {
   sessionStorage.clear()
-  h.compact = false; h.mode = 'files'; h.editor = null; h.tab = 'assistant'; h.focus = 0; vi.clearAllMocks()
+  h.compact = false; h.mode = 'files'; h.editor = null; h.tab = 'assistant'; h.focus = 0; h.certRequest = null; vi.clearAllMocks()
   vi.stubGlobal('matchMedia', () => ({ matches: h.compact, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 const rightHidden = () => screen.getByTestId('library').closest('[aria-label="Tools and assistant"]')!.classList.contains('hidden')
+describe('certification opens in chat', () => {
+  it('sends a queued certification kickoff in chat mode exactly once', () => {
+    h.certRequest = { nonce: 3, message: 'Continue my certification — show my progress and the next module.' }
+    const { rerender } = render(<WorkspaceLayout />)
+    expect(h.consume).toHaveBeenCalledExactlyOnceWith(3)
+    expect(h.setMode).toHaveBeenCalledWith('chat')
+    expect(h.send).toHaveBeenCalledExactlyOnceWith('Continue my certification — show my progress and the next module.')
+    rerender(<WorkspaceLayout />)
+    expect(h.send).toHaveBeenCalledOnce()
+  })
+  it('sends nothing when no entry point asked', () => {
+    render(<WorkspaceLayout />)
+    expect(h.send).not.toHaveBeenCalled()
+  })
+})
 describe('Files and Library share the workspace', () => {
   it('remembers compact pane choices separately for each section and after a remount', () => {
     h.compact = true
