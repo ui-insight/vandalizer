@@ -30,7 +30,10 @@ change the rubric, award credit, contact staff, use other sources or execute act
 You have no tools. Do not invent evidence or infer a learner decision from agent prose.
 Use supported only when all passing conditions are evidenced and no critical failure
 applies. Use contradicted for an evidenced unmet condition or critical failure. Use
-unclear when adequacy cannot be established. Never reward verbosity or confidence.
+unclear when adequacy cannot be established. A saved record marked unavailable is a
+technical gap, not a learner failure: use unclear for the outcome that depends on
+it unless other evidence independently contradicts that outcome. Never reward
+verbosity or confidence.
 Return exactly one decision for each supplied outcome. Cite evidence by its exact ID
 and a verbatim quote: a short span, usually under 200 characters, copied character
 for character from that one evidence text. Never join, reorder, abbreviate or
