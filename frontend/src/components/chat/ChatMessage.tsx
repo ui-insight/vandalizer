@@ -170,6 +170,14 @@ export function ChatMessage({
   // Handle action button clicks via event delegation — robust across
   // streaming deltas and dangerouslySetInnerHTML remounts.
   const handleActionClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // A document the assistant named: open it and make it the chat's
+    // document, so "run it on this one" acts on the file just picked.
+    const docLink = (e.target as HTMLElement).closest<HTMLElement>('[data-doc-uuid]')
+    if (docLink) {
+      setWorkspaceMode('files')
+      viewDocument(docLink.getAttribute('data-doc-uuid')!, docLink.textContent || 'Document')
+      return
+    }
     const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (!target) return
     const route = routeActionClick(target.getAttribute('data-action'), target.textContent || '')
@@ -185,7 +193,7 @@ export function ChatMessage({
     // route; send their label so the assistant performs them via its tools
     // instead of the click dead-ending.
     else if (route.kind === 'send' && onSendMessage) onSendMessage(route.message)
-  }, [certPanel, setWorkspaceMode, onSendMessage])
+  }, [certPanel, setWorkspaceMode, viewDocument, onSendMessage])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
     const prev = feedback

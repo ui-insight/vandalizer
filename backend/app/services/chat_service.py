@@ -3865,6 +3865,13 @@ def _build_open_documents_block(
         "For documents below, use their UUIDs directly for tools like "
         "run_extraction or get_document_text — do NOT call search_documents to "
         "look them up.",
+        "",
+        "These documents are what the user is working on — usually the file "
+        "open in their viewer. When they ask to run a workflow or extraction, "
+        "or say \"run it\" or \"check this\", without naming a different "
+        "file, act on these documents. Do not ask which file, and do not offer "
+        "other workspace files as alternatives. Ask only when several are "
+        "attached and the request plainly means just one of them.",
     ]
     for doc in documents:
         lines.append(f'- Document: "{doc.title}" (uuid: {doc.uuid})')
@@ -4057,7 +4064,7 @@ async def _build_workspace_inventory(
     # Documents
     if doc_count > 0:
         doc_names = ", ".join(
-            f'"{d.title}"' for d in recent_docs[:3]
+            f'"{d.title}" (uuid: {d.uuid})' for d in recent_docs[:3]
         )
         lines.append(
             f"- {doc_count} document{'s' if doc_count != 1 else ''}"

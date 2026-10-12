@@ -269,6 +269,8 @@ html {
   color: #5f6368;
 }
 .chat-markdown a { color: #2563eb; text-decoration: underline; }
+.chat-markdown .chat-doc-link { display: inline; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: #2563eb; text-decoration: underline; cursor: pointer; text-align: left; }
+.chat-markdown .chat-doc-link:hover { color: #1d4ed8; }
 .chat-markdown table { border-collapse: collapse; margin: 0.5em 0; width: 100%; }
 .chat-markdown th, .chat-markdown td {
   border: 1px solid #e5e7eb;

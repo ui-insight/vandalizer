@@ -131,3 +131,36 @@ describe('gpt-oss citation markup (#1011)', () => {
     expect(html).not.toContain('【')
   })
 })
+
+describe('renderMarkdown document links', () => {
+  function docLinks(html: string): Array<{ uuid: string; label: string }> {
+    const box = document.createElement('div')
+    box.innerHTML = html
+    return [...box.querySelectorAll<HTMLButtonElement>('button[data-doc-uuid]')].map(b => ({
+      uuid: b.getAttribute('data-doc-uuid')!, label: b.textContent!,
+    }))
+  }
+
+  it('turns [title](doc:uuid) into a button that shows only the title', () => {
+    const html = renderMarkdown(
+      'Which one?\n\n- **[NOA_G26AC00033-00.pdf](doc:0f3c9a7e-1b2d-4c5e-8f90-123456789abc)**\n' +
+      '- [NOA_Signed_Original_Agreement_V250737_01.15.26_Award.PDF](doc:a1b2c3d4e5f6)',
+    )
+    expect(docLinks(html)).toEqual([
+      { uuid: '0f3c9a7e-1b2d-4c5e-8f90-123456789abc', label: 'NOA_G26AC00033-00.pdf' },
+      { uuid: 'a1b2c3d4e5f6', label: 'NOA_Signed_Original_Agreement_V250737_01.15.26_Award.PDF' },
+    ])
+    expect(html).not.toContain('doc:')
+  })
+
+  it('keeps markup in a title as text', () => {
+    const html = renderMarkdown('[Budget & <b>Plan</b>.docx](doc:abcd1234)')
+    expect(docLinks(html)).toEqual([{ uuid: 'abcd1234', label: 'Budget & <b>Plan</b>.docx' }])
+  })
+
+  it('leaves ordinary links alone', () => {
+    const html = renderMarkdown('[NSF](https://nsf.gov/x)')
+    expect(docLinks(html)).toEqual([])
+    expect(html).toContain('href="https://nsf.gov/x"')
+  })
+})

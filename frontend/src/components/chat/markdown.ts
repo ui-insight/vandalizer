@@ -49,6 +49,20 @@ function actionButton(type: string, label: string): string {
   return `<button data-action="${type}" class="chat-action-btn">${clean}</button>`
 }
 
+// [Title](doc:<uuid>) — the model's link to a workspace document. DOMPurify
+// drops the unknown doc: scheme from an <a>, so it becomes a button that
+// ChatMessage opens in the viewer.
+const DOC_LINK_RE = /\[([^\]\n]+)\]\(\s*doc:\s*([\w-]{4,80})\s*\)/g
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function docLinkButton(label: string, uuid: string): string {
+  const clean = label.trim().replace(/^[*_`]+|[*_`]+$/g, '') || 'Open document'
+  return `<button type="button" data-doc-uuid="${uuid}" class="chat-doc-link">${escapeHtml(clean)}</button>`
+}
+
 /** Render a markdown string to sanitized HTML. */
 export function renderMarkdown(text: string): string {
   let cleaned = normalizeCitationMarkup(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''))
@@ -70,9 +84,12 @@ export function renderMarkdown(text: string): string {
     actionButton(type, '')
   )
   cleaned = cleaned.replace(ACTION_CLOSE_REMNANT_RE, '')
+  cleaned = cleaned.replace(DOC_LINK_RE, (_match, label: string, uuid: string) =>
+    docLinkButton(label, uuid)
+  )
   const sanitized = DOMPurify.sanitize(marked.parse(cleaned) as string, {
     ADD_TAGS: ['button'],
-    ADD_ATTR: ['data-action'],
+    ADD_ATTR: ['data-action', 'data-doc-uuid'],
   })
   const content = document.createElement('div')
   content.innerHTML = sanitized

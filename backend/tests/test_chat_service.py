@@ -601,6 +601,22 @@ class TestOpenDocumentsBlock:
         # Must not imply the model can clear the conversation itself.
         assert "no tool to clear the conversation" in out
 
+    def test_attached_documents_are_the_default_target(self):
+        # Support ticket: a NOA open in the viewer, "run it" → chat asked which
+        # of two NOA files to use instead of running on the open one.
+        out = self._b([MagicMock(title="NOA.pdf", uuid="u1")])
+        assert "Do not ask which file" in out
+        assert "do not offer" in out
+
+    def test_agentic_prompt_names_the_block_it_relies_on(self):
+        # The continuity rule pointed at "Documents open in this chat", a
+        # heading no block has, so the model never matched it to the list.
+        from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT
+        heading = self._b([MagicMock(title="NOA.pdf", uuid="u1")]).splitlines()[0]
+        assert heading.removeprefix("## ") in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "Documents open in this chat" not in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "(doc:<uuid>)" in AGENTIC_CHAT_SYSTEM_PROMPT
+
 
 # ---------------------------------------------------------------------------
 # No-document grounding
