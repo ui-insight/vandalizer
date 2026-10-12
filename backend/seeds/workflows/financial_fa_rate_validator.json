@@ -7,7 +7,6 @@
     "seed_id": "wf-financial-fa-rate-validator",
     "display_name": "F&A Rate Validator",
     "description": "Validates that the correct facilities and administrative (indirect cost) rate is applied to an award, checking the MTDC base and sponsor caps.",
-    "quality_tier": "excellent",
     "collections": [
       "financial"
     ],
@@ -64,6 +63,32 @@
           "name": "Cites the regulation it applied",
           "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.1, definition of Modified Total Direct Cost), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
           "category": "accuracy"
+        },
+        {
+          "id": "86114ee6-cf49-591e-8b2a-1c36da27c448",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every rate, base amount, excluded cost and indirect amount in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "79110736-41b7-51b4-9f55-3ed7f81bb47e",
+          "name": "Rate and base arithmetic is right",
+          "category": "accuracy",
+          "description": "Any MTDC base the output computes equals total direct costs less the exclusions it names, and any indirect amount equals the rate times that base, with the arithmetic shown. FAIL for a wrong figure or an unshown calculation presented as a result."
+        },
+        {
+          "id": "75b76ee3-173c-5e92-8c28-e59c446f7818",
+          "name": "The rate comes from the document",
+          "category": "content",
+          "description": "The negotiated or applied rate the output validates against is the one the document states (rate agreement, award or budget). If the document gives no rate agreement, the output says the rate could not be confirmed. FAIL if a rate is assumed."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "256a7a7e-7979-50aa-8b82-8e0821f120e7",
+          "type": "text",
+          "label": "Fictional budget with one planted error. Answer key: categories sum to $345,000 total direct (pass); MTDC base $300,000 = $345,000 less $25,000 equipment and $20,000 participant support (consistent); 50% of $300,000 = $150,000 indirect (pass); $345,000 + $150,000 = $495,000, so the stated $500,000 total is overstated by $5,000 (fail). Foreign travel and consultants are not budgeted.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL BUDGET\nWatershed Sensor Network Pilot — proposed budget, budget period 1\nSenior Personnel Costs: $120,000\nOther Personnel Costs: $60,000\nFringe Benefits: $54,000 (fringe benefit rate 30%)\nEquipment: $25,000 (one sensor array, unit cost $25,000)\nTravel Domestic: $8,000\nTravel Foreign: N/A\nParticipant Support Costs: $20,000\nMaterials and Supplies: $12,000\nSubcontracts: $40,000 (one subaward to River College)\nConsultant Costs: none\nOther Direct Costs: $6,000\nTotal Direct Costs: $345,000\nIndirect Cost Rate: 50% (applied to modified total direct costs, MTDC)\nIndirect Cost Base: $300,000 (MTDC)\nIndirect Costs: $150,000\nTotal Project Cost: $500,000\nCost Sharing Amount: none\nNumber of Budget Periods: 1"
         }
       ]
     }

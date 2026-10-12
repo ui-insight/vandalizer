@@ -7,7 +7,6 @@
     "seed_id": "wf-financial-cost-allocation",
     "display_name": "Cost Allocation Analyzer",
     "description": "Reviews cost allocations for compliance with 2 CFR 200 Uniform Guidance, checking allowability, allocability, and reasonableness.",
-    "quality_tier": "excellent",
     "collections": [
       "financial"
     ],
@@ -64,6 +63,24 @@
           "name": "Cites the regulation it applied",
           "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.403, factors affecting allowability), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
           "category": "accuracy"
+        },
+        {
+          "id": "8cd2940c-1853-51e8-9be2-d9b54886fb69",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every cost amount, allocation percentage and period in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "a0229d70-51b0-5c4d-b526-bea703b72250",
+          "name": "Every cost item is assessed",
+          "category": "completeness",
+          "description": "Each cost item the document lists is assessed for allowability, allocability and reasonableness. FAIL for each listed cost the output skips."
+        },
+        {
+          "id": "f66e73f5-f1a5-542f-89a8-62a786daacd8",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (allowable, allocable, reasonable) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
       ]
     }

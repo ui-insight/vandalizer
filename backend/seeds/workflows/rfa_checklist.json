@@ -136,9 +136,34 @@
           "name": "Formatting Consistency & Redundancy Elimination",
           "description": "Review the entire checklist for consistent markdown formatting: headings use `##`, bullet points use `*` (or `-`) uniformly, bold text (`**bold**`) is applied to all key requirements or limits, and italics are used sparingly. Additionally, scan for any identical sentence or bullet that appears more than once; the checklist must not contain duplicated information.",
           "category": "formatting"
+        },
+        {
+          "id": "a456d328-6f63-5b9e-99a0-0ea7a6b27653",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every deadline, time, time zone, dollar amount, page limit and award count in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "b470f8d1-c036-514a-b469-806f967483f7",
+          "name": "Every date in the RFA is in Dates & Deadlines",
+          "category": "completeness",
+          "description": "Every date the RFA states, including internal or institutional deadlines and the project period, is in the Dates & Deadlines table with its time and time zone. When an amendment changes a date, the amended date is used and the change is noted. FAIL for an omitted date or a superseded date shown as current."
+        },
+        {
+          "id": "f7453c94-f4ef-5025-8c1f-33aad90a07bc",
+          "name": "Says when the document is silent",
+          "category": "content",
+          "description": "For each eligibility rule, page limit, budget rule or required component that the source document does not state, the output says it is not stated (or not found) instead of filling in a typical value, a common practice or a figure from memory, and instead of leaving it out without comment. FAIL if a missing item is given a value the document does not contain."
         }
       ],
-      "validation_inputs": []
+      "validation_inputs": [
+        {
+          "id": "573bd94d-db2f-5bb9-a08f-482d91794322",
+          "type": "text",
+          "label": "Fictional solicitation and amendment. Answer key: sponsor deadline November 19, 2026, 5:00 p.m. Pacific Time (amended from November 12); institutional deadline November 9, 2026 at noon Pacific Time (unchanged); project period July 1, 2027 to June 30, 2028; direct costs capped at $180,000; indirect costs additional, at most 25% of direct; no equipment; one application per university; required: narrative, itemized budget, budget justification, one signed community-partner letter. Not stated: a page limit, citizenship eligibility, a waiver process.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: notice-v1\nCommunity Resilience Pilot — original notice, October 1, 2026\n\n1. Eligibility\nAn application must be submitted by a university research office. Each university\nmay submit one application. This notice does not specify citizenship eligibility.\n\n2. Dates\nThe sponsor deadline is November 12, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline is November 9, 2026 at noon Pacific Time.\nThe project period is July 1, 2027 through June 30, 2028.\n\n3. Budget\nThe maximum direct-cost request is $180,000. Indirect costs are additional and\nmay not exceed 25% of direct costs. Equipment purchases are not permitted.\nTravel and subaward costs are allowed within the direct-cost limit.\nThis notice does not give an exception or waiver process.\n\n4. Required material\nInclude a project narrative, an itemized budget, a budget justification and one\nsigned community-partner letter. The letter must arrive with the application.\nThe notice does not specify a page limit for the budget justification.\n\nFICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: amendment-v2\nCommunity Resilience Pilot — official amendment, October 8, 2026\n\nThis amendment supersedes the sponsor deadline in section 2 of notice-v1.\nThe new sponsor deadline is November 19, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline remains November 9, 2026 at noon Pacific Time.\nAll other requirements, limits and project dates in notice-v1 remain unchanged."
+        }
+      ]
     }
   ]
 }

@@ -79,7 +79,26 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
+      "validation_plan": [
+        {
+          "id": "dc8109f7-f445-5caa-a225-f1fc2b4a0dc5",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every dollar amount, date, rate, award number, email address and phone number in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "e916def0-387b-5d46-b468-a1127b4b933c",
+          "name": "Contact details are exact",
+          "category": "accuracy",
+          "description": "Every email address and phone number matches the source character for character and is attached to the role the source gives it. FAIL for any altered contact detail or one assigned to the wrong person or role."
+        },
+        {
+          "id": "64720026-e4fc-509d-aea3-670decc6a903",
+          "name": "Says when the document is silent",
+          "category": "content",
+          "description": "For each subaward term, rate or reporting requirement that the source document does not state, the output says it is not stated (or not found) instead of filling in a typical value, a common practice or a figure from memory, and instead of leaving it out without comment. FAIL if a missing item is given a value the document does not contain."
+        }
+      ],
       "validation_inputs": []
     }
   ]

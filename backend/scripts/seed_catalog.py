@@ -207,6 +207,7 @@ async def upsert_verified_metadata(
     quality_grade: str | None = None, credit: dict | None = None,
     official_baseline: dict | None = None,
     official_baseline_score: float | None = None,
+    retract_unmeasured_tier: bool = False,
 ):
     """Create or refresh VerifiedItemMetadata.
 
@@ -221,6 +222,11 @@ async def upsert_verified_metadata(
     deployment gets drift-checkable evaluation data instead of only a
     hand-asserted tier. It never overwrites a baseline an examiner pinned
     locally — local pins carry a user id, seed pins carry "catalog-seed".
+
+    ``retract_unmeasured_tier`` clears a tier an earlier catalog asserted
+    when the seed no longer asserts one and nothing here measured a score
+    (#1013 §5): an author's "excellent" with no run behind it read as a
+    quality claim. A tier backed by a score measured on this install stays.
     """
     quality_tier = normalize_tier(quality_tier)
     existing = await VerifiedItemMetadata.find_one(
@@ -238,6 +244,9 @@ async def upsert_verified_metadata(
         measured_here = existing.quality_score is not None
         if quality_tier is not None and not (seed_asserts_only and measured_here):
             existing.quality_tier = quality_tier
+        elif retract_unmeasured_tier and quality_tier is None and not measured_here:
+            existing.quality_tier = None
+            existing.quality_grade = None
         elif existing.quality_tier in _LEGACY_TIERS:
             existing.quality_tier = _LEGACY_TIERS[existing.quality_tier]
         if quality_score is not None:
@@ -532,7 +541,10 @@ async def seed_workflow(
 
     # Upsert: update top-level fields and metadata on existing workflows; don't
     # touch the step graph (may have run history referencing it).
-    existing = await Workflow.find_one({"resource_config.seed_id": seed_id})
+    # Only the catalog's own workflow: a user's copy keeps the seed_id
+    # (library_service copies resource_config), and an upgrade must not
+    # rewrite its name, validation plan or validation inputs.
+    existing = await Workflow.find_one({"resource_config.seed_id": seed_id, "user_id": SYSTEM_USER})
     if existing:
         patched = await _patch_inline_extractions(existing, item)
         if patched:
@@ -580,6 +592,7 @@ async def seed_workflow(
             quality_grade=meta.get("quality_grade"),
             official_baseline=meta.get("official_baseline"),
             official_baseline_score=meta.get("official_baseline_score"),
+            retract_unmeasured_tier=True,
         )
         for slug in meta.get("collections", []):
             col = slug_to_collection.get(slug)
@@ -672,6 +685,7 @@ async def seed_workflow(
         quality_grade=meta.get("quality_grade"),
         official_baseline=meta.get("official_baseline"),
         official_baseline_score=meta.get("official_baseline_score"),
+        retract_unmeasured_tier=True,
     )
 
     # Add to collections

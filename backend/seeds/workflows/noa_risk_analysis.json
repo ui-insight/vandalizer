@@ -49,7 +49,26 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
+      "validation_plan": [
+        {
+          "id": "87f17086-074a-5674-b1fa-a62a8e65272f",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every amount, date, term and condition in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "c8c6ef5e-6859-59bd-a5be-f751cf89b39d",
+          "name": "Each rating names the award term behind it",
+          "category": "content",
+          "description": "Every risk rating cites the specific award term, condition or figure in the notice that it rests on. A risk domain the notice gives no basis to rate is marked not assessable rather than scored. FAIL for a rating with no stated basis."
+        },
+        {
+          "id": "0ccddafa-4ffa-5298-9886-62e974aa5b5f",
+          "name": "Uses only the risk domains provided",
+          "category": "accuracy",
+          "description": "The workflow refers to a risk-domain reference (Risk_Domains.docx). If that reference was not provided to the run, the output says so instead of presenting domains of its own as the reference's. FAIL if it invents the reference's contents."
+        }
+      ],
       "validation_inputs": []
     }
   ]

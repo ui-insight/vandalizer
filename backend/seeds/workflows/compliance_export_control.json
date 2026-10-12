@@ -7,7 +7,6 @@
     "seed_id": "wf-compliance-export-control",
     "display_name": "Export Control Screening",
     "description": "Screens a project description or agreement for potential export control concerns under EAR, ITAR, and OFAC regulations.",
-    "quality_tier": "excellent",
     "collections": [
       "compliance"
     ],
@@ -63,6 +62,24 @@
           "name": "Cites the regulation it applied",
           "description": "Each rule, threshold or requirement the output applies is cited to its section of the Export Administration Regulations (15 CFR 730-774) (for example 15 CFR 734.8, fundamental research), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
           "category": "accuracy"
+        },
+        {
+          "id": "b54e1dd5-3d79-573c-b546-0d73fcafda9f",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every country, collaborator, technology area and regulation reference in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "778aa779-8eaa-5811-92ea-86742eacbdca",
+          "name": "Every foreign party and technology area is screened",
+          "category": "completeness",
+          "description": "Each foreign collaborator, country, foreign national participant, item of equipment or software and technology area named in the document is addressed. FAIL for each one the output does not screen."
+        },
+        {
+          "id": "806e5cca-464e-5caa-98c2-8b73cc7d8b04",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (fundamental research, no license needed, no concerns) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
       ]
     }

@@ -7,7 +7,6 @@
     "seed_id": "wf-compliance-coi-review",
     "display_name": "Conflict of Interest Review",
     "description": "Screens a proposal or disclosure for conflict of interest concerns, assessing financial relationships and recommending management plans.",
-    "quality_tier": "excellent",
     "collections": [
       "compliance"
     ],
@@ -63,6 +62,24 @@
           "name": "Cites the regulation it applied",
           "description": "Each rule, threshold or requirement the output applies is cited to its section of the PHS financial conflict of interest regulation (42 CFR 50 Subpart F) (for example 42 CFR 50.603, definition of significant financial interest), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
           "category": "accuracy"
+        },
+        {
+          "id": "acb3a26e-e484-5f23-99e9-55a36a4df858",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every dollar amount, equity percentage, date and entity name in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "9b61034e-ccb9-58b8-b358-9a9f912e8c1b",
+          "name": "Every disclosed interest is assessed",
+          "category": "completeness",
+          "description": "Each financial interest, consulting arrangement, equity holding, IP or licensing relationship, sponsored travel and board position stated in the document is named and assessed. FAIL for each disclosed interest the output skips."
+        },
+        {
+          "id": "bc5af276-e6cd-5e29-bc80-beb58c102ac2",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (no significant financial interest, no conflict) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
       ]
     }

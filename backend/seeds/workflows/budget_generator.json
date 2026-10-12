@@ -37,7 +37,26 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
+      "validation_plan": [
+        {
+          "id": "8a9090bc-05e7-5a99-81da-7fa32c41bf59",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every line item, amount, rate and total in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "d033d4ce-52ae-5f41-b0b2-cd9a31048910",
+          "name": "Every budget line is justified, with its amount",
+          "category": "completeness",
+          "description": "Each line of the source budget appears in the justification with the same amount, and the justification's totals equal the budget's totals. FAIL for a missing line, a changed amount or a total that does not add up."
+        },
+        {
+          "id": "60168701-9c68-512f-b337-0a57c922faa1",
+          "name": "No invented costs or rationale",
+          "category": "accuracy",
+          "description": "The justification adds no cost, quantity, rate or personnel detail that the source budget does not give. Where the budget gives no basis for a line, the output says the basis must be supplied. FAIL for any invented specifics."
+        }
+      ],
       "validation_inputs": []
     }
   ]

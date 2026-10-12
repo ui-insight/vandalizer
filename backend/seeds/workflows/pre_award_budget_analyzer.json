@@ -7,7 +7,6 @@
     "seed_id": "wf-pre-award-budget-analyzer",
     "display_name": "Budget Analyzer",
     "description": "Extracts budget line items from a proposal or award document, checks for arithmetic errors, and flags potentially disallowed costs.",
-    "quality_tier": "excellent",
     "collections": [
       "pre-award",
       "financial"
@@ -132,6 +131,26 @@
           "name": "Reports the computed arithmetic as computed",
           "description": "Each arithmetic finding (category sum, total, rate applied to the base, base exclusions) matches the PASS, FAIL or NOT CHECKED result Vandalizer computed, with the computed figure or difference. A NOT CHECKED result is reported as not checked, with the missing or inexact value named, never replaced by the model's own calculation.",
           "category": "accuracy"
+        },
+        {
+          "id": "c81749b2-e1cd-5e54-9fbb-eaeff30315a3",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every budget amount, rate and total in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "b646ca7d-1e52-59f6-9a5b-e16c275a429d",
+          "name": "Allowability flags name the line",
+          "category": "content",
+          "description": "Every equipment, unallowable-cost or participant-support finding names the budget line and amount it is about. FAIL for a flag that does not identify the line, or a line flagged on a basis the budget does not show."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "7e8b7708-c57a-5abf-b1a3-a188333944fc",
+          "type": "text",
+          "label": "Fictional budget with one planted error. Answer key: categories sum to $345,000 total direct (pass); MTDC base $300,000 = $345,000 less $25,000 equipment and $20,000 participant support (consistent); 50% of $300,000 = $150,000 indirect (pass); $345,000 + $150,000 = $495,000, so the stated $500,000 total is overstated by $5,000 (fail). Foreign travel and consultants are not budgeted.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL BUDGET\nWatershed Sensor Network Pilot — proposed budget, budget period 1\nSenior Personnel Costs: $120,000\nOther Personnel Costs: $60,000\nFringe Benefits: $54,000 (fringe benefit rate 30%)\nEquipment: $25,000 (one sensor array, unit cost $25,000)\nTravel Domestic: $8,000\nTravel Foreign: N/A\nParticipant Support Costs: $20,000\nMaterials and Supplies: $12,000\nSubcontracts: $40,000 (one subaward to River College)\nConsultant Costs: none\nOther Direct Costs: $6,000\nTotal Direct Costs: $345,000\nIndirect Cost Rate: 50% (applied to modified total direct costs, MTDC)\nIndirect Cost Base: $300,000 (MTDC)\nIndirect Costs: $150,000\nTotal Project Cost: $500,000\nCost Sharing Amount: none\nNumber of Budget Periods: 1"
         }
       ]
     }

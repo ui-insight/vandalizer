@@ -73,3 +73,52 @@ async def test_a_run_hands_the_rules_to_the_extraction_step(mongo_client, sync_m
         t for s in steps_data for t in s["tasks"] if t["name"] == "Extraction"
     )
     assert [r["id"] for r in extraction["data"]["cross_field_rules"]] == RULE_IDS
+
+
+# --- #1013 §5: validation evidence and starter tiers -------------------------
+
+async def test_an_upgrade_never_rewrites_a_users_copy(mongo_client):
+    # A copy made from the library keeps the catalog seed_id.
+    copy = Workflow(
+        name="My budget review", user_id="user-1", space="global", steps=[],
+        resource_config={"seed_id": "wf-pre-award-budget-analyzer"},
+        validation_plan=[{"id": "mine", "name": "Our own check", "category": "content", "description": "x"}],
+    )
+    await copy.insert()
+    assert await _seed() == "created"
+    copy = await Workflow.get(copy.id)
+    assert copy.name == "My budget review"
+    assert [c["id"] for c in copy.validation_plan] == ["mine"]
+    assert copy.validation_inputs == []
+
+
+async def test_an_upgrade_retracts_an_unmeasured_author_tier(mongo_client):
+    from app.models.verification import VerifiedItemMetadata
+
+    await _seed()
+    wf = await Workflow.find_one({"resource_config.seed_id": "wf-pre-award-budget-analyzer", "user_id": "system"})
+    meta = await VerifiedItemMetadata.find_one({"item_kind": "workflow", "item_id": str(wf.id)})
+    meta.quality_tier = "excellent"  # what catalogs before 1.3.10 asserted
+    await meta.save()
+
+    await _seed()
+    meta = await VerifiedItemMetadata.find_one({"item_kind": "workflow", "item_id": str(wf.id)})
+    assert meta.quality_tier is None
+    # The seeded plan and the example budget arrived with the upgrade.
+    wf = await Workflow.get(wf.id)
+    assert len(wf.validation_plan) >= 4
+    assert "overstated by $5,000" in wf.validation_inputs[0]["label"]
+
+
+async def test_a_tier_measured_on_this_install_is_kept(mongo_client):
+    from app.models.verification import VerifiedItemMetadata
+
+    await _seed()
+    wf = await Workflow.find_one({"resource_config.seed_id": "wf-pre-award-budget-analyzer", "user_id": "system"})
+    meta = await VerifiedItemMetadata.find_one({"item_kind": "workflow", "item_id": str(wf.id)})
+    meta.quality_tier, meta.quality_score = "good", 78.0
+    await meta.save()
+
+    await _seed()
+    meta = await VerifiedItemMetadata.find_one({"item_kind": "workflow", "item_id": str(wf.id)})
+    assert (meta.quality_tier, meta.quality_score) == ("good", 78.0)
