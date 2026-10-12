@@ -63,6 +63,23 @@ def _money_values(text: str) -> dict[float, str]:
     return out
 
 
+# A bare amount in structured tool output: "1250000", "1,250,000.00". Four or
+# more digits, or comma groups, so short counts and list numbers are skipped.
+# A digit, "$" or separator before it means it is the tail of something longer.
+_BARE_AMOUNT_RE = re.compile(r"(?<![\d$.,])(\d{1,3}(?:,\d{3})+|\d{4,})(\.\d+)?(?!\d|,\d)")
+
+
+def bare_amounts_as_money(text: str) -> str:
+    """*text* with bare amounts written as dollars, for use as a source.
+
+    Extraction and other tool results store a budget as "1250000"; the
+    answer reports it as "$1,250,000". Treating the bare number as support
+    keeps a real extracted value from being flagged, while a figure that no
+    tool returned in any form still is.
+    """
+    return _BARE_AMOUNT_RE.sub(lambda m: "$" + m.group(1) + (m.group(2) or ""), text or "")
+
+
 def _percent_values(text: str) -> dict[float, str]:
     out: dict[float, str] = {}
     for m in _PERCENT_RE.finditer(text):

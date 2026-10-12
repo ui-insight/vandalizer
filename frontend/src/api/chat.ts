@@ -203,6 +203,15 @@ export function queueChatMessage(conversationUuid: string, message: string) {
   })
 }
 
+/** Record that the user pressed Stop, so the server saves the turn as stopped
+ * (activity canceled) instead of as a dropped connection. */
+export function stopChatTurn(conversationUuid: string) {
+  return apiFetch<{ success: boolean }>('/api/chat/stop', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_uuid: conversationUuid }),
+  })
+}
+
 export function truncateContext(conversationUuid: string, cutoffIndex?: number) {
   return apiFetch<{ success: boolean; context_mode: string; context_cutoff_index: number }>(
     '/api/chat/truncate',

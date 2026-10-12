@@ -2,9 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StreamChunk } from '../types/chat'
 import { useChat } from './useChat'
-import { streamChat, queueChatMessage } from '../api/chat'
-vi.mock('../api/chat', () => ({ streamChat: vi.fn(), getHistory: vi.fn(), queueChatMessage: vi.fn() }))
-beforeEach(() => vi.clearAllMocks())
+import { streamChat, queueChatMessage, stopChatTurn } from '../api/chat'
+vi.mock('../api/chat', () => ({ streamChat: vi.fn(), getHistory: vi.fn(), queueChatMessage: vi.fn(), stopChatTurn: vi.fn() }))
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(stopChatTurn).mockResolvedValue({ success: true })
+})
 describe('interrupted agent responses', () => {
   it('retains a tool call even when stopped before text or a result arrives', async () => {
     vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, onChunk, _model, _kb, _o, _f, _first, _demo, signal) => {
@@ -70,4 +73,35 @@ it('accepts first-turn identity before completion so queueing and Stop preserve 
   await waitFor(() => expect(result.current.isStreaming).toBe(false))
   expect(result.current.conversationUuid).toBe('first-conversation')
   expect(result.current.activityId).toBe('first-activity')
+})
+
+it('records Stop with the server before aborting, so the turn is saved as stopped', async () => {
+  const order: string[] = []
+  vi.mocked(stopChatTurn).mockImplementation(async () => { order.push('stop recorded'); return { success: true } })
+  vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, _onChunk, _model, _kb, _o, _f, _first, _demo, signal, _project, onStarted) => {
+    onStarted?.({ conversationUuid: 'c-1', activityId: 'a-1' })
+    return new Promise((_resolve, reject) => signal?.addEventListener('abort', () => {
+      order.push('aborted')
+      reject(new DOMException('Stopped', 'AbortError'))
+    }))
+  })
+  const { result } = renderHook(() => useChat())
+  act(() => { void result.current.send('Run the extraction on all four') })
+  act(() => result.current.stop())
+  await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  expect(stopChatTurn).toHaveBeenCalledWith('c-1')
+  expect(order).toEqual(['stop recorded', 'aborted'])
+})
+
+it('still aborts when recording Stop fails', async () => {
+  vi.mocked(stopChatTurn).mockRejectedValue(new Error('offline'))
+  vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, _onChunk, _model, _kb, _o, _f, _first, _demo, signal, _project, onStarted) => {
+    onStarted?.({ conversationUuid: 'c-1', activityId: 'a-1' })
+    return new Promise((_resolve, reject) => signal?.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError'))))
+  })
+  const { result } = renderHook(() => useChat())
+  act(() => { void result.current.send('Start') })
+  act(() => result.current.stop())
+  await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  expect(result.current.messages.at(-1)).toMatchObject({ role: 'user', content: 'Start' })
 })

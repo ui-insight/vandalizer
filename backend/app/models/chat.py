@@ -73,6 +73,10 @@ class ChatMessage(Document):
     unsupported_figures: Optional[list[str]] = None
     # Sentences that conclude a rule from the sources' silence (#1012).
     silence_inferences: Optional[list[str]] = None
+    # Set on a turn that ended early: "stopped" when the user pressed Stop,
+    # "connection" when the stream died (disconnect, error, tool budget). The
+    # chat shows which, so a reopened transcript doesn't call a Stop a failure.
+    interruption: Optional[str] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -106,6 +110,8 @@ class ChatMessage(Document):
             d["unsupported_figures"] = self.unsupported_figures
         if self.silence_inferences:
             d["silence_inferences"] = self.silence_inferences
+        if self.interruption:
+            d["interruption"] = self.interruption
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -276,6 +282,11 @@ class ChatConversation(Document):
     # {"text": str, "ts": iso timestamp}.
     queued_messages: list[dict] = []
 
+    # Set by POST /api/chat/stop just before the client aborts the stream, so
+    # the cancelled turn is recorded as the user's Stop rather than a dropped
+    # connection. Cleared when the next turn starts.
+    stop_requested: bool = False
+
     # Latest task checklist from update_plan (uplift plan Phase 8), persisted
     # so a follow-up turn and a page reload resume the same visible plan.
     # Each entry: {"content", "active_form", "status"}.
@@ -334,6 +345,7 @@ class ChatConversation(Document):
         source_documents: Optional[list[dict]] = None,
         unsupported_figures: Optional[list[str]] = None,
         silence_inferences: Optional[list[str]] = None,
+        interruption: Optional[str] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -346,6 +358,7 @@ class ChatConversation(Document):
             citations=citations or None,
             unsupported_figures=unsupported_figures or None,
             silence_inferences=silence_inferences or None,
+            interruption=interruption or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

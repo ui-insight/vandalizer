@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, queueChatMessage } from '../api/chat'
+import { streamChat, getHistory, queueChatMessage, stopChatTurn } from '../api/chat'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
@@ -14,6 +14,9 @@ export interface ChatError {
   suggestedAction?: 'convert_to_kb' | 'continue'
   oversizeDocuments?: OversizeDocument[]
 }
+
+/** Longest Stop waits for the server to record it before aborting anyway. */
+const STOP_NOTICE_WAIT_MS = 1500
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
@@ -400,8 +403,18 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [clearLiveTurn])
 
   const stop = useCallback(() => {
-    abortRef.current?.abort()
-  }, [])
+    const controller = abortRef.current
+    if (!controller) return
+    // Tell the server first, so the turn is saved as stopped rather than as a
+    // lost connection. Don't let a slow or failed request hold up the abort.
+    const told = conversationUuid
+      ? Promise.race([
+          stopChatTurn(conversationUuid).catch(() => undefined),
+          new Promise((resolve) => setTimeout(resolve, STOP_NOTICE_WAIT_MS)),
+        ])
+      : Promise.resolve()
+    void told.then(() => controller.abort())
+  }, [conversationUuid])
 
   const loadHistory = useCallback(async (uuid: string) => {
     const version = ++historyLoadVersion.current

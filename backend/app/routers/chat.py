@@ -32,6 +32,7 @@ from app.schemas.chat import (
     ClearContextRequest,
     CompactContextRequest,
     QueueMessageRequest,
+    StopTurnRequest,
     TruncateContextRequest,
 )
 from app.services import access_control, organization_service
@@ -832,6 +833,27 @@ async def queue_message(
             "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }}},
     )
+    return {"success": True}
+
+
+@router.post("/stop")
+async def stop_turn(
+    body: StopTurnRequest,
+    user: User = Depends(get_current_user),
+):
+    """Mark the streaming turn as stopped by the user.
+
+    The client calls this just before it aborts the stream. The abort cancels
+    the turn server-side either way; this flag is what lets chat_stream save
+    it as stopped (and its activity as canceled) rather than as a dropped
+    connection.
+    """
+    result = await ChatConversation.get_motor_collection().update_one(
+        {"uuid": body.conversation_uuid, "user_id": user.user_id},
+        {"$set": {"stop_requested": True}},
+    )
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     return {"success": True}
 
 

@@ -20,6 +20,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    ToolReturnPart,
     UserPromptPart,
 )
 
@@ -43,7 +44,7 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
-from app.services.kb_answer_grounding import unsupported_figures
+from app.services.kb_answer_grounding import bare_amounts_as_money, unsupported_figures
 from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
     RoutingDecision,
@@ -2291,6 +2292,16 @@ async def chat_stream(
     # plus any search_knowledge_base tool calls (agentic path).
     streamed_citations: list[dict] = list(kb_sources)
 
+    def _completed_work() -> dict:
+        """What a turn that ends early finished, for _save_failed_assistant_turn."""
+        return {
+            **_completed_tool_work(
+                streamed_tool_calls, streamed_tool_results, streamed_segments,
+            ),
+            "citations": streamed_citations or None,
+            "plan_state": deps.plan_state if deps is not None else None,
+        }
+
     # Meter every token this chat consumes (see app/services/metering.py). Manual
     # enter/exit avoids re-indenting the large streaming body; __aexit__ in the
     # finally flushes whatever was accrued, even on cancellation mid-stream.
@@ -2307,6 +2318,9 @@ async def chat_stream(
         # surfaces through the stream's error path instead of aborting the SSE.
         await _meter.__aenter__()
         _meter_entered = True
+        # A Stop that arrived after the previous turn already finished must
+        # not label this one.
+        await _consume_stop_request(conversation)
         think_parser = _ThinkTagParser()
 
         iter_kwargs: dict = {
@@ -2522,18 +2536,26 @@ async def chat_stream(
                 # (#998), checked against their full text: the copy the
                 # model saw may have been trimmed, and a figure the
                 # document does state is not one to flag.
+                #
+                # Tool results count too, including earlier turns'. A
+                # conversation that runs extractions reports their values,
+                # and one stopped partway once made up "$250,000" for a
+                # document it never ran an extraction on. So once a
+                # conversation has used tools, its figures are checked against
+                # what those tools returned.
+                tool_outputs = [
+                    r["content"] if isinstance(r["content"], str)
+                    else json.dumps(r["content"], default=str)
+                    for r in streamed_tool_results
+                ] + _replayed_tool_outputs(previous_messages)
                 unsupported = (
                     unsupported_figures(assistant_message, "\n".join(
                         [s.text for s in (*doc_segments, *attachment_segments)]
                         + [getattr(d, "raw_text", None) or "" for d in documents or []]
                         + [message]
-                        + [
-                            r["content"] if isinstance(r["content"], str)
-                            else json.dumps(r["content"], default=str)
-                            for r in streamed_tool_results
-                        ]
+                        + [bare_amounts_as_money(t) for t in tool_outputs]
                     ))
-                    if active_kbs or documents else []
+                    if active_kbs or documents or tool_outputs else []
                 )
                 # A gap in the sources read as a rule ("may be any length")
                 # is flagged the same way (#1012).
@@ -2636,6 +2658,7 @@ async def chat_stream(
                 "usage limit",
                 thinking="".join(full_thinking) or None,
                 thinking_duration=thinking_duration,
+                **_completed_work(),
             )
         except Exception as save_err:
             logger.error("Failed to persist usage-limited turn: %s", save_err)
@@ -2667,15 +2690,24 @@ async def chat_stream(
     except asyncio.CancelledError:
         # Client disconnected mid-stream. Persist any partial response so the
         # user message isn't orphaned (would leave consecutive user turns in
-        # history, which pydantic-ai rejects on the next request).
+        # history, which pydantic-ai rejects on the next request). The client
+        # posts /chat/stop before aborting on Stop, so a set flag means the
+        # user stopped the turn rather than losing the connection.
         try:
+            stopped = await asyncio.shield(_consume_stop_request(conversation))
             await asyncio.shield(_save_failed_assistant_turn(
                 conversation,
-                _build_interrupted_body(full_response, "connection closed before completion"),
+                _build_interrupted_body(
+                    full_response,
+                    "stopped by the user" if stopped
+                    else "connection closed before completion",
+                ),
                 activity_id,
-                "client disconnected",
+                "stopped by the user" if stopped else "client disconnected",
                 thinking="".join(full_thinking) or None,
                 thinking_duration=thinking_duration,
+                interruption="stopped" if stopped else "connection",
+                **_completed_work(),
             ))
         except Exception as save_err:
             logger.error("Failed to persist interrupted chat on cancel: %s", save_err)
@@ -2696,6 +2728,7 @@ async def chat_stream(
                 str(e),
                 thinking="".join(full_thinking) or None,
                 thinking_duration=thinking_duration,
+                **_completed_work(),
             )
         except Exception as save_err:
             logger.error("Failed to persist interrupted chat: %s", save_err)
@@ -3662,6 +3695,65 @@ def _build_interrupted_body(full_response: list[str], reason: str) -> str:
     return f"_(no response — {reason})_"
 
 
+def _completed_tool_work(
+    tool_calls: list[dict], tool_results: list[dict], segments: list[dict],
+) -> dict:
+    """The tool calls a turn finished, for saving a turn that ended early.
+
+    A call still running when the turn ended has no result. It is dropped:
+    replaying a tool call without its return is an API error, and the work it
+    started is reported by its own activity, not by this transcript.
+    """
+    done = {r.get("tool_call_id") for r in tool_results if r.get("tool_call_id")}
+    kept: list[dict] = []
+    for seg in segments:
+        kind = seg.get("kind")
+        if kind == "tool_call" and seg.get("call", {}).get("tool_call_id") not in done:
+            continue
+        if kind == "text":
+            text = _THINK_BLOCK_RE.sub("", seg.get("content", "")).strip()
+            if not text:
+                continue
+            seg = {"kind": "text", "content": normalize_citation_markup(text)}
+        kept.append(seg)
+    return {
+        "tool_calls": [c for c in tool_calls if c.get("tool_call_id") in done] or None,
+        "tool_results": list(tool_results) or None,
+        "segments": kept or None,
+    }
+
+
+def _replayed_tool_outputs(history: list[ModelMessage]) -> list[str]:
+    """Text of every tool result replayed from earlier turns."""
+    out: list[str] = []
+    for msg in history:
+        for part in getattr(msg, "parts", ()):
+            if isinstance(part, ToolReturnPart):
+                content = part.content
+                out.append(
+                    content if isinstance(content, str)
+                    else json.dumps(content, default=str)
+                )
+    return out
+
+
+async def _consume_stop_request(conversation: ChatConversation) -> bool:
+    """True if the user pressed Stop on this turn; clears the flag.
+
+    Read from the database, not the in-memory document: the flag was set by
+    another request while this turn streamed. Cleared in memory as well, so
+    the next save of *conversation* can't write a stale True back.
+    """
+    coll = ChatConversation.get_motor_collection()
+    raw = await coll.find_one_and_update(
+        {"_id": conversation.id, "stop_requested": True},
+        {"$set": {"stop_requested": False}},
+        projection={"_id": 1},
+    )
+    conversation.stop_requested = False
+    return raw is not None
+
+
 async def _save_failed_assistant_turn(
     conversation: ChatConversation,
     body: str,
@@ -3669,6 +3761,13 @@ async def _save_failed_assistant_turn(
     reason: str,
     thinking: Optional[str] = None,
     thinking_duration: Optional[float] = None,
+    *,
+    interruption: Optional[str] = None,
+    tool_calls: Optional[list[dict]] = None,
+    tool_results: Optional[list[dict]] = None,
+    segments: Optional[list[dict]] = None,
+    citations: Optional[list[dict]] = None,
+    plan_state: Optional[list[dict]] = None,
 ) -> None:
     """Persist a placeholder assistant turn after a failure or cancellation.
 
@@ -3676,19 +3775,40 @@ async def _save_failed_assistant_turn(
     fails or is cancelled, the conversation would otherwise be left with an
     orphan user turn. pydantic-ai's message_history rejects consecutive user
     turns, so the *next* request would error or silently drop messages.
+
+    Whatever the turn finished is kept: its completed tool calls and results,
+    citations and plan. Saving only the text once left a stopped extraction
+    batch as bare "PI: …, budget: …" lines. After a reload the cards and
+    checklist were gone, and on "continue" the model copied that pattern and
+    reported invented budgets for documents it never ran.
     """
+    if segments:
+        # The reason is the last thing the model reads for this turn.
+        note = body.rsplit("\n\n", 1)[-1] if "\n\n" in body else body
+        segments = [*segments, {"kind": "text", "content": note}]
     await conversation.add_message(
         ChatRole.ASSISTANT,
         body,
         thinking=thinking,
         thinking_duration=thinking_duration,
+        tool_calls=tool_calls,
+        tool_results=tool_results,
+        segments=segments,
+        citations=citations,
+        interruption=interruption,
     )
+    if plan_state is not None:
+        conversation.active_plan = plan_state
+        await conversation.save()
     if not activity_id:
         return
     ev = await ActivityEvent.get(activity_id)
     if not ev:
         return
-    ev.status = ActivityStatus.FAILED.value
+    ev.status = (
+        ActivityStatus.CANCELED.value if interruption == "stopped"
+        else ActivityStatus.FAILED.value
+    )
     ev.error = reason[:2000]
     from datetime import datetime, timezone
     ev.finished_at = datetime.now(timezone.utc)

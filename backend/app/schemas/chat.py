@@ -56,3 +56,7 @@ class ClearContextRequest(BaseModel):
 class QueueMessageRequest(BaseModel):
     conversation_uuid: str
     message: str
+
+
+class StopTurnRequest(BaseModel):
+    conversation_uuid: str
