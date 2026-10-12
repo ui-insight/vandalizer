@@ -652,8 +652,17 @@ async def get_chat_history(
     await _refresh_openable_citations(messages, user.user_id)
     url_attachments = await conversation.get_url_attachments()
     file_attachments = await conversation.get_file_attachments()
+    # Follow-up turns resume by activity_id. Restoring just the transcript
+    # would show this chat but send the next message to whichever chat the
+    # panel used last.
+    activity = await ActivityEvent.find_one({
+        "conversation_id": conversation_uuid,
+        "user_id": user.user_id,
+        "type": ActivityType.CONVERSATION.value,
+    })
 
     return {
+        "activity_id": str(activity.id) if activity else None,
         "messages": messages,
         "url_attachments": [
             {
