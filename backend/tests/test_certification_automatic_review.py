@@ -265,3 +265,9 @@ async def test_agent_adapter_lets_the_model_repair_a_misquoted_citation_once(fix
     assert len(seen) == 2
     assert 'not an exact contiguous span' in seen[1][0]
     assert 'Fields stitched' not in seen[1][0]
+
+
+def test_grading_timeout_ends_before_the_recovery_deadline():
+    from app.services.certification_versions.automatic_review import REVIEW_TIMEOUT_SECONDS
+    from app.services.certification_versions.review_recovery import REVIEW_RECOVERY_SECONDS
+    assert REVIEW_TIMEOUT_SECONDS < REVIEW_RECOVERY_SECONDS

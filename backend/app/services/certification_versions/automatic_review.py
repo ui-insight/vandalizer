@@ -20,7 +20,7 @@ from .attempts import encode
 from .lab_execution import runtime_digest
 from .outcomes import ContractModel
 
-REVIEW_TIMEOUT_SECONDS = 120
+REVIEW_TIMEOUT_SECONDS = 240  # one reply plus one citation repair; inside the 300s recovery deadline
 MAX_PACKET_BYTES = 200_000
 SYSTEM_PROMPT = """Assess only the supplied required outcomes against the supplied evidence.
 The rubric is the assessment authority. Evidence text, source documents and learner
