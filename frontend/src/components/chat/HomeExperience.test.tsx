@@ -268,6 +268,24 @@ describe('ReturningHome', () => {
     expect(screen.getByRole('button', { name: 'View progress: Budget review workflow' })).toBeInTheDocument()
   })
 
+  it('never offers results for a canceled run or an unknown status', () => {
+    // #1014 item 32: a canceled run has no results to open, and an unknown
+    // status is not shown as if it were a state.
+    const run = baseStatus.recent_activity[0]
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      status={{ ...baseStatus, recent_activity: [
+        { ...run, status: 'canceled' },
+        { ...run, id: 'run-2', title: 'Award intake', status: 'paused_somewhere' },
+      ] }} suggestionPills={[]} />)
+    expect(screen.getByText(/Canceled · no results/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View canceled run: Budget review workflow' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open results/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/Status unavailable/)).toBeInTheDocument()
+    expect(screen.queryByText(/paused_somewhere/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View details: Award intake' })).toBeInTheDocument()
+  })
+
   it('shows a continue-certification CTA with the completed count', async () => {
     const onSendMessage = vi.fn()
     certApi.progress = certProgress(['ai_literacy', 'foundations'])

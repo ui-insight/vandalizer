@@ -361,8 +361,9 @@ function activityLabel(item: RecentActivityItem): string {
   if (item.status === 'running') return 'Processing'
   if (item.status === 'queued') return 'Queued'
   if (item.status === 'failed') return 'Run failed'
+  if (item.status === 'canceled') return 'Canceled · no results'
   if (item.status === 'completed') return 'Run completed · results need your review'
-  return item.status || 'Status unavailable'
+  return 'Status unavailable'
 }
 
 interface SharedHomeProps {
@@ -439,7 +440,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
   const documents = [...new Map((status?.recent_documents || []).map(doc => [doc.uuid, doc])).values()]
   const activityRow = (item: RecentActivityItem) => {
     const Icon = item.type === 'conversation' ? MessageSquare : item.type === 'workflow_run' ? Workflow : FileSearch
-    const label = item.pending_review ? 'Review submission' : item.type === 'conversation' ? 'Continue chat' : item.status === 'failed' ? 'Inspect failed run' : ['running', 'queued'].includes(item.status) ? 'View progress' : 'Open results'
+    const label = item.pending_review ? 'Review submission' : item.type === 'conversation' ? 'Continue chat' : item.status === 'failed' ? 'Inspect failed run' : item.status === 'canceled' ? 'View canceled run' : ['running', 'queued'].includes(item.status) ? 'View progress' : item.status === 'completed' ? 'Open results' : 'View details'
     return <li key={item.id}>
       <Icon size={18} aria-hidden="true" />
       <div><strong>{item.title}</strong><p>{activityLabel(item)}{item.relative_time ? ` · ${item.relative_time}` : ''}</p></div>

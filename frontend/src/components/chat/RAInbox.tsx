@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { AlertTriangle, CalendarClock, Check, EyeOff, FileText, Inbox } from 'lucide-react'
 import { getInbox, setInboxHidden, setObligationDismissed, setObligationDone } from '../../api/obligations'
@@ -50,6 +50,12 @@ function urgency(item: Obligation): string | null {
   return null
 }
 
+const SOURCE_ROLES: Record<string, string> = { limit: 'Limit', observed: 'Observed value' }
+
+// Home stays open while people work elsewhere; recheck when they come back to
+// it so an item done or added from chat or another tab doesn't stay stale.
+const REFRESH_MS = 60_000
+
 const BUTTON = {
   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
   padding: 'var(--workspace-space-4) var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)',
@@ -65,7 +71,6 @@ function InboxRow({ item, onChanged, onError }: {
   const navigate = useNavigate()
   const { viewDocument } = useWorkspace()
   const [busy, setBusy] = useState(false)
-  const source = item.sources[0]
   const soon = urgency(item)
   const Icon = item.kind === 'deadline' ? CalendarClock : item.kind === 'limit' ? AlertTriangle : FileText
   const alert = item.in_conflict || (soon != null && (daysUntil(item) ?? 99) <= 7)
@@ -99,16 +104,23 @@ function InboxRow({ item, onChanged, onError }: {
             onClick={() => navigate({ to: '/', search: { project: item.project_uuid } as never })}>
             {item.project_title || 'Project'}
           </button>
-          {source && (
-            <button type="button" title={source.quote} style={BUTTON}
-              aria-label={`Open ${source.document_title}${source.page ? ` at page ${source.page}` : ''}`}
-              onClick={() => viewDocument(source.document_uuid, source.document_title, {
-                terms: [source.quote.split(/\s+/).slice(0, 8).join(' ')],
-                page: source.page,
-              })}>
-              {source.document_title}{source.page ? ` · p. ${source.page}` : ''}
-            </button>
-          )}
+          {item.sources.map((source, i) => {
+            // A limit cites the sponsor's limit and the figure that breaks it,
+            // often in different documents; both open at their passage.
+            const role = SOURCE_ROLES[source.role]
+            const where = `${source.document_title}${source.page ? ` at page ${source.page}` : ''}`
+            return (
+              <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={source.quote} style={BUTTON}
+                aria-label={role ? `Open the ${role.toLowerCase()} in ${where}` : `Open ${where}`}
+                onClick={() => viewDocument(source.document_uuid, source.document_title, {
+                  terms: [source.quote.split(/\s+/).slice(0, 8).join(' ')],
+                  page: source.page,
+                })}>
+                {role && <span style={{ fontWeight: 600 }}>{role}:</span>}
+                {source.document_title}{source.page ? ` · p. ${source.page}` : ''}
+              </button>
+            )
+          })}
           <span style={{ flex: 1 }} />
           <button type="button" style={BUTTON} disabled={busy}
             aria-label={`Mark "${item.title}" done for everyone on the project`}
@@ -133,22 +145,38 @@ export function RAInbox() {
   const [showDismissed, setShowDismissed] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const loaded = useRef(false)
   const load = useCallback(async (includeDismissed: boolean) => {
     try {
       const data = await getInbox(includeDismissed)
+      loaded.current = true
       setLoadError(false)
       setItems(data.items)
       setHidden(data.inbox_hidden)
-      setError(null)
     } catch {
-      setLoadError(true)
+      // A failed background refresh keeps what is on screen; only a first
+      // load that fails is shown as an error, never as an empty inbox.
+      if (!loaded.current) setLoadError(true)
     }
   }, [])
 
   useEffect(() => { void load(showDismissed) }, [load, showDismissed])
 
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load(showDismissed) }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, REFRESH_MS)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(timer)
+    }
+  }, [load, showDismissed])
+
   if (loadError) return <p role="status" className="home-meta">Project obligations could not be loaded. <button type="button" className="home-text-action" onClick={() => void load(showDismissed)}>Retry obligations</button></p>
-  if (hidden || items == null) return null
+  if (items == null) return <p role="status" className="home-meta">Loading project obligations…</p>
+  if (hidden) return null
   const visible = showDismissed ? items : items.filter(i => !i.dismissed)
   const dismissedCount = items.filter(i => i.dismissed).length
   if (visible.length === 0 && !showDismissed) return null

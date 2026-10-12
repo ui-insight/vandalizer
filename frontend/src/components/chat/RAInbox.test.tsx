@@ -87,6 +87,38 @@ describe('RA inbox', () => {
     expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
   })
 
+  it('opens both the limit and the figure that breaks it (#1014 item 33)', async () => {
+    const limitSource = { document_uuid: 'notice', document_title: 'sponsor-notice.pdf', page: 3, quote: 'The maximum direct-cost request is $180,000.', role: 'limit' }
+    const observedSource = { document_uuid: 'prop', document_title: 'proposal-draft.pdf', page: 2, quote: 'Direct-cost total: $200,000', role: 'observed' }
+    api.getInbox.mockResolvedValue({ items: [{ ...CAP, sources: [limitSource, observedSource] }], inbox_hidden: false })
+    render(<RAInbox />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open the limit in sponsor-notice.pdf at page 3' }))
+    expect(viewDocument).toHaveBeenLastCalledWith('notice', 'sponsor-notice.pdf', expect.objectContaining({ page: 3 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open the observed value in proposal-draft.pdf at page 2' }))
+    expect(viewDocument).toHaveBeenLastCalledWith('prop', 'proposal-draft.pdf', expect.objectContaining({ page: 2 }))
+  })
+
+  it('says it is loading instead of showing nothing (#1014 item 55)', async () => {
+    let resolve!: (v: unknown) => void
+    api.getInbox.mockReturnValueOnce(new Promise(r => { resolve = r }))
+    render(<RAInbox />)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading project obligations')
+    await act(async () => { resolve({ items: [DEADLINE], inbox_hidden: false }) })
+    expect(await screen.findByRole('region', { name: 'RA inbox' })).toBeInTheDocument()
+  })
+
+  it('refreshes when you come back, and keeps the list if that refresh fails (#1014 item 57)', async () => {
+    render(<RAInbox />)
+    await screen.findByText('Sponsor deadline')
+    api.getInbox.mockResolvedValueOnce({ items: [DEADLINE, CAP, LETTER, item({ uuid: 'ob-4', title: 'Internal routing deadline' })], inbox_hidden: false })
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    expect(await screen.findByText('Internal routing deadline')).toBeInTheDocument()
+    api.getInbox.mockRejectedValueOnce(new Error('offline'))
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    expect(screen.getByText('Internal routing deadline')).toBeInTheDocument()
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument()
+  })
+
   it('keeps the item and says so when a change fails', async () => {
     api.setObligationDone.mockRejectedValueOnce(new Error('Only the project owner and editors can change its inbox.'))
     render(<RAInbox />)
