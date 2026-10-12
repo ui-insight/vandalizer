@@ -32,6 +32,12 @@ class OrderingCheck(ContractModel):
     revision_instruction: str = Field(min_length=10, max_length=1000)
 
 
+class AvailabilityCheck(ContractModel):
+    """A saved record the outcome depends on; ``path`` is dotted keys, empty for the whole record."""
+    kind: str = Field(min_length=1, max_length=80)
+    path: str = Field(default='', pattern=r'^([a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*)?$')
+
+
 class Outcome(ContractModel):
     id: str = Field(pattern=r'^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$')
     statement: str = Field(min_length=20)
@@ -46,6 +52,7 @@ class Outcome(ContractModel):
     teaching_status: Literal['revision_required', 'authored']
     assessment_status: Literal['not_implemented', 'implemented', 'verified']
     ordering_checks: tuple[OrderingCheck, ...] = ()
+    availability_checks: tuple[AvailabilityCheck, ...] = ()
 
     @model_validator(mode='after')
     def validate_cases(self):
@@ -54,6 +61,8 @@ class Outcome(ContractModel):
             raise ValueError('Every outcome needs unique passing and failing calibration cases')
         if any(check.critical_failure not in self.critical_failures for check in self.ordering_checks):
             raise ValueError('An ordering check must enforce one of the outcome critical failures')
+        if any(check.kind not in self.evidence for check in self.availability_checks):
+            raise ValueError('An availability check must name one of the outcome evidence kinds')
         if len(self.lesson_ids) != len(set(self.lesson_ids)):
             raise ValueError('Repeated lesson reference')
         return self

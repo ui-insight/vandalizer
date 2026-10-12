@@ -615,7 +615,13 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "checks"
+            }
+          ]
         }
       ]
     },
@@ -696,7 +702,13 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "stage_checks"
+            }
+          ]
         },
         {
           "id": "multi_step.bounded_reasoning",
@@ -812,7 +824,17 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "calculation"
+            },
+            {
+              "kind": "calculation_record",
+              "path": ""
+            }
+          ]
         },
         {
           "id": "advanced_nodes.parallel_safety",
@@ -966,7 +988,17 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "delivery_receipt",
+              "path": "retry"
+            },
+            {
+              "kind": "learner_decision",
+              "path": "recovery"
+            }
+          ]
         }
       ]
     },
@@ -1083,7 +1115,13 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "validation_receipt",
+              "path": "retest"
+            }
+          ]
         }
       ]
     },
@@ -1282,7 +1320,13 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "capstone"
+            }
+          ]
         },
         {
           "id": "governance.review_and_revision",

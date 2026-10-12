@@ -173,6 +173,43 @@ def citation_problems(response, evidence):
     return problems
 
 
+UNAVAILABLE_REVISION = ('The saved record for this check is unavailable, so it cannot be assessed. '
+                        'Complete or retry the check so it is saved, then request review again.')
+
+
+def availability_gaps(outcomes, evidence):
+    """Unclear decisions for outcomes whose declared record is marked unavailable.
+
+    A lost record is neither learner success nor learner failure, so it can
+    never support an outcome.
+    """
+    gaps = {}
+    for outcome in outcomes:
+        for check in getattr(outcome, 'availability_checks', ()):
+            for item in evidence:
+                if item.kind != check.kind:
+                    continue
+                try:
+                    record = json.loads(item.text)
+                except ValueError:
+                    continue
+                for key in filter(None, check.path.split('.')):
+                    record = record.get(key) if isinstance(record, dict) else None
+                if not isinstance(record, dict) or record.get('record_status') != 'unavailable':
+                    continue
+                quote = next(q for q in ('"record_status": "unavailable"', 'unavailable') if q in item.text)
+                gaps[outcome.id] = {
+                    'outcome_id': outcome.id, 'verdict': 'unclear',
+                    'explanation': f'The {check.kind} record{" for " + check.path if check.path else ""} is marked unavailable, '
+                                   'so this outcome can be neither supported nor failed from it.',
+                    'citations': [{'evidence_id': item.id, 'quote': quote}],
+                    'revision_instruction': UNAVAILABLE_REVISION}
+                break
+            if outcome.id in gaps:
+                break
+    return gaps
+
+
 async def _call_model(model_name, system_config, payload):
     from types import SimpleNamespace
     from pydantic_ai import Agent, ModelRetry
@@ -279,8 +316,13 @@ async def evaluate_draft_structured_review(contract, module_id, evidence, *, mod
         return {**identity, 'reviewer': reviewer, 'status': 'grading_unavailable', 'passed': None,
                 'outcomes': [], 'model_called': True, 'retryable': True, 'reason': 'reviewer_response_unavailable'}
     # A broken timestamp order is a critical failure the model cannot excuse.
+    # A lost record cannot support an outcome, but a contradiction the model
+    # found elsewhere still stands.
     vetoes = ordering_violations(outcomes, evidence)
-    decisions = [vetoes.get(item['outcome_id'], item) for item in response.model_dump(mode='json')['outcomes']]
+    gaps = availability_gaps(outcomes, evidence)
+    decisions = [vetoes.get(item['outcome_id'])
+                 or (gaps.get(item['outcome_id']) if item['verdict'] == 'supported' else None)
+                 or item for item in response.model_dump(mode='json')['outcomes']]
     passed = all(item['verdict'] == 'supported' for item in decisions)
     return {**identity, 'reviewer': reviewer, 'status': 'requirements_supported' if passed else 'revision_required',
             'passed': passed, 'outcomes': decisions, 'model_called': True}

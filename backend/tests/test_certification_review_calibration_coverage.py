@@ -100,8 +100,11 @@ async def test_biased_judge_detects_false_passes_and_false_rejections(suite, fix
     result = await run_review_calibration(CONTRACT, suite, model_name='synthetic-judge', system_config=CONFIG, call_model=call)
     assert call.await_count == len(suite.cases)
     # A broken timestamp order is contradicted in code, so a biased judge cannot pass it.
-    vetoed = {(case.id, outcome_id) for case in suite.cases
-              for outcome_id in automatic_review.ordering_violations(*review_packet(CONTRACT, suite.module_id, case.evidence)[:2])}
+    # A declared record marked unavailable is forced to unclear, so it cannot be a false pass either.
+    def caught(case):
+        outcomes, evidence = review_packet(CONTRACT, suite.module_id, case.evidence)[:2]
+        return {**automatic_review.availability_gaps(outcomes, evidence), **automatic_review.ordering_violations(outcomes, evidence)}
+    vetoed = {(case.id, outcome_id) for case in suite.cases for outcome_id in caught(case)}
     expected_false_support = sum(v != 'supported' and (case.id, outcome_id) not in vetoed
                                  for case in suite.cases for outcome_id, v in case.expected.items())
     expected_false_rejection = sum(v == 'supported' for case in suite.cases for v in case.expected.values())
@@ -119,3 +122,46 @@ async def test_unavailable_judge_is_not_a_learner_rejection(suite):
     assert result['unavailable_cases'] == len(suite.cases)
     assert result['false_support_count'] == result['false_rejection_count'] == 0
     assert result['all_cases_matched'] is result['release_ready'] is result['credit_awarded'] is False
+
+
+def unavailable_case(module_id, case_id):
+    suite = next(suite for suite in SUITES if suite.module_id == module_id)
+    return next(case for case in suite.cases if case.id == case_id)
+
+
+@pytest.mark.parametrize('module_id, case_id', [
+    ('advanced_nodes', 'calculation_record_unreadable'), ('extraction_engine', 'source_check_record_unavailable'),
+    ('governance', 'supervision_record_unavailable'), ('multi_step', 'stage_review_record_unavailable'),
+    ('output_delivery', 'retry_receipt_unavailable'), ('validation_qa', 'retest_receipt_unavailable')])
+async def test_a_lost_record_cannot_support_its_outcome_even_from_an_always_passing_judge(module_id, case_id):
+    case = unavailable_case(module_id, case_id)
+    async def model(name, config, payload):
+        return verdict_response(payload, {o['id']: 'supported' for o in json.loads(payload)['requirements']})
+    result = await automatic_review.evaluate_draft_structured_review(
+        CONTRACT, module_id, [item.model_dump(mode='json') for item in case.evidence],
+        model_name='synthetic-judge', system_config=CONFIG, call_model=model)
+    actual = {item['outcome_id']: item['verdict'] for item in result['outcomes']}
+    assert actual == case.expected
+    assert result['passed'] is False
+    gap = next(item for item in result['outcomes'] if item['verdict'] == 'unclear')
+    assert gap['revision_instruction'] == automatic_review.UNAVAILABLE_REVISION
+
+
+async def test_a_lost_record_keeps_a_contradiction_the_judge_found_elsewhere():
+    case = unavailable_case('extraction_engine', 'source_check_record_unavailable')
+    async def model(name, config, payload):
+        return verdict_response(payload, {'extraction_engine.field_semantics': 'supported',
+                                          'extraction_engine.quality_repair': 'contradicted'})
+    result = await automatic_review.evaluate_draft_structured_review(
+        CONTRACT, 'extraction_engine', [item.model_dump(mode='json') for item in case.evidence],
+        model_name='synthetic-judge', system_config=CONFIG, call_model=model)
+    assert {item['outcome_id']: item['verdict'] for item in result['outcomes']}['extraction_engine.quality_repair'] == 'contradicted'
+
+
+async def test_available_records_leave_the_judge_verdict_alone():
+    suite = next(suite for suite in SUITES if suite.module_id == 'extraction_engine')
+    for case in suite.cases:
+        if 'unavailable' in json.dumps([item.model_dump(mode='json') for item in case.evidence]):
+            continue
+        outcomes, evidence = review_packet(CONTRACT, 'extraction_engine', [item.model_dump(mode='json') for item in case.evidence])[:2]
+        assert automatic_review.availability_gaps(outcomes, evidence) == {}
