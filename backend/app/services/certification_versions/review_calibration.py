@@ -43,23 +43,27 @@ class ReviewCalibrationSuite(ContractModel):
             raise ValueError('Automatic-only grading needs an unclear-evidence calibration case')
 
 
+def measure_calibration_case(case, result):
+    """Measure a returned verdict without confusing technical failure with performance."""
+    actual = {item['outcome_id']: item['verdict'] for item in result['outcomes']}
+    unavailable = result['status'] == 'grading_unavailable'
+    false_support = [outcome for outcome, expected in case.expected.items()
+                     if expected != 'supported' and actual.get(outcome) == 'supported']
+    false_rejection = [outcome for outcome, expected in case.expected.items()
+                       if expected == 'supported' and actual.get(outcome) in {'contradicted', 'unclear'}]
+    return {'case_id': case.id, 'expected': case.expected, 'actual': actual,
+            'matches': not unavailable and actual == case.expected,
+            'false_supported_outcomes': false_support, 'false_rejected_outcomes': false_rejection,
+            'grading_unavailable': unavailable, 'review_result': result}
+
+
 async def run_review_calibration(contract, suite, *, model_name, system_config, call_model=None):
     suite.verify_contract(contract)
     rows = []
     for case in suite.cases:
         result = await evaluate_draft_structured_review(contract, suite.module_id, case.evidence,
             model_name=model_name, system_config=system_config, call_model=call_model)
-        actual = {item['outcome_id']: item['verdict'] for item in result['outcomes']}
-        unavailable = result['status'] == 'grading_unavailable'
-        false_support = [outcome for outcome, expected in case.expected.items()
-                         if expected != 'supported' and actual.get(outcome) == 'supported']
-        false_rejection = [outcome for outcome, expected in case.expected.items()
-                           if expected == 'supported' and actual.get(outcome) in {'contradicted', 'unclear'}]
-        rows.append({'case_id': case.id, 'expected': case.expected, 'actual': actual,
-                     'matches': not unavailable and actual == case.expected,
-                     'false_supported_outcomes': false_support, 'false_rejected_outcomes': false_rejection,
-                     'grading_unavailable': unavailable,
-                     'review_result': result})
+        rows.append(measure_calibration_case(case, result))
     return {'suite_id': suite.suite_id, 'suite_sha256': encode(suite.model_dump(mode='json'))[1],
             'synthetic': True, 'cases': rows, 'all_cases_matched': all(row['matches'] for row in rows),
             'false_support_count': sum(len(row['false_supported_outcomes']) for row in rows),

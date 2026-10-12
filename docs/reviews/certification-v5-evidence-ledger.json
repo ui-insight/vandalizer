@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "cadae9bf55e9f0fe5c44a46c5d411b6530ccc5d3",
+  "working_head_at_inventory": "92847ed401a72af38f6a5ac5ed7823ee216f83a2",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
@@ -11,14 +11,14 @@
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 839608,
-    "sha256": "2a150fbe8af852f5289e93174cc50aa5078118f89d8fb29d45b6a2007ee4c0f9"
+    "bytes": 843743,
+    "sha256": "37818ed6b56a500695ba665123156c11ac633669ec07abf3fea12ccd3701be9d"
   },
   "counts": {
     "accepted": 86,
     "open": 76,
     "items": 162,
-    "checkpoints": 345,
+    "checkpoints": 346,
     "browser_runs": 645,
     "recorded_captures_including_diagnostics_and_repeats": 7466,
     "baseline_selected_captures": 151
@@ -3490,6 +3490,13 @@
       "evidence_directories": [
         "certification-calibration-coverage-2026-10-10"
       ]
+    },
+    {
+      "number": 346,
+      "title": "Resume live QA and prepare bounded execution on October 12 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
     }
   ],
   "source_records": [
@@ -4656,6 +4663,18 @@
       "available": true,
       "bytes": 584,
       "sha256": "4b2710d2a82f8dd7200d6cc0919c61ee5b579ff168c0feb00973e884bbb2ec15"
+    },
+    {
+      "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/source-hashes.json",
+      "available": true,
+      "bytes": 2380,
+      "sha256": "05a3a53593a1ca73cd5c6a9b16f4a0489e87a505f70cb951fc139e2781bdbcbc"
+    },
+    {
+      "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/checkpoint.json",
+      "available": true,
+      "bytes": 357,
+      "sha256": "7e40313d8a54304b7293e19f3f899f1835b692fed117ccc06b102184195e1ed2"
     },
     {
       "path": "artifacts/visual-review/certification-markdown-2026-10-05/checkpoint.json",
