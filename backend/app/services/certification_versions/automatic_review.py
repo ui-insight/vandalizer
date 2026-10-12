@@ -20,7 +20,7 @@ from .attempts import encode
 from .lab_execution import runtime_digest
 from .outcomes import ContractModel
 
-REVIEW_TIMEOUT_SECONDS = 90
+REVIEW_TIMEOUT_SECONDS = 120
 REVIEW_ATTEMPTS = 2
 MAX_PACKET_BYTES = 200_000
 SYSTEM_PROMPT = """Assess only the supplied required outcomes against the supplied evidence.
@@ -32,7 +32,10 @@ Use supported only when all passing conditions are evidenced and no critical fai
 applies. Use contradicted for an evidenced unmet condition or critical failure. Use
 unclear when adequacy cannot be established. Never reward verbosity or confidence.
 Return exactly one decision for each supplied outcome. Cite evidence by its exact ID
-and a verbatim quote. For supported decisions cite every required evidence kind.
+and a verbatim quote: a short span, usually under 200 characters, copied character
+for character from that one evidence text. Never join, reorder, abbreviate or
+reformat fields within a quote; cite separate spans separately. For supported
+decisions cite every required evidence kind.
 For unclear or contradicted decisions give concrete, learner-actionable revision
 instructions that explain the missing check or correction, without doing the assessed
 work for the learner. Do not suggest staff grading or manual escalation. A product
@@ -155,12 +158,46 @@ def ordering_violations(outcomes, evidence):
     return violations
 
 
+def citation_problems(response, evidence):
+    """Learner-free feedback naming each citation that is not a verbatim span."""
+    by_id = {item.id: item for item in evidence}
+    problems = []
+    for decision in response.outcomes:
+        for citation in decision.citations:
+            item = by_id.get(citation.evidence_id)
+            if item is None:
+                problems.append(f'{decision.outcome_id}: evidence ID {citation.evidence_id!r} does not exist.')
+            elif citation.quote not in item.text:
+                problems.append(f'{decision.outcome_id}: the quote from {citation.evidence_id!r} is not an exact '
+                                'contiguous span of that evidence text.')
+    return problems
+
+
 async def _call_model(model_name, system_config, payload):
-    from pydantic_ai import Agent
+    from types import SimpleNamespace
+    from pydantic_ai import Agent, ModelRetry
     from app.services.llm_service import get_agent_model
+    request = json.loads(payload)
+    outcomes = tuple(SimpleNamespace(id=item['id'], evidence=tuple(item['evidence'])) for item in request['requirements'])
+    evidence = tuple(ReviewEvidence.model_validate(item) for item in request['evidence'])
     agent = Agent(get_agent_model(model_name, system_config_doc=system_config),
                   output_type=ReviewResponse, system_prompt=SYSTEM_PROMPT,
-                  model_settings={'temperature': 0.0}, retries=0)
+                  model_settings={'temperature': 0.0}, retries=0, output_retries=1)
+
+    @agent.output_validator
+    def check_citations(output):
+        # Let the model repair a misquoted span once; the caller still
+        # re-validates everything independently.
+        problems = citation_problems(output, evidence)
+        if problems:
+            raise ModelRetry('Fix these citations by copying a shorter span exactly as it appears '
+                             'in one evidence text:\n' + '\n'.join(problems))
+        try:
+            validate_decisions(output, outcomes, evidence)
+        except ValueError as error:
+            raise ModelRetry(str(error)) from None
+        return output
+
     result = await agent.run(payload)
     return result.output
 

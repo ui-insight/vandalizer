@@ -235,6 +235,37 @@ async def test_actual_agent_adapter_uses_structured_output_without_action_tools(
     from app.services.certification_versions.automatic_review import _call_model
     test_model = TestModel(custom_output_args=decisions())
     with patch('app.services.llm_service.get_agent_model', return_value=test_model):
-        result = await _call_model('synthetic-judge', CONFIG, '{}')
+        result = await _call_model('synthetic-judge', CONFIG, adapter_payload())
     assert len(result.outcomes) == len(REQUIRED)
     assert test_model.last_model_request_parameters.function_tools == []
+
+
+def adapter_payload():
+    return json.dumps({'requirements': [outcome.model_dump(mode='json') for outcome in REQUIRED], 'evidence': packet()})
+
+
+@pytest.mark.parametrize('fixed_on_retry', [True, False])
+async def test_agent_adapter_lets_the_model_repair_a_misquoted_citation_once(fixed_on_retry):
+    from pydantic_ai.messages import ModelResponse, RetryPromptPart, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+    from app.services.certification_versions.automatic_review import _call_model
+    bad = decisions()
+    bad['outcomes'][0]['citations'][0]['quote'] = 'Fields stitched together from several places.'
+    seen = []
+
+    def reply(messages, info):
+        retries = [part for message in messages for part in getattr(message, 'parts', []) if isinstance(part, RetryPromptPart)]
+        seen.append([str(part.content) for part in retries])
+        args = decisions() if retries and fixed_on_retry else bad
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, args)])
+
+    with patch('app.services.llm_service.get_agent_model', return_value=FunctionModel(reply)):
+        if fixed_on_retry:
+            result = await _call_model('synthetic-judge', CONFIG, adapter_payload())
+            assert len(result.outcomes) == len(REQUIRED)
+        else:
+            with pytest.raises(Exception):
+                await _call_model('synthetic-judge', CONFIG, adapter_payload())
+    assert len(seen) == 2
+    assert 'not an exact contiguous span' in seen[1][0]
+    assert 'Fields stitched' not in seen[1][0]
