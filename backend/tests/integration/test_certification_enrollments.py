@@ -3930,9 +3930,12 @@ async def test_saved_review_delivery_rejects_corruption_and_untrusted_provenance
     with pytest.raises(CourseCatalogError):
         await delivery.get(source.user_id, source.uuid, prepared['attempt_id'])
     await collection.update_one({'uuid': prepared['attempt_id']}, {'$set': {'record_sha256': prepared['record_sha256']}})
+    from app.services.certification_versions.review_attempts import evidence_request_digest
     record = dict(prepared['record'], submission_channel='internal_authenticated_evidence_producer')
     raw, digest = encode(record)
-    await collection.update_one({'uuid': prepared['attempt_id']}, {'$set': {'record_json': raw, 'record_sha256': digest}})
+    # Keep every integrity field consistent so only the untrusted channel is wrong.
+    await collection.update_one({'uuid': prepared['attempt_id']}, {'$set': {
+        'record_json': raw, 'record_sha256': digest, 'evidence_request_sha256': evidence_request_digest(record)}})
     with pytest.raises(SavedReviewUnavailable):
         await delivery.get(source.user_id, source.uuid, prepared['attempt_id'])
     assert (await delivery.list(source.user_id, source.uuid, 'foundations'))['attempts'] == []
@@ -4004,7 +4007,9 @@ async def test_saved_review_delivery_bounds_history_and_can_open_older_receipt(r
         identity = uuid4().hex
         record = dict(prepared['record'], uuid=identity)
         raw, digest = encode(record)
-        await collection.insert_one({**{key: value for key, value in original.items() if key != '_id'},
+        # Copies share one evidence packet, whose identity is unique per attempt.
+        await collection.insert_one({**{key: value for key, value in original.items()
+                                        if key not in ('_id', 'evidence_request_sha256')},
                                      'uuid': identity, 'record_json': raw, 'record_sha256': digest})
     delivery = ReviewDelivery(repo)
     listing = await delivery.list(source.user_id, source.uuid, 'foundations')
