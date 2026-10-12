@@ -132,7 +132,9 @@ def unavailable_case(module_id, case_id):
 @pytest.mark.parametrize('module_id, case_id', [
     ('advanced_nodes', 'calculation_record_unreadable'), ('extraction_engine', 'source_check_record_unavailable'),
     ('governance', 'supervision_record_unavailable'), ('multi_step', 'stage_review_record_unavailable'),
-    ('output_delivery', 'retry_receipt_unavailable'), ('validation_qa', 'retest_receipt_unavailable')])
+    ('output_delivery', 'retry_receipt_unavailable'), ('validation_qa', 'retest_receipt_unavailable'),
+    ('batch_processing', 'pilot_quality_unavailable'), ('process_mapping', 'method_rationale_unavailable'),
+    ('workflow_design', 'approval_time_unavailable')])
 async def test_a_lost_record_cannot_support_its_outcome_even_from_an_always_passing_judge(module_id, case_id):
     case = unavailable_case(module_id, case_id)
     async def model(name, config, payload):

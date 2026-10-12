@@ -306,7 +306,14 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "method",
+              "status_key": "rationale_record_status"
+            }
+          ]
         },
         {
           "id": "process_mapping.human_checkpoint",
@@ -457,7 +464,14 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "boundary",
+              "status_key": "approval_record_status"
+            }
+          ]
         },
         {
           "id": "workflow_design.reviewable_design",
@@ -1238,7 +1252,19 @@
             }
           ],
           "teaching_status": "authored",
-          "assessment_status": "implemented"
+          "assessment_status": "implemented",
+          "availability_checks": [
+            {
+              "kind": "learner_decision",
+              "path": "resource",
+              "status_key": "quality_review_status"
+            },
+            {
+              "kind": "pilot_result_snapshot",
+              "path": "candidates",
+              "status_key": "quality_record_status"
+            }
+          ]
         }
       ]
     },

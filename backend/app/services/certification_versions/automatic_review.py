@@ -190,14 +190,15 @@ def availability_gaps(outcomes, evidence):
                 if item.kind != check.kind:
                     continue
                 try:
-                    record = json.loads(item.text)
+                    records = [json.loads(item.text)]
                 except ValueError:
                     continue
                 for key in filter(None, check.path.split('.')):
-                    record = record.get(key) if isinstance(record, dict) else None
-                if not isinstance(record, dict) or record.get('record_status') != 'unavailable':
+                    records = [record.get(key) for record in records if isinstance(record, dict)]
+                    records = [entry for record in records for entry in (record if isinstance(record, list) else [record])]
+                if not any(isinstance(record, dict) and record.get(check.status_key) == 'unavailable' for record in records):
                     continue
-                quote = next(q for q in ('"record_status": "unavailable"', 'unavailable') if q in item.text)
+                quote = next(q for q in (f'"{check.status_key}": "unavailable"', 'unavailable') if q in item.text)
                 gaps[outcome.id] = {
                     'outcome_id': outcome.id, 'verdict': 'unclear',
                     'explanation': f'The {check.kind} record{" for " + check.path if check.path else ""} is marked unavailable, '

@@ -33,9 +33,14 @@ class OrderingCheck(ContractModel):
 
 
 class AvailabilityCheck(ContractModel):
-    """A saved record the outcome depends on; ``path`` is dotted keys, empty for the whole record."""
+    """A saved record the outcome depends on; ``path`` is dotted keys, empty for the whole record.
+
+    The record is lost when its ``status_key`` is ``unavailable``; a list along
+    the path is lost when any element is.
+    """
     kind: str = Field(min_length=1, max_length=80)
     path: str = Field(default='', pattern=r'^([a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*)?$')
+    status_key: str = Field(default='record_status', pattern=r'^[a-z][a-z0-9_]*_status$')
 
 
 class Outcome(ContractModel):
