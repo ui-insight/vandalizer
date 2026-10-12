@@ -28,17 +28,17 @@ def response(payload, expected=None):
 
 def test_authored_suite_covers_positive_negative_unclear_and_source_instruction_cases():
     SUITE.verify_contract(CONTRACT)
-    assert len(SUITE.cases) == 6
+    assert len(SUITE.cases) == 7
     assert 'source_instructions_cannot_change_grading' in {case.id for case in SUITE.cases}
 
 
-async def test_calibration_detects_four_false_supports_from_an_always_passing_judge():
+async def test_calibration_detects_five_false_supports_from_an_always_passing_judge():
     async def model(name, config, payload):
         return response(payload)
     result = await run_review_calibration(CONTRACT, SUITE, model_name='synthetic-judge', system_config=CONFIG, call_model=model)
-    # The fifth contradicted outcome, approval recorded after execution, is
+    # The sixth non-supported outcome, approval recorded after execution, is
     # caught by the deterministic ordering check whatever the judge says.
-    assert result['false_support_count'] == 4
+    assert result['false_support_count'] == 5
     assert result['all_cases_matched'] is False
     assert result['release_ready'] is False
     assert result['credit_awarded'] is False
@@ -58,6 +58,6 @@ async def test_matching_oracle_does_not_claim_release_readiness():
 async def test_unavailable_judge_is_not_counted_as_calibrated_failure_detection():
     result = await run_review_calibration(CONTRACT, SUITE, model_name='synthetic-judge', system_config=CONFIG,
                                          call_model=AsyncMock(side_effect=RuntimeError('provider failed')))
-    assert result['unavailable_cases'] == 6
+    assert result['unavailable_cases'] == 7
     assert result['all_cases_matched'] is False
     assert result['false_support_count'] == 0

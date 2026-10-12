@@ -48,7 +48,7 @@ async def run(path, **kwargs):
 def test_plan_covers_all_cases_without_loading_config_or_calling_provider(capsys):
     assert runner.main(['--config', '/nonexistent/private-config.json']) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report['case_count'] == 56
+    assert report['case_count'] == 57
     assert len(report['suites']) == 10
     assert report['release_ready'] is report['credit_awarded'] is False
 
@@ -58,7 +58,7 @@ async def test_one_case_budget_resumes_without_repeating_and_keeps_usage_local(t
     call = AsyncMock(side_effect=supported)
     first = await run(path, call_model=call)
     assert call.await_count == 1
-    assert first['summary']['pending_cases'] == 5
+    assert first['summary']['pending_cases'] == 6
     assert first['summary']['all_cases_matched'] is False
     assert first['attempts'][0]['matches'] is True
     assert first['attempts'][0]['usage']['tokens_in'] == 100
@@ -89,7 +89,7 @@ async def test_provider_outage_stops_and_explicit_retry_preserves_original_attem
     assert second['attempts'][1]['case_id'] == first['attempts'][0]['case_id']
     assert second['summary']['recorded_cases'] == 1
     assert second['summary']['unavailable_cases'] == 0
-    assert second['summary']['pending_cases'] == 5
+    assert second['summary']['pending_cases'] == 6
 
 
 @pytest.mark.parametrize('change', ['routing', 'suite', 'tamper'])
@@ -128,7 +128,7 @@ async def test_cancellation_keeps_completed_cases_and_releases_output_lock(tmp_p
         await run(path, call_model=interrupted, max_cases=6)
     report = json.loads(path.read_text())
     assert len(report['attempts']) == 1
-    assert report['summary']['pending_cases'] == 5
+    assert report['summary']['pending_cases'] == 6
     assert not path.with_name('report.json.lock').exists()
     assert runner.metering.current_scope() is None
 
@@ -179,7 +179,7 @@ async def test_complete_oracle_run_still_cannot_claim_release_or_credit(tmp_path
             if result['verdict'] != 'supported':
                 result['revision_instruction'] = 'Inspect the cited saved decision and correct its unsupported source or approval before reassessment.'
         return response
-    report = await run(tmp_path / 'report.json', call_model=oracle, max_cases=6)
+    report = await run(tmp_path / 'report.json', call_model=oracle, max_cases=len(SUITES[0].cases))
     assert report['stop_reason'] == 'completed'
     assert report['summary']['all_cases_matched'] is True
     assert report['summary']['pending_cases'] == report['summary']['unavailable_cases'] == 0
