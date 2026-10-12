@@ -2257,6 +2257,7 @@ async def test_saved_lab_runs_block_activation_even_when_input_reference_is_unav
 
 
 REVIEW_CONFIG = {'available_models': [{'name': 'synthetic-reviewer', 'api_key': 'private-review-key'}]}
+REVIEW_MODEL = 'synthetic-reviewer'
 
 
 async def review_fixture(repo):
@@ -3329,12 +3330,12 @@ async def trusted_review_fixture(repo):
     return source, package, document, snapshot, run, values
 
 
-async def prepare_trusted_review(repo, source, package, run_id, request_id=None, *, model_name='synthetic-reviewer'):
+async def prepare_trusted_review(repo, source, package, run_id, request_id=None, *, model_name=None):
     from app.services.certification_versions.review_attempts import ReviewAttemptRepository
     from app.services.certification_versions.runtime import CourseOperation
     async with repo.write_boundary(source.user_id, source.uuid, operation='prepare_trusted_review') as progress:
         return await ReviewAttemptRepository().prepare_from_run(CourseOperation(source.user_id, package, progress, True),
-            run_id, request_id or uuid4().hex, actor_user_id=source.user_id, model_name=model_name, system_config=REVIEW_CONFIG)
+            run_id, request_id or uuid4().hex, actor_user_id=source.user_id, model_name=model_name or REVIEW_MODEL, system_config=REVIEW_CONFIG)
 
 
 async def test_trusted_review_freezes_owned_record_packet_and_duplicate_request_never_recollects_new_answers(repo):
@@ -5565,7 +5566,7 @@ async def prepare_process_review(repo, source, package, submission_id, request_i
     async with repo.write_boundary(source.user_id, source.uuid, operation='prepare_process_review') as progress:
         return await ReviewAttemptRepository().prepare_from_process(CourseOperation(source.user_id, package, progress, True),
             submission_id, request_id or uuid4().hex, actor_user_id=source.user_id,
-            model_name='synthetic-reviewer', system_config=REVIEW_CONFIG)
+            model_name=REVIEW_MODEL, system_config=REVIEW_CONFIG)
 
 
 async def test_process_review_collects_exact_original_design_and_keeps_replay_without_recollection(repo):
@@ -6192,7 +6193,7 @@ async def prepare_workflow_review(repo, source, package, submission_id, request_
     async with repo.write_boundary(source.user_id, source.uuid, operation='prepare_workflow_design_review') as progress:
         return await ReviewAttemptRepository().prepare_from_workflow_design(CourseOperation(source.user_id, package, progress, True),
             submission_id, request_id or uuid4().hex, actor_user_id=source.user_id,
-            model_name='synthetic-reviewer', system_config=REVIEW_CONFIG)
+            model_name=REVIEW_MODEL, system_config=REVIEW_CONFIG)
 
 
 async def test_workflow_review_binds_actual_artifact_decisions_and_original_map_without_execution(repo):
@@ -7401,7 +7402,7 @@ async def prepare_connected_assessment(repo, fixture, submission_id, request_id=
     async with repo.write_boundary(source.user_id, source.uuid, operation='prepare_connected_assessment') as progress:
         return await ReviewAttemptRepository().prepare_from_connected_review(CourseOperation(source.user_id, package, progress, True),
             submission_id, request_id or uuid4().hex, actor_user_id=actor or source.user_id,
-            model_name='synthetic-reviewer', system_config=REVIEW_CONFIG)
+            model_name=REVIEW_MODEL, system_config=REVIEW_CONFIG)
 
 
 @pytest.mark.parametrize('reverse', [False, True])

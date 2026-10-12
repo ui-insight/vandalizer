@@ -42,7 +42,7 @@ async def prepare(repo, f, submission_id, request_id=None):
     async with repo.write_boundary(f.learner.user_id, f.learner.uuid, operation='prepare_capstone_review') as progress:
         return await ReviewAttemptRepository().prepare_from_governance_review(CourseOperation(f.learner.user_id, f.package, progress, True),
             submission_id, request_id or uuid4().hex, actor_user_id=f.learner.user_id,
-            model_name='synthetic-reviewer', system_config=enrollments.REVIEW_CONFIG)
+            model_name=enrollments.REVIEW_MODEL, system_config=enrollments.REVIEW_CONFIG)
 
 
 async def test_complete_automatic_review_and_answer_revision_survive_live_history_deletion(repo):

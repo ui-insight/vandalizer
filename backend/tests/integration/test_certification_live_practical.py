@@ -11,6 +11,7 @@ never commit it) and CERTIFICATION_LIVE_MODEL. Set CERTIFICATION_LIVE_REPORT to
 save a per-module report. No real learner, credit claim, publication or
 external message is involved.
 """
+from functools import partial
 import json
 import os
 from pathlib import Path
@@ -227,3 +228,33 @@ async def test_extraction_repair_live_run_is_checked_by_the_learner_and_graded_b
         assert assessment['status'] == 'revision_required', assessment
     else:
         assert assessment['status'] == 'requirements_supported', assessment
+
+
+@pytest.mark.parametrize('module_id', ['process_mapping', 'workflow_design'])
+async def test_thin_design_answers_are_sent_back_by_the_live_reviewer(repo, tmp_path, monkeypatch, module_id):
+    # The shared fixture answers name the right choices without explaining
+    # them. A nonempty explanation alone must not earn the outcome.
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+    for name in ('process_design_fixture', 'connected_workflow_fixture'):
+        monkeypatch.setattr(base, name, partial(getattr(base, name), enrolled=(learner, package)))
+    if module_id == 'process_mapping':
+        _, _, _, body = await base.process_design_fixture(repo)
+        saved = await base.save_process(repo, learner, package, body)
+        prepared = await base.prepare_process_review(repo, learner, package, saved['uuid'])
+    else:
+        _, _, _, body = await base.workflow_approval_fixture(repo)
+        saved = await base.approve_workflow_design(repo, learner, package, body)
+        prepared = await base.prepare_workflow_review(repo, learner, package, saved['uuid'])
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record(module_id, {'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+    assert assessment['status'] == 'revision_required', assessment
+    assert assessment['credit_awarded'] is False
+    unmet = [item for item in assessment['outcomes'] if item['verdict'] != 'supported']
+    assert unmet and all(len(item['revision_instruction']) >= 10 for item in unmet)
