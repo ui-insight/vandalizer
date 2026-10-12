@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type ReactNode } from 'react'
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import {
   Award,
   BookOpen,
@@ -355,6 +355,16 @@ function SurfaceCard({
   )
 }
 
+// Per-browser Home preferences. Storage can be unavailable (private mode,
+// blocked site data); Home then simply shows its defaults.
+const HIDE_TASKS_KEY = 'vandalizer:home:hide-task-starters'
+function readFlag(key: string): boolean {
+  try { return localStorage.getItem(key) === '1' } catch { return false }
+}
+function writeFlag(key: string, on: boolean) {
+  try { if (on) localStorage.setItem(key, '1'); else localStorage.removeItem(key) } catch { /* keep the in-page choice */ }
+}
+
 function activityLabel(item: RecentActivityItem): string {
   if (item.pending_review) return 'Awaiting review'
   if (item.type === 'conversation') return 'Conversation'
@@ -438,6 +448,11 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
   const unfinished = activities.filter(item => item.type !== 'conversation' && (item.pending_review || ['running', 'queued', 'failed'].includes(item.status)))
   const recent = activities.filter(item => !unfinished.includes(item))
   const documents = [...new Map((status?.recent_documents || []).map(doc => [doc.uuid, doc])).values()]
+  // Once there is real work on the page, the composer is the one dominant
+  // action; a "Start a conversation" button beside it only repeats it.
+  const hasWork = activities.length > 0 || documents.length > 0
+  const [tasksHidden, setTasksHidden] = useState(() => readFlag(HIDE_TASKS_KEY))
+  const toggleTasks = (hidden: boolean) => { writeFlag(HIDE_TASKS_KEY, hidden); setTasksHidden(hidden) }
   const activityRow = (item: RecentActivityItem) => {
     const Icon = item.type === 'conversation' ? MessageSquare : item.type === 'workflow_run' ? Workflow : FileSearch
     const label = item.pending_review ? 'Review submission' : item.type === 'conversation' ? 'Continue chat' : item.status === 'failed' ? 'Inspect failed run' : item.status === 'canceled' ? 'View canceled run' : ['running', 'queued'].includes(item.status) ? 'View progress' : item.status === 'completed' ? 'Open results' : 'View details'
@@ -458,11 +473,12 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
         <h3>Work in progress</h3><ul>{unfinished.map(activityRow)}</ul>
       </section>}
       <div className="home-primary-actions">
-        <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
+        {!hasWork && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
         <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
-        {onOpenProjects && <ActionPillButton label="Open projects" icon={BookOpen} onClick={onOpenProjects} />}
+        {onOpenProjects && <button type="button" className="home-text-action" onClick={onOpenProjects}>Open projects</button>}
       </div>
-      {onPrepareTask && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} />}
+      <p className="home-meta home-upload-note">An uploaded document is attached to your next question. Nothing runs until you send it.</p>
+      {onPrepareTask && !tasksHidden && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} onHide={() => toggleTasks(true)} />}
       {recent.length > 0 && <section className="home-activity" aria-label="Recent work">
         <h3>Recent work</h3><p className="home-meta">Your most recent conversations and runs across workspaces.</p><ul>{recent.map(activityRow)}</ul>
       </section>}
@@ -480,6 +496,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
       {status?.has_documents && documents.length === 0 && onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose documents to work with</button>}
       <HomeQualityAlerts alerts={status?.active_alerts || []} recentActivity={activities} onOpenActivity={onOpenActivity} onOpenTool={onOpenTool} onSendMessage={onSendMessage} onNoticeChanged={onNoticeChanged} disabled={disabled} />
       <details className="home-other-actions"><summary>More ways to work</summary>
+        {onPrepareTask && tasksHidden && <button type="button" className="home-text-action" onClick={() => toggleTasks(false)}>Show task starters</button>}
         {!status?.has_ready_knowledge_base && <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />}
         <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
         {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}

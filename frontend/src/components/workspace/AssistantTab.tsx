@@ -3,6 +3,24 @@ import { ChatPanel } from '../chat/ChatPanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useTeams } from '../../hooks/useTeams'
 
+const DRAFT_KEY = 'vandalizer:chat-draft:'
+
+/** Map-like draft store backed by sessionStorage; falls back to memory. */
+const sessionDrafts = (() => {
+  const memory = new Map<string, string>()
+  return {
+    get(scope: string): string | undefined {
+      try { return sessionStorage.getItem(DRAFT_KEY + scope) ?? undefined } catch { return memory.get(scope) }
+    },
+    set(scope: string, draft: string) {
+      try { sessionStorage.setItem(DRAFT_KEY + scope, draft) } catch { memory.set(scope, draft) }
+    },
+    delete(scope: string) {
+      try { sessionStorage.removeItem(DRAFT_KEY + scope) } catch { memory.delete(scope) }
+    },
+  }
+})()
+
 export function AssistantTab() {
   const {
     loadConversationId,
@@ -18,9 +36,11 @@ export function AssistantTab() {
   } = useWorkspace()
   const { currentTeam, loading: teamsLoading, error: teamError, refreshTeams } = useTeams()
   const draftScope = `${currentTeam?.uuid ?? 'personal'}:${activeProjectUuid ?? 'home'}`
-  // Keep unsent text in memory per team/project while the user browses other
-  // scopes. Attachments still follow the workspace's explicit scope rules.
-  const drafts = useRef(new Map<string, string>())
+  // Keep unsent text per team/project while the user browses other scopes,
+  // other pages and the Library. Session storage outlives this component, so
+  // opening a source, alert or project doesn't discard a half-written
+  // question. Attachments still follow the workspace's explicit scope rules.
+  const drafts = useRef(sessionDrafts)
   const previousScope = useRef(draftScope)
   const lastLoadedRef = useRef<string | null>(null)
   const [resetKey, setResetKey] = useState(0)

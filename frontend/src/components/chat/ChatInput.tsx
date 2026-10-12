@@ -180,7 +180,7 @@ export function ChatInput({
 
   return (
     <div
-      className="chat-composer shrink-0 p-[15px] bg-white"
+      className="chat-composer shrink-0 px-[15px] py-[10px] bg-white"
       style={{ boxShadow: '0 0px 23px -8px rgb(211, 211, 211)', zIndex: 500 }}
     >
       {/* Link input row */}
@@ -221,7 +221,7 @@ export function ChatInput({
         {/* Text input area */}
         <div
           className="cursor-text"
-          style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-6)" }}
+          style={{ padding: message ? "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-6)" : "var(--workspace-space-4) var(--workspace-space-6)" }}
           onClick={() => textareaRef.current?.focus()}
         >
           <textarea
@@ -252,6 +252,8 @@ export function ChatInput({
               onClick={() => setShowAddMenu(!showAddMenu)}
               aria-expanded={showAddMenu}
               aria-haspopup="menu"
+              aria-label="Add a source to this conversation: a document, a website or a knowledge base"
+              title="Add a source: a document, a website or a knowledge base"
               className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -284,7 +286,7 @@ export function ChatInput({
                   style={{ minHeight: 40 }}
                 >
                   <Globe className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                  <span>Add Website</span>
+                  <span>Add Website<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>Reads the page at a link you paste</span></span>
                 </button>
                 {onAddKnowledge && (
                   <button
@@ -294,7 +296,7 @@ export function ChatInput({
                     style={{ minHeight: 40 }}
                   >
                     <BookOpen className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                    <span>Add Knowledge Base</span>
+                    <span>Add Knowledge Base<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>Answers from a collection, with references</span></span>
                   </button>
                 )}
               </div>
@@ -331,6 +333,7 @@ export function ChatInput({
                   <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
                     <div role="dialog" aria-modal="true" aria-label="Choose chat model" className="w-full max-w-md overflow-y-auto rounded-xl border border-gray-300 bg-white p-3 shadow-xl" style={{ maxHeight: 'calc(100dvh - 32px)' }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowModelMenu(false) } }}>
                       <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-base font-semibold text-gray-900">Choose chat model</h2><button type="button" aria-label="Close model picker" className="rounded p-2 text-gray-700" onClick={() => setShowModelMenu(false)}><X size={18} /></button></div>
+                      <p className="mb-2 text-sm text-gray-700">The model writes this conversation's answers. Faster models suit quick questions; stronger ones suit long documents and careful comparisons. External models send your text to an outside provider. Your choice applies to new messages.</p>
                       {modelsLoading ? <p role="status" className="p-3 text-sm text-gray-700">Loading models…</p>
                         : modelError ? <div role="alert" className="p-3 text-sm text-red-800">Could not load available models. <button type="button" className="underline" onClick={() => void loadModels()}>Retry models</button></div>
                         : uniqueModels.length === 0 ? <p className="p-3 text-sm text-gray-700">No models are currently available. Contact your administrator or <button type="button" className="underline" onClick={() => void loadModels()}>Refresh models</button>.</p>

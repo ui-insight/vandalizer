@@ -10,11 +10,13 @@ const TASKS = [
 
 export interface TaskDocument { uuid: string; title: string }
 
-export function HomeTaskShortcuts({ documents, disabled, onPrepare, onChooseDocuments }: {
+export function HomeTaskShortcuts({ documents, disabled, onPrepare, onChooseDocuments, onHide }: {
   documents: TaskDocument[]
   disabled?: boolean
   onPrepare: (prompt: string, document?: TaskDocument) => void
   onChooseDocuments?: () => void
+  /** Hides the starters on this browser; "More ways to work" brings them back. */
+  onHide?: () => void
 }) {
   const [task, setTask] = useState<(typeof TASKS)[number] | null>(null)
   const [documentUuid, setDocumentUuid] = useState('')
@@ -26,7 +28,7 @@ export function HomeTaskShortcuts({ documents, disabled, onPrepare, onChooseDocu
     if (chooseInFiles) onChooseDocuments?.()
   }
   return <section className="home-tasks" aria-label="Start an RA task">
-    <h3>Start a task</h3>
+    <div className="home-section-heading"><h3>Start a task</h3>{onHide && <button type="button" className="home-text-action" onClick={onHide} aria-label="Hide task starters. You can show them again under More ways to work.">Hide</button>}</div>
     <div className="home-task-buttons">{TASKS.map(item => <button type="button" key={item.title} disabled={disabled} onClick={() => { setDocumentUuid(''); setTask(item) }}>{item.title}</button>)}</div>
     {task && <div className="home-task-overlay" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setTask(null) } }}>
       <FocusTrap focusTrapOptions={{ escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>

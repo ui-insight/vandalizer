@@ -9,7 +9,7 @@ vi.mock('../chat/ChatPanel', () => ({ ChatPanel: ({ initialDraft, onDraftChange 
   return <input aria-label="Draft" value={text} onChange={e => { setText(e.target.value); onDraftChange(e.target.value) }} />
 } }))
 import { AssistantTab } from './AssistantTab'
-beforeEach(() => { state.project = 'project-a'; state.signal = 0; state.team = 'team-a'; state.loading = false })
+beforeEach(() => { state.project = 'project-a'; state.signal = 0; state.team = 'team-a'; state.loading = false; sessionStorage.clear() })
 it('waits for initial scope and preserves typing across background team refresh', () => {
   state.team = null; state.loading = true
   const { rerender } = render(<AssistantTab />)
@@ -40,4 +40,13 @@ it('explicit New Chat in the same scope clears its unsent draft', () => {
   fireEvent.change(screen.getByLabelText('Draft'), { target: { value: 'Draft to discard' } })
   state.signal++; rerender(<AssistantTab />)
   expect(screen.getByLabelText('Draft')).toHaveValue('')
+})
+it('keeps an unsent draft when the Assistant is left and reopened (#1014 item 50)', () => {
+  // Opening a source, an alert or the Library unmounts the Assistant; the
+  // half-written question must still be there on return.
+  const first = render(<AssistantTab />)
+  fireEvent.change(screen.getByLabelText('Draft'), { target: { value: 'Is the cap direct or total?' } })
+  first.unmount()
+  render(<AssistantTab />)
+  expect(screen.getByLabelText('Draft')).toHaveValue('Is the cap direct or total?')
 })

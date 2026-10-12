@@ -53,3 +53,10 @@
 .home-task-dialog select { width: 100%; margin: 8px 0 12px; padding: 8px; border: 1px solid #64748b; border-radius: 6px; }
 .home-task-dialog summary { cursor: pointer; padding: 8px 0; font-size: 14px; }
 .home-task-actions { margin-top: 16px; }
+
+/* #1014 density: tighter rhythm, one bordered control per row, quiet headings. */
+.returning-home { gap: 16px; }
+.returning-home .chat-home-heading h2 { font-size: 22px; }
+.home-upload-note { margin-top: -8px !important; }
+.home-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.home-section-heading h3 { margin-bottom: 8px; }

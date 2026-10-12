@@ -104,7 +104,8 @@ export function MemoryPanel() {
         aria-expanded={open}
         aria-haspopup="dialog"
         title="What the assistant remembers about you"
-        className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+        aria-label="Assistant memory: what the assistant remembers about you"
+        className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors"
       >
         <Brain className="h-4 w-4" />
       </button>

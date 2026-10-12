@@ -268,6 +268,31 @@ describe('ReturningHome', () => {
     expect(screen.getByRole('button', { name: 'View progress: Budget review workflow' })).toBeInTheDocument()
   })
 
+  it('leaves the composer as the one way to start once there is work (#1014 items 40-41)', () => {
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      status={baseStatus} suggestionPills={[]} />)
+    expect(screen.queryByRole('button', { name: 'Start a conversation' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload a document' })).toBeInTheDocument()
+    expect(screen.getByText(/Nothing runs until you send it/)).toBeInTheDocument()
+  })
+
+  it('hides the task starters on request and brings them back (#1014 item 58)', () => {
+    localStorage.clear()
+    const home = () => <ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      onPrepareTask={vi.fn()} status={baseStatus} suggestionPills={[]} />
+    const view = render(home())
+    fireEvent.click(screen.getByRole('button', { name: /Hide task starters/ }))
+    expect(screen.queryByRole('region', { name: 'Start an RA task' })).not.toBeInTheDocument()
+    view.unmount()
+    render(home())
+    expect(screen.queryByRole('region', { name: 'Start an RA task' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show task starters' }))
+    expect(screen.getByRole('region', { name: 'Start an RA task' })).toBeInTheDocument()
+    localStorage.clear()
+  })
+
   it('never offers results for a canceled run or an unknown status', () => {
     // #1014 item 32: a canceled run has no results to open, and an unknown
     // status is not shown as if it were a state.

@@ -109,3 +109,13 @@ it('recovers model-loading failure and supports arrow selection without losing t
   expect(screen.queryByRole('dialog', { name: 'Choose chat model' })).not.toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('Keep this draft')
 })
+
+describe('composer controls explain themselves (#1014 items 45, 47)', () => {
+  it('names what Add adds and what each source does', () => {
+    render(<ChatInput onSend={vi.fn()} onAddKnowledge={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Add a source to this conversation/ }))
+    expect(screen.getByRole('menuitem', { name: /Add Website.*Reads the page at a link/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Add Knowledge Base.*with references/ })).toBeInTheDocument()
+  })
+})
+

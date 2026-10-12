@@ -1522,3 +1522,10 @@ html {
   .extraction-design { padding: 12px !important; }
   .extraction-field-value { margin-left: 0 !important; }
 }
+
+/* #1014 item 44: the composer's editor draws the focus ring (focus-within).
+   The workspace-wide textarea outline drew a second ring inside it. */
+.chat-composer-editor textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}

@@ -1578,7 +1578,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       )}
 
-      {(attachLoading || anySelectedProcessing) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
+      {(attachLoading || anySelectedProcessing || isLoadingHistory) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : isLoadingHistory ? 'Loading this conversation. Keep typing; Send becomes available when it has loaded.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
       {/* Input. Typing stays enabled while a turn streams (Phase 10):
           submits mid-run queue into the current turn instead of sending. */}
       {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}

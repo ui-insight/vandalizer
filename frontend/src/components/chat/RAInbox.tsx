@@ -62,6 +62,9 @@ const BUTTON = {
   fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
   border: '1px solid var(--workspace-border)', backgroundColor: '#fff', color: '#374151',
 } as const
+// Row actions read as actions without a box each: the source button is the
+// one bordered control a row needs.
+const QUIET = { ...BUTTON, border: '1px solid transparent', color: '#374151' } as const
 
 function InboxRow({ item, onChanged, onError }: {
   item: Obligation
@@ -122,12 +125,12 @@ function InboxRow({ item, onChanged, onError }: {
             )
           })}
           <span style={{ flex: 1 }} />
-          <button type="button" style={BUTTON} disabled={busy}
+          <button type="button" style={QUIET} disabled={busy}
             aria-label={`Mark "${item.title}" done for everyone on the project`}
             onClick={() => act('done', () => setObligationDone(item.uuid, true))}>
             <Check size={12} aria-hidden /> Done
           </button>
-          <button type="button" style={BUTTON} disabled={busy}
+          <button type="button" style={QUIET} disabled={busy}
             aria-label={`Hide "${item.title}" from your Home`}
             onClick={() => act('dismissed', () => setObligationDismissed(item.uuid, true))}>
             <EyeOff size={12} aria-hidden /> Dismiss
