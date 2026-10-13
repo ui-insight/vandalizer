@@ -214,6 +214,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           <button
             type="button"
             aria-label="New chat"
+            title={visualDocked ? 'New chat' : undefined}
             onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}
             className={cn(
               'flex items-center gap-2 rounded-lg cursor-pointer p-2',

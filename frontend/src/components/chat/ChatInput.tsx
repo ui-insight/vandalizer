@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useId, type KeyboardEvent, type ReactNode } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
-import { Send, Square, X, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
+import { Send, Square, X, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu, SquarePen } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
@@ -24,6 +24,8 @@ interface Props {
   onModelChange?: (model: string) => void
   onModelsLoaded?: (models: ModelInfo[]) => void
   onExport?: (format: string) => void
+  /** Starts a fresh conversation; shown once this one has messages. */
+  onNewChat?: () => void
   hasMessages?: boolean
   hasDocuments?: boolean
   contextMeter?: ReactNode
@@ -39,7 +41,7 @@ const MIN_COMPOSER_TEXT_HEIGHT = 24
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
-  selectedModel, onModelChange, onModelsLoaded, onExport, hasMessages, hasDocuments,
+  selectedModel, onModelChange, onModelsLoaded, onExport, onNewChat, hasMessages, hasDocuments,
   contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
 }: Props) {
   const branding = useBranding()
@@ -354,6 +356,20 @@ export function ChatInput({
           {/* Assistant memory */}
           {memoryControl}
           {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
+
+          {/* The rail's New chat is an unlabeled icon when the rail is
+              collapsed, so the chat offers its own (support ticket). */}
+          {onNewChat && hasMessages && (
+            <button
+              type="button"
+              onClick={onNewChat}
+              title="Start a new conversation"
+              className="flex shrink-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+            >
+              <SquarePen className="h-3 w-3 shrink-0" aria-hidden="true" />
+              New chat
+            </button>
+          )}
 
           {/* Export button */}
           {onExport && hasMessages && (

@@ -140,7 +140,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -1603,6 +1603,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onModelChange={handleModelChange}
         onModelsLoaded={modelPreference.setModels}
         onExport={handleExport}
+        onNewChat={() => { triggerNewChat(); focusChat() }}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
         memoryControl={<MemoryPanel />}

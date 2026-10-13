@@ -119,3 +119,14 @@ describe('composer controls explain themselves (#1014 items 45, 47)', () => {
   })
 })
 
+
+it('offers New chat in the composer once the conversation has messages', () => {
+  // Support ticket: with the activity rail collapsed, its New chat was an
+  // unlabeled icon and the chat window had no way to start over.
+  const newChat = vi.fn()
+  const view = render(<ChatInput onSend={vi.fn()} onNewChat={newChat} hasMessages={false} />)
+  expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
+  view.rerender(<ChatInput onSend={vi.fn()} onNewChat={newChat} hasMessages />)
+  fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+  expect(newChat).toHaveBeenCalledOnce()
+})
