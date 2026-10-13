@@ -2648,21 +2648,63 @@ async def _workflow_quality_sidecar(workflow_id: str, user) -> Optional[dict]:
     return sidecar
 
 
+# How long get_workflow_status waits for a run to settle before reporting.
+# A chat turn that checked straight after run_workflow reported "running,
+# 0 of 3 steps" while the run card beside it went on to show the finished
+# result; most chat-started runs finish within this.
+_RUN_WAIT_SECONDS = 60.0
+_RUN_POLL_SECONDS = 2.0
+
+
+def _run_settled(status: str | None) -> bool:
+    """Finished, failed, canceled, or stopped for approval: not going to
+    change without someone acting."""
+    from app.services.output_handlers import is_failed_status
+
+    return (
+        status in ("completed", "canceled", "cancelled")
+        or is_failed_status(status)
+        or status in _AWAITING_APPROVAL_STATUSES
+    )
+
+
 async def get_workflow_status(
     context: RunContext[AgenticChatDeps],
     session_id: str,
+    wait: bool = True,
 ) -> dict:
-    """Check the status of a running or completed workflow execution.
+    """Check a workflow run, waiting up to a minute for it to finish.
+
+    By default this waits until the run completes, fails, stops for approval
+    or is canceled (up to about a minute), so call it once after run_workflow
+    and report what it returns: the result when the run finished, or that it
+    is still running when it didn't. Don't call it again in the same reply.
 
     Args:
         context: The call context.
         session_id: The session ID returned by run_workflow.
+        wait: Wait for the run to settle (default). Pass false only when the
+            user asks for a quick progress check on a long run.
     """
+    import asyncio
+    import time
+
     from app.services import workflow_service
+    from app.services.output_handlers import is_failed_status
 
     status = await workflow_service.get_workflow_status(
         session_id, user=context.deps.user,
     )
+    started = time.monotonic()
+    while (
+        wait and status and not _run_settled(status["status"])
+        and time.monotonic() - started < _RUN_WAIT_SECONDS
+    ):
+        await asyncio.sleep(_RUN_POLL_SECONDS)
+        status = await workflow_service.get_workflow_status(
+            session_id, user=context.deps.user,
+        ) or status
+    waited = int(time.monotonic() - started)
     if not status:
         return _err(
             f"Workflow session '{session_id}' not found.",
@@ -2708,8 +2750,10 @@ async def get_workflow_status(
             result["output"] = output
         else:
             result["output"] = final
-    elif status["status"] == "failed":
-        result["error_detail"] = status.get("current_step_detail")
+    elif is_failed_status(status["status"]):
+        # WorkflowResult records a failed run as "error"; this branch used to
+        # look only for "failed", so a failed run reported no detail at all.
+        result["error_detail"] = status.get("error") or status.get("current_step_detail")
     elif status["status"] in _AWAITING_APPROVAL_STATUSES:
         step = status.get("current_step_name") or "approval"
         result["awaiting_approval"] = True
@@ -2722,11 +2766,17 @@ async def get_workflow_status(
             f'or reject_workflow_step with session_id="{session_id}". Never ask '
             "the user for an approval ID — they can't see one."
         )
-    elif status["status"] not in ("completed", "canceled", "error"):
+    elif not _run_settled(status["status"]):
+        step = status.get("current_step_name")
+        waited_note = f" after waiting {waited} seconds" if waited else ""
+        step_note = f', now on "{step}"' if step else ""
         result["message"] = (
-            f"Still running ({done} of {total} steps completed). You can't "
-            "notify the user when it finishes — never promise to. Tell them "
-            "the run card in this chat updates live, or to ask again."
+            f"Still running{waited_note} ({done} of {total} steps completed"
+            f"{step_note}). This is a snapshot: the "
+            "run card in this chat updates live and will show the result when "
+            "it finishes, so say that rather than presenting this step count "
+            "as where the run stands. You can't notify the user when it "
+            "finishes; never promise to. Offer to check again."
         )
 
     if status.get("current_step_preview"):

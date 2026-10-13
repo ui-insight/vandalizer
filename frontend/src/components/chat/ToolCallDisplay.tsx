@@ -134,6 +134,9 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
       const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
       return docs > 0 ? `from ${docs} document${docs !== 1 ? 's' : ''}` : ''
     }
+    case 'get_workflow_status':
+      // The tool waits for the run to settle, so the line can sit here a while.
+      return args.wait === false ? '' : 'until it finishes (up to a minute)'
     case 'get_app_help': {
       const t = args.topic
       return typeof t === 'string' && t

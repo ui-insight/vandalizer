@@ -692,7 +692,7 @@ class TestGetWorkflowStatus:
         }
         ctx = _make_context()
         with patch("app.services.workflow_service.get_workflow_status", new_callable=AsyncMock, return_value=status_data):
-            result = await get_workflow_status(ctx, "session-123")
+            result = await get_workflow_status(ctx, "session-123", wait=False)
 
         assert "awaiting_approval" not in result
         assert "can't notify" in result["message"]
