@@ -26,6 +26,7 @@ import pytest
 
 from app.models.document import SmartDocument
 from app.services import workflow_engine
+from app.services.extraction_engine import ExtractionEngine
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.user import User
 from app.services.certification_versions.catalog import CourseCatalog
@@ -36,6 +37,7 @@ LIVE_CONFIG = os.environ.get('CERTIFICATION_LIVE_MODEL_CONFIG')
 # Captured before any fixture stubs them.
 REAL_PROVIDERS = {name: getattr(workflow_engine, name) for name in ('llm_chat_model', 'format_model', 'data_extraction_model')}
 LIVE_CALLS = []
+REAL_EXTRACT = ExtractionEngine.extract
 LIVE_MODEL = os.environ.get('CERTIFICATION_LIVE_MODEL')
 
 repo = base.repo
@@ -451,4 +453,238 @@ async def test_output_delivery_live_generation_review_and_private_handoff(repo, 
         'credit_awarded': assessment['credit_awarded']})
     assert LIVE_CALLS
     assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+
+
+async def test_batch_live_extraction_controlled_failure_and_targeted_retry(repo, tmp_path, monkeypatch):
+    from tests.integration import test_certification_batch_inputs as batch_inputs
+    from tests.integration import test_certification_batch_execution as batch_execution
+    from tests.integration import test_certification_batch_reviews as batch
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    LIVE_CALLS.clear()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+    monkeypatch.setattr(batch_inputs, 'fixture', partial(batch_inputs.fixture, enrolled=(learner, package)))
+
+    def live_provider(f, wrong=False):
+        def extract(**kwargs):
+            # Run the real engine on exactly the inputs the batch dispatched.
+            kwargs.update(model=LIVE_MODEL, extraction_config_override={'mode': 'one_pass', 'model': LIVE_MODEL})
+            result = REAL_EXTRACT(ExtractionEngine(system_config_doc=runtime_config), **kwargs)
+            LIVE_CALLS.append(('extract', LIVE_MODEL, json.dumps(result, default=str)[:300]))
+            return result
+        return extract
+    monkeypatch.setattr(batch_execution, 'provider', live_provider)
+
+    f = await batch.fixture(repo)
+    saved = await batch.submit(repo, f)
+    prepared = await batch.prepare(repo, f, saved['uuid'])
+    assessment, technical_retries, unavailable = await evaluate_with_technical_retry(
+        repo, learner, package, prepared['attempt_id'], runtime_config)
+    record('batch_processing', {'live_calls': list(LIVE_CALLS), 'technical_retries': technical_retries,
+        'unavailable_reasons': unavailable,
+        'states': [f.original['state'], f.retry['state']], 'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'deterministic': [(item['outcome_id'], item['passed']) for item in assessment.get('deterministic_outcomes', [])],
+        'credit_awarded': assessment['credit_awarded']})
+    assert LIVE_CALLS
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+
+
+async def evaluate_with_technical_retry(repo, learner, package, attempt_id, runtime_config):
+    """Grade once; on a technical gap, take the learner's explicit retry once.
+
+    The product never retries on its own, so the test asks the way a learner
+    would. Returns the assessment, the number of retries and any unavailable reasons.
+    """
+    reviewed = await base.evaluate_review(repo, learner, package, attempt_id, config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    reasons = []
+    if assessment['status'] == 'grading_unavailable':
+        reasons.append(assessment.get('reason'))
+        child = await base.retry_review(repo, learner, package, attempt_id, config=runtime_config)
+        reviewed = await base.evaluate_review(repo, learner, package, child['attempt_id'], config=runtime_config)
+        assessment = reviewed['result']['assessment']
+        return assessment, 1, reasons
+    return assessment, 0, reasons
+
+
+def live_after_controlled_failure(scripted, runtime_config):
+    """Keep the scripted original failure; run every repaired extraction live."""
+    def provider(f, *, wrong=False):
+        if wrong:
+            return scripted(f, wrong=True)
+
+        def extract(**kwargs):
+            kwargs.update(model=LIVE_MODEL, extraction_config_override={'mode': 'one_pass', 'model': LIVE_MODEL})
+            result = REAL_EXTRACT(ExtractionEngine(system_config_doc=runtime_config), **kwargs)
+            LIVE_CALLS.append(('extract', LIVE_MODEL, json.dumps(result, default=str)[:300]))
+            return result
+        return extract
+    return provider
+
+
+def live_reviewer(monkeypatch, runtime_config):
+    LIVE_CALLS.clear()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+
+
+CARELESS_VALIDATION = 'I fixed the budget prompt and reran it. Everything is correct now, so the extraction will work on any proposal.'
+CARELESS_SUPERVISION = 'I fixed the funding prompt, reran it and sent the memo. The workflow is reliable now and ready for real awards.'
+
+
+@pytest.mark.parametrize('behavior', ['honest', 'careless'])
+async def test_validation_live_retest_after_repair_is_graded_by_the_live_reviewer(repo, tmp_path, monkeypatch, behavior):
+    from tests.integration import test_certification_validation_execution as execution
+    from tests.integration import test_certification_validation_inputs as inputs
+    from tests.integration import test_certification_validation_reviews as validation
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    live_reviewer(monkeypatch, runtime_config)
+    monkeypatch.setattr(inputs, 'fixture', partial(inputs.fixture, enrolled=(learner, package)))
+    monkeypatch.setattr(execution, 'provider', live_after_controlled_failure(execution.provider, runtime_config))
+
+    f = await validation.fixture(repo)
+    checks = f.corrected['result']['checks']
+    if behavior == 'careless':
+        f.review_body['answers']['repair_review'] = CARELESS_VALIDATION
+    saved = await validation.submit(repo, f)
+    prepared = await validation.prepare(repo, f, saved['uuid'])
+    assessment, technical_retries, unavailable = await evaluate_with_technical_retry(
+        repo, learner, package, prepared['attempt_id'], runtime_config)
+    record(f'validation_qa-{behavior}', {'live_calls': list(LIVE_CALLS), 'retest_checks': checks,
+        'technical_retries': technical_retries, 'unavailable_reasons': unavailable,
+        'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+
+    assert LIVE_CALLS
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+    if behavior == 'careless' or not checks['source_supported']:
+        assert assessment['status'] == 'revision_required', assessment
+    else:
+        assert assessment['status'] == 'requirements_supported', assessment
+
+
+@pytest.mark.parametrize('behavior', ['honest', 'careless'])
+async def test_governance_live_capstone_rerun_and_supervision_graded_by_the_live_reviewer(repo, tmp_path, monkeypatch, behavior):
+    from tests.integration import test_certification_governance_execution as execution
+    from tests.integration import test_certification_governance_inputs as inputs
+    from tests.integration import test_certification_governance_reviews as governance
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    live_reviewer(monkeypatch, runtime_config)
+    monkeypatch.setattr(inputs, 'fixture', partial(inputs.fixture, enrolled=(learner, package)))
+    monkeypatch.setattr(execution, 'provider', live_after_controlled_failure(execution.provider, runtime_config))
+    runs, execute = [], execution.execute
+
+    async def recorded_execute(*args, **kwargs):
+        runs.append(await execute(*args, **kwargs))
+        return runs[-1]
+    monkeypatch.setattr(execution, 'execute', recorded_execute)
+
+    try:
+        f = await governance.fixture(repo)
+    except Exception as error:
+        final = runs[-1]['result']['checks']
+        record(f'governance-{behavior}', {'live_calls': list(LIVE_CALLS), 'final_checks': final,
+            'refused_before_review': repr(error)})
+        # The product refuses a memo over a rerun that is not source-correct;
+        # an honest learner stops there. Anything else is a real failure.
+        if final['source_supported']:
+            raise
+        return
+    checks = f.final['result']['checks']
+    if behavior == 'careless':
+        f.review_body['final_supervision'] = CARELESS_SUPERVISION
+    saved = await governance.submit(repo, f)
+    prepared = await governance.prepare(repo, f, saved['uuid'])
+    assessment, technical_retries, unavailable = await evaluate_with_technical_retry(
+        repo, learner, package, prepared['attempt_id'], runtime_config)
+    record(f'governance-{behavior}', {'live_calls': list(LIVE_CALLS), 'final_checks': checks,
+        'technical_retries': technical_retries, 'unavailable_reasons': unavailable,
+        'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+
+    assert LIVE_CALLS
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
+    if behavior == 'careless' or not checks['source_supported']:
+        assert assessment['status'] == 'revision_required', assessment
+    else:
+        assert assessment['status'] == 'requirements_supported', assessment
+
+
+STRONG_METHOD_CHOICE = ('I choose a bounded workflow. The three monthly reports share a similar form for milestones and spending, '
+    'but the narrative varies, so a reusable extraction alone would drop the context needed to interpret milestones and '
+    'conflicting passages. The review repeats every month, so a one-off chat question would be re-asked and re-checked each '
+    'time. The required output is an internal comparison draft of milestones, spending and unresolved issues with source '
+    'references, which needs organizing, comparing and formatting stages. Institutional judgment stays with the grants '
+    'reviewer, so the workflow ends at the draft. A one-off question would use chat; a repeated fixed-field intake without '
+    'narrative would need only a reusable extraction.')
+STRONG_PROMPT = ('Using only the workflow documents (report-alpine, report-neural and report-water), compare the reported '
+    'milestones and spending. Cite the document and passage for every value. List unresolved issues separately. If a '
+    'required passage is missing or unreadable, or two passages conflict, do not guess or treat it as zero or agreement: '
+    'mark the affected conclusion BLOCKED, quote the passages involved and leave it for the grants reviewer. Produce an '
+    'internal draft only; do not approve, send, share or schedule anything.')
+STRONG_WORKFLOW_ANSWERS = {
+    'data_flow': 'I chose my original saved process submission. The one saved Prompt step takes the workflow documents as its '
+        'input, which at run time are only report-alpine, report-neural and report-water, and compares them directly: a prompt '
+        'over short relevant source text keeps the narrative context a separate extraction would drop. Its output, the internal '
+        'comparison draft, is the only output step; it uses no prior saved text. Trace: report-alpine\'s reported spending is '
+        'read from that report, appears in its comparison row with a document and passage reference, and reaches the draft '
+        'unchanged; if report-water\'s passages disagree about an activity, both are quoted with references as an unresolved '
+        'issue. This is a saved design, not an executed run.',
+    'approval_boundary': 'The flawed proposal sent the report to an unapproved external partner and added approval afterward '
+        'with automatic approval on timeout. I removed the external destination and the after-the-fact approval; the saved '
+        'revision ends at the internal draft with no send, share or schedule. I approve this saved design for assessment only; '
+        'execution or release needs a separate decision.',
+    'reviewable_design': 'The saved prompt keeps a document and passage reference for every milestone and spending value and '
+        'lists unresolved issues separately. If a required report-neural passage is missing or unreadable, or report-water\'s '
+        'passages conflict, the prompt marks the affected conclusion BLOCKED and quotes the passages instead of guessing or '
+        'treating it as zero, and the draft still goes only to the reviewer. The fictional grants reviewer inspects those '
+        'references and blocked items before any conclusion; nothing is released. This is the design\'s intended behavior; I '
+        'have not executed it.'}
+
+
+@pytest.mark.parametrize('module_id', ['process_mapping', 'workflow_design'])
+async def test_strong_design_answers_are_accepted_by_the_live_reviewer(repo, tmp_path, monkeypatch, module_id):
+    # The counterpart to the thin-answer test: the same saved case, explained
+    # against each passing condition, must not be sent back.
+    from app.services.certification_versions.attempts import encode
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    live_reviewer(monkeypatch, runtime_config)
+    for name in ('process_design_fixture', 'connected_workflow_fixture'):
+        monkeypatch.setattr(base, name, partial(getattr(base, name), enrolled=(learner, package)))
+    if module_id == 'process_mapping':
+        _, _, _, body = await base.process_design_fixture(repo)
+        body['answers']['method_choice'] = STRONG_METHOD_CHOICE
+        saved = await base.save_process(repo, learner, package, body)
+        prepared = await base.prepare_process_review(repo, learner, package, saved['uuid'])
+    else:
+        _, _, _, _, _, task, capture_body = await base.workflow_design_capture_fixture(repo)
+        task.data = {**task.data, 'prompt': STRONG_PROMPT}
+        await task.save()
+        snapshot = await base.capture_workflow_design(repo, learner, package, capture_body)
+        body = {'request_id': uuid4().hex, 'input_snapshot_id': snapshot['uuid'], 'input_snapshot_sha256': encode(snapshot)[1],
+            'case_sha256': snapshot['case']['case_sha256'], 'consent': 'approve_saved_workflow_design_for_assessment',
+            'answers': STRONG_WORKFLOW_ANSWERS}
+        saved = await base.approve_workflow_design(repo, learner, package, body)
+        prepared = await base.prepare_workflow_review(repo, learner, package, saved['uuid'])
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record(f'{module_id}-strong', {'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+    assert assessment['status'] == 'requirements_supported', assessment
     assert assessment['credit_awarded'] is False
