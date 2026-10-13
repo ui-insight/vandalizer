@@ -16,6 +16,7 @@ from app.models.workflow import (
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
 )
 from app.models.system_config import SystemConfig
 from app.models.user_config import UserModelConfig
@@ -80,6 +81,7 @@ ALL_MODELS = [
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
     SystemConfig,
     UserModelConfig,
     ChatMessage,

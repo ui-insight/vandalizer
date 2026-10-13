@@ -276,6 +276,7 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
 # the button the user actually sees.
 _APPROVE_BUTTON_LABELS = {
     "create_workflow": "Create workflow",
+    "update_workflow": "Update workflow",
     "create_automation": "Create automation",
     "create_extraction_from_document": "Create extraction",
     "run_workflow": "Run workflow",
@@ -5106,6 +5107,10 @@ async def create_workflow(
     (handy with text_input — e.g. pin the source PDF so the typed bed name is
     matched against it).
 
+    To change a workflow that already exists, including one created earlier
+    in this conversation, use update_workflow instead: calling this again
+    makes a second workflow.
+
     Call first with confirmed=false to preview the plan, then confirmed=true
     after the user approves.
 
@@ -6003,6 +6008,8 @@ async def submit_certification_assessment(
     }
 
 
+from app.services.chat_workflow_tools import get_workflow_definition, update_workflow  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
@@ -6062,6 +6069,8 @@ TOOLS = [
     create_automation,
     # Phase 10 — Workflow authoring
     create_workflow,
+    get_workflow_definition,
+    update_workflow,
     # Phase 11 — Certification program
     get_certification_progress,
     get_certification_module,
@@ -6107,6 +6116,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "get_certification_module",
     "get_certification_lesson",
     "check_certification_module",
+    "get_workflow_definition",
 })
 
 

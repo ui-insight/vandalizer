@@ -12,7 +12,7 @@ import {
   Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
-  Cpu,
+  Cpu, GitBranch,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -34,6 +34,8 @@ import {
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
+import { WorkflowVersionsTab } from './WorkflowVersionsTab'
+import { useOnWorkflowEdited } from '../../lib/workflowEdits'
 import { StalePlanBanner } from './StalePlanBanner'
 import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
@@ -88,7 +90,7 @@ import { assertedTierNote } from '../../lib/qualityLabels'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'history'
+type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'versions' | 'history'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
 
 interface TaskTypeDef {
@@ -151,6 +153,7 @@ const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
   { key: 'input', label: 'Input', icon: Zap },
   { key: 'validate', label: 'Validate', icon: ClipboardCheck },
   { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
+  { key: 'versions', label: 'Versions', icon: GitBranch },
   { key: 'history', label: 'History', icon: Clock },
 ]
 
@@ -322,6 +325,12 @@ export function WorkflowEditorPanel() {
   }, [openWorkflowId, openWorkflowShareToken, refreshSparkline])
 
   useEffect(() => { refresh() }, [refresh])
+  // Chat's update_workflow replaces this workflow's steps; reload so the
+  // editor never edits steps that no longer exist.
+  useOnWorkflowEdited(openWorkflowId, () => {
+    void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+    return refresh()
+  })
 
   // Load results from a pending session (e.g. clicking a completed activity).
   // workflowOpenSignal reruns this when a rail click re-opens the workflow
@@ -1132,6 +1141,12 @@ export function WorkflowEditorPanel() {
             onImportDefinition={() => importInputRef.current?.click()}
             onExportDefinition={() => window.open(exportWorkflowUrl(workflow.id), '_blank')}
           />
+        )}
+        {activeTab === 'versions' && (
+          <WorkflowVersionsTab workflowId={workflow.id} onRestored={() => {
+            void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+            return refresh()
+          }} />
         )}
         {activeTab === 'history' && openWorkflowId && (
           <RunHistoryTab

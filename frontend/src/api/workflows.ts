@@ -657,6 +657,42 @@ export interface RunHistoryEntry {
   pending_review_uuid?: string | null
 }
 
+export interface WorkflowVersionEntry {
+  id: string
+  number: number
+  note: string
+  source: 'original' | 'chat' | 'editor' | 'restore' | string
+  created_by_user_id: string | null
+  created_by_name: string | null
+  created_at: string | null
+  restored_from: number | null
+  name: string | null
+  step_names: string[]
+  is_current: boolean
+}
+
+export interface WorkflowVersionHistory {
+  versions: WorkflowVersionEntry[]
+  unsaved_changes: boolean
+  can_manage: boolean
+}
+
+export function listWorkflowVersions(workflowId: string) {
+  return apiFetch<WorkflowVersionHistory>(`/api/workflows/${workflowId}/versions`)
+}
+
+export function saveWorkflowVersion(workflowId: string, note: string) {
+  return apiFetch<{ id: string; number: number }>(`/api/workflows/${workflowId}/versions`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  })
+}
+
+export function restoreWorkflowVersion(workflowId: string, versionId: string) {
+  return apiFetch<{ id: string; number: number; restored_from: number; name_note: string | null }>(
+    `/api/workflows/${workflowId}/versions/${versionId}/restore`, { method: 'POST' },
+  )
+}
+
 export function getWorkflowHistory(workflowId: string, limit = 50) {
   return apiFetch<{ runs: RunHistoryEntry[] }>(`/api/workflows/${workflowId}/history?limit=${limit}`)
 }

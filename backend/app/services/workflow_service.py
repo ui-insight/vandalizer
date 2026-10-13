@@ -309,6 +309,9 @@ async def delete_workflow(workflow_id: str, user: User) -> bool:
         att = await WorkflowAttachment.get(att_id)
         if att:
             await att.delete()
+    from app.services.workflow_versions import delete_versions
+
+    await delete_versions(str(wf.id))
     await wf.delete()
     return True
 

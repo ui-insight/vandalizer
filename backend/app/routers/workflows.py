@@ -1278,6 +1278,71 @@ async def get_workflow_history(
     }
 
 
+class SaveWorkflowVersionRequest(BaseModel):
+    note: str = ""
+
+
+@router.get("/{workflow_id}/versions")
+async def list_workflow_versions(workflow_id: str, user: User = Depends(get_current_user)):
+    """The workflow's version history, newest first."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    history = await workflow_versions.list_versions(wf)
+    authors = await resolve_authors({v["created_by_user_id"] for v in history["versions"] if v["created_by_user_id"]})
+    for v in history["versions"]:
+        author = authors.get(v["created_by_user_id"]) if v["created_by_user_id"] else None
+        v["created_by_name"] = (author.name or author.email) if author else None
+    team_access = await access_control.get_team_access_context(user)
+    history["can_manage"] = access_control.can_manage_workflow(wf, user, team_access)
+    return history
+
+
+@router.post("/{workflow_id}/versions")
+async def save_workflow_version(
+    workflow_id: str, body: SaveWorkflowVersionRequest, user: User = Depends(get_current_user),
+):
+    """Save the workflow as it stands now as a version, with an optional note."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    latest = await workflow_versions.latest_version(str(wf.id))
+    definition = await workflow_versions.current_definition(wf)
+    if latest and latest.definition_hash == workflow_versions.definition_hash(definition):
+        raise HTTPException(status_code=409, detail=f"Nothing has changed since version {latest.number}.")
+    source = "editor" if latest else "original"
+    version = await workflow_versions.record_version(
+        wf, note=body.note.strip() or workflow_versions.SOURCE_LABELS[source], source=source,
+        user_id=user.user_id, definition=definition,
+    )
+    return {"id": str(version.id), "number": version.number}
+
+
+@router.post("/{workflow_id}/versions/{version_id}/restore")
+async def restore_workflow_version(
+    workflow_id: str, version_id: str, user: User = Depends(get_current_user),
+):
+    """Make an earlier version current again. Recorded as a new version."""
+    from app.models.workflow import WorkflowVersion
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    try:
+        version = await WorkflowVersion.get(PydanticObjectId(version_id))
+    except Exception:
+        version = None
+    if not version or version.workflow_id != str(wf.id):
+        raise HTTPException(status_code=404, detail="Version not found")
+    restored, name_note = await workflow_versions.restore_version(wf, version, user.user_id)
+    return {"id": str(restored.id), "number": restored.number, "restored_from": version.number, "name_note": name_note}
+
+
 @router.get("/{workflow_id}/quality-history")
 async def get_workflow_quality_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),

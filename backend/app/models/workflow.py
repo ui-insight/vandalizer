@@ -89,6 +89,33 @@ class Workflow(Document):
         ]
 
 
+class WorkflowVersion(Document):
+    """A saved definition of a workflow: one entry in its version history.
+
+    Each edit made through chat, each restore, and editor changes captured
+    before one of those (or saved by hand) records the full definition as it
+    stood afterwards, tagged with what changed. Restoring applies a version's
+    definition and records a new version, so history is never rewritten.
+    """
+
+    workflow_id: str
+    number: int
+    note: str
+    # "original" | "chat" | "editor" | "restore"
+    source: str
+    created_by_user_id: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    definition: dict = {}
+    definition_hash: str = ""
+    restored_from: Optional[int] = None
+
+    class Settings:
+        name = "workflow_version"
+        indexes = [
+            [("workflow_id", 1), ("number", -1)],
+        ]
+
+
 class WorkflowResult(Document):
     """Result of a workflow execution."""
 

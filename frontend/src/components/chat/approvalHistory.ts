@@ -51,6 +51,7 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
           : status === 'running' ? 'Running'
           : status === 'completed' ? 'Completed'
           : result.tool_name === 'create_workflow' && content.workflow_id ? 'Workflow created'
+          : result.tool_name === 'update_workflow' && content.workflow_id ? 'Workflow updated'
           : result.tool_name === 'run_workflow' && content.session_id ? 'Run accepted'
           : 'Result recorded'
         record = { label, detail: 'A matching confirmed action has a result below. Inspect that result for details; this preview is retained as history.' }

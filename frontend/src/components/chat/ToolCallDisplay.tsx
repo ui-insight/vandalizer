@@ -17,6 +17,7 @@ import { useCertificationPanelOptional } from '../../contexts/CertificationPanel
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
+import { announceWorkflowEdited } from '../../lib/workflowEdits'
 import type { WorkflowStatus } from '../../types/workflow'
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,8 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   propose_obligations: { label: 'Updating the RA inbox', category: 'write' },
   create_automation:     { label: 'Creating automation',      category: 'write' },
   create_workflow:       { label: 'Building workflow',         category: 'write' },
+  get_workflow_definition: { label: 'Reading workflow steps',  category: 'read' },
+  update_workflow:       { label: 'Updating workflow',         category: 'write' },
   get_certification_progress:      { label: 'Checking certification progress', category: 'read' },
   get_certification_module:        { label: 'Loading certification module',    category: 'read' },
   get_certification_lesson:        { label: 'Loading lesson',                  category: 'read' },
@@ -421,6 +424,17 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const n = (obj.steps_created as number) || 0
       const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
       return { text: `Built ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'update_workflow': {
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Updated ${t}${typeof obj.version === 'number' ? ` · version ${obj.version}` : ''}`, qualityHint: '' }
+    }
+
+    case 'get_workflow_definition': {
+      const n = Array.isArray(obj.steps) ? obj.steps.length : 0
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Read ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
     }
 
     case 'get_certification_progress': {
@@ -1181,6 +1195,11 @@ export function ToolStatusLine({
   const unconfirmed = !isActive && !!call && !result
 
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
+  // An editor showing a workflow chat just changed reloads its steps.
+  const editedWorkflowId = name === 'update_workflow' && !needsConfirmation && !isError && typeof obj?.workflow_id === 'string' ? obj.workflow_id : null
+  useEffect(() => {
+    if (editedWorkflowId) announceWorkflowEdited(editedWorkflowId, result?.tool_call_id)
+  }, [editedWorkflowId, result?.tool_call_id])
   const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
   const decisionRef = useRef(false)
   const [decisionError, setDecisionError] = useState<string | null>(null)
@@ -1205,10 +1224,10 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ create_workflow: 'Create workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation' } as Record<string, string>)[name] ?? `Approve ${name.replaceAll('_', ' ')}`
+  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation' } as Record<string, string>)[name] ?? `Approve ${name.replaceAll('_', ' ')}`
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
-    ? name === 'create_workflow' && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
+    ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
       : name === 'create_extraction_from_document' && typeof obj.extraction_set_uuid === 'string' ? { label: 'Open extraction', open: () => openExtraction(obj.extraction_set_uuid as string) }
       : name === 'create_automation' && typeof obj.id === 'string' ? { label: 'Open automation', open: () => openAutomation(obj.id as string) }
       : null

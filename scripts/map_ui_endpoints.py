@@ -181,7 +181,11 @@ def _call_span(text: str, i: int) -> int:
     while i < len(text):
         ch = text[i]
         if ch in "'\"`":
-            _, i = _read_string(text, i)
+            _, end = _read_string(text, i)
+            # An unterminated "string" (a quote inside a regex literal, such
+            # as /filename="([^"]+)"/) returns the same index; step past it
+            # instead of looping forever.
+            i = end if end > i else i + 1
             continue
         if ch == "(":
             depth += 1
