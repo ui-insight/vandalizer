@@ -53,6 +53,21 @@ export function VerificationNavBar({
 
   if (!current) return null
 
+  // The value the field holds now: the user's correction if they made one,
+  // else what was extracted. Editing starts from it.
+  const currentValue =
+    current.status === 'corrected' && current.expected !== null ? current.expected : current.extracted
+
+  // Saving an edit. An empty value is a real answer ("not in the document").
+  // A value equal to the extraction is the extraction approved, so clearing a
+  // correction on a field that was extracted empty restores it.
+  const saveEdit = () => {
+    const value = editValue.trim()
+    if (value === current.extracted.trim()) patch('approved')
+    else patch('corrected', value)
+    setEditing(false)
+  }
+
   const canGoPrev = index > 0
   const canGoNext = index < total - 1
   const allResolved = session.fields.every((f) => f.status !== 'pending')
@@ -183,10 +198,11 @@ export function VerificationNavBar({
               autoFocus
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
+              placeholder="Leave empty if the document doesn't have this value"
+              aria-label={`Correct value for ${current.key}`}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && editValue.trim()) {
-                  patch('corrected', editValue.trim())
-                  setEditing(false)
+                if (e.key === 'Enter') {
+                  saveEdit()
                 } else if (e.key === 'Escape') {
                   setEditing(false)
                 }
@@ -211,12 +227,14 @@ export function VerificationNavBar({
               }}
               title={current.extracted}
             >
-              {current.expected && current.status === 'corrected' ? (
+              {current.expected !== null && current.status === 'corrected' ? (
                 <>
-                  <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 'var(--workspace-space-6)' }}>
-                    {current.extracted}
-                  </span>
-                  <span>{current.expected}</span>
+                  {current.extracted && (
+                    <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 'var(--workspace-space-6)' }}>
+                      {current.extracted}
+                    </span>
+                  )}
+                  {current.expected || <span style={{ color: '#d1d5db' }}>(empty)</span>}
                 </>
               ) : (
                 current.extracted || <span style={{ color: '#d1d5db' }}>(empty)</span>
@@ -251,7 +269,7 @@ export function VerificationNavBar({
             </button>
             <button
               onClick={() => {
-                setEditValue(current.extracted)
+                setEditValue(currentValue)
                 setEditing(true)
               }}
               disabled={busy}
@@ -275,13 +293,8 @@ export function VerificationNavBar({
         {editing && (
           <>
             <button
-              onClick={() => {
-                if (editValue.trim()) {
-                  patch('corrected', editValue.trim())
-                  setEditing(false)
-                }
-              }}
-              disabled={busy || !editValue.trim()}
+              onClick={saveEdit}
+              disabled={busy}
               style={{ ...actionBtn, background: '#2563eb', color: '#fff', borderColor: '#2563eb' }}
             >
               Save correction
