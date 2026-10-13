@@ -2978,6 +2978,7 @@ def build_workflow_engine(
     system_config_doc: dict | None = None,
     allow_code_execution: bool = False,
     config_override: dict | None = None,
+    force_model: bool = False,
 ) -> WorkflowEngine:
     """Build a WorkflowEngine from step data dicts.
 
@@ -2992,6 +2993,8 @@ def build_workflow_engine(
             ``{"step_overrides": {step_name: {"model": str, "prompt_variant": str | None}}}``.
             When supplied, per-step model + prompt-variant overrides are merged
             into each task's ``data`` before node construction.
+        force_model: Run every task on ``model``, over a step's own model and
+            an optimizer model swap. Set for a run started on a named model.
     """
     engine = WorkflowEngine()
     nodes = []
@@ -3027,6 +3030,8 @@ def build_workflow_engine(
                 task_data["model"] = task_data.get("model") or model
                 # Optimizer-applied per-step override (model swap + prompt variant).
                 _apply_step_override(task_name, task_data, step_override)
+                if force_model and model:
+                    task_data["model"] = model
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)

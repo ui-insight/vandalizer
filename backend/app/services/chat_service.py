@@ -1901,6 +1901,11 @@ async def chat_stream(
     if open_docs_block:
         reminder_blocks.append(open_docs_block)
 
+    # Which model is answering, and which others exist. Without it chat said
+    # it "cannot create this workflow with a specific model" when asked to use
+    # the selected one, which its tools were already doing.
+    reminder_blocks.append(_build_model_block(model_name, sys_config_doc))
+
     # Tell the agent it's inside a project, and what that project contains
     # (pinned workflows/extractions with their ids, file/KB counts). This is
     # what makes the project tools usable — without it the agent doesn't know a
@@ -3825,6 +3830,44 @@ def _get_full_text(documents: list[SmartDocument]) -> str:
         if doc.raw_text:
             parts.append(f"\n\n## Document: {doc.title}\n{doc.raw_text}")
     return "".join(parts)
+
+
+def _model_label(entry: dict) -> str:
+    """How the model picker names a model: its tag, with the name if different."""
+    name = str(entry.get("name") or "")
+    tag = str(entry.get("tag") or "")
+    if tag and name and tag != name:
+        return f"{tag} ({name})"
+    return tag or name
+
+
+def _build_model_block(model_name: str, sys_config_doc: Optional[dict]) -> str:
+    """Name the chat's model and the configured models the tools can use."""
+    models = [
+        m for m in ((sys_config_doc or {}).get("available_models") or [])
+        if isinstance(m, dict) and (m.get("name") or m.get("tag"))
+    ]
+    current = next(
+        (m for m in models if model_name in (m.get("name"), m.get("tag"))), None,
+    )
+    current_label = _model_label(current) if current else model_name
+    lines = [
+        "## Model",
+        f"You are running on **{current_label}**, the model selected in this "
+        "chat's model picker. Workflows you create or run, and extractions you "
+        "run, use it unless the user names another.",
+    ]
+    others = [_model_label(m) for m in models if m is not current]
+    if others:
+        lines.append("Other configured models: " + ", ".join(others) + ".")
+    lines.append(
+        "When the user names a model for a workflow, pass it as `model` to "
+        "create_workflow or run_workflow. To compare models, run the workflow "
+        "once per model (run_workflow with each `model`), then compare the two "
+        "runs' outputs from get_workflow_status. You cannot change this chat's "
+        "own model; the user switches it in the model picker."
+    )
+    return "\n".join(lines)
 
 
 def _build_open_documents_block(

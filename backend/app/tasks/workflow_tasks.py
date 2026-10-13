@@ -1182,6 +1182,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             system_config_doc=sys_config,
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
+            force_model=bool(result_doc.get("model_forced")),
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
@@ -1839,6 +1840,7 @@ def resume_workflow_after_approval(self, approval_uuid):
             system_config_doc=sys_config,
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
+            force_model=bool(result_doc.get("model_forced")),
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(

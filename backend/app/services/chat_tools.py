@@ -2343,11 +2343,41 @@ async def add_url_to_kb(
 # ---------------------------------------------------------------------------
 
 
+async def _resolve_requested_model(model: Optional[str]) -> tuple[Optional[str], Optional[dict]]:
+    """Match a model the user named against the configured models.
+
+    Returns ``(name, None)`` for a match (by name or tag), ``(None, None)``
+    when nothing was named, and ``(None, error)`` for a name that isn't
+    configured, so the tool fails before it spends a call.
+    """
+    if not (model or "").strip():
+        return None, None
+    from app.models.system_config import SystemConfig
+    sys_cfg = await SystemConfig.get_config()
+    available = (sys_cfg.available_models if sys_cfg else None) or []
+    wanted = model.strip()
+    match = next(
+        (m for m in available if wanted in (m.get("name"), m.get("tag"))),
+        None,
+    ) or next(
+        (m for m in available if wanted.lower() in (str(m.get("name") or "").lower(), str(m.get("tag") or "").lower())),
+        None,
+    )
+    if not match:
+        names = [m.get("name") for m in available if m.get("name")]
+        return None, _err(
+            f"Model '{model}' is not configured on this deployment.",
+            hint=f"Configured models: {', '.join(names) or 'none'}. Retry with one of these names.",
+        )
+    return match.get("name"), None
+
+
 async def run_workflow(
     context: RunContext[AgenticChatDeps],
     workflow_id: str,
     document_uuids: list[str] | None = None,
     text_input: str = "",
+    model: Optional[str] = None,
     confirmed: bool = False,
 ) -> dict:
     """Start a workflow execution. Returns a session ID for status polling.
@@ -2378,8 +2408,17 @@ async def run_workflow(
         text_input: For a text-input workflow, the text the user wants it to run
             on (e.g. a bed name, a pasted snippet). It becomes the workflow's
             input; any documents pinned to the workflow are included too.
+        model: Only when the user names a model ("run it on kimi-k3", or two
+            models to compare). Every step then runs on that model, including
+            steps that set their own. Omit it otherwise: the run uses the model
+            selected in chat for steps that don't set one. To compare models,
+            call once per model and compare the two runs' outputs.
         confirmed: Must be true to actually run. If false, returns a preview.
     """
+    requested_model, model_error = await _resolve_requested_model(model)
+    if model_error:
+        return model_error
+
     # Fall back to the documents already open in the chat when the model omits
     # them ("run the workflow on it"). Text-input workflows pass text instead,
     # so only default when no text was given.
@@ -2424,10 +2463,16 @@ async def run_workflow(
     gate = await _confirm_gate(
         context,
         tool_name="run_workflow",
-        key={"workflow_id": workflow_id, "docs": sorted(document_uuids), "text": text[:200]},
+        key={
+            "workflow_id": workflow_id, "docs": sorted(document_uuids),
+            "text": text[:200], "model": requested_model,
+        },
         preview={
             "action": "run_workflow",
-            "preview": f"Run workflow \"{wf.name}\" on {run_label}",
+            "preview": (
+                f"Run workflow \"{wf.name}\" on {run_label}"
+                + (f", every step on {requested_model}" if requested_model else "")
+            ),
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -2450,15 +2495,19 @@ async def run_workflow(
             logger.error("Failed to create temp document for workflow %s: %s", workflow_id, e)
             return {"error": "Couldn't prepare the text input for this run — try again."}
 
-    return await _execute_workflow(context, wf, run_docs)
+    return await _execute_workflow(context, wf, run_docs, model=requested_model)
 
 
 async def _execute_workflow(
     context: RunContext[AgenticChatDeps],
     wf,
     document_uuids: list[str],
+    model: Optional[str] = None,
 ) -> dict:
     """Dispatch an already-authorized workflow against documents.
+
+    ``model`` (a configured name) runs every step on it; without it the chat's
+    model is the default for steps that don't set their own.
 
     Shared by ``run_workflow`` (after auth + confirmation) and
     ``run_pin_on_project``. Caps at 10 documents (the workflow_service limit).
@@ -2497,9 +2546,10 @@ async def _execute_workflow(
             workflow_id=workflow_id,
             document_uuids=document_uuids[:10],
             user_id=context.deps.user_id,
-            model=context.deps.model_name or None,
+            model=model or context.deps.model_name or None,
             user=context.deps.user,
             activity_id=activity_id,
+            force_model=bool(model),
         )
     except ValueError as e:
         return {"error": str(e)}
@@ -2528,6 +2578,7 @@ async def _execute_workflow(
     return {
         "session_id": session_id,
         "status": "running",
+        "model": model or context.deps.model_name or None,
         "message": "Workflow started. Use get_workflow_status with the session_id to check progress.",
     }
 
@@ -2607,6 +2658,9 @@ async def get_workflow_status(
         "progress": f"{done} of {total} steps completed",
         "current_step": status.get("current_step_name"),
     }
+    # Which model the run used, so two runs can be compared by model.
+    if status.get("model"):
+        result["model"] = status["model"]
 
     if status["status"] == "completed" and status.get("workflow_id"):
         try:
@@ -3473,22 +3527,9 @@ async def run_validation(
 
     # Resolve an explicitly requested model against the configured list before
     # burning any LLM calls — an unknown name would otherwise fail mid-run.
-    requested_model: Optional[str] = None
-    if model:
-        from app.models.system_config import SystemConfig
-        sys_cfg = await SystemConfig.get_config()
-        available = (sys_cfg.available_models if sys_cfg else None) or []
-        match = next(
-            (m for m in available if m.get("name") == model or m.get("tag") == model),
-            None,
-        )
-        if not match:
-            names = [m.get("name") for m in available if m.get("name")]
-            return _err(
-                f"Model '{model}' is not configured on this deployment.",
-                hint=f"Configured models: {', '.join(names) or 'none'}. Retry with one of these names.",
-            )
-        requested_model = match.get("name")
+    requested_model, model_error = await _resolve_requested_model(model)
+    if model_error:
+        return model_error
 
     model_note = f' under model "{requested_model}"' if requested_model else ""
     gate = await _confirm_gate(
@@ -5021,6 +5062,7 @@ async def create_workflow(
     description: str = "",
     input_mode: str = "documents",
     fixed_document_uuids: list[str] | None = None,
+    model: Optional[str] = None,
     confirmed: bool = False,
 ) -> dict:
     """Build a multi-step workflow from a plain-language description of the steps.
@@ -5074,6 +5116,9 @@ async def create_workflow(
         description: Optional description of what the workflow does.
         input_mode: "documents" (default), "text_input", or "no_input".
         fixed_document_uuids: Optional UUIDs always included alongside the input.
+        model: Only when the user names a model for the workflow ("build it with
+            kimi-k3"). Its steps are set to that model. Omit it otherwise: the
+            steps use the model selected in chat.
         confirmed: Must be true to actually create. If false, returns a preview.
     """
     if not name or not name.strip():
@@ -5087,7 +5132,10 @@ async def create_workflow(
     if input_mode not in ("documents", "text_input", "no_input"):
         return {"error": "input_mode must be 'documents', 'text_input', or 'no_input'."}
 
-    model = context.deps.model_name or None
+    requested_model, model_error = await _resolve_requested_model(model)
+    if model_error:
+        return model_error
+    model = requested_model or context.deps.model_name or None
 
     # Validate every step up front so the preview reflects a buildable plan and
     # we never half-create a workflow because step 4 was malformed.
@@ -5127,10 +5175,17 @@ async def create_workflow(
     gate = await _confirm_gate(
         context,
         tool_name="create_workflow",
-        key={"name": name, "mode": input_mode, "steps": [{"t": p["type"], "n": p["label"]} for p in plan]},
+        key={
+            "name": name, "mode": input_mode, "model": model,
+            "steps": [{"t": p["type"], "n": p["label"]} for p in plan],
+        },
         preview={
             "action": "create_workflow",
-            "preview": f"Create workflow \"{name}\"{mode_suffix} with {len(plan)} step(s): {preview_lines}",
+            "preview": (
+                f"Create workflow \"{name}\"{mode_suffix} with {len(plan)} step(s)"
+                + (f" on {model}" if model else "")
+                + f": {preview_lines}"
+            ),
             "needs_confirmation": True,
         },
         confirmed=confirmed,

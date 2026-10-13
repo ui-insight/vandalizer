@@ -141,6 +141,10 @@ class WorkflowResult(Document):
     # so the resume task reads it back from here to keep steps after the gate on
     # the same model. None for runs created before this field existed.
     model: Optional[str] = None
+    # True when the run was started with an explicit model that every step
+    # must use, including steps that name their own (chat's "run it on model
+    # X" for comparing models). Read back by the resume task like ``model``.
+    model_forced: bool = False
     # Celery task id of the execution job, captured at enqueue time so a user
     # can cancel an in-flight run (revoke + terminate). None for runs created
     # before this field existed or for runs that never enqueued a task.

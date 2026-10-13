@@ -557,8 +557,13 @@ async def run_workflow(
     activity_id: str | None = None,
     user: User | None = None,
     share_token: str | None = None,
+    force_model: bool = False,
 ) -> str:
-    """Start workflow execution. Returns session_id for polling."""
+    """Start workflow execution. Returns session_id for polling.
+
+    ``force_model`` runs every step on ``model``, including steps that name
+    their own; without it ``model`` is only the default for steps that don't.
+    """
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user, share_token=share_token)
         if not wf:
@@ -605,6 +610,7 @@ async def run_workflow(
         num_steps_total=len(wf.steps),
         input_context={"doc_uuids": document_uuids},
         model=model,
+        model_forced=bool(force_model and model),
         celery_task_id=celery_task_id,
     )
     await result.insert()
@@ -684,6 +690,7 @@ async def get_workflow_status(
         "workflow_id": str(result.workflow) if result.workflow else None,
         "document_title": result.document_title,
         "start_time": result.start_time,
+        "model": result.model,
     }
 
 
