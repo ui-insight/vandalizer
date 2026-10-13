@@ -126,6 +126,13 @@ async def _rebind_many(
     return bound, unbound
 
 
+def _add_import_note(data: dict, note: str) -> None:
+    """Add to a task's import note rather than replace it: a grounded task
+    can lose both its knowledge bases and a selected document."""
+    prev = data.get("_import_note")
+    data["_import_note"] = f"{prev} {note}" if isinstance(prev, str) and prev else note
+
+
 def _unbound_note(titles: list[str], *, what: str) -> str:
     quoted = ", ".join(f"\"{t}\"" for t in titles)
     plural = "s" if len(titles) != 1 else ""
@@ -175,18 +182,21 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
                 ],
             }
 
-    # --- KnowledgeBaseQuery tasks: embed KB metadata ---
-    if task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
-        embedded = await _embed_knowledge_base(data["kb_uuid"])
-        if embedded:
-            data["_embedded_knowledge_base"] = embedded
-    if task_name == "KnowledgeBaseQuery" and isinstance(data.get("knowledge_bases"), list):
+    # --- KnowledgeBaseQuery tasks: embed KB metadata. A step saved with a
+    # list mirrors its first base into kb_uuid for older readers; the list
+    # is the whole truth, so only a single-base step embeds kb_uuid. ---
+    kb_list = data.get("knowledge_bases") if task_name == "KnowledgeBaseQuery" else None
+    if isinstance(kb_list, list) and any(kb_list):
         embedded_list = [
-            e for e in [await _embed_knowledge_base(u) for u in data["knowledge_bases"] if u]
+            e for e in [await _embed_knowledge_base(u) for u in kb_list if u]
             if e
         ]
         if embedded_list:
             data["_embedded_knowledge_bases"] = embedded_list
+    elif task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
+        embedded = await _embed_knowledge_base(data["kb_uuid"])
+        if embedded:
+            data["_embedded_knowledge_base"] = embedded
 
     # --- Grounded tasks: embed every knowledge base they read, with the
     # queries that base is searched with, so import can rebind each one and
@@ -357,6 +367,8 @@ async def _reconstruct_task_references(
         embedded_list = data.pop("_embedded_knowledge_bases")
         bound, unbound = await _rebind_many(embedded_list, user_id, team_id)
         data["knowledge_bases"] = bound
+        # kb_uuid mirrors the first base, as the editor saves it.
+        data["kb_uuid"] = bound[0] if bound else ""
         if unbound:
             data["_import_note"] = _unbound_note(unbound, what="for this lookup")
 
@@ -385,15 +397,17 @@ async def _reconstruct_task_references(
             # The shared list was folded into each entry at export time.
             grounding.pop("queries", None)
             if unbound:
-                data["_import_note"] = _unbound_note(unbound, what="for grounding")
+                _add_import_note(data, _unbound_note(unbound, what="for grounding"))
         elif grounding.get("knowledge_bases"):
-            # A v1-style export with bare uuids: nothing to match on, and the
-            # uuids won't exist here. Clear them rather than let the step fail
-            # by name on every run.
+            # No embedded descriptions (an export from before rebinding, or of
+            # bases deleted before export): nothing to match on, and the uuids
+            # won't exist here. Clear them rather than let the step fail by
+            # name on every run.
             grounding["knowledge_bases"] = []
-            data["_import_note"] = (
+            _add_import_note(
+                data,
                 "This step was grounded in knowledge bases that do not exist "
-                "here. Please select local knowledge bases for it."
+                "here. Please select local knowledge bases for it.",
             )
         data["kb_grounding"] = grounding
 
@@ -401,9 +415,10 @@ async def _reconstruct_task_references(
     if data.get("_embedded_document_ref"):
         ref = data.pop("_embedded_document_ref")
         data["selected_document_uuid"] = ""
-        data["_import_note"] = (
+        _add_import_note(
+            data,
             f"Originally referenced document \"{ref.get('title', 'Unknown')}\". "
-            f"Please select a local document for this step."
+            f"Please select a local document for this step.",
         )
 
     return data

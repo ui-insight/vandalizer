@@ -436,11 +436,66 @@ def _upstream_sources(inputs: dict, sources: list[str]) -> list[dict]:
     return [s for s in carried if isinstance(s, dict)] if isinstance(carried, list) else []
 
 
-def _cited_instruction(instruction: str, cited: bool) -> str:
+class _GroundedContext:
+    """A task's context with its knowledge-base passages, and what it may cite.
+
+    ``own`` are the passages this task retrieved; ``upstream`` the passages
+    behind cited text it reads from the previous step. Either earns the
+    citation rule. Only ``own`` earns the retry: a task that passes earlier
+    citations along is not re-asked when it drops them.
+    """
+
+    __slots__ = ("context", "grounding", "upstream")
+
+    def __init__(self, context, grounding: GroundingResult | None, upstream: list[dict]) -> None:
+        self.context = context
+        self.grounding = grounding
+        self.upstream = upstream
+
+    @property
+    def own(self) -> list[dict]:
+        return self.grounding.sources if self.grounding is not None else []
+
+    def instruction(self, text: str) -> str:
+        cited = bool(self.grounding is not None and self.grounding.text) or bool(self.upstream)
+        approximate = any(s.get("page_approximate") for s in self.own + self.upstream)
+        return _cited_instruction(text, cited, approximate=approximate)
+
+    def attach(self, result: dict) -> dict:
+        return _attach_grounding(result, self.grounding, upstream=self.upstream)
+
+
+def _grounded_context(
+    node, inputs: dict, sources: list[str], instruction: str,
+) -> tuple[_GroundedContext | None, str | None]:
+    """Build a task's context with its knowledge-base passages appended.
+
+    Returns ``(context, error)``; on a grounding failure the caller fails the
+    step with ``error``.
+    """
+    base_context = _build_combined_context(node.data, inputs, sources)
+    grounding, error = _resolve_grounding(
+        node, inputs, base_context=base_context, instruction=instruction,
+    )
+    if error:
+        return None, error
+    context = base_context
+    if grounding is not None and grounding.text:
+        context = _build_combined_context(
+            node.data, inputs, sources, grounding_text=grounding.text,
+        )
+    return _GroundedContext(context, grounding, _upstream_sources(inputs, sources)), None
+
+
+def _cited_instruction(instruction: str, cited: bool, *, approximate: bool = False) -> str:
     """Append the citation rule to a task's instruction when its context holds
     passages or cited statements. Last, because the rule is what the model
-    must still honour after everything the author asked for."""
-    return f"{instruction}\n\n{CITATION_RULE}" if cited else instruction
+    must still honour after everything the author asked for. ``approximate``
+    adds how to cite a scanned source's estimated (``p. ~N``) page."""
+    if not cited:
+        return instruction
+    rule = f"{CITATION_RULE}\n{KB_APPROXIMATE_PAGE_RULE}" if approximate else CITATION_RULE
+    return f"{instruction}\n\n{rule}"
 
 
 def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> str:
@@ -464,17 +519,19 @@ def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> 
 
 
 def _attach_grounding(
-    result: dict, grounding: GroundingResult | None, carried: list[dict] | None = None,
+    result: dict, grounding: GroundingResult | None, upstream: list[dict] | None = None,
 ) -> dict:
     """Carry citations and warnings on the task result, where ``MultiTaskNode``
     merges them into the step and the run's Sources panel.
 
-    ``carried`` is the previous step's passages, for a task that was told to
-    keep its input's citations: they ride along so the citations in this
-    task's output still resolve to passages downstream. An output that cites
-    a source no passage matches is flagged — the run UI leaves such a
-    citation unlinked, and a reader must not take it for a verified one.
+    ``upstream`` is the previous step's passages, for a task that was told to
+    keep its input's citations: when the output still cites them they ride
+    along, so those citations resolve to passages downstream too. An output
+    that cites a source no passage matches is flagged — the run UI leaves
+    such a citation unlinked, and a reader must not take it for a verified one.
     """
+    output = result.get("output")
+    carried = upstream if upstream and isinstance(output, str) and cites_any(output, upstream) else None
     sources = merge_sources(
         result.get("retrieved_sources"),
         grounding.sources if grounding is not None else None,
@@ -483,9 +540,9 @@ def _attach_grounding(
     if sources:
         result["retrieved_sources"] = sources
     warnings = list(grounding.warnings) if grounding is not None else []
-    output = result.get("output")
-    if sources and isinstance(output, str):
-        bad = unmatched_citations(output, sources)
+    known = merge_sources(sources, upstream)
+    if known and isinstance(output, str):
+        bad = unmatched_citations(output, known)
         if bad:
             shown = "; ".join(f"[{b}]" for b in bad[:3]) + (" …" if len(bad) > 3 else "")
             plural = "s" if len(bad) != 1 else ""
@@ -776,7 +833,9 @@ class MultiTaskNode(Node):
             # failed KB lookup reports a warning, a blocked API call an error).
             sources = result.get("retrieved_sources")
             if isinstance(sources, list):
-                merged_sources.extend(sources)
+                # Merged, not appended: tasks that carry the same earlier
+                # passages forward would otherwise list each one twice.
+                merged_sources[:] = merge_sources(merged_sources, sources)
             # Form Filler's per-field check/source table and the values it
             # wrote: persisted under steps_output and read by the run UI.
             report = result.get("fill_report")
@@ -1018,36 +1077,21 @@ class PromptNode(Node):
         self.report_progress(f"Prompt: {prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        base_context = _build_combined_context(self.data, inputs, sources)
-        grounding, grounding_error = _resolve_grounding(
-            self, inputs, base_context=base_context, instruction=prompt,
-        )
+        g, grounding_error = _grounded_context(self, inputs, sources, prompt)
         if grounding_error:
             return {"output": "", "error": grounding_error, "input": prompt, "step_name": self.name}
-        context = _build_combined_context(
-            self.data, inputs, sources,
-            grounding_text=grounding.text if grounding else None,
-        )
-        # Cite: this task's own passages, or citations riding on the previous
-        # step's output that must stay attached to what they support.
-        upstream = _upstream_sources(inputs, sources)
-        cited = bool(grounding is not None and grounding.text) or bool(upstream)
-        citable = (grounding.sources if grounding is not None else []) + upstream
 
         chat_response = _cited_call(
             lambda instruction: llm_chat_model(
-                model=self.model, prompt=instruction, data=context,
+                model=self.model, prompt=instruction, data=g.context,
                 include_next_step=False, system_config_doc=self._sys_cfg,
                 usage_acc=self._usage_acc,
             ),
-            _cited_instruction(prompt, cited), citable if cited else [],
+            g.instruction(prompt), g.own,
             report=self.report_progress,
         )
 
-        return _attach_grounding(
-            {"output": chat_response, "input": prompt, "step_name": self.name}, grounding,
-            carried=upstream,
-        )
+        return g.attach({"output": chat_response, "input": prompt, "step_name": self.name})
 
 
 class FormatNode(Node):
@@ -1062,35 +1106,22 @@ class FormatNode(Node):
         self.report_progress(f"Formatter: {formatting_prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        base_context = _build_combined_context(self.data, inputs, sources)
-        grounding, grounding_error = _resolve_grounding(
-            self, inputs, base_context=base_context, instruction=formatting_prompt,
-        )
+        g, grounding_error = _grounded_context(self, inputs, sources, formatting_prompt)
         if grounding_error:
             return {
                 "output": "", "error": grounding_error,
                 "input": formatting_prompt, "step_name": self.name,
             }
-        text = _build_combined_context(
-            self.data, inputs, sources,
-            grounding_text=grounding.text if grounding else None,
-        )
-        upstream = _upstream_sources(inputs, sources)
-        cited = bool(grounding is not None and grounding.text) or bool(upstream)
-        citable = (grounding.sources if grounding is not None else []) + upstream
 
         output = _cited_call(
             lambda instruction: format_model(
-                self.model, instruction, text,
+                self.model, instruction, g.context,
                 system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
             )[1],
-            _cited_instruction(formatting_prompt, cited), citable if cited else [],
+            g.instruction(formatting_prompt), g.own,
             report=self.report_progress,
         )
-        return _attach_grounding(
-            {"output": output, "input": formatting_prompt, "step_name": self.name}, grounding,
-            carried=upstream,
-        )
+        return g.attach({"output": output, "input": formatting_prompt, "step_name": self.name})
 
 
 class WebsiteNode(Node):
@@ -1515,21 +1546,13 @@ class ResearchNode(Node):
         prev_step_name = inputs.get("step_name")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        base_context = _build_combined_context(self.data, inputs, sources)
-        grounding, grounding_error = _resolve_grounding(
-            self, inputs, base_context=base_context, instruction=question,
-        )
+        g, grounding_error = _grounded_context(self, inputs, sources, question)
         if grounding_error:
             return {
                 "output": "", "error": grounding_error,
                 "input": inputs.get("output"), "step_name": self.name,
             }
-        input_data = _build_combined_context(
-            self.data, inputs, sources,
-            grounding_text=grounding.text if grounding else None,
-        )
-        upstream = _upstream_sources(inputs, sources)
-        cited = bool(grounding is not None and grounding.text) or bool(upstream)
+        input_data = g.context
 
         # No data means nothing to analyze — stop here, before any model call.
         # Sent through anyway, the chat helper would drop into its standalone
@@ -1562,7 +1585,7 @@ class ResearchNode(Node):
             "does contain. Do not produce findings from general knowledge."
         )
         findings = llm_chat_model(
-            model=self.model, prompt=_cited_instruction(analysis_prompt, cited), data=input_data,
+            model=self.model, prompt=g.instruction(analysis_prompt), data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
@@ -1598,14 +1621,11 @@ class ResearchNode(Node):
             f"Findings:\n{findings}"
         )
         report = llm_chat_model(
-            model=self.model, prompt=_cited_instruction(synthesis_prompt, cited), data=input_data,
+            model=self.model, prompt=g.instruction(synthesis_prompt), data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
-        return _attach_grounding(
-            {"output": report, "input": inputs.get("output"), "step_name": self.name}, grounding,
-            carried=upstream,
-        )
+        return g.attach({"output": report, "input": inputs.get("output"), "step_name": self.name})
 
 
 def _open_sync_db():
@@ -2162,10 +2182,8 @@ class FormFillerNode(Node):
     def process(self, inputs):
         prev_step_name = inputs.get("step_name")
         sources = _resolve_input_sources(self.data, prev_step_name)
-        base_context = _build_combined_context(self.data, inputs, sources)
-        grounding, grounding_error = _resolve_grounding(
-            self, inputs, base_context=base_context,
-            instruction=self.data.get("template", "") or "",
+        g, grounding_error = _grounded_context(
+            self, inputs, sources, self.data.get("template", "") or "",
         )
         if grounding_error:
             return {
@@ -2174,12 +2192,8 @@ class FormFillerNode(Node):
             }
         # Read by _attribution_sources so a value the model took from a
         # passage is credited to the knowledge base, not to a document.
-        self._grounding = grounding
-        input_data = _build_combined_context(
-            self.data, inputs, sources,
-            grounding_text=grounding.text if grounding else None,
-        )
-        return _attach_grounding(self._fill(inputs, sources, input_data), grounding)
+        self._grounding = g.grounding
+        return _attach_grounding(self._fill(inputs, sources, g.context), g.grounding)
 
     def _fill(self, inputs, sources: list[str], input_data) -> dict:
         template = self.data.get("template", "")

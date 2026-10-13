@@ -100,13 +100,6 @@ KB_GROUNDING_HEADER = (
     "it."
 )
 
-KB_APPROXIMATE_PAGE_RULE = (
-    "A page written as `p. ~N` is an estimate: that source was scanned, so "
-    "page positions were interpolated rather than read. Keep the tilde when "
-    "you cite it and describe the location as approximate; never restate such "
-    "a page as exact."
-)
-
 # Appended to the INSTRUCTION of a task whose context carries knowledge-base
 # passages or already-cited statements. It cannot live in the passages header:
 # the engine's grounded prompt tells the model that CONTEXT is data, never
@@ -395,47 +388,26 @@ def condense_query(
 # Retrieval
 # ---------------------------------------------------------------------------
 
-def _pin_terms(query: str) -> list[str]:
+def _pinned_hits(dm, kb_uuid: str, query: str) -> list[dict]:
+    """Chunks that literally contain a section number or identifier the query
+    names (``§ 200.414``), the way chat pins them: exact matches only, so a
+    query about 200.1 does not pin 200.10. A failed lookup pins nothing."""
+    from app.services.chat_service import _extract_pin_terms, retrieve_pinned_chunks_sync
+
     try:
-        from app.services.chat_service import _extract_pin_terms
-    except Exception:  # pragma: no cover — chat module unavailable in a stripped worker
+        return retrieve_pinned_chunks_sync(
+            dm, kb_uuid, _extract_pin_terms(query), limit_per_ref=PIN_LIMIT_PER_TERM,
+        )
+    except Exception as e:  # noqa: BLE001 — vector retrieval still runs
+        logger.debug("Lexical pin lookup failed for %r: %s", query, e)
         return []
-    try:
-        return _extract_pin_terms(query)
-    except Exception:  # noqa: BLE001
-        return []
-
-
-def _rank_lexical_hits(chunks: list[dict], term: str) -> list[dict]:
-    pattern = re.compile(re.escape(term), re.IGNORECASE)
-
-    def key(item: dict) -> tuple:
-        content = item.get("content") or ""
-        starts = [m.start() for m in pattern.finditer(content)]
-        return (-len(starts), starts[0] if starts else len(content))
-
-    return sorted(chunks, key=key)
 
 
 def _diverse(results: list[dict], k: int) -> list[dict]:
-    """Relevance order with a per-source cap; see chat's ``_select_diverse_chunks``."""
-    max_per_source = max(2, -(-k // 2))
-    selected: list[dict] = []
-    overflow: list[dict] = []
-    counts: dict = {}
-    for r in results:
-        meta = r.get("metadata") or {}
-        src = meta.get("source_id") or meta.get("source_name")
-        if counts.get(src, 0) < max_per_source:
-            selected.append(r)
-            counts[src] = counts.get(src, 0) + 1
-        else:
-            overflow.append(r)
-        if len(selected) >= k:
-            break
-    if len(selected) < k:
-        selected.extend(overflow[: k - len(selected)])
-    return selected[:k]
+    """Relevance order, no source taking more than half the slots."""
+    from app.services.chat_service import _select_diverse_chunks
+
+    return _select_diverse_chunks(results, k, max(2, -(-k // 2)))
 
 
 def _round_robin(pools: list[list[dict]]) -> list[dict]:
@@ -499,14 +471,7 @@ def _retrieve_pool(
             if not isinstance(r.get("similarity"), (int, float)) or r["similarity"] >= floor
         ]
 
-    pinned: list[dict] = []
-    for term in _pin_terms(query):
-        try:
-            hits = dm.get_kb_chunks_containing(kb_uuid, term, limit=PIN_LIMIT_PER_TERM)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("Lexical pin lookup failed for %r: %s", term, e)
-            continue
-        pinned.extend(_rank_lexical_hits(hits, term))
+    pinned = _pinned_hits(dm, kb_uuid, query)
 
     half = max(1, -(-k // 2))
     final: list[dict] = []
@@ -585,35 +550,33 @@ def render_passages(
     label_kb: bool = True,
     show_queries: bool = True,
     queries_note: Optional[str] = None,
-) -> tuple[str, list[dict], bool]:
+) -> tuple[str, list[dict]]:
     """The framed text block and its citation list.
 
-    Returns ``(text, sources, any_approximate)``. ``label_kb`` prefixes each
-    source line with the knowledge base it came from; a single-base lookup
-    reads as it always has without it. Each passage is cited against the
-    query that retrieved it (``_query``), falling back to the first query.
+    ``label_kb`` prefixes each source line with the knowledge base it came
+    from; a single-base lookup reads as it always has without it. Each
+    passage is cited against the query that retrieved it (``_query``),
+    falling back to the first query. How to cite an estimated (``p. ~N``)
+    page is an instruction, so the engine adds it to the task's instruction
+    rather than to this block, which the model reads as data.
     """
     parts: list[str] = []
     sources: list[dict] = []
-    any_approximate = False
     fallback_query = queries[0] if queries else ""
     for i, r in enumerate(passages, 1):
         query = r.get("_query") or fallback_query
         label, source = _passage_label(
             r, kb_title=(r.get("kb_title") if label_kb else None), query=query,
         )
-        any_approximate = any_approximate or bool(source.get("page_approximate"))
         parts.append(f"[{i}] {label}\n{annotate_chunk_pages(r.get('content') or '', r.get('metadata') or {})}")
         sources.append(source)
     if not parts:
-        return "", [], False
+        return "", []
     lines = [header]
-    if any_approximate:
-        lines.append(KB_APPROXIMATE_PAGE_RULE)
     if show_queries and (queries_note or queries):
         lines.append(queries_note or ("Retrieval queries: " + "; ".join(f"{q!r}" for q in queries)))
     text = "\n\n".join(lines) + "\n\n" + "\n\n---\n\n".join(parts)
-    return text, sources, any_approximate
+    return text, sources
 
 
 # ---------------------------------------------------------------------------
@@ -746,14 +709,24 @@ def cites_any(text: str, sources: list[dict]) -> bool:
         return False
     for m in _CITATION_RE.finditer(text):
         for part in re.split(r"\s*;\s*", m.group(1)):
-            if looks_like_citation(part) and part.strip() not in unmatched_citations(f"[{part}]", sources):
+            if looks_like_citation(part) and not unmatched_citations(f"[{part}]", sources):
                 return True
     contents = [str(s.get("content") or "") for s in sources if isinstance(s, dict)]
-    for m in re.finditer(r"\b(\d{2,4}\.\d{1,4})\b", text):
+    for m in _SECTION_REF_RE.finditer(text):
         sec = re.escape(m.group(1))
-        if any(re.search(rf"(?:§\s*|\b){sec}(?!\d)", c) for c in contents):
+        # Bare, "52.5" may be a figure: only a passage that writes "§ 52.5"
+        # makes it a section. The run UI applies the same rule.
+        marker = r"§\s*" if m.group(0).startswith(m.group(1)) else r"(?:§\s*|\b)"
+        if any(re.search(rf"{marker}{sec}(?!\d)", c) for c in contents):
             return True
     return False
+
+
+# A section named in text: "§ 200.407", "2 CFR 200.403(h)", or a bare
+# "200.407". Mirrors the run UI's SECTION_RE (CitedMarkdown.tsx).
+_SECTION_REF_RE = re.compile(
+    r"(?:§\s*|\b\d{1,2}\s*CFR\s*(?:part\s*)?)?\b(\d{2,4}\.\d{1,4})\b", re.IGNORECASE,
+)
 
 
 CITATION_RETRY_NUDGE = (
@@ -827,8 +800,8 @@ def retrieve_grounding(
     pre-resolved by the task loader. When it is supplied and a configured base
     is missing from it, that base no longer exists — a configuration error
     that fails the step, like a Knowledge Base Query step with no base
-    selected. Without ``kb_meta`` (Test Step on an unsaved config, unit
-    tests) bases are queried as given.
+    selected. Without ``kb_meta`` (unit tests, a caller that did not
+    pre-load it) bases are queried as given.
 
     Retrieval failures raise; the caller turns them into a step error so the
     failure text never flows downstream as if it were retrieved content.
@@ -843,8 +816,7 @@ def retrieve_grounding(
         if missing:
             raise GroundingConfigError(
                 f"Knowledge base not found: {', '.join(title_of(u) for u in missing)}. "
-                "It may have been deleted or is no longer shared with you — pick "
-                "another knowledge base for this step."
+                "It may have been deleted — pick another knowledge base for this step."
             )
     unqueried = [t for t in cfg.targets if not t.queries]
     if unqueried:
@@ -890,9 +862,11 @@ def retrieve_grounding(
         return GroundingResult(text="", warnings=warnings)
 
     if dm is None:
-        from app.services.document_manager import DocumentManager
+        # The process-wide instance, as chat uses: a grounded task per thread
+        # in a parallel step must not open a vector-store client each.
+        from app.services.document_manager import get_document_manager
 
-        dm = DocumentManager()
+        dm = get_document_manager()
 
     if progress:
         progress("Retrieving knowledge-base passages…")
@@ -944,7 +918,7 @@ def retrieve_grounding(
         queries_note = "Retrieval queries — " + " | ".join(
             f"{title_of(t.kb_uuid)}: " + "; ".join(f"{q!r}" for q in qs) for t, qs in prepared
         )
-    text, sources, _ = render_passages(
+    text, sources = render_passages(
         passages, queries=all_queries, header=header, label_kb=label_kb,
         show_queries=show_queries, queries_note=queries_note,
     )

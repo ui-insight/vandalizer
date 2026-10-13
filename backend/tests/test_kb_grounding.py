@@ -13,6 +13,7 @@ from app.services.kb_grounding import (
     GroundingConfig,
     GroundingConfigError,
     KnowledgeBaseTarget,
+    cites_any,
     condense_query,
     dedupe_passages,
     grounding_targets,
@@ -333,6 +334,17 @@ class TestRetrieveGrounding:
         result = retrieve_grounding(cfg, {}, dm=dm)
         assert [p["chunk_id"] for p in result.passages][0] == "lex"
 
+    def test_a_section_pin_is_exact_not_a_prefix(self):
+        """The store's substring lookup for "200.1" also returns 200.10; only
+        the exact section may take a pinned slot."""
+        dm = FakeDM(lexical={("ug", "200.1"): [
+            _chunk("s10", "§ 200.10 U.S. Federal awarding agency."),
+            _chunk("s1", "§ 200.1 Definitions."),
+        ]})
+        cfg = self._cfg(targets=_targets(ug=["§ 200.1 definitions"]), k=2)
+        result = retrieve_grounding(cfg, {}, dm=dm)
+        assert [p["chunk_id"] for p in result.passages] == ["s1"]
+
     def test_missing_knowledge_base_is_a_config_error(self):
         meta = {"ug": {"title": "UG", "exists": True}, "osp": {"title": None, "exists": False}}
         with pytest.raises(GroundingConfigError, match="Knowledge base not found"):
@@ -443,6 +455,17 @@ class TestCitationHelpers:
     def test_an_invented_source_is_reported_once(self):
         text = "x [NIH GPS — Section 7 · p. 3] y [NIH GPS — Section 7 · p. 3]"
         assert unmatched_citations(text, self.SOURCES) == ["NIH GPS — Section 7 · p. 3"]
+
+    def test_a_named_section_cites_but_a_bare_figure_does_not(self):
+        sources = [
+            {"chunk_id": "s", "content": "§ 200.306 Cost sharing or matching. (a) Under research proposals…"},
+            {"chunk_id": "r", "content": "The negotiated research rate is 52.5 percent of MTDC."},
+        ]
+        assert cites_any("Not expected under 2 CFR 200.306.", sources)
+        assert cites_any("See § 200.306(b).", sources)
+        assert cites_any("Governed by 200.306.", sources)  # the passage writes "§ 200.306"
+        assert not cites_any("Charged at 52.5% of MTDC.", sources)
+        assert not cites_any("See 200.999.", sources)
 
     def test_ordinary_brackets_are_not_citations(self):
         assert unmatched_citations("[N/A] [see above] [Section II.B] [1]", self.SOURCES) == []

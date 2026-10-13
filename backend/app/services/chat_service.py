@@ -1755,6 +1755,17 @@ def _rank_pinned_chunks(chunks: list[dict], pattern: re.Pattern) -> list[dict]:
 async def _retrieve_pinned_chunks(
     kb_uuid: str, terms: list[str], limit_per_ref: int = 6,
 ) -> list[dict]:
+    """Chat's pin lookup; see :func:`retrieve_pinned_chunks_sync`."""
+    from app.services.document_manager import get_document_manager
+
+    return await asyncio.to_thread(
+        retrieve_pinned_chunks_sync, get_document_manager(), kb_uuid, terms, limit_per_ref,
+    )
+
+
+def retrieve_pinned_chunks_sync(
+    dm, kb_uuid: str, terms: list[str], limit_per_ref: int = 6,
+) -> list[dict]:
     """Lexically fetch chunks that literally contain each pin term.
 
     A candidate pool comes from ChromaDB's substring filter (which would also
@@ -1765,10 +1776,10 @@ async def _retrieve_pinned_chunks(
 
     ``$contains`` is case-sensitive, so a multi-word phrase is also looked up
     in the capitalisations a heading or a title would actually use.
-    """
-    from app.services.document_manager import get_document_manager
 
-    dm = get_document_manager()
+    Sync, so a workflow task (kb_grounding.py) pins the same way chat does;
+    chat runs it through ``_retrieve_pinned_chunks`` off the event loop.
+    """
     out: list[dict] = []
     seen: set = set()
     for term in terms:
@@ -1784,9 +1795,7 @@ async def _retrieve_pinned_chunks(
         candidates: list[dict] = []
         pooled: set = set()
         for variant in dict.fromkeys(variants):
-            for r in await asyncio.to_thread(
-                dm.get_kb_chunks_containing, kb_uuid, variant, _PIN_FETCH_POOL,
-            ):
+            for r in dm.get_kb_chunks_containing(kb_uuid, variant, _PIN_FETCH_POOL):
                 cid = r.get("chunk_id")
                 if cid is not None and cid in pooled:
                     continue

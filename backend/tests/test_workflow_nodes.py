@@ -1964,7 +1964,7 @@ class TestApprovalNode:
 # ---------------------------------------------------------------------------
 
 class TestKnowledgeBaseQueryNode:
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_basic_query(self, mock_dm_cls):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
@@ -1999,7 +1999,7 @@ class TestKnowledgeBaseQueryNode:
         assert result["output"] == ""
         assert "query is empty" in result["error"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_no_results(self, mock_dm_cls):
         """An empty result set surfaces a warning and an explicit output
         message instead of silently feeding "" to the next step."""
@@ -2012,7 +2012,7 @@ class TestKnowledgeBaseQueryNode:
         assert "no matching passages" in result["output"]
         assert "obscure" in result["warning"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_passages_output_has_framing_header(self, mock_dm_cls):
         """Downstream LLM steps are told the chunks are partial retrieval
         excerpts, mirroring the framing the chat RAG path uses."""
@@ -2027,7 +2027,7 @@ class TestKnowledgeBaseQueryNode:
         assert "partial excerpts" in result["output"]
         assert "Chunk text" in result["output"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_templated_query_uses_previous_output(self, mock_dm_cls):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = []
@@ -2055,7 +2055,7 @@ class TestKnowledgeBaseQueryNode:
         assert result["error"]
         assert result["output"] == ""
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_min_similarity_filters_low_relevance_chunks(self, mock_dm_cls):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
@@ -2072,7 +2072,7 @@ class TestKnowledgeBaseQueryNode:
         assert "Junk" not in result["output"]
         assert len(result["retrieved_sources"]) == 1
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_min_similarity_filtering_everything_warns(self, mock_dm_cls):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
@@ -2086,7 +2086,7 @@ class TestKnowledgeBaseQueryNode:
         result = node.process({"output": "prev"})
         assert "no matching passages" in result["warning"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_query_error_hard_fails_the_step(self, mock_dm_cls):
         """Reversal of the earlier soft-fail (#805): the warning let the run
         finish Completed while the failure text flowed downstream as the next
@@ -2102,7 +2102,7 @@ class TestKnowledgeBaseQueryNode:
         assert result["output"] == ""
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_answer_mode_synthesizes_grounded_answer(self, mock_dm_cls, mock_llm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
@@ -2128,7 +2128,7 @@ class TestKnowledgeBaseQueryNode:
         assert "Cost share is 50%" in call.kwargs["data"]
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_passages_mode_makes_no_llm_call(self, mock_dm_cls, mock_llm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
@@ -2140,7 +2140,7 @@ class TestKnowledgeBaseQueryNode:
         node.process({"output": "prev"})
         mock_llm.assert_not_called()
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
         """The KB node returns a structured citation list for the workflow
         result to persist, in addition to the joined prompt text."""
