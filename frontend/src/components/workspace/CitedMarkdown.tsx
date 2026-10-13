@@ -9,10 +9,11 @@ import type { WorkflowCitation } from '../../types/workflow'
 /**
  * Markdown output with knowledge-base citations rendered inline.
  *
- * A grounded task is told to cite the source line shown above each passage,
- * e.g. `[OMB Uniform Guidance — Subpart F · p. 12]`, and the run keeps every
- * passage it retrieved (`retrieved_sources`, each with that `label` and its
- * `content`). Here each bracketed citation that matches a retrieved passage
+ * A grounded task cites a passage by its tag ([KB2]); the engine swaps each
+ * tag for the passage's source line, e.g. `[OMB Uniform Guidance — Subpart F
+ * · p. 12]`, and the run keeps every passage it retrieved (`retrieved_sources`,
+ * each with that `label` and its `content`). A source without pages is told
+ * apart by its position, `· part 12`. Here each bracketed citation that matches a retrieved passage
  * becomes a chip beside the claim; clicking it opens a popover with the
  * passage text, so a reader can check the claim against what it rests on.
  * Bracketed text that matches no passage is left exactly as written — a
@@ -69,9 +70,11 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
     if (normalizeCitation(citationLabel(sources[i])) === t) return i
   }
   // 2. The document named (title contained either way) and, when the citation
-  //    names a page, a passage that covers it.
+  //    names a page — or, for a source without pages, its "part N" — the
+  //    passage that is there.
   const page = citedPage(t)
-  const titleOnly = t.replace(/\s*·?\s*p\. \d+(\s*-\s*\d+)?\s*$/, '').trim()
+  const part = /\bpart (\d+)\s*$/.exec(t)?.[1] ?? null
+  const titleOnly = t.replace(/\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$/, '').trim()
   let candidates: number[] = []
   for (let i = 0; i < sources.length; i++) {
     const title = normalizeCitation(sources[i].document_title || '')
@@ -82,6 +85,9 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
     if (named) candidates.push(i)
   }
   if (page != null) candidates = candidates.filter(i => coversPage(sources[i], page))
+  if (part != null) {
+    candidates = candidates.filter(i => normalizeCitation(citationLabel(sources[i])).endsWith(`part ${part}`))
+  }
   if (candidates.length === 0) return null
   // Several tasks can retrieve the same passage; any of them is the same text.
   return candidates[0]

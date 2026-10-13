@@ -425,6 +425,35 @@ class TestInlineCitations:
 
     @patch("app.services.workflow_engine.llm_chat_model")
     @patch("app.services.document_manager.get_document_manager")
+    def test_the_model_cites_a_tag_and_the_output_carries_the_source_line(self, mock_dm_cls, mock_llm):
+        """Passages are shown as [KB1] …; the reply's tag is swapped for the
+        exact source line before anything downstream (or the UI) sees it."""
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.return_value = '{"rationale": "Cost share must be documented [KB1]."}'
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert "[KB1] OMB Uniform Guidance — Subpart C · p. 12" in str(mock_llm.call_args.kwargs["data"])
+        assert "[KB2]" in mock_llm.call_args.kwargs["prompt"]  # the rule's example tag
+        assert mock_llm.call_count == 1
+        assert result["output"] == (
+            '{"rationale": "Cost share must be documented [OMB Uniform Guidance — Subpart C · p. 12]."}'
+        )
+        assert result["retrieved_sources"][0]["label"] == "OMB Uniform Guidance — Subpart C · p. 12"
+        assert "warning" not in result
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_a_later_step_is_told_to_keep_citations_not_to_cite_tags(self, mock_llm):
+        mock_llm.return_value = "- Cost share: 20% [OMB Uniform Guidance — Subpart C · p. 12]"
+        node = PromptNode({"prompt": "Render as markdown", "model": "m", "input_sources": ["step_input"]})
+        node.process({
+            "output": "20% [OMB Uniform Guidance — Subpart C · p. 12]",
+            "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES,
+        })
+        sent = mock_llm.call_args.kwargs["prompt"]
+        assert "keep its citation with it" in sent
+        assert "[KB2]" not in sent
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.get_document_manager")
     def test_a_cited_reply_is_not_retried(self, mock_dm_cls, mock_llm):
         mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
         mock_llm.return_value = "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]."

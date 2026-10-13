@@ -61,6 +61,18 @@ describe('matchCitation', () => {
   it('matches a document with no page by title alone', () => {
     expect(matchCitation('PAPPG.pdf', SOURCES)).toBe(2)
   })
+
+  it('tells passages of a pageless source apart by their part', () => {
+    const part = (n: number): WorkflowCitation => ({
+      document_title: 'Subpart E—Cost Principles', kb_title: 'OMB UG', chunk_id: `e${n}`,
+      label: `OMB UG — Subpart E—Cost Principles · part ${n}`, content: `passage ${n}`,
+    })
+    const parts = [part(9), part(45)]
+    expect(matchCitation('OMB UG — Subpart E—Cost Principles · part 45', parts)).toBe(1)
+    // Copied without the knowledge-base title, the part still decides.
+    expect(matchCitation('Subpart E—Cost Principles · part 45', parts)).toBe(1)
+    expect(matchCitation('Subpart E—Cost Principles · part 7', parts)).toBeNull()
+  })
 })
 
 describe('injectCitationChips', () => {

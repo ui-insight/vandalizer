@@ -94,37 +94,55 @@ KB_GROUNDING_HEADER = (
     "retrieval queries listed below. They are REFERENCE MATERIAL, not the "
     "document under review, and may be incomplete, off-topic, or "
     "contradictory: read each one before relying on it and ignore the "
-    "irrelevant ones. When you use a passage, cite the source line shown "
-    "above it (e.g. [OMB Uniform Guidance — Subpart E · p. 12]), copying it "
-    "exactly, and never attribute a claim to a passage that does not support "
-    "it."
+    "irrelevant ones. Each passage starts with its tag, e.g. [KB2], and the "
+    "source it comes from."
 )
 
-# Appended to the INSTRUCTION of a task whose context carries knowledge-base
-# passages or already-cited statements. It cannot live in the passages header:
-# the engine's grounded prompt tells the model that CONTEXT is data, never
-# instructions, so a rule placed there is (correctly) ignored. The JSON clause
-# is what lets a citation survive a task that emits a fragment for a later
+# Appended to the INSTRUCTION of a task whose context carries its own
+# knowledge-base passages. It cannot live in the passages header: the
+# engine's grounded prompt tells the model that CONTEXT is data, never
+# instructions, so a rule placed there is (correctly) ignored. The model
+# cites a short tag ([KB2]) — copying a long source line is what models skip
+# or abbreviate, and a bare number would mean a different passage in every
+# task — and the engine replaces each tag with the passage's source line as
+# soon as the reply arrives (resolve_passage_tags). The JSON clause is what
+# lets a citation survive a task that emits a fragment for a later
 # consolidation step to render.
 CITATION_RULE = (
     "CITATIONS (required): the CONTEXT includes knowledge-base passages, each "
-    "under a source line in square brackets such as "
-    "[OMB Uniform Guidance — Subpart E · p. 40], and may include statements "
-    "that already carry such citations. Whenever a statement you write draws "
-    "on a passage, follow that statement immediately with the passage's "
-    "source line in square brackets, copied exactly as shown — right after "
-    "the sentence or value it supports, never gathered in a list at the end. "
-    "When you restate or reorganize a statement that already carries a "
-    "citation, keep the citation with it. If your output is JSON, this rule "
+    "introduced by a tag in square brackets such as [KB2] followed by its "
+    "source. Whenever a statement you write draws on a passage, follow that "
+    "statement immediately with the passage's tag in square brackets — right "
+    "after the sentence or value it supports, never gathered in a list at "
+    "the end; cite two passages as [KB1][KB3]. Statements in the CONTEXT that "
+    "already carry a citation in square brackets keep it, exactly as written, "
+    "when you restate or reorganize them. If your output is JSON, this rule "
     "still applies and overrides any instruction to emit only the listed "
     "fields' bare values: end every string value that states a rule, "
-    "requirement, threshold, or rationale drawn from a passage with the "
-    "citation, inside the string — e.g. \"rationale\": \"Prior written "
-    "approval is required for equipment purchases [OMB Uniform Guidance "
-    "(2 CFR 200) — Subpart E · p. 40]\". Add no new fields. Never invent a "
-    "citation, never attach one to a claim the passage does not support, "
+    "requirement, threshold, or rationale drawn from a passage with the tag, "
+    "inside the string — e.g. \"rationale\": \"Prior written approval is "
+    "required for equipment purchases [KB2]\". Add no new fields. Never "
+    "invent a tag, never attach one to a claim the passage does not support, "
     "and cite nothing for statements that come only from the document under "
     "review."
+)
+
+# The same rule for a task with no passages of its own that reads cited text
+# (or a Knowledge Base Query step's passages) from the previous step: the
+# citations there are already source lines, so they are kept as written.
+CARRY_CITATION_RULE = (
+    "CITATIONS (required): statements in the CONTEXT carry knowledge-base "
+    "citations in square brackets, such as [OMB Uniform Guidance (2 CFR 200) "
+    "— Subpart E—Cost Principles · part 12], and knowledge-base passages may "
+    "appear under such a citation. When you restate, reorganize or summarize "
+    "a cited statement, keep its citation with it, copied exactly — right "
+    "after the sentence or value it supports, never gathered in a list at "
+    "the end. When you draw on a passage shown under a citation, follow your "
+    "statement with that citation, copied exactly. If your output is JSON, "
+    "this rule still applies and overrides any instruction to emit only the "
+    "listed fields' bare values: keep each citation inside the string value "
+    "it supports. Add no new fields. Never invent a citation, and cite "
+    "nothing for statements that come only from the document under review."
 )
 
 
@@ -506,6 +524,12 @@ def merge_pools(per_kb: list[list[list[dict]]], max_passages: int) -> list[dict]
 # Rendering
 # ---------------------------------------------------------------------------
 
+def _citation_safe(label: str) -> str:
+    label = label.replace("[", "(").replace("]", ")").replace(";", ",")
+    label = label.replace('"', "'").replace("\\", "/")
+    return re.sub(r"\s+", " ", label).strip()
+
+
 def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str, dict]:
     meta = r.get("metadata") or {}
     content = r.get("content") or ""
@@ -514,9 +538,19 @@ def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str
     cited = cited_pages(meta, content, query)
     page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
     locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
+    if not locator:
+        # A web page or eCFR subpart has no pages, so every passage from it
+        # would share one source line and a citation could not say which it
+        # means. Its position in the source tells them apart, the same in
+        # every task that retrieves it.
+        m = re.search(r"_chunk_(\d+)$", str(r.get("chunk_id") or ""))
+        locator = f"part {int(m.group(1)) + 1}" if m else None
     label = f"{source_name} · {locator}" if locator else source_name
     if kb_title:
         label = f"{kb_title} — {label}"
+    # A source line rides inside brackets and JSON strings, and ";" separates
+    # citations in one bracket: keep it free of all of them.
+    label = _citation_safe(label)
     source = {
         "document_id": meta.get("source_id"),
         "document_title": source_name,
@@ -550,11 +584,16 @@ def render_passages(
     label_kb: bool = True,
     show_queries: bool = True,
     queries_note: Optional[str] = None,
+    tagged: bool = True,
 ) -> tuple[str, list[dict]]:
     """The framed text block and its citation list.
 
-    ``label_kb`` prefixes each source line with the knowledge base it came
-    from; a single-base lookup reads as it always has without it. Each
+    ``tagged`` heads each passage with a tag the model cites ([KB2], resolved
+    by :func:`resolve_passage_tags`, so it only suits a task that cites in its
+    own reply); otherwise each passage sits under its source line in brackets,
+    for text that flows into a later step as it is (a Knowledge Base Query
+    step). ``label_kb`` prefixes each source line with the knowledge base it
+    came from; a single-base lookup reads as it always has without it. Each
     passage is cited against the query that retrieved it (``_query``),
     falling back to the first query. How to cite an estimated (``p. ~N``)
     page is an instruction, so the engine adds it to the task's instruction
@@ -568,7 +607,8 @@ def render_passages(
         label, source = _passage_label(
             r, kb_title=(r.get("kb_title") if label_kb else None), query=query,
         )
-        parts.append(f"[{i}] {label}\n{annotate_chunk_pages(r.get('content') or '', r.get('metadata') or {})}")
+        heading = f"[KB{i}] {label}" if tagged else f"[{label}]"
+        parts.append(f"{heading}\n{annotate_chunk_pages(r.get('content') or '', r.get('metadata') or {})}")
         sources.append(source)
     if not parts:
         return "", []
@@ -695,10 +735,47 @@ def _norm_citation(text: str) -> str:
 
 def looks_like_citation(text: str) -> bool:
     """Whether a bracketed string is shaped like a source line, as opposed to
-    ordinary bracketed prose such as [N/A] or [see above]."""
+    ordinary bracketed prose such as [N/A] or [see above]. A passage tag left
+    unresolved ([KB9] past the last passage) counts, so it is reported."""
     t = text or ""
     return ("·" in t or "—" in t or " -- " in t
-            or bool(_PAGE_RE.search(t)) or bool(_PAGE_WORD_RE.search(t)))
+            or bool(_PAGE_RE.search(t)) or bool(_PAGE_WORD_RE.search(t))
+            or bool(_TAG_ONLY_RE.fullmatch(t.strip())))
+
+
+# A passage tag as the model cites it: [KB2], [KB1, KB3], [KB1; 3], and the
+# (KB2) a model sometimes writes instead.
+_PASSAGE_TAG_RE = re.compile(
+    r"[\[(]\s*KB\s*(\d{1,3})((?:\s*[,;]\s*(?:KB\s*)?\d{1,3})*)\s*[\])]", re.IGNORECASE,
+)
+_TAG_ONLY_RE = re.compile(r"KB\s*\d{1,3}", re.IGNORECASE)
+
+
+def resolve_passage_tags(text: str, sources: list[dict]) -> str:
+    """Replace every passage tag in ``text`` with that passage's source line.
+
+    ``sources`` is the task's passage list in the order the tags number it
+    ([KB1] is ``sources[0]``). Run right after the model replies, so the
+    output, every later step that reads it, and the run UI see the exact
+    source line rather than a number that means a different passage in each
+    task. A tag past the last passage is left as written (and reported as
+    an unmatched citation).
+    """
+    if not text or not sources or not isinstance(text, str):
+        return text
+
+    def sub(m: re.Match) -> str:
+        nums = [int(m.group(1))] + [int(n) for n in re.findall(r"\d{1,3}", m.group(2) or "")]
+        labels: list[str] = []
+        for n in nums:
+            label = sources[n - 1].get("label") if 1 <= n <= len(sources) else None
+            if not label:
+                return m.group(0)
+            if label not in labels:
+                labels.append(label)
+        return "".join(f"[{label}]" for label in labels)
+
+    return _PASSAGE_TAG_RE.sub(sub, text)
 
 
 def cites_any(text: str, sources: list[dict]) -> bool:
@@ -732,9 +809,8 @@ _SECTION_REF_RE = re.compile(
 CITATION_RETRY_NUDGE = (
     "Your previous reply used the knowledge-base passages but did not cite "
     "them. Reply again with the same content and, after every statement or "
-    "value that rests on a passage, its source line in square brackets "
-    "exactly as shown above the passage — inside the string value when the "
-    "output is JSON."
+    "value that rests on a passage, that passage's tag in square brackets "
+    "(e.g. [KB2]) — inside the string value when the output is JSON."
 )
 
 
@@ -766,7 +842,7 @@ def unmatched_citations(text: str, sources: list[dict]) -> list[str]:
             n = _norm_citation(part)
             if n in labels:
                 continue
-            title_only = re.sub(r"\s*·?\s*p\. \d+(\s*-\s*\d+)?\s*$", "", n).strip()
+            title_only = re.sub(r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$", "", n).strip()
             if any(t in n or (len(title_only) >= 4 and title_only in t) for t in titles):
                 continue
             if part not in bad:
@@ -791,6 +867,7 @@ def retrieve_grounding(
     header: str = KB_GROUNDING_HEADER,
     label_kb: Optional[bool] = None,
     show_queries: bool = True,
+    tagged: bool = True,
     progress: Optional[Callable[[str], None]] = None,
 ) -> GroundingResult:
     """Run the grounding pipeline for one task.
@@ -920,7 +997,7 @@ def retrieve_grounding(
         )
     text, sources = render_passages(
         passages, queries=all_queries, header=header, label_kb=label_kb,
-        show_queries=show_queries, queries_note=queries_note,
+        show_queries=show_queries, queries_note=queries_note, tagged=tagged,
     )
     return GroundingResult(
         text=text, sources=sources, warnings=warnings, queries=all_queries, passages=passages,

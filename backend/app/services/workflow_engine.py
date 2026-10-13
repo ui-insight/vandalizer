@@ -28,6 +28,7 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
     form_value_is_missing,
 )
 from app.services.kb_grounding import (
+    CARRY_CITATION_RULE,
     CITATION_RETRY_NUDGE,
     CITATION_RULE,
     cites_any,
@@ -39,6 +40,7 @@ from app.services.kb_grounding import (
     has_grounding,
     merge_sources,
     parse_grounding_config,
+    resolve_passage_tags,
     retrieve_grounding,
     unmatched_citations,
 )
@@ -457,9 +459,11 @@ class _GroundedContext:
         return self.grounding.sources if self.grounding is not None else []
 
     def instruction(self, text: str) -> str:
-        cited = bool(self.grounding is not None and self.grounding.text) or bool(self.upstream)
         approximate = any(s.get("page_approximate") for s in self.own + self.upstream)
-        return _cited_instruction(text, cited, approximate=approximate)
+        return _cited_instruction(
+            text, own=bool(self.grounding is not None and self.grounding.text),
+            upstream=bool(self.upstream), approximate=approximate,
+        )
 
     def attach(self, result: dict) -> dict:
         return _attach_grounding(result, self.grounding, upstream=self.upstream)
@@ -487,14 +491,19 @@ def _grounded_context(
     return _GroundedContext(context, grounding, _upstream_sources(inputs, sources)), None
 
 
-def _cited_instruction(instruction: str, cited: bool, *, approximate: bool = False) -> str:
+def _cited_instruction(
+    instruction: str, *, own: bool, upstream: bool = False, approximate: bool = False,
+) -> str:
     """Append the citation rule to a task's instruction when its context holds
-    passages or cited statements. Last, because the rule is what the model
-    must still honour after everything the author asked for. ``approximate``
-    adds how to cite a scanned source's estimated (``p. ~N``) page."""
-    if not cited:
+    its own passages (cite their tags) or only cited statements from the
+    previous step (keep those citations). Last, because the rule is what the
+    model must still honour after everything the author asked for.
+    ``approximate`` adds how to cite a scanned source's estimated page."""
+    if not (own or upstream):
         return instruction
-    rule = f"{CITATION_RULE}\n{KB_APPROXIMATE_PAGE_RULE}" if approximate else CITATION_RULE
+    rule = CITATION_RULE if own else CARRY_CITATION_RULE
+    if approximate:
+        rule = f"{rule}\n{KB_APPROXIMATE_PAGE_RULE}"
     return f"{instruction}\n\n{rule}"
 
 
@@ -507,12 +516,15 @@ def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> 
     dependable at the cost of one extra call, only when the first reply
     cited nothing at all. The retry's reply is kept even if it still does
     not cite — the unmatched/uncited warning then says so.
+
+    ``sources`` are the task's own passages in tag order: each reply's
+    passage tags ([KB2]) are replaced with their source lines on arrival.
     """
-    text = call(instruction)
+    text = resolve_passage_tags(call(instruction), sources)
     if sources and isinstance(text, str) and text.strip() and not cites_any(text, sources):
         if report:
             report("Reply cited no passage — asking once more for citations…")
-        again = call(f"{instruction}\n\n{CITATION_RETRY_NUDGE}")
+        again = resolve_passage_tags(call(f"{instruction}\n\n{CITATION_RETRY_NUDGE}"), sources)
         if isinstance(again, str) and again.strip():
             text = again
     return text
@@ -1625,6 +1637,7 @@ class ResearchNode(Node):
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
+        report = resolve_passage_tags(report, g.own)
         return g.attach({"output": report, "input": inputs.get("output"), "step_name": self.name})
 
 
@@ -2645,6 +2658,9 @@ class KnowledgeBaseQueryNode(Node):
                 # told apart on every source line.
                 label_kb=len(cfg.knowledge_bases) > 1,
                 show_queries=False,
+                # The passages flow on as text: each sits under its source
+                # line, which a later step copies as its citation.
+                tagged=False,
                 progress=self.report_progress,
             )
         except GroundingConfigError as e:

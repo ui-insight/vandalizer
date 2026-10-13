@@ -4,6 +4,7 @@ Retrieval is exercised against a fake DocumentManager; nothing here touches
 Chroma, Mongo, or a model.
 """
 
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -23,6 +24,7 @@ from app.services.kb_grounding import (
     merge_sources,
     parse_grounding_config,
     render_queries,
+    resolve_passage_tags,
     retrieve_grounding,
     trim_to_budget,
     unmatched_citations,
@@ -386,7 +388,11 @@ class TestRetrieveGrounding:
         dm = FakeDM(vector={("ug", "cost"): [_chunk("u1", "text", source="PAPPG.pdf", page=234)]})
         cfg = self._cfg(targets=_targets(ug=["cost"]))
         result = retrieve_grounding(cfg, {}, dm=dm, header="HDR", show_queries=False)
-        assert result.text.startswith("HDR\n\n[1] PAPPG.pdf · p. 234\n")
+        assert result.text.startswith("HDR\n\n[KB1] PAPPG.pdf · p. 234\n")
+        # Untagged (a Knowledge Base Query step): each passage under its
+        # source line, which a later step copies as its citation.
+        untagged = retrieve_grounding(cfg, {}, dm=dm, header="HDR", show_queries=False, tagged=False)
+        assert untagged.text.startswith("HDR\n\n[PAPPG.pdf · p. 234]\n")
 
 
 class TestTrimToBudget:
@@ -425,8 +431,29 @@ class TestCitationPayload:
         src = result.sources[0]
         assert src["label"] == "OMB Uniform Guidance — Subpart C · p. 12"
         assert src["content"].startswith("Cost sharing means")
-        # The model is shown the same line it is told to copy when citing.
-        assert "[1] " + src["label"] in result.text
+        # The model cites the tag; the engine swaps in this exact line.
+        assert "[KB1] " + src["label"] in result.text
+
+    def test_a_pageless_passage_is_told_apart_by_its_part(self):
+        """A web page or eCFR subpart has no pages: without its position every
+        passage from it would share one source line."""
+        dm = FakeDM(vector={("ug", "cost"): [
+            _chunk("src_chunk_44", "first", source="Subpart E—Cost Principles"),
+            _chunk("src_chunk_8", "second", source="Subpart E—Cost Principles"),
+        ]})
+        meta = {"ug": {"title": "OMB UG", "exists": True}}
+        result = retrieve_grounding(GroundingConfig(targets=_targets(ug=["cost"])), {}, kb_meta=meta, dm=dm)
+        assert [s["label"] for s in result.sources] == [
+            "OMB UG — Subpart E—Cost Principles · part 45",
+            "OMB UG — Subpart E—Cost Principles · part 9",
+        ]
+
+    def test_a_source_line_is_safe_inside_brackets_and_json(self):
+        dm = FakeDM(vector={("ug", "cost"): [
+            _chunk("c1", "x", source='APM 45.05 [Cost "Share"]; notes\\draft', page=3),
+        ]})
+        result = retrieve_grounding(GroundingConfig(targets=_targets(ug=["cost"])), {}, dm=dm)
+        assert result.sources[0]["label"] == "APM 45.05 (Cost 'Share'), notes/draft · p. 3"
 
 
 class TestCitationHelpers:
@@ -455,6 +482,22 @@ class TestCitationHelpers:
     def test_an_invented_source_is_reported_once(self):
         text = "x [NIH GPS — Section 7 · p. 3] y [NIH GPS — Section 7 · p. 3]"
         assert unmatched_citations(text, self.SOURCES) == ["NIH GPS — Section 7 · p. 3"]
+
+    def test_passage_tags_resolve_to_their_source_lines(self):
+        a, b = self.SOURCES[0]["label"], self.SOURCES[1]["label"]
+        assert resolve_passage_tags("Audits apply [KB1].", self.SOURCES) == f"Audits apply [{a}]."
+        assert resolve_passage_tags("x [KB1, KB2] y [kb2; 1] z (KB2)", self.SOURCES) == (
+            f"x [{a}][{b}] y [{b}][{a}] z [{b}]"
+        )
+        # Inside a JSON string the result is still valid JSON.
+        out = resolve_passage_tags('{"rationale": "Required [KB2]", "pages": [1]}', self.SOURCES)
+        assert json.loads(out) == {"rationale": f"Required [{b}]", "pages": [1]}
+
+    def test_a_tag_past_the_last_passage_is_left_and_reported(self):
+        out = resolve_passage_tags("x [KB9]", self.SOURCES)
+        assert out == "x [KB9]"
+        assert unmatched_citations(out, self.SOURCES) == ["KB9"]
+        assert resolve_passage_tags("x [KB1]", []) == "x [KB1]"
 
     def test_a_named_section_cites_but_a_bare_figure_does_not(self):
         sources = [
