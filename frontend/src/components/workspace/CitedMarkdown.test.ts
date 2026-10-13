@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SECTION_RE, citationLabel, injectCitationChips, matchCitation, matchSectionReference, normalizeCitation, renderCitedMarkdown } from './CitedMarkdown'
+import { SECTION_RE, citationLabel, injectCitationChips, matchCitation, matchSectionReference, normalizeCitation, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
 import type { WorkflowCitation } from '../../types/workflow'
 
 const UG: WorkflowCitation = {
@@ -135,6 +135,17 @@ describe('section references', () => {
     expect(injectCitationChips(html, [SEC_407])).toBe(html)
   })
 
+  it('does not turn a bare figure into a chip because a passage contains the same number', () => {
+    const RATE: WorkflowCitation = {
+      document_title: 'F&A Rate Agreement', page: 2, chunk_id: 'r1', label: 'F&A Rate Agreement · p. 2',
+      content: 'The negotiated on-campus research rate is 52.5 percent of MTDC.',
+    }
+    expect(injectCitationChips('<p>Charged at 52.5% of MTDC.</p>', [RATE])).toBe('<p>Charged at 52.5% of MTDC.</p>')
+    // Named as a section, the same number links only to a passage that is one.
+    expect(matchSectionReference('52.5', [RATE], { requireMarker: true })).toBeNull()
+    expect(matchSectionReference('200.407', [SEC_407], { requireMarker: true })).toBe(0)
+  })
+
   it('leaves a bracket citation alone when it already contains the section', () => {
     const html = `<p>Rule [${SEC_407.label}] applies.</p>`
     const out = injectCitationChips(html, [SEC_407])
@@ -152,5 +163,21 @@ describe('renderCitedMarkdown', () => {
 
   it('is plain sanitized markdown when there are no sources', () => {
     expect(renderCitedMarkdown('a [b] c', [])).toBe('<p>a [b] c</p>\n')
+  })
+
+  it('keeps model HTML sanitized next to a chip', () => {
+    const out = renderCitedMarkdown(`<img src=x onerror="alert(1)"> Cost share [${OSP.label}].`, SOURCES)
+    expect(out).toContain('data-cite="1"')
+    expect(out).not.toContain('onerror')
+  })
+})
+
+describe('renderCitedText', () => {
+  it('escapes the text, keeps it as written, and still adds chips', () => {
+    const json = `{\n  "result": "<b>Allowable</b> [${OSP.label}]"\n}`
+    const out = renderCitedText(json, SOURCES)
+    expect(out).toContain('&lt;b&gt;Allowable&lt;/b&gt;')
+    expect(out).toContain('{\n  "result"')
+    expect(out).toContain('data-cite="1"')
   })
 })

@@ -86,9 +86,10 @@ import { splitFieldTerms } from '../../utils/extractionTerms'
 
 type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'history'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
-// Task types that can read knowledge-base passages as an input source
-// (backend: every node that builds its context through _build_combined_context
-// or the extraction engine's reference context).
+// Task types that can be grounded in knowledge bases (`kb_grounding`), a
+// per-task setting independent of the step's input (backend: every node that
+// builds its context through _build_combined_context or the extraction
+// engine's reference context).
 const GROUNDABLE_TASKS = ['Prompt', 'Extraction', 'Formatter', 'Format', 'ResearchNode', 'FormFiller']
 
 interface TaskTypeDef {
@@ -2266,20 +2267,7 @@ function EditStepOverlay({
                         <Trash2 style={{ width: 14, height: 14 }} />
                       </button>
                     )}
-                    {taskKnowledgeBaseCount(task.name, task.data) > 0 && (
-                      <span
-                        title={`Reads passages from ${taskKnowledgeBaseCount(task.name, task.data)} knowledge base${taskKnowledgeBaseCount(task.name, task.data) === 1 ? '' : 's'}`}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-                          padding: '1px 6px', borderRadius: 4,
-                          color: '#075985', backgroundColor: '#e0f2fe',
-                        }}
-                      >
-                        <Sparkles style={{ width: 10, height: 10 }} />
-                        {taskKnowledgeBaseCount(task.name, task.data)} KB
-                      </span>
-                    )}
+                    <KnowledgeBaseBadge count={taskKnowledgeBaseCount(task.name, task.data)} />
                   </div>
                 )
               })}
@@ -3027,19 +3015,71 @@ export function readGroundingDraft(raw: unknown): GroundingDraft {
   }
 }
 
+/** A Knowledge Base Query task's bases and queries (one per line): its own
+ *  lists, else the legacy single `kb_uuid` / `query`. */
+export function readKbQueryDraft(data: Record<string, unknown>): { kbs: string[]; queries: string } {
+  const kbs = Array.isArray(data.knowledge_bases)
+    ? data.knowledge_bases.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    : []
+  const queries = Array.isArray(data.queries)
+    ? data.queries.filter((s): s is string => typeof s === 'string')
+    : []
+  return {
+    kbs: kbs.length > 0 ? kbs : (typeof data.kb_uuid === 'string' && data.kb_uuid.trim() !== '' ? [data.kb_uuid] : []),
+    queries: queries.length > 0 ? queries.join('\n') : (typeof data.query === 'string' ? data.query : ''),
+  }
+}
+
 /** How many knowledge bases a saved task reads: a Knowledge Base Query's own
  *  list (or legacy single `kb_uuid`), or a grounded task's `kb_grounding`.
  *  Drives the step card's KB badge. */
 export function taskKnowledgeBaseCount(taskName: string, data: Record<string, unknown>): number {
-  if (taskName === 'KnowledgeBaseQuery') {
-    const list = Array.isArray(data.knowledge_bases)
-      ? data.knowledge_bases.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
-      : []
-    if (list.length > 0) return list.length
-    return typeof data.kb_uuid === 'string' && data.kb_uuid.trim() !== '' ? 1 : 0
-  }
+  if (taskName === 'KnowledgeBaseQuery') return readKbQueryDraft(data).kbs.length
   if (!GROUNDABLE_TASKS.includes(taskName)) return 0
   return readGroundingDraft(data.kb_grounding).targets.length
+}
+
+/** The step card's "n KB" badge, so a grounded task reads as one at a glance. */
+function KnowledgeBaseBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span
+      title={`Reads passages from ${count} knowledge base${count === 1 ? '' : 's'}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+        padding: '1px 6px', borderRadius: 4,
+        color: '#075985', backgroundColor: '#e0f2fe',
+      }}
+    >
+      <Sparkles style={{ width: 10, height: 10 }} />
+      {count} KB
+    </span>
+  )
+}
+
+/** What an import could not rebind, shown beside the picker that fixes it. */
+function ImportNote({ text }: { text: string }) {
+  return (
+    <div role="note" style={{
+      padding: '8px 12px', backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+      borderRadius: 6, fontSize: 12, color: '#92400e', marginBottom: 8, lineHeight: 1.5,
+    }}>
+      {text}
+    </div>
+  )
+}
+
+/** `text` re-indented when it is a JSON object or array, else null. */
+export function prettyJson(text: string): string | null {
+  const t = text.trim()
+  if (!t.startsWith('{') && !t.startsWith('[')) return null
+  try {
+    const parsed: unknown = JSON.parse(t)
+    return parsed && typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : null
+  } catch {
+    return null
+  }
 }
 
 export function requiredFieldMessage(taskName: string, data: Record<string, unknown>): string | null {
@@ -3322,9 +3362,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // Knowledge-base grounding: a property of this task, independent of the
   // step's data sources above. Each selected base carries its own retrieval
   // queries (one per line), persisted as `kb_grounding`.
-  const initialGrounding = readGroundingDraft(task.data.kb_grounding)
-  const [groundingEnabled, setGroundingEnabled] = useState<boolean>(() => initialGrounding.targets.length > 0)
-  const [groundingTargets, setGroundingTargets] = useState<GroundingTargetDraft[]>(() => initialGrounding.targets)
+  const [initialGrounding] = useState(() => readGroundingDraft(task.data.kb_grounding))
+  const [groundingEnabled, setGroundingEnabled] = useState<boolean>(initialGrounding.targets.length > 0)
+  const [groundingTargets, setGroundingTargets] = useState<GroundingTargetDraft[]>(initialGrounding.targets)
   const [groundingK, setGroundingK] = useState<string>(initialGrounding.k)
   const [groundingMax, setGroundingMax] = useState<string>(initialGrounding.max_passages)
   const [groundingMin, setGroundingMin] = useState<string>(initialGrounding.min_similarity)
@@ -3334,6 +3374,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   const [suggestQueriesError, setSuggestQueriesError] = useState<string | null>(null)
   const [querySuggestion, setQuerySuggestion] = useState<{ kb_uuid: string; suggestion: KbQuerySuggestion } | null>(null)
   const toggleGroundingKb = (uuid: string) => {
+    // A suggestion drafted for a base that is now unticked must not come back
+    // when it is ticked again.
+    if (querySuggestion?.kb_uuid === uuid) setQuerySuggestion(null)
+    setSuggestQueriesError(null)
     setGroundingTargets(prev => (
       prev.some(t => t.kb_uuid === uuid)
         ? prev.filter(t => t.kb_uuid !== uuid)
@@ -3358,22 +3402,25 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // Knowledge Base Query task: several bases and several queries per step.
   // `kb_uuid` / `query` stay populated with the first of each for older
   // readers of the saved config.
-  const [kbQueryKbs, setKbQueryKbs] = useState<string[]>(() => {
-    const list = task.data.knowledge_bases
-    if (Array.isArray(list) && list.length > 0) {
-      return list.filter((u): u is string => typeof u === 'string' && u !== '')
-    }
-    return typeof task.data.kb_uuid === 'string' && task.data.kb_uuid ? [task.data.kb_uuid] : []
-  })
-  const [kbQueryQueries, setKbQueryQueries] = useState<string>(() => {
-    const list = task.data.queries
-    if (Array.isArray(list) && list.length > 0) return list.filter((s): s is string => typeof s === 'string').join('\n')
-    return typeof task.data.query === 'string' ? task.data.query : ''
-  })
+  const [kbQueryKbs, setKbQueryKbs] = useState<string[]>(() => readKbQueryDraft(task.data).kbs)
+  const [kbQueryQueries, setKbQueryQueries] = useState<string>(() => readKbQueryDraft(task.data).queries)
   const toggleKbQueryKb = (uuid: string) => {
     setKbQueryKbs(prev => (prev.includes(uuid) ? prev.filter(u => u !== uuid) : [...prev, uuid]))
   }
   const importNote = typeof task.data._import_note === 'string' ? task.data._import_note : null
+
+  // The knowledge-base fields as the editor shows them: what Save writes and
+  // what Test Step runs, so a test never uses a stale saved choice.
+  const kbDraftPatch = (): Record<string, unknown> => {
+    if (GROUNDABLE_TASKS.includes(task.name)) {
+      return { kb_grounding: groundingEnabled ? groundingConfigDraft() : undefined }
+    }
+    if (task.name === 'KnowledgeBaseQuery') {
+      const list = splitLines(kbQueryQueries)
+      return { knowledge_bases: kbQueryKbs, kb_uuid: kbQueryKbs[0] || '', queries: list, query: list[0] || '' }
+    }
+    return {}
+  }
 
   // Credentials (API Node auth_strategy picker)
   const [credentials, setCredentials] = useState<Credential[] | null>(null)
@@ -3482,8 +3529,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
   const [models, setModels] = useState<ModelInfo[]>([])
 
-  // Knowledge base list for KnowledgeBaseQuery tasks
+  // Knowledge base list for KnowledgeBaseQuery and groundable tasks
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
+  // Until the list arrives, a selected base is not "missing".
+  const [knowledgeBasesLoaded, setKnowledgeBasesLoaded] = useState(false)
 
   // Test step
   const [testing, setTesting] = useState(false)
@@ -3517,7 +3566,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // can be grounded in one.
   useEffect(() => {
     if (task.name === 'KnowledgeBaseQuery' || GROUNDABLE_TASKS.includes(task.name)) {
-      listKnowledgeBases().then(setKnowledgeBases).catch(() => {})
+      listKnowledgeBases().then(setKnowledgeBases).catch(() => {}).finally(() => setKnowledgeBasesLoaded(true))
     }
   }, [task.name])
 
@@ -3597,23 +3646,13 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
         [TASK_INPUT_OVERRIDE_KEY]: inputOverride ? true : undefined,
         ...(inputOverride ? inputValuePatch(overrideInput) : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
+        ...kbDraftPatch(),
       }
-      if (GROUNDABLE_TASKS.includes(task.name)) {
-        if (groundingEnabled) {
-          finalData.kb_grounding = groundingConfigDraft()
-          // Bound now — the import note asked for exactly this.
-          finalData._import_note = undefined
-        } else {
-          finalData.kb_grounding = undefined
-        }
-      }
-      if (task.name === 'KnowledgeBaseQuery') {
-        finalData.knowledge_bases = kbQueryKbs
-        finalData.kb_uuid = kbQueryKbs[0] || ''
-        finalData.queries = kbQueryList
-        finalData.query = kbQueryList[0] || ''
-        if (kbQueryKbs.length > 0) finalData._import_note = undefined
-      }
+      // Bound now — the import note asked for exactly this.
+      const bound = GROUNDABLE_TASKS.includes(task.name)
+        ? groundingEnabled && groundingTargets.length > 0
+        : task.name === 'KnowledgeBaseQuery' && kbQueryKbs.length > 0
+      if (bound) finalData._import_note = undefined
       await onSave(task.id, finalData)
     } finally {
       setSaving(false)
@@ -3624,10 +3663,20 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // instructions and that base's description — so Uniform Guidance and the
   // institution's policy base each get queries in their own vocabulary.
   const handleSuggestQueries = async (kbUuid: string) => {
+    // An Extraction task's "instructions" are the fields it extracts; a
+    // linked saved prompt keeps its body out of the task's own data.
+    const inlineKeys = Array.isArray(taskData.searchphrases)
+      ? taskData.searchphrases.filter((s): s is string => typeof s === 'string')
+      : []
+    const extractionFields = task.name === 'Extraction'
+      ? [...linkedSetItems.map(i => i.title || i.searchphrase), ...inlineKeys].join('\n')
+      : ''
     const instruction = getTextValue('prompt') || getTextValue('format_template')
-      || getTextValue('question') || getTextValue('template')
+      || getTextValue('question') || getTextValue('template') || linkedSavedBody || extractionFields
     if (!instruction.trim()) {
-      setSuggestQueriesError("Write this task's instructions first — the queries are drafted from them.")
+      setSuggestQueriesError(task.name === 'Extraction'
+        ? 'Choose the fields to extract first — the queries are drafted from them.'
+        : "Write this task's instructions first — the queries are drafted from them.")
       return
     }
     const kb = knowledgeBases.find(k => k.uuid === kbUuid)
@@ -3675,17 +3724,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     try {
       // Test what the editor currently shows, including unsaved grounding
       // and Knowledge Base Query choices — the same shape handleUpdate saves.
-      const testData: Record<string, unknown> = { ...taskData }
-      if (GROUNDABLE_TASKS.includes(task.name)) {
-        testData.kb_grounding = groundingEnabled ? groundingConfigDraft() : undefined
-      }
-      if (task.name === 'KnowledgeBaseQuery') {
-        const list = splitLines(kbQueryQueries)
-        testData.knowledge_bases = kbQueryKbs
-        testData.kb_uuid = kbQueryKbs[0] || ''
-        testData.queries = list
-        testData.query = list[0] || ''
-      }
+      const testData: Record<string, unknown> = { ...taskData, ...kbDraftPatch() }
       const { task_id } = await testStep({
         task_name: task.name,
         // The step owns the input, so the test has to be told what it is —
@@ -4598,15 +4637,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                     Knowledge Bases
                   </label>
-                  {importNote && (
-                    <div role="note" style={{
-                      padding: '8px 12px', backgroundColor: '#fffbeb', border: '1px solid #fde68a',
-                      borderRadius: 6, fontSize: 12, color: '#92400e', marginBottom: 8, lineHeight: 1.5,
-                    }}>
-                      {importNote}
-                    </div>
-                  )}
-                  {knowledgeBases.length === 0 ? (
+                  {importNote && <ImportNote text={importNote} />}
+                  {knowledgeBasesLoaded && knowledgeBases.length === 0 && kbQueryKbs.length === 0 ? (
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
                       No knowledge bases are available to you yet. Create one under Knowledge, or adopt one from the catalog.
                     </div>
@@ -4627,6 +4659,22 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                             onChange={() => toggleKbQueryKb(kb.uuid)}
                           />
                           <span>{kb.title}{kb.status !== 'ready' ? ` (${kb.status})` : ''}</span>
+                        </label>
+                      ))}
+                      {/* A selected base that was deleted or unshared has no row
+                          of its own, yet the step still searches it. */}
+                      {knowledgeBasesLoaded && kbQueryKbs.filter(u => !knowledgeBases.some(kb => kb.uuid === u)).map(uuid => (
+                        <label key={uuid} style={{
+                          display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                          color: '#b91c1c', padding: '3px 0', cursor: 'pointer',
+                        }}>
+                          <input
+                            type="checkbox"
+                            aria-label="Stop searching an unavailable knowledge base"
+                            checked
+                            onChange={() => toggleKbQueryKb(uuid)}
+                          />
+                          <span>Unavailable knowledge base (deleted or no longer shared) — untick to remove</span>
                         </label>
                       ))}
                     </div>
@@ -5293,6 +5341,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                 marginTop: 16, border: groundingEnabled ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, padding: 12, backgroundColor: '#fff',
               }}>
+                {/* Outside the toggle: an import that bound none of the bases
+                    leaves grounding off, and the note is what says so. */}
+                {importNote && <ImportNote text={importNote} />}
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: canManage ? 'pointer' : 'default' }}>
                   <input
                     type="checkbox"
@@ -5317,18 +5368,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
 
                 {groundingEnabled && (
                   <div style={{ marginTop: 12 }}>
-                    {importNote && (
-                      <div role="note" style={{
-                        padding: '8px 12px', backgroundColor: '#fffbeb', border: '1px solid #fde68a',
-                        borderRadius: 6, fontSize: 12, color: '#92400e', marginBottom: 8, lineHeight: 1.5,
-                      }}>
-                        {importNote}
-                      </div>
-                    )}
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Knowledge bases to search
                     </div>
-                    {knowledgeBases.length === 0 ? (
+                    {knowledgeBasesLoaded && knowledgeBases.length === 0 ? (
                       <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
                         No knowledge bases are available to you yet. Create one under Knowledge, or adopt one from the catalog.
                       </div>
@@ -5356,23 +5399,40 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
 
                     {groundingTargets.map(target => {
                       const kb = knowledgeBases.find(k => k.uuid === target.kb_uuid)
-                      const title = kb?.title || target.kb_uuid
+                      // Deleted or no longer shared: it has no row in the list
+                      // above, so this card is the only place to remove it.
+                      const missing = !kb && knowledgeBasesLoaded
+                      const title = kb?.title || (missing ? 'an unavailable knowledge base' : target.kb_uuid)
                       const busy = suggestingFor === target.kb_uuid
                       return (
                         <div key={target.kb_uuid} style={{
-                          marginTop: 10, border: '1px solid #e5e7eb', borderRadius: 6,
-                          padding: '8px 10px', backgroundColor: '#f9fafb',
+                          marginTop: 10, border: `1px solid ${missing ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 6,
+                          padding: '8px 10px', backgroundColor: missing ? '#fef2f2' : '#f9fafb',
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               Queries for {title}
                               <span style={{ fontWeight: 400, color: '#6b7280' }}> · one per line</span>
                             </div>
+                            {missing && canManage && (
+                              <button
+                                type="button"
+                                onClick={() => toggleGroundingKb(target.kb_uuid)}
+                                title="This knowledge base was deleted or is no longer shared with you; the task fails on it until it is removed."
+                                style={{
+                                  marginLeft: 'auto', flexShrink: 0, padding: '3px 8px', fontSize: 11, fontWeight: 600,
+                                  fontFamily: 'inherit', border: '1px solid #fca5a5', borderRadius: 6,
+                                  backgroundColor: '#fff', color: '#b91c1c', cursor: 'pointer',
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleSuggestQueries(target.kb_uuid)}
                               disabled={suggestingFor !== null || !canManage}
-                              title={`Draft two to four short queries for ${title} from this task's instructions. You can edit them before saving.`}
+                              title={`Draft up to three short queries for ${title} from this task's instructions. You can edit them before saving.`}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
                                 padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
@@ -5589,8 +5649,21 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   if (file) return <FileOutputCard summary={file} onDownload={handleDownloadTestResult} maxHeight={200} />
                   if (typeof testResult === 'string' && testSources.length > 0) {
                     // Grounded output: render it so its citations become chips
-                    // that open the passage — the point of testing the step.
-                    return (
+                    // that open the passage — the point of testing the step. A
+                    // JSON fragment stays a monospace block, as it is ungrounded.
+                    const json = prettyJson(testResult)
+                    return json !== null ? (
+                      <CitedMarkdown
+                        markdown={json}
+                        sources={testSources}
+                        format="text"
+                        style={{
+                          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                          padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                          maxHeight: 260, overflowY: 'auto', color: '#374151', wordBreak: 'break-word',
+                        }}
+                      />
+                    ) : (
                       <CitedMarkdown
                         markdown={testResult}
                         sources={testSources}
@@ -6382,8 +6455,9 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
             return (
               <button
                 type="button"
-                key={`${c.chunk_id ?? c.document_id ?? i}`}
+                key={`${i}:${c.chunk_id ?? ''}`}
                 className="kb-cite-chip"
+                aria-haspopup="dialog"
                 title={[relevance, 'Click to see the passage'].filter(Boolean).join(' — ')}
                 aria-expanded={open}
                 onClick={e => openAt(i, e.currentTarget)}

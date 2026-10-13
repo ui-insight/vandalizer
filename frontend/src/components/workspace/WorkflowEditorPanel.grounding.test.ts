@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readGroundingDraft, splitLines, taskKnowledgeBaseCount } from './WorkflowEditorPanel'
+import { prettyJson, readGroundingDraft, readKbQueryDraft, splitLines, taskKnowledgeBaseCount } from './WorkflowEditorPanel'
 
 describe('readGroundingDraft', () => {
   it('reads per-base entries, each with its own queries', () => {
@@ -69,5 +69,24 @@ describe('taskKnowledgeBaseCount', () => {
     expect(taskKnowledgeBaseCount('APINode', { kb_grounding: { knowledge_bases: [{ kb_uuid: 'ug', queries: ['q'] }] } })).toBe(0)
     expect(taskKnowledgeBaseCount('Prompt', {})).toBe(0)
     expect(taskKnowledgeBaseCount('Prompt', { kb_grounding: { knowledge_bases: [] } })).toBe(0)
+  })
+})
+
+describe('readKbQueryDraft', () => {
+  it('reads the lists, else the legacy single base and query', () => {
+    expect(readKbQueryDraft({ knowledge_bases: ['a', '', 'b'], queries: ['q1', 'q2'] })).toEqual({ kbs: ['a', 'b'], queries: 'q1\nq2' })
+    expect(readKbQueryDraft({ kb_uuid: 'a', query: 'q' })).toEqual({ kbs: ['a'], queries: 'q' })
+    expect(readKbQueryDraft({ knowledge_bases: [], kb_uuid: 'a', queries: [], query: 'q' })).toEqual({ kbs: ['a'], queries: 'q' })
+    expect(readKbQueryDraft({})).toEqual({ kbs: [], queries: '' })
+  })
+})
+
+describe('prettyJson', () => {
+  it('re-indents a JSON object or array and ignores anything else', () => {
+    expect(prettyJson('{"a":1}')).toBe('{\n  "a": 1\n}')
+    expect(prettyJson(' [1] ')).toBe('[\n  1\n]')
+    expect(prettyJson('"text"')).toBeNull()
+    expect(prettyJson('{ not json')).toBeNull()
+    expect(prettyJson('Allowable [UG · p. 4]')).toBeNull()
   })
 })

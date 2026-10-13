@@ -97,15 +97,19 @@ export const SECTION_RE = /(?:§\s*|\b\d{1,2}\s*CFR\s*(?:part\s*)?)?\b(\d{2,4}\.
 
 /** The passage whose text literally contains the section a reference names,
  *  or null. Only a base that holds the regulation qualifies: the marker must
- *  appear as "§ 200.403" (or "200.403" followed by a heading) in the passage. */
-export function matchSectionReference(section: string, sources: WorkflowCitation[]): number | null {
+ *  appear as "§ 200.403" (or "200.403" followed by a heading) in the passage.
+ *  A bare number in the output ("52.5", "1240.00") may be a figure, not a
+ *  section, so with `requireMarker` only a passage that writes "§ 52.5" counts. */
+export function matchSectionReference(
+  section: string, sources: WorkflowCitation[], { requireMarker = false } = {},
+): number | null {
   const wanted = section.trim()
   if (!/^\d{2,4}\.\d{1,4}$/.test(wanted)) return null
   const escaped = wanted.replace('.', '\\.')
   // "§ 200.407 Prior written approval." — the marker followed by a heading is
   // the section itself; "(see § 200.407)" is a passage that merely cites it.
   const heading = new RegExp(`§\\s*${escaped}\\s+[A-Z][a-z]`)
-  const mention = new RegExp(`(?:§\\s*|\\b)${escaped}(?![\\d])`)
+  const mention = new RegExp(`(?:§\\s*${requireMarker ? '' : '|\\b'})${escaped}(?![\\d])`)
   let best: number | null = null
   let bestScore = -Infinity
   for (let i = 0; i < sources.length; i++) {
@@ -160,12 +164,21 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
     chip.setAttribute('data-cite', String(idx))
     chip.setAttribute('title', `${citationLabel(c)} — click to see the passage`)
     chip.setAttribute('aria-label', `Citation: ${citationLabel(c)}`)
+    chip.setAttribute('aria-haspopup', 'dialog')
     const n = doc.createElement('span')
     n.className = 'kb-cite-n'
     n.textContent = String(idx + 1)
     chip.appendChild(n)
     if (!compact) chip.appendChild(doc.createTextNode(shortLabel(c)))
     return chip
+  }
+
+  // The same section is usually named many times in one output.
+  const sectionMatches = new Map<string, number | null>()
+  const sectionMatch = (section: string, requireMarker: boolean): number | null => {
+    const key = `${section}|${requireMarker}`
+    if (!sectionMatches.has(key)) sectionMatches.set(key, matchSectionReference(section, sources, { requireMarker }))
+    return sectionMatches.get(key) ?? null
   }
 
   for (const node of textNodes) {
@@ -190,7 +203,8 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
     for (let m = SECTION_RE.exec(text); m; m = SECTION_RE.exec(text)) {
       const start = m.index, end = m.index + m[0].length
       if (spans.some(s => start < s.end && end > s.start)) continue
-      const idx = matchSectionReference(m[1], sources)
+      // Named with "§" or "CFR" it is a section; bare, it may be a figure.
+      const idx = sectionMatch(m[1], m[0].indexOf(m[1]) === 0)
       if (idx === null) continue
       spans.push({ start, end, chips: [makeChip(idx, true)], keep: true })
     }
@@ -217,9 +231,22 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
 
 /** Markdown → sanitized HTML with citation chips. */
 export function renderCitedMarkdown(markdown: string, sources: WorkflowCitation[]): string {
-  const html = DOMPurify.sanitize(marked.parse(markdown) as string)
+  return withChips(DOMPurify.sanitize(marked.parse(markdown) as string), sources)
+}
+
+/** Plain text (e.g. a JSON fragment) → escaped HTML with citation chips; the
+ *  caller keeps its line breaks with `white-space: pre-wrap`. */
+export function renderCitedText(text: string, sources: WorkflowCitation[]): string {
+  const holder = document.createElement('div')
+  holder.textContent = text
+  return withChips(holder.innerHTML, sources)
+}
+
+function withChips(html: string, sources: WorkflowCitation[]): string {
   try {
-    return injectCitationChips(html, sources)
+    // Sanitized again after the parse/serialize round trip, so the HTML React
+    // receives is exactly what DOMPurify last approved.
+    return DOMPurify.sanitize(injectCitationChips(html, sources))
   } catch {
     return html
   }
@@ -227,31 +254,42 @@ export function renderCitedMarkdown(markdown: string, sources: WorkflowCitation[
 
 // --- Popover ----------------------------------------------------------------
 
-export interface CitationAnchor {
+interface CitationAnchor {
   index: number
+  /** The chip that opened the popover; focus returns to it on Escape. */
+  el: Element
   rect: { top: number; bottom: number; left: number; right: number }
 }
 
 const POPOVER_WIDTH = 440
 
 /** The passage a citation rests on, floated beside the chip that was clicked. */
-export function CitationPopover({ citation, anchor, onClose }: {
+function CitationPopover({ citation, anchor, onClose }: {
   citation: WorkflowCitation
   anchor: CitationAnchor
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
+  // Escape and the close button hand focus back to the chip; a click or
+  // scroll elsewhere leaves focus wherever the reader put it.
+  const dismiss = useCallback(() => {
+    onClose()
+    if (anchor.el instanceof HTMLElement && anchor.el.isConnected) anchor.el.focus()
+  }, [onClose, anchor.el])
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') dismiss() }
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node | null
-      if (ref.current && target && !ref.current.contains(target)) {
-        // A click on another chip is handled by that chip; anything else closes.
-        if (!(target instanceof Element) || !target.closest('.kb-cite, .kb-cite-chip')) onClose()
-      }
+      // The opening chip toggles itself on click; any other click closes,
+      // including one on a chip whose own popover then opens.
+      if (target && !ref.current?.contains(target) && !anchor.el.contains(target)) onClose()
     }
-    const onScroll = () => onClose()
+    // Scrolling the passage inside the popover must not close it.
+    const onScroll = (e: Event) => {
+      if (!(e.target instanceof Node && ref.current?.contains(e.target))) onClose()
+    }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onDown)
     window.addEventListener('scroll', onScroll, true)
@@ -260,7 +298,7 @@ export function CitationPopover({ citation, anchor, onClose }: {
       document.removeEventListener('mousedown', onDown)
       window.removeEventListener('scroll', onScroll, true)
     }
-  }, [onClose])
+  }, [onClose, dismiss, anchor.el])
 
   useEffect(() => { ref.current?.focus() }, [])
 
@@ -301,7 +339,7 @@ export function CitationPopover({ citation, anchor, onClose }: {
         </div>
         <button
           type="button"
-          onClick={onClose}
+          onClick={dismiss}
           aria-label="Close passage"
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex', flexShrink: 0 }}
         >
@@ -330,19 +368,19 @@ export function useCitationPopover(sources: WorkflowCitation[]) {
   const openAt = useCallback((index: number, el: Element) => {
     const r = el.getBoundingClientRect()
     setAnchor(prev => (
-      prev && prev.index === index ? null : { index, rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+      prev && prev.el === el ? null : { index, el, rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
     ))
   }, [])
   const citation = anchor ? sources[anchor.index] : undefined
   const popover = anchor && citation
     ? <CitationPopover citation={citation} anchor={anchor} onClose={close} />
     : null
-  return { anchor, openAt, close, popover }
+  return { anchor, openAt, popover }
 }
 
 // --- Component --------------------------------------------------------------
 
-export const CITATION_CHIP_CSS = `
+const CITATION_CHIP_CSS = `
 .kb-cite {
   display: inline-flex; align-items: center; gap: 4px; vertical-align: baseline;
   margin: 0 2px; padding: 0 7px 0 3px; max-width: 280px; height: 18px;
@@ -364,13 +402,19 @@ export const CITATION_CHIP_CSS = `
  * popover for whichever chip is open. Click handling is delegated from the
  * container, since the chips live in injected HTML.
  */
-export function CitedMarkdown({ markdown, sources, className, style }: {
+export function CitedMarkdown({ markdown, sources, format = 'markdown', className, style }: {
   markdown: string
   sources: WorkflowCitation[]
+  /** `text` keeps the string as written (a JSON fragment, say) instead of
+   *  rendering it as Markdown; style it with `white-space: pre-wrap`. */
+  format?: 'markdown' | 'text'
   className?: string
   style?: CSSProperties
 }) {
-  const html = useMemo(() => renderCitedMarkdown(markdown, sources), [markdown, sources])
+  const html = useMemo(
+    () => (format === 'text' ? renderCitedText(markdown, sources) : renderCitedMarkdown(markdown, sources)),
+    [markdown, sources, format],
+  )
   const { openAt, popover } = useCitationPopover(sources)
 
   const onClick = (e: ReactMouseEvent<HTMLDivElement>) => {
