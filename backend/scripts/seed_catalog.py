@@ -376,40 +376,43 @@ async def _patch_inline_extractions(wf: Workflow, seed_item: dict) -> int:
 
 
 async def _patch_superseded_prompts(wf: Workflow, seed_item: dict, meta: dict) -> int:
-    """Replace Prompt tasks still carrying a prompt this catalog has since corrected.
+    """Replace task prompts (Prompt, Formatter, …) this catalog has since corrected.
 
     Workflow upserts leave the step graph alone, so a fix to a seeded prompt
     (such as an outdated regulatory threshold) would otherwise reach only new
     installs. ``_seed_meta.superseded_prompt_sha256`` lists hashes of earlier
     shipped prompts; a task whose text still hashes to one of them is replaced
-    with the seed's current prompt for the step of the same name. A prompt
-    anyone has edited no longer matches and is left alone, as is any workflow
-    not owned by the catalog (a user's copy keeps its ``seed_id``).
-    Returns the number of tasks replaced.
+    with the seed's current prompt for the task of the same name in the step
+    of the same name. A prompt anyone has edited no longer matches and is left
+    alone, as is any workflow not owned by the catalog (a user's copy keeps
+    its ``seed_id``). Returns the number of tasks replaced.
     """
     superseded = set(meta.get("superseded_prompt_sha256") or [])
     if not superseded or wf.user_id != SYSTEM_USER:
         return 0
-    current: dict[str, str] = {}
+    current: dict[tuple[str, str], str] = {}
     for step_data in seed_item.get("steps", []):
         for task_data in step_data.get("tasks", []):
-            if task_data.get("name") == "Prompt":
-                current[step_data["name"]] = task_data.get("data", {}).get("prompt", "")
+            prompt = (task_data.get("data") or {}).get("prompt")
+            if isinstance(prompt, str):
+                current[(step_data["name"], task_data.get("name"))] = prompt
+    step_names = {step_name for step_name, _ in current}
     patched = 0
     for step_id in wf.steps:
         step = await WorkflowStep.get(step_id)
-        if not step or step.name not in current:
+        if not step or step.name not in step_names:
             continue
         for task_id in step.tasks:
             task = await WorkflowStepTask.get(task_id)
-            if not task or task.name != "Prompt":
+            if not task or (step.name, task.name) not in current:
                 continue
             prompt = task.data.get("prompt") or ""
             if hashlib.sha256(prompt.encode()).hexdigest() not in superseded:
                 continue
-            if prompt == current[step.name]:
+            replacement = current[(step.name, task.name)]
+            if prompt == replacement:
                 continue
-            task.data = {**task.data, "prompt": current[step.name]}
+            task.data = {**task.data, "prompt": replacement}
             await task.save()
             patched += 1
     return patched

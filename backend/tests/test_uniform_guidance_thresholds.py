@@ -137,6 +137,28 @@ async def test_a_users_copy_of_a_catalog_workflow_is_left_alone():
 
 
 @pytest.mark.asyncio
+async def test_an_installed_superseded_formatter_prompt_is_replaced():
+    wf, step, task = _installed(OLD)
+    task.name = "Formatter"
+    seed_item = {"steps": [{"name": "Budget Analysis", "tasks": [
+        {"name": "Prompt", "data": {"prompt": "Unrelated analysis prompt."}},
+        {"name": "Formatter", "data": {"prompt": NEW}},
+    ]}]}
+    with patch.object(seed_catalog.WorkflowStep, "get", AsyncMock(return_value=step)), \
+         patch.object(seed_catalog.WorkflowStepTask, "get", AsyncMock(return_value=task)):
+        assert await seed_catalog._patch_superseded_prompts(wf, seed_item, META) == 1
+    assert task.data["prompt"] == NEW
+
+
+@pytest.mark.asyncio
+async def test_a_task_type_the_seed_step_does_not_have_is_left_alone():
+    wf, step, task = _installed(OLD)
+    task.name = "Formatter"
+    assert await _patch(wf, step, task) == 0
+    assert task.data["prompt"] == OLD
+
+
+@pytest.mark.asyncio
 async def test_a_step_the_seed_no_longer_has_is_left_alone():
     wf, step, task = _installed(OLD, step_name="Renamed Step")
     assert await _patch(wf, step, task) == 0
