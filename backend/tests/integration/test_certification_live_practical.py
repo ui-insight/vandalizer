@@ -355,7 +355,8 @@ async def test_multi_step_live_runs_compare_a_broken_and_repaired_connection(rep
         assert assessment['status'] == 'requirements_supported', assessment
 
 
-async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, monkeypatch):
+@pytest.mark.parametrize('behavior', ['honest', 'careless'])
+async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, monkeypatch, behavior):
     from tests.integration import test_certification_advanced_calculation_records as budget_inputs
     from tests.integration import test_certification_advanced_workflow_execution as budget_execution
     from tests.integration import test_certification_advanced_workflow_reviews as budget
@@ -366,12 +367,13 @@ async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, mon
     monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
     monkeypatch.setattr(budget_inputs, 'fixture', partial(budget_inputs.fixture, enrolled=(learner, package)))
     after_fixture(monkeypatch, budget_execution, runtime_config)
-    f = await budget.fixture(repo, monkeypatch, correct=True)
+    # The careless learner keeps a wrong equipment sum (45001.00 for 45000.00).
+    f = await budget.fixture(repo, monkeypatch, correct=behavior == 'honest')
     saved = await budget.submit(repo, f)
     prepared = await budget.prepare(repo, f, saved['uuid'])
     reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
     assessment = reviewed['result']['assessment']
-    record('advanced_nodes', {'run_state': f.completed['state'],
+    record(f'advanced_nodes-{behavior}', {'run_state': f.completed['state'],
         'live_calls': list(LIVE_CALLS),
         'assessment_status': assessment['status'],
         'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
@@ -381,5 +383,10 @@ async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, mon
     assert f.completed['state'] == 'completed'
     # Two parallel reviews and the memo, each answered by the live model.
     assert len(LIVE_CALLS) == 3 and not any(output.startswith('RESULT: ') for _, _, output in LIVE_CALLS)
-    assert assessment['status'] == 'requirements_supported', assessment
     assert assessment['credit_awarded'] is False
+    if behavior == 'careless':
+        assert assessment['status'] == 'revision_required', assessment
+        verdicts = {item['outcome_id']: item['verdict'] for item in assessment['outcomes']}
+        assert verdicts['advanced_nodes.checked_computation'] != 'supported'
+    else:
+        assert assessment['status'] == 'requirements_supported', assessment
