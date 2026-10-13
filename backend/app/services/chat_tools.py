@@ -5039,7 +5039,10 @@ async def create_workflow(
                           field names) OR "extraction_set_uuid" (an existing set).
           "prompt"      — run an instruction over the input. Needs "prompt".
           "summarize"   — summarize the input. "prompt" optional.
-          "format"      — reshape the input into a template. Needs "format_template".
+          "format"      — assemble the deliverable from a template. Needs
+                          "format_template". Unlike other steps it reads EVERY
+                          earlier step's output (extraction fields, summary,
+                          checks), so put it last and name what it should use.
           "research"    — investigate a question (multi-pass). Needs "question".
           "knowledge_base_query" — query a KB. Needs "kb_uuid" and "query".
           "website"     — fetch a page. Needs "url".
@@ -5156,10 +5159,16 @@ async def create_workflow(
             data = dict(p["data"])
             # Linear wiring: the first document-consuming step reads the run's
             # documents; every later step reads the previous step's output.
+            # A format step reads every earlier step instead: it assembles the
+            # deliverable, and behind a summary or check step it would never
+            # see the extraction its template names (support ticket: the memo
+            # came back as {{FAIN Award Number}} placeholders).
             if p["doc_consuming"]:
                 if not first_doc_step_wired:
                     data["input_sources"] = ["workflow_documents"]
                     first_doc_step_wired = True
+                elif p["type"] == "format":
+                    data["input_sources"] = ["earlier_steps"]
                 else:
                     data["input_sources"] = ["step_input"]
 

@@ -1341,20 +1341,25 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             team_id=workflow_doc.get("team_id"),
             activity_id=activity_id,
         ):
+            # The steps a resumed pass skips, replayed from the saved run: both
+            # the record and a step reading "All Earlier Steps" need them.
+            replayed = (
+                _replay_step_entries(engine, prior_steps_output, start_index)
+                if start_index else []
+            )
             final_output, data = engine.execute(
                 workflow_result_updater=update_progress,
                 start_index=start_index,
                 initial_output=initial_output,
                 should_cancel=should_cancel,
                 check_budget=check_budget,
+                prior_steps=replayed,
             )
         if start_index:
             # execute() reports only the steps this pass ran. Without the
             # earlier ones the saved record would begin mid-workflow — the same
             # correction the approval resume already makes.
-            data = _replay_step_entries(
-                engine, prior_steps_output, start_index,
-            ) + (data or [])
+            data = replayed + (data or [])
     except WorkflowCancelled:
         logger.info(
             "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
@@ -1893,19 +1898,23 @@ def resume_workflow_after_approval(self, approval_uuid):
             team_id=workflow_doc.get("team_id"),
             activity_id=str(_act["_id"]) if _act else None,
         ):
+            # Steps before the gate, replayed from the persisted steps_output:
+            # a step reading "All Earlier Steps" after the gate needs them.
+            replayed = _replay_step_entries(
+                engine, result_doc.get("steps_output") or {}, resume_index,
+            )
             final_output, data = engine.execute(
                 workflow_result_updater=update_progress,
                 start_index=resume_index,
                 initial_output=resume_output,
                 check_budget=check_budget,
+                prior_steps=replayed,
             )
         # execute() reports only the steps this pass ran. Prepend the ones
-        # earlier passes completed, replayed from the persisted steps_output,
-        # or the saved run record would show a workflow that began at the
-        # approval gate and everything before it would vanish from the output.
-        data = _replay_step_entries(
-            engine, result_doc.get("steps_output") or {}, resume_index,
-        ) + (data or [])
+        # earlier passes completed, or the saved run record would show a
+        # workflow that began at the approval gate and everything before it
+        # would vanish from the output.
+        data = replayed + (data or [])
     except WorkflowStepError as e:
         # Deterministic step failure — mark the run failed, don't retry.
         logger.warning("Workflow %s failed after resume: %s", workflow_id, e)

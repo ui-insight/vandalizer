@@ -2,7 +2,7 @@ import type { ConnectedCapture, ConnectedRun } from '../../types/connectedWorkfl
 
 export const connectedButton = 'min-h-11 min-w-0 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm font-medium text-gray-900 [overflow-wrap:anywhere] disabled:opacity-50'
 export const connectedControl = 'mt-1 block min-h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white p-2 text-sm text-gray-900'
-const inputLabels: Record<string, string> = { workflow_documents: 'Workflow Documents', step_input: 'Step Input', select_document: 'Selected document' }
+const inputLabels: Record<string, string> = { workflow_documents: 'Workflow Documents', step_input: 'Step Input', earlier_steps: 'All Earlier Steps', select_document: 'Selected document' }
 const stateLabels: Record<ConnectedRun['state'], string> = { prepared: 'Prepared · not run', executing: 'Run started · no final receipt', completed: 'Run completed', failed: 'Run stopped', uncertain: 'Run outcome uncertain' }
 function inputText(context: Record<string, unknown> | undefined) {
   if (context?.kind === 'combined_context') return context.value

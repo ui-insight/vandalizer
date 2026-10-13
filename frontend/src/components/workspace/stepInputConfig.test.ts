@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   deriveStepInput,
   effectiveTaskInput,
+  INPUT_SOURCE_LABELS,
   inputValuePatch,
   readInputValue,
   sameInputValue,
@@ -150,5 +151,17 @@ describe('effectiveTaskInput', () => {
     const t = task('t1', { input_sources: ['workflow_documents'] })
     const s = step({}, [t])
     expect(effectiveTaskInput(s, t).sources).toEqual(['workflow_documents'])
+  })
+})
+
+describe('All Earlier Steps', () => {
+  it('survives reading and saving, so the editor never drops it', () => {
+    // A chat-built memo step reads every earlier step. The editor used to filter
+    // unknown sources out, so opening and saving it would have repointed the
+    // memo at the previous step alone.
+    const value = readInputValue({ input_sources: ['earlier_steps'] })
+    expect(value.sources).toEqual(['earlier_steps'])
+    expect(inputValuePatch(value)).toMatchObject({ input_sources: ['earlier_steps'], input_source: 'earlier_steps' })
+    expect(INPUT_SOURCE_LABELS.earlier_steps).toBe('All Earlier Steps')
   })
 })

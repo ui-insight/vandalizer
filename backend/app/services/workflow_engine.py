@@ -156,7 +156,33 @@ INPUT_SOURCE_LABELS = {
     "step_input": "Previous Step Output",
     "select_document": "Selected Document",
     "workflow_documents": "Workflow Documents",
+    "earlier_steps": "All Earlier Steps",
 }
+
+# Where execute() hands a step the outputs of every step before it, for the
+# "earlier_steps" source. A chain is otherwise strictly linear: a memo step at
+# the end of Extract → Summarize → Check saw only the check's text, so its
+# template's extraction fields came back as literal {{placeholders}}.
+EARLIER_STEPS_KEY = "_earlier_steps"
+
+
+def _earlier_step_sections(inputs: dict) -> list[tuple[str, str]]:
+    """One labeled section per earlier step with output, oldest first.
+
+    Outside a run (the editor testing one step on sample input) there is no
+    list, so the step's own input stands in for it.
+    """
+    if EARLIER_STEPS_KEY not in inputs:
+        text = _stringify_context(inputs.get("output"))
+        return [(INPUT_SOURCE_LABELS["step_input"], text)] if text else []
+    sections: list[tuple[str, str]] = []
+    for entry in inputs.get(EARLIER_STEPS_KEY) or []:
+        if not isinstance(entry, dict) or entry.get("name") == "Document":
+            continue  # the trigger's output is document ids, not content
+        text = _stringify_context(entry.get("output"))
+        if text:
+            sections.append((f"Step: {entry.get('name') or 'Unnamed step'}", text))
+    return sections
 
 
 # Arithmetic an Extraction step's rules computed in code. A later model step
@@ -293,6 +319,9 @@ def _resolve_input_sources(data: dict, prev_step_name: str | None = None) -> lis
 
     if prev_step_name == "Document":
         sources = ["workflow_documents" if s == "step_input" else s for s in sources]
+    # Earlier steps include the previous one; reading it twice only repeats it.
+    if "earlier_steps" in sources:
+        sources = [s for s in sources if s != "step_input"]
 
     seen: set[str] = set()
     deduped: list[str] = []
@@ -352,6 +381,14 @@ def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
             if joined:
                 sections.append((INPUT_SOURCE_LABELS[src], joined))
                 raw_single = joined
+        elif src == "earlier_steps":
+            earlier = _earlier_step_sections(inputs)
+            sections.extend(earlier)
+            if len(earlier) == 1:
+                raw_single = earlier[0][1]
+            checks = describe_rule_checks(inputs.get("rule_checks"))
+            if checks:
+                sections.append((RULE_CHECKS_LABEL, checks))
 
     if not sections:
         return ""
@@ -1950,6 +1987,9 @@ class FormFillerNode(Node):
                 text = _stringify_context(inputs.get("output"))
                 if text:
                     out.append({"kind": src, "title": INPUT_SOURCE_LABELS[src], "text": text})
+            elif src == "earlier_steps":
+                for title, text in _earlier_step_sections(inputs):
+                    out.append({"kind": src, "title": title, "text": text})
             elif src == "select_document":
                 text = self.data.get("selected_doc_text") or ""
                 meta = self.data.get("selected_doc_meta") or {}
@@ -2609,7 +2649,7 @@ class WorkflowEngine:
         return build_step_output_keys(self.get_topological_order())
 
     def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
-                should_cancel=None, check_budget=None):
+                should_cancel=None, check_budget=None, prior_steps=None):
         """Execute workflow. Returns (final_output, step_data_list).
 
         Args:
@@ -2631,6 +2671,13 @@ class WorkflowEngine:
         data = []
         nodes = self.get_topological_order()
         output_keys = self.step_output_keys()
+        # Every finished step, for the "earlier_steps" source. A resumed pass
+        # gets the steps before start_index from the caller (prior_steps,
+        # replayed from the saved run), since this pass never ran them.
+        earlier: list[dict] = [
+            {"name": e.get("name"), "output": e.get("output")}
+            for e in (prior_steps or []) if isinstance(e, dict)
+        ]
 
         latest_output = initial_output
         for idx, node in enumerate(nodes):
@@ -2657,6 +2704,7 @@ class WorkflowEngine:
             if idx == 0 and latest_output is None:
                 output = _process_tagged(node, {})
             else:
+                step_inputs = {**(latest_output or {}), EARLIER_STEPS_KEY: list(earlier)}
                 if isinstance(node, MultiTaskNode):
                     for task in node.tasks:
                         task.progress_reporter = (
@@ -2667,7 +2715,7 @@ class WorkflowEngine:
                                     "current_step_preview": preview,
                                 }) if workflow_result_updater else None
                         )
-                output = _process_tagged(node, latest_output or {})
+                output = _process_tagged(node, step_inputs)
 
             # Retry-on-empty / fallback-model. Optimizer-set hook: if the
             # node's first task has ``_fallback_model`` and the output looks
@@ -2675,7 +2723,9 @@ class WorkflowEngine:
             # transient model failures (rate limits, partial outages) that
             # would otherwise silently degrade the trial.
             if _should_retry_with_fallback(node, output):
-                output = _retry_node_with_fallback(node, latest_output or {})
+                output = _retry_node_with_fallback(
+                    node, {**(latest_output or {}), EARLIER_STEPS_KEY: list(earlier)},
+                )
 
             latest_output = output
 
@@ -2706,6 +2756,7 @@ class WorkflowEngine:
                 "output": latest_output.get("output"),
                 "input": latest_output.get("input"),
             }
+            earlier.append({"name": node.name, "output": entry["output"]})
             sources = latest_output.get("retrieved_sources")
             if isinstance(sources, list) and sources:
                 entry["retrieved_sources"] = sources

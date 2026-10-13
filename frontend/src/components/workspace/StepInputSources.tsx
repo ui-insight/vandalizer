@@ -199,6 +199,25 @@ export function StepInputSources({
           </div>
         </label>
 
+        {/* All Earlier Steps */}
+        <label style={cardStyle(sources.includes('earlier_steps'))}>
+          <input
+            type="checkbox"
+            checked={sources.includes('earlier_steps')}
+            disabled={disabled}
+            onChange={() => toggle('earlier_steps')}
+            style={{ marginTop: 'var(--workspace-space-2)' }}
+          />
+          <div>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>All Earlier Steps</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+              The output of every step before this one, each labeled with its step name. Use it
+              for a final memo or report that combines an extraction with later summaries or checks.
+              Includes the previous step, so Step Input adds nothing alongside it.
+            </div>
+          </div>
+        </label>
+
         {/* Select a Document */}
         <label style={cardStyle(wantsSelectDocument)}>
           <input
