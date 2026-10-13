@@ -2151,6 +2151,29 @@ class FormFillerNode(Node):
         return result
 
 
+def _json_rows(value):
+    """A JSON object or list of objects carried as text, else the value unchanged.
+
+    Formatter and Prompt steps return text, so a record they produce reaches
+    Data Export as a JSON string, sometimes inside a code fence.
+    """
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1)
+    if not text.startswith(("{", "[")):
+        return value
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return value
+    if isinstance(parsed, dict) or (isinstance(parsed, list) and parsed and all(isinstance(row, dict) for row in parsed)):
+        return parsed
+    return value
+
+
 class DataExportNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("DataExport")
@@ -2164,6 +2187,7 @@ class DataExportNode(Node):
 
         if fmt == "csv":
             buf = io.StringIO()
+            input_data = _json_rows(input_data)
             if isinstance(input_data, list) and input_data and isinstance(input_data[0], dict):
                 headers = list(input_data[0].keys())
                 writer = csv.DictWriter(buf, fieldnames=headers)
@@ -2185,8 +2209,9 @@ class DataExportNode(Node):
                 warning = (
                     "This step's input was not tabular (no list of rows or "
                     "single record), so it was exported as plain text rather "
-                    "than CSV. Put an Extraction or Formatter step before "
-                    "Data Export to produce rows."
+                    "than CSV. Put an Extraction step before Data Export, or "
+                    "have the previous step return a JSON object or list of "
+                    "objects."
                 )
                 data_b64 = base64.b64encode(content.encode("utf-8")).decode("utf-8")
                 return {

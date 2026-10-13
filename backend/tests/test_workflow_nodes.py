@@ -5,6 +5,7 @@ Tests cover happy paths, error handling, and input routing logic.
 """
 
 import base64
+import csv
 import json
 import zipfile
 import io
@@ -2656,3 +2657,24 @@ class TestDataExportNonTabularCsv:
         assert result["output"]["file_type"] == "csv"
         assert result["output"]["filename"] == "rows.csv"
         assert "warning" not in result
+
+    @pytest.mark.parametrize("text", [
+        '{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}',
+        '```json\n{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}\n```',
+        '[{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}]',
+    ])
+    def test_a_json_record_returned_as_text_exports_as_csv(self, text):
+        # A Formatter or Prompt step returns its record as text.
+        node = DataExportNode({"format": "csv", "filename": "summary"})
+        result = node.process({"output": text})
+        assert result["output"]["file_type"] == "csv"
+        assert "warning" not in result
+        rows = list(csv.DictReader(io.StringIO(base64.b64decode(result["output"]["data_b64"]).decode())))
+        assert rows == [{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}]
+
+    @pytest.mark.parametrize("text", ['["a", "b"]', '{"unterminated": ', '42', 'Summary: {"a": 1}'])
+    def test_text_that_is_not_a_json_record_still_exports_as_text(self, text):
+        node = DataExportNode({"format": "csv", "filename": "summary"})
+        result = node.process({"output": text})
+        assert result["output"]["file_type"] == "txt"
+        assert "not tabular" in result["warning"]
