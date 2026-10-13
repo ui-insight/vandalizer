@@ -25,6 +25,7 @@ import fitz
 import pytest
 
 from app.models.document import SmartDocument
+from app.services import workflow_engine
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.user import User
 from app.services.certification_versions.catalog import CourseCatalog
@@ -32,6 +33,9 @@ from tests.integration import test_certification_enrollments as base
 from tests.test_certification_outcome_rubric import candidate, VERSION
 
 LIVE_CONFIG = os.environ.get('CERTIFICATION_LIVE_MODEL_CONFIG')
+# Captured before any fixture stubs them.
+REAL_PROVIDERS = {name: getattr(workflow_engine, name) for name in ('llm_chat_model', 'format_model', 'data_extraction_model')}
+LIVE_CALLS = []
 LIVE_MODEL = os.environ.get('CERTIFICATION_LIVE_MODEL')
 
 repo = base.repo
@@ -81,6 +85,35 @@ def record(module_id, entry):
     report = json.loads(Path(path).read_text()) if Path(path).exists() else {'model': LIVE_MODEL, 'modules': {}}
     report['modules'][module_id] = entry
     Path(path).write_text(json.dumps(report, indent=2, sort_keys=True))
+
+
+def route_workflow_models_live(monkeypatch, runtime_config):
+    """Send every workflow model call to the live model, whatever fixture name a task saved.
+
+    Saved plans keep the fixture's model labels; the calls themselves are live.
+    """
+    def routed(name):
+        real = REAL_PROVIDERS[name]
+
+        def call(model, *args, **kwargs):
+            kwargs['system_config_doc'] = runtime_config
+            result = real(LIVE_MODEL, *args, **kwargs)
+            LIVE_CALLS.append((name, model, str(result)[:200]))
+            return result
+        return call
+    for name in REAL_PROVIDERS:
+        monkeypatch.setattr(workflow_engine, name, routed(name))
+
+
+def after_fixture(monkeypatch, module, runtime_config):
+    """Re-apply live routing after a shared fixture installs its provider stubs."""
+    original = module.fixture
+
+    async def wrapped(*args, **kwargs):
+        built = await original(*args, **kwargs)
+        route_workflow_models_live(monkeypatch, runtime_config)
+        return built
+    monkeypatch.setattr(module, 'fixture', wrapped)
 
 
 async def prepare_live_review(repo, learner, package, run_id, runtime_config):
@@ -320,3 +353,33 @@ async def test_multi_step_live_runs_compare_a_broken_and_repaired_connection(rep
     else:
         assert connected['passed'] is True
         assert assessment['status'] == 'requirements_supported', assessment
+
+
+async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, monkeypatch):
+    from tests.integration import test_certification_advanced_calculation_records as budget_inputs
+    from tests.integration import test_certification_advanced_workflow_execution as budget_execution
+    from tests.integration import test_certification_advanced_workflow_reviews as budget
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    LIVE_CALLS.clear()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+    monkeypatch.setattr(budget_inputs, 'fixture', partial(budget_inputs.fixture, enrolled=(learner, package)))
+    after_fixture(monkeypatch, budget_execution, runtime_config)
+    f = await budget.fixture(repo, monkeypatch, correct=True)
+    saved = await budget.submit(repo, f)
+    prepared = await budget.prepare(repo, f, saved['uuid'])
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record('advanced_nodes', {'run_state': f.completed['state'],
+        'live_calls': list(LIVE_CALLS),
+        'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'deterministic': [(item['outcome_id'], item['passed']) for item in assessment.get('deterministic_outcomes', [])],
+        'credit_awarded': assessment['credit_awarded']})
+    assert f.completed['state'] == 'completed'
+    # Two parallel reviews and the memo, each answered by the live model.
+    assert len(LIVE_CALLS) == 3 and not any(output.startswith('RESULT: ') for _, _, output in LIVE_CALLS)
+    assert assessment['status'] == 'requirements_supported', assessment
+    assert assessment['credit_awarded'] is False
