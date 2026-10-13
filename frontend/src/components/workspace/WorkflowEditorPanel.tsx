@@ -19,6 +19,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { withAdminRemedy } from '../../utils/truncationWarning'
 import { useShareLink } from '../../lib/shareLink'
+import { runModelLabel } from '../../lib/runModel'
 import { useConfirm } from '../shared/useConfirm'
 import { getProjectDocuments } from '../../api/projects'
 import {
@@ -5724,6 +5725,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             {status && status.num_steps_total > 0 && (
               <> - Step {status.num_steps_completed + 1} of {status.num_steps_total}</>
             )}
+            {runModelLabel(status) && <> - {runModelLabel(status)}</>}
           </div>
           <div style={{
             marginTop: 'var(--workspace-space-8)', height: 4, borderRadius: 2,
@@ -5761,6 +5763,11 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             {stepWarnings.length > 0
               ? `Completed with ${stepWarnings.length} warning${stepWarnings.length === 1 ? '' : 's'} — check the output before using it`
               : 'Completed'}
+            {runModelLabel(status) && (
+              <span style={{ marginLeft: 'auto', color: '#6b7280', fontWeight: 400, fontSize: 'var(--workspace-font-meta)' }}>
+                {runModelLabel(status)}
+              </span>
+            )}
           </div>
           {fileSummary ? (
             <FileOutputCard summary={fileSummary} downloadHref={fileDownloadHref} />

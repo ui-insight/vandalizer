@@ -1252,6 +1252,13 @@ async def get_workflow_history(
         .limit(limit)
         .to_list()
     )
+    # Which model each run used lives on its WorkflowResult; one query for all.
+    from app.models.workflow import WorkflowResult
+    session_ids = [ev.workflow_session_id for ev in events if ev.workflow_session_id]
+    run_models: dict[str, tuple] = {}
+    if session_ids:
+        for r in await WorkflowResult.find({"session_id": {"$in": session_ids}}).to_list():
+            run_models[r.session_id] = (r.model, list(r.models_used or []))
     return {
         "runs": [
             {
@@ -1272,6 +1279,8 @@ async def get_workflow_history(
                 # history row say "awaiting approval" and link to the review
                 # instead of showing a run that has been "running" for days.
                 "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
+                "model": run_models.get(ev.workflow_session_id, (None, []))[0],
+                "models_used": run_models.get(ev.workflow_session_id, (None, []))[1],
             }
             for ev in events
         ],

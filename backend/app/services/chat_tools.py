@@ -2373,6 +2373,22 @@ async def _resolve_requested_model(model: Optional[str]) -> tuple[Optional[str],
     return match.get("name"), None
 
 
+def _workflow_run_model(context: RunContext[AgenticChatDeps], wf, requested: Optional[str]) -> tuple[Optional[str], str]:
+    """The model a chat-started run uses, and where that choice came from.
+
+    A model the user named wins; then the model set on the workflow (the
+    editor's "Runs every step on this model"); then this chat's model. Chat
+    used to pass its own model first, so a workflow set to kimi-k3 ran on
+    whatever chat was using and no screen said so.
+    """
+    if requested:
+        return requested, "named"
+    default = (getattr(wf, "input_config", None) or {}).get("default_model")
+    if isinstance(default, str) and default.strip():
+        return default.strip(), "workflow"
+    return (context.deps.model_name or None), "chat"
+
+
 async def run_workflow(
     context: RunContext[AgenticChatDeps],
     workflow_id: str,
@@ -2411,9 +2427,10 @@ async def run_workflow(
             input; any documents pinned to the workflow are included too.
         model: Only when the user names a model ("run it on kimi-k3", or two
             models to compare). Every step then runs on that model, including
-            steps that set their own. Omit it otherwise: the run uses the model
-            selected in chat for steps that don't set one. To compare models,
-            call once per model and compare the two runs' outputs.
+            steps that set their own. Omit it otherwise: the run uses the
+            model set on the workflow, or this chat's model if the workflow
+            sets none. The preview says which. To compare models, call once
+            per model and compare the two runs' outputs.
         confirmed: Must be true to actually run. If false, returns a preview.
     """
     requested_model, model_error = await _resolve_requested_model(model)
@@ -2461,19 +2478,22 @@ async def run_workflow(
         else f"{len(document_uuids)} document(s)" if document_uuids
         else "its pinned inputs"
     )
+    run_model, model_source = _workflow_run_model(context, wf, requested_model)
+    model_note = {
+        "named": f", every step on {run_model}",
+        "workflow": f", on {run_model} (the workflow's model)",
+        "chat": f", on {run_model} (this chat's model)",
+    }[model_source] if run_model else ""
     gate = await _confirm_gate(
         context,
         tool_name="run_workflow",
         key={
             "workflow_id": workflow_id, "docs": sorted(document_uuids),
-            "text": text[:200], "model": requested_model,
+            "text": text[:200], "model": run_model,
         },
         preview={
             "action": "run_workflow",
-            "preview": (
-                f"Run workflow \"{wf.name}\" on {run_label}"
-                + (f", every step on {requested_model}" if requested_model else "")
-            ),
+            "preview": f"Run workflow \"{wf.name}\" on {run_label}{model_note}",
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -2507,8 +2527,9 @@ async def _execute_workflow(
 ) -> dict:
     """Dispatch an already-authorized workflow against documents.
 
-    ``model`` (a configured name) runs every step on it; without it the chat's
-    model is the default for steps that don't set their own.
+    ``model`` (a configured name the user asked for) runs every step on it;
+    without it the run uses the workflow's model, else the chat's, as the
+    default for steps that don't set their own (``_workflow_run_model``).
 
     Shared by ``run_workflow`` (after auth + confirmation) and
     ``run_pin_on_project``. Caps at 10 documents (the workflow_service limit).
@@ -2542,12 +2563,13 @@ async def _execute_workflow(
     except Exception:
         logger.exception("Failed to create chat-tagged activity for workflow %s", workflow_id)
 
+    run_model, _ = _workflow_run_model(context, wf, model)
     try:
         session_id = await workflow_service.run_workflow(
             workflow_id=workflow_id,
             document_uuids=document_uuids[:10],
             user_id=context.deps.user_id,
-            model=model or context.deps.model_name or None,
+            model=run_model,
             user=context.deps.user,
             activity_id=activity_id,
             force_model=bool(model),
@@ -2579,7 +2601,7 @@ async def _execute_workflow(
     return {
         "session_id": session_id,
         "status": "running",
-        "model": model or context.deps.model_name or None,
+        "model": run_model,
         "message": "Workflow started. Use get_workflow_status with the session_id to check progress.",
     }
 
@@ -2659,9 +2681,12 @@ async def get_workflow_status(
         "progress": f"{done} of {total} steps completed",
         "current_step": status.get("current_step_name"),
     }
-    # Which model the run used, so two runs can be compared by model.
+    # Which model the run used, so two runs can be compared by model. Steps
+    # with their own model can make that more than one.
     if status.get("model"):
         result["model"] = status["model"]
+    if len(status.get("models_used") or []) > 1:
+        result["models_used"] = status["models_used"]
 
     if status["status"] == "completed" and status.get("workflow_id"):
         try:

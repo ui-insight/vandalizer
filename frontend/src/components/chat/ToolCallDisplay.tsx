@@ -3,6 +3,7 @@ import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { runModelLabel } from '../../lib/runModel'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
 import {
@@ -1088,6 +1089,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
         <span>{fetchFailed ? 'Workflow status unavailable' : labels[effective] || `Workflow status: ${effective}`}{total > 0 && ` · ${done}/${total} steps completed`}</span>
       </div>
       {fetchFailed && <div role="alert" className="agent-run-error">Could not refresh this run. {status ? `Last known state: ${labels[effective] || effective}.` : 'Its current state is not confirmed.'} Checking again does not start another run.</div>}
+      {runModelLabel(status) && <p className="agent-run-model">{runModelLabel(status)}</p>}
       {status?.current_step_name && <p><strong>{failed ? 'Failed step' : 'Current step'}:</strong> {status.current_step_name}</p>}
       {failed && <p className="agent-run-error">{status?.error || status?.current_step_detail || 'The run reported a failure without further details.'}</p>}
       {effective === 'canceled' && <p>The run was canceled. {partial ? 'Completed results remain available below.' : 'No completed step results were returned.'}</p>}

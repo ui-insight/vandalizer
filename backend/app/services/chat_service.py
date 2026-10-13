@@ -3854,8 +3854,10 @@ def _build_model_block(model_name: str, sys_config_doc: Optional[dict]) -> str:
     lines = [
         "## Model",
         f"You are running on **{current_label}**, the model selected in this "
-        "chat's model picker. Workflows you create or run, and extractions you "
-        "run, use it unless the user names another.",
+        "chat's model picker. Workflows you create and extractions you run use "
+        "it unless the user names another. A workflow you run uses the model "
+        "set on the workflow if it has one, else this one; the approval card "
+        "and run_workflow's result say which, so tell the user.",
     ]
     others = [_model_label(m) for m in models if m is not current]
     if others:

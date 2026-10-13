@@ -2624,6 +2624,8 @@ class WorkflowEngine:
         self.graph = graphlib.TopologicalSorter()
         self.usage = UsageAccumulator()
         self._topological_order: list[Node] | None = None
+        # Distinct models the build assigned to model-using tasks, in order.
+        self.models_used: list[str] = []
 
     def add_node(self, node: Node) -> None:
         self.graph.add(node)
@@ -2971,6 +2973,15 @@ def _apply_step_override(
     return task_data
 
 
+# Task types that call a model. The rest (approval, website, code, export, …)
+# carry a model in their data but never use it, so they don't count toward
+# the models a run used.
+_MODEL_TASKS = frozenset({
+    "Extraction", "Prompt", "Formatter", "DescribeImage", "ResearchNode",
+    "FormFiller", "KnowledgeBaseQuery", "BrowserAutomation", "Browser",
+})
+
+
 def build_workflow_engine(
     steps_data: list[dict],
     model: str,
@@ -3032,6 +3043,12 @@ def build_workflow_engine(
                 _apply_step_override(task_name, task_data, step_override)
                 if force_model and model:
                     task_data["model"] = model
+                if (
+                    task_name in _MODEL_TASKS
+                    and task_data.get("model")
+                    and task_data["model"] not in engine.models_used
+                ):
+                    engine.models_used.append(task_data["model"])
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)

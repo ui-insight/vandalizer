@@ -694,6 +694,7 @@ async def get_workflow_status(
         "document_title": result.document_title,
         "start_time": result.start_time,
         "model": result.model,
+        "models_used": list(getattr(result, "models_used", None) or []),
     }
 
 

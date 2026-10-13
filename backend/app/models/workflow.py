@@ -172,6 +172,10 @@ class WorkflowResult(Document):
     # must use, including steps that name their own (chat's "run it on model
     # X" for comparing models). Read back by the resume task like ``model``.
     model_forced: bool = False
+    # The models the run's model-using steps actually ran on, in step order,
+    # recorded when the engine is built (after step overrides, optimizer
+    # swaps and a forced model). What the run views show as "Model".
+    models_used: list[str] = []
     # Celery task id of the execution job, captured at enqueue time so a user
     # can cancel an in-flight run (revoke + terminate). None for runs created
     # before this field existed or for runs that never enqueued a task.

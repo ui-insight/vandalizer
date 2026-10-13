@@ -140,6 +140,9 @@ export interface WorkflowStatus {
   error?: string | null;
   error_payload?: WorkflowErrorPayload | null;
   retrieved_sources?: WorkflowCitation[];
+  /** The run's model, and the models its steps actually ran on. */
+  model?: string | null;
+  models_used?: string[];
 }
 
 export interface ModelInfo {

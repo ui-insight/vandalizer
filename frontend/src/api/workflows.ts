@@ -655,6 +655,9 @@ export interface RunHistoryEntry {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
+  /** Workflow runs: the run's model, and the models its steps ran on. */
+  model?: string | null
+  models_used?: string[]
 }
 
 export interface WorkflowVersionEntry {

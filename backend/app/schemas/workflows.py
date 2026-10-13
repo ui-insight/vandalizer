@@ -115,6 +115,10 @@ class WorkflowStatusResponse(BaseModel):
     error: Optional[str] = None
     error_payload: Optional[dict] = None
     retrieved_sources: list[dict] = []
+    # The run's model, and the models its steps actually ran on (see
+    # WorkflowResult.models_used). Shown on every run view.
+    model: Optional[str] = None
+    models_used: list[str] = []
 
 
 class BatchStatusItem(BaseModel):

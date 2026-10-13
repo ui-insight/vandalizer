@@ -8,6 +8,7 @@ import { relativeTime } from '../../utils/time'
 import { getWorkflowStatus, downloadResults } from '../../api/workflows'
 import { FileOutputCard } from './FileOutputCard'
 import { summarizeFilePayload } from './outputFilePayload'
+import { runModelLabel } from '../../lib/runModel'
 
 export interface HistoryRun {
   id: string
@@ -25,6 +26,9 @@ export interface HistoryRun {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
+  /** Workflow runs: the run's model, and the models its steps ran on. */
+  model?: string | null
+  models_used?: string[]
 }
 
 function formatDuration(ms: number): string {
@@ -271,6 +275,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
                 {run.steps_completed ?? 0}/{run.steps_total} steps
               </span>
             )}
+            {type === 'workflow' && runModelLabel(run) && <span>{runModelLabel(run)}</span>}
             {(run.tokens_input > 0 || run.tokens_output > 0) && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <Zap style={{ width: 11, height: 11 }} />

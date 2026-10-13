@@ -367,6 +367,22 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
     return steps_data, output_step_names
 
 
+def _record_models_used(db, workflow_result_id: str, engine) -> None:
+    """Store which models the run's steps run on, for the run views.
+
+    Best-effort: a failed write must not stop the run it describes.
+    """
+    from bson import ObjectId
+
+    try:
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"models_used": list(engine.models_used)}},
+        )
+    except Exception:
+        logger.warning("Could not record models used for %s", workflow_result_id, exc_info=True)
+
+
 def _resume_point(engine, result_doc: dict) -> tuple[int, dict | None]:
     """Where a retried run should pick up, and what to feed the first step.
 
@@ -1187,6 +1203,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     except WorkflowStepError as e:
         _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
         return {"status": "error", "result_id": workflow_result_id}
+    _record_models_used(db, workflow_result_id, engine)
 
     # Any pickup resumes where a previous attempt stopped, decided from the
     # run document itself: a fresh run has no stored step output, so
@@ -1852,6 +1869,7 @@ def resume_workflow_after_approval(self, approval_uuid):
         if _act:
             _clear_pause_marker(db, _act["_id"])
         return {"status": "error", "result_id": workflow_result_id}
+    _record_models_used(db, workflow_result_id, engine)
 
     # The run is moving again: drop the pause marker so the rail stops showing
     # "awaiting approval" and the stale reaper starts covering this row again.
