@@ -37,6 +37,6 @@
   "expected_values": {},
   "star_criteria": {},
   "assessment_case_id": "award-amendment-bounded-supervision-and-accountable-handoff",
-  "governance_case_sha256": "9d423d8b075790c64abc3c64367f6e4e4e5ab6fe6454708d1256611447d29a7b",
+  "governance_case_sha256": "ec016a78b22ec02df478aaa4f2718e638e3b45fdac6cb73706e8c66dd0a52921",
   "assessment_method": "authenticated_bounded_supervision_and_private_handoff"
 }

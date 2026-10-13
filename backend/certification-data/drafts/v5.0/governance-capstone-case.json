@@ -167,7 +167,8 @@
     {
       "outcome_id": "governance.accountable_handoff",
       "passing_conditions": [
-        "The handoff names the owner, intended use, limitations, evidence revision and appropriate review route."
+        "The handoff names the owner, intended use, limitations, evidence revision and appropriate review route.",
+        "The handoff itself states limitations beyond its audience, the checked run it relies on and who corrects or reviews it when sources or the artifact change; an audience restriction or a file revision does not stand in for them."
       ],
       "critical_failures": [
         "Equate sharing with everyone or examiner availability with demonstrated governance."
