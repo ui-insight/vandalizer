@@ -1325,7 +1325,8 @@
             "delivery_receipt"
           ],
           "passing_conditions": [
-            "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains."
+            "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains.",
+            "The final supervision traces each decision to its saved record, states what remains unproven and when a changed artifact needs new evidence, and claims no reliability beyond the checked case."
           ],
           "critical_failures": [
             "Accept an agent-written assertion that the learner reviewed or approved the required decisions.",
