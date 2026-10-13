@@ -1761,6 +1761,38 @@ async def get_extraction_quality_history(
     return {"runs": await get_quality_history("search_set", uuid, limit)}
 
 
+@router.get("/search-sets/{uuid}/quality-history/{run_uuid}/results")
+async def get_extraction_quality_run_results(
+    uuid: str, run_uuid: str, user: User = Depends(get_current_user),
+) -> dict:
+    """One validation run's per-document, per-field results, for the Quality
+    History row that expands to show which fields matched or missed.
+
+    The same shape the results download carries (``documents``), as JSON.
+    """
+    import datetime
+
+    from app.models.validation_run import ValidationRun
+
+    ss = await _get_search_set_or_404(uuid, user)
+    vr = await ValidationRun.find_one(
+        ValidationRun.uuid == run_uuid,
+        ValidationRun.item_id == ss.uuid,
+        ValidationRun.item_kind == "search_set",
+    )
+    if not vr:
+        raise HTTPException(status_code=404, detail="Validation run not found")
+    payload, _ = _build_validation_results_export(
+        ss_uuid=ss.uuid,
+        ss_title=ss.title,
+        vr=vr,
+        doc_by_case={},
+        exported_by_user_id=user.user_id,
+        exported_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    )
+    return {"run": payload["validation_run"], "documents": payload["documents"]}
+
+
 @router.get("/search-sets/{uuid}/quality-sparkline")
 async def get_extraction_quality_sparkline(
     uuid: str, limit: int = 10, user: User = Depends(get_current_user),

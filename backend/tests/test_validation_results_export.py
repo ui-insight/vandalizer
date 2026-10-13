@@ -135,3 +135,39 @@ def test_tolerates_sources_key_and_missing_snapshot():
     )
     assert payload2["documents"] == []
     assert csv_rows2 == []
+
+
+# --- the Quality History row's per-field results (JSON, not the zip) ----------
+
+import pytest  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+
+from fastapi import HTTPException  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_quality_run_results_returns_the_run_fields():
+    from app.routers import extractions as router
+
+    ss = SimpleNamespace(uuid="ss-1", title="NSF Subaward UI-BSU-2024-0847 Extraction")
+    with patch.object(router, "_get_search_set_or_404", new=AsyncMock(return_value=ss)), \
+         patch("app.models.validation_run.ValidationRun") as VR:
+        VR.find_one = AsyncMock(return_value=_make_vr())
+        body = await router.get_extraction_quality_run_results("ss-1", "run-1", user=MagicMock(user_id="u1"))
+
+    assert body["run"]["uuid"] == "run-1"
+    fields = body["documents"][0]["fields"]
+    assert [f["field_name"] for f in fields] == ["title", "amount"]
+    assert fields[0]["expected"] == "Hello" and fields[0]["most_common_value"] == "Hello"
+
+
+@pytest.mark.asyncio
+async def test_quality_run_results_404s_for_another_templates_run():
+    from app.routers import extractions as router
+
+    with patch.object(router, "_get_search_set_or_404", new=AsyncMock(return_value=SimpleNamespace(uuid="ss-1", title="t"))), \
+         patch("app.models.validation_run.ValidationRun") as VR:
+        VR.find_one = AsyncMock(return_value=None)
+        with pytest.raises(HTTPException) as exc:
+            await router.get_extraction_quality_run_results("ss-1", "run-x", user=MagicMock(user_id="u1"))
+    assert exc.value.status_code == 404

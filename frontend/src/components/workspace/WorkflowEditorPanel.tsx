@@ -8464,12 +8464,12 @@ function ValidateTab({
                     <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
                     <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
                   </div>
-                  <div style={{ width: '100%', height: 80 }}>
+                  <div style={{ width: '100%', height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                      <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                         <XAxis dataKey="date" tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} interval="preserveStartEnd" />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
+                        <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} interval={0} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
                         <Tooltip
                           contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)" }}
                           formatter={(value, name) => {

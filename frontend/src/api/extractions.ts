@@ -444,6 +444,29 @@ export function getExtractionQualityHistory(uuid: string) {
   return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/extractions/search-sets/${uuid}/quality-history`)
 }
 
+export interface QualityRunFieldResult {
+  field_name: string
+  expected: string | null
+  replicates: { run: number; value: string | null }[]
+  most_common_value: string | null
+  accuracy: number | null
+  consistency: number | null
+}
+
+export interface QualityRunDocumentResult {
+  test_case_uuid: string
+  label: string
+  overall_accuracy: number | null
+  fields: QualityRunFieldResult[]
+}
+
+/** One Quality History run's per-document, per-field results. */
+export function getExtractionQualityRunResults(uuid: string, runUuid: string) {
+  return apiFetch<{ documents: QualityRunDocumentResult[] }>(
+    `/api/extractions/search-sets/${uuid}/quality-history/${encodeURIComponent(runUuid)}/results`,
+  )
+}
+
 export interface SparklinePoint {
   score: number
   created_at: string

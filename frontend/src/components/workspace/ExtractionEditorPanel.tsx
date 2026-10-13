@@ -52,6 +52,8 @@ import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
 import { QualitySparkline } from '../library/QualitySparkline'
+import { QualityRunResults } from './QualityRunResults'
+import { qualityChartData } from './qualityChartData'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { getQualityStatus } from '../../api/extractions'
 import type { QualityStatus } from '../../api/extractions'
@@ -3939,9 +3941,7 @@ function ValidateTab({
             <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
             <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
           </div>
-          <div style={{ width: '100%', height: 80 }}>
-            <QualityHistoryChart runs={qualityHistory} />
-          </div>
+          <QualityHistoryChart runs={qualityHistory} />
 
           {/* Expand toggle for run details */}
           <button
@@ -4054,6 +4054,9 @@ function ValidateTab({
                                 </div>
                               </div>
                             )}
+                            <div style={{ fontWeight: 600, color: '#4b5563', marginBottom: 'var(--workspace-space-4)' }}>Field results</div>
+                            {searchSetUuid && <QualityRunResults searchSetUuid={searchSetUuid} runUuid={run.uuid} />}
+                            <div style={{ fontWeight: 600, color: '#4b5563', margin: 'var(--workspace-space-12) 0 var(--workspace-space-4)' }}>Extraction settings</div>
                             {_renderConfigDetails(run.extraction_config)}
                           </td>
                         </tr>
@@ -4519,36 +4522,38 @@ function ValidateTab({
 }
 
 function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
-  const data = [...runs].reverse().map(r => {
-    // Use raw score (pre-penalty) for the chart so users see actual quality
-    const rawScore = r.score_breakdown?.raw_score ?? r.score
-    return {
-      date: new Date(r.created_at).toLocaleDateString(),
-      score: Math.round(rawScore),
-      adjusted: Math.round(r.score),
-      hasPenalty: r.score_breakdown ? r.score_breakdown.sample_size_penalty > 0 : false,
-    }
-  })
-
+  const data = qualityChartData(runs)
+  const showRaw = data.some(d => d.raw != null)
   const latestScore = data.length > 0 ? data[data.length - 1].score : 0
   const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#92400e' : '#dc2626'
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="date" tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} interval="preserveStartEnd" />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
-        <Tooltip
-          contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)" }}
-          formatter={(value, name) => {
-            const label = name === 'score' ? 'Quality' : 'Adjusted'
-            return [`${Number(value ?? 0)}%`, label]
-          }}
-        />
-        <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} name="score" />
-      </LineChart>
-    </ResponsiveContainer>
+    <div>
+      {/* Tall enough that 85 and 100 don't land on the same pixel row. */}
+      <div style={{ width: '100%', height: 200 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="label" tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} interval="preserveStartEnd" />
+            <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} interval={0} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
+            <Tooltip
+              contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)" }}
+              formatter={(value, name) => [`${Number(value ?? 0)}`, name === 'raw' ? 'Before sample-size penalty' : 'Score']}
+            />
+            <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 3 }} name="score" isAnimationActive={false} />
+            {showRaw && (
+              <Line type="monotone" dataKey="raw" stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="4 3" dot={{ r: 2 }} name="raw" connectNulls isAnimationActive={false} />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+        <span><span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: `2px solid ${lineColor}`, verticalAlign: 'middle', marginRight: 4 }} />Score (as in the run table)</span>
+        {showRaw && (
+          <span><span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: '2px dashed #9ca3af', verticalAlign: 'middle', marginRight: 4 }} />Before the sample-size penalty</span>
+        )}
+      </div>
+    </div>
   )
 }
 
