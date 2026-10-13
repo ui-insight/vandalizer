@@ -1028,31 +1028,36 @@ def _evaluate_cross_field_rules(search_set, values: dict) -> Optional[dict]:
         return None
 
 
-@router.post("/run-sync")
-@limiter.limit("30/minute")
-async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
-    # Look up the search set for the activity title
-    ss = await _get_search_set_or_404(req.search_set_uuid, user)
-    document_uuids = await _authorize_documents(req.document_uuids, user)
-    title = ss.title
+async def run_recorded_extraction(
+    ss,
+    document_uuids: list[str],
+    *,
+    user_id: str,
+    team_id: Optional[str],
+    model: Optional[str] = None,
+    extraction_config_override: Optional[dict] = None,
+    combined_context: bool = False,
+    tags: Optional[list[str]] = None,
+) -> dict:
+    """Run an extraction set and record it as a run in History.
 
-    # Nothing to extract with: refuse before a run exists. The service
-    # returns [] for a fieldless set, so this used to record a "completed"
-    # run in a few milliseconds — green tick in History, nothing to open —
-    # once per click (support ticket).
-    if not await svc.get_extraction_keys(req.search_set_uuid):
-        raise HTTPException(
-            status_code=400,
-            detail="This extraction has no fields yet — add at least one field before running it",
-        )
+    The one implementation behind the editor's Run and chat's run_extraction,
+    so the same set on the same document gives the same values and sources
+    either way, and both runs open from History with their real duration.
+    Chat once ran its own copy of the engine call, with the set's raw config
+    instead of the optimizer's, domain prompt hints the editor never used, and
+    no model, and logged a zero-length run with nothing to open.
 
-    # Create activity event
+    Callers authorize *ss* and *document_uuids* and check the set has fields.
+    Returns the run-sync response plus ``activity_id``.
+    """
     activity = await activity_service.activity_start(
         type=ActivityType.SEARCH_SET_RUN,
-        title=title,
-        user_id=user.user_id,
-        team_id=str(user.current_team) if user.current_team else None,
-        search_set_uuid=req.search_set_uuid,
+        title=ss.title,
+        user_id=user_id,
+        team_id=team_id,
+        search_set_uuid=ss.uuid,
+        tags=tags,
     )
     assert activity.id is not None
 
@@ -1060,8 +1065,8 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         from app.services.metering import metered_async
         async with metered_async(
             "extraction",
-            user_id=user.user_id,
-            team_id=str(user.current_team) if user.current_team else None,
+            user_id=user_id,
+            team_id=team_id,
             activity_id=str(activity.id),
         ):
             # Degraded inputs the run should disclose: text that is garbled,
@@ -1070,12 +1075,12 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             # expensive place to stay quiet.
             document_warnings: list[dict] = []
             results = await svc.run_extraction_sync(
-                search_set_uuid=req.search_set_uuid,
+                search_set_uuid=ss.uuid,
                 document_uuids=document_uuids,
-                user_id=user.user_id,
-                model=req.model,
-                extraction_config_override=req.extraction_config_override,
-                combined_context=req.combined_context,
+                user_id=user_id,
+                model=model,
+                extraction_config_override=extraction_config_override,
+                combined_context=combined_context,
                 capture_sources=True,
                 document_warnings=document_warnings,
             )
@@ -1167,7 +1172,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 # looks exactly like a run over documents read whole.
                 "document_warnings": document_warnings,
                 "document_uuids": document_uuids,
-                "search_set_uuid": req.search_set_uuid,
+                "search_set_uuid": ss.uuid,
             },
         )
 
@@ -1183,11 +1188,12 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 "cross_field_sets": [],
                 "document_warnings": document_warnings,
                 "error": EXTRACTION_NO_VALUES_ERROR,
+                "activity_id": str(activity.id),
             }
 
         # Fire-and-forget auto-validation if test cases exist
         from app.tasks.quality_tasks import auto_validate_extraction
-        auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
+        auto_validate_extraction.delay(ss.uuid, user_id, model)
 
         return {
             "results": results,
@@ -1195,12 +1201,47 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             "cross_field": cross_field,
             "cross_field_sets": cross_field_sets,
             "document_warnings": document_warnings,
+            "activity_id": str(activity.id),
         }
+    except asyncio.CancelledError:
+        # The caller gave up (chat's tool timeout). Without this the run
+        # would show as running in History forever.
+        await asyncio.shield(activity_service.activity_finish(
+            activity.id, ActivityStatus.FAILED, error="Extraction was cancelled before it finished",
+        ))
+        raise
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
         )
         raise
+
+
+@router.post("/run-sync")
+@limiter.limit("30/minute")
+async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
+    ss = await _get_search_set_or_404(req.search_set_uuid, user)
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+
+    # Nothing to extract with: refuse before a run exists. The service
+    # returns [] for a fieldless set, so this used to record a "completed"
+    # run in a few milliseconds — green tick in History, nothing to open —
+    # once per click (support ticket).
+    if not await svc.get_extraction_keys(req.search_set_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="This extraction has no fields yet — add at least one field before running it",
+        )
+
+    return await run_recorded_extraction(
+        ss,
+        document_uuids,
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+        model=req.model,
+        extraction_config_override=req.extraction_config_override,
+        combined_context=req.combined_context,
+    )
 
 
 # ---------------------------------------------------------------------------

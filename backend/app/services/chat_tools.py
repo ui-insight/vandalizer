@@ -1707,8 +1707,11 @@ async def _execute_extraction(
     boundary). Each document is still authorized against the caller. Returns
     the same response shape as ``run_extraction``, including the quality
     sidecar. Caps at 10 documents and 50 entities.
+
+    The run itself is the editor's (``run_recorded_extraction``): same config,
+    model, field metadata and source tracking, and the same History record.
     """
-    from app.services.extraction_engine import ExtractionEngine
+    from app.routers.extractions import run_recorded_extraction
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -1723,21 +1726,9 @@ async def _execute_extraction(
     if not keys:
         return {"error": "Extraction set has no valid field keys."}
 
-    # Build field metadata
-    field_metadata = [
-        {
-            "key": item.searchphrase,
-            "is_optional": item.is_optional,
-            "enum_values": item.enum_values,
-        }
-        for item in items
-        if item.searchphrase
-    ]
-
-    # Authorize and load document texts
-    doc_texts: list[str] = []
+    # Authorize documents and set aside the ones with no text yet
+    run_doc_uuids: list[str] = []
     doc_names: list[str] = []
-    doc_metadata: list[dict] = []
     docs_unreadable: list[str] = []
     for doc_uuid in document_uuids[:10]:  # Cap at 10 documents
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
@@ -1751,13 +1742,8 @@ async def _execute_extraction(
             if doc.user_id != user_id:
                 continue
         if doc.raw_text:
-            doc_texts.append(doc.raw_text)
+            run_doc_uuids.append(doc_uuid)
             doc_names.append(doc.title or doc_uuid)
-            doc_metadata.append({
-                "uuid": doc_uuid,
-                "title": doc.title or doc_uuid,
-                "text_markers": doc.text_markers or [],
-            })
         else:
             # Accessible but has no text — a failed or unfinished ingest, not
             # an authorization miss. Reported separately below so the model
@@ -1769,7 +1755,7 @@ async def _execute_extraction(
             else:
                 docs_unreadable.append(f"{label} (still processing)")
 
-    if not doc_texts:
+    if not run_doc_uuids:
         return _err(
             "No accessible documents with text content found.",
             hint=(
@@ -1779,28 +1765,21 @@ async def _execute_extraction(
             ),
         )
 
-    # Run extraction synchronously in a thread
-    sys_cfg = context.deps.system_config_doc
-
-    def _run():
-        engine = ExtractionEngine(system_config_doc=sys_cfg, domain=ss.domain)
-        results = engine.extract(
-            extract_keys=keys,
-            doc_texts=doc_texts,
-            extraction_config_override=ss.extraction_config or None,
-            field_metadata=field_metadata,
-            # Per-field source tracking, same as the interactive run-sync
-            # endpoint — chat-dispatched runs must not ship untraced values.
-            capture_sources=True,
-            doc_metadata=doc_metadata,
-        )
-        return results, engine.tokens_in, engine.tokens_out
-
     from app.services.extraction_engine import ExtractionError
 
     try:
-        results, tokens_in, tokens_out = await asyncio.wait_for(
-            asyncio.to_thread(_run), timeout=120,
+        run = await asyncio.wait_for(
+            run_recorded_extraction(
+                ss,
+                run_doc_uuids,
+                user_id=user_id,
+                team_id=team_id,
+                # The model chat is using, as the other chat tools do. The
+                # set's own pinned model, if any, still wins inside the engine.
+                model=context.deps.model_name or None,
+                tags=["chat"],
+            ),
+            timeout=120,
         )
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out after 2 minutes. Try with fewer documents or a smaller extraction set."}
@@ -1816,37 +1795,21 @@ async def _execute_extraction(
                 "do not describe any field as 'not found'."
             ),
         )
+    if run.get("error"):
+        return _err(
+            run["error"],
+            hint=(
+                "The run is recorded as failed in History. Tell the user no "
+                "values were extracted; do not describe any field as found."
+            ),
+        )
+    results = run.get("results") or []
 
     # Record behavioral memory — best-effort, never blocks the tool.
     from app.services import user_memory_service
     await user_memory_service.record_extraction(
         user_id, team_id, extraction_set_uuid, ss.title or extraction_set_uuid
     )
-
-    # Persist a SEARCH_SET_RUN activity event so cert validators + analytics can
-    # see that this extraction was actually run (matches what the REST route
-    # does for classical runs). Best-effort — never blocks the tool.
-    try:
-        from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
-        now = datetime.datetime.now(datetime.timezone.utc)
-        await ActivityEvent(
-            type=ActivityType.SEARCH_SET_RUN.value,
-            title=f"Extraction: {ss.title or extraction_set_uuid}",
-            status=ActivityStatus.COMPLETED.value,
-            user_id=user_id,
-            team_id=team_id,
-            search_set_uuid=extraction_set_uuid,
-            started_at=now,
-            finished_at=now,
-            last_updated_at=now,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-            total_tokens=tokens_in + tokens_out,
-            documents_touched=len(doc_names),
-            tags=["chat"],
-        ).insert()
-    except Exception:
-        logger.exception("Failed to log SEARCH_SET_RUN activity for %s", extraction_set_uuid)
 
     # Attach quality metadata as sidecar if validation data exists
     latest_run = await ValidationRun.find(
@@ -1861,15 +1824,16 @@ async def _execute_extraction(
     # interactive run-sync endpoint): `sources` stays index-aligned with
     # `entities`. Quotes are previewed, not full — the page + verified flag is
     # the trust signal; the full passage is one click away in the editor.
-    from app.services.extraction_sources import SOURCE_KEY
+    from app.services.extraction_sources import support_state_of
 
     entities = results[:50]  # Cap output size
+    raw_sources = run.get("sources") or []
     sources: list[dict] = []
     fields_verified = 0
     fields_unsourced = 0
-    for entity in entities:
+    for i, entity in enumerate(entities):
         entity_sources: dict = {}
-        raw_sidecar = entity.pop(SOURCE_KEY, None) if isinstance(entity, dict) else None
+        raw_sidecar = raw_sources[i] if i < len(raw_sources) else None
         if isinstance(entity, dict):
             for field_key, value in entity.items():
                 src = (raw_sidecar or {}).get(field_key)
@@ -1881,6 +1845,7 @@ async def _execute_extraction(
                         "document_uuid": src.get("document_uuid"),
                         "document_title": src.get("document_title"),
                         "verified": bool(src.get("verified")),
+                        "support": support_state_of(src),
                     }
                 # Only extracted values need a source; a null/absent value
                 # has nothing to trace.
@@ -1903,7 +1868,8 @@ async def _execute_extraction(
             "fields_with_verified_source": fields_verified,
             "fields_without_verified_source": fields_unsourced,
         },
-        "token_usage": {"input": tokens_in, "output": tokens_out},
+        # The run in History, same as an editor run.
+        "activity_id": run.get("activity_id"),
     }
     if fields_unsourced:
         response["source_note"] = (
@@ -1920,6 +1886,9 @@ async def _execute_extraction(
         )
     if docs_skipped > 0:
         notes.append(f"{docs_skipped} of {docs_requested} document(s) were skipped (not found or not accessible).")
+    # The caveats the editor shows above the same run's results.
+    for w in run.get("document_warnings") or []:
+        notes.append(f"{w.get('title') or w.get('document_uuid')}: {w.get('text')}")
     if len(results) > 50:
         notes.append(f"Results truncated to 50 of {len(results)} entities.")
     if notes:
@@ -3082,12 +3051,19 @@ async def propose_test_case(
         "text_markers": doc.text_markers or [],
     }]
 
+    from app.services.search_set_service import effective_extraction_config
+
+    model = context.deps.model_name or None
+
     def _run():
-        engine = ExtractionEngine(system_config_doc=sys_cfg, domain=ss.domain)
+        # The settings an editor run uses (see run_recorded_extraction), so a
+        # drafted test case expects the values the validated set produces.
+        engine = ExtractionEngine(system_config_doc=sys_cfg)
         return engine.extract(
             extract_keys=keys,
+            model=model,
             doc_texts=[doc.raw_text],
-            extraction_config_override=ss.extraction_config or None,
+            extraction_config_override=effective_extraction_config(ss) or None,
             field_metadata=field_metadata,
             # These values seed the human-verification flow that produces
             # ground-truth test cases — of all places, they must be traced.
