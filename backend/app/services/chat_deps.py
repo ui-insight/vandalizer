@@ -67,3 +67,8 @@ class AgenticChatDeps:
     # (llm_service._inject_queued_user_parts) folds them into the outgoing
     # request as user parts and clears the list.
     queued_user_parts: list[str] = field(default_factory=list)
+
+    # Set once the reply was sent back for pointing at an approval button no
+    # tool prepared (approval_claims.require_approval_card), so a second miss
+    # is accepted instead of failing the turn.
+    approval_card_retry_used: bool = False
