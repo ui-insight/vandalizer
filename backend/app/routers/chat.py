@@ -216,6 +216,8 @@ async def chat(
         # shows something immediately while the AI title generates in the background.
         if not activity.title:
             first_line = (message or "").strip().splitlines()[0] if message else ""
+            # A message pasted in quotes left a stray quote on the name.
+            first_line = first_line.strip("\"'“”‘’ ")
             words = [w for w in first_line.split() if w]
             short = " ".join(words[:6]).strip() or "Chat"
             if len(short) > 80:

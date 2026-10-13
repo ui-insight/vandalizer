@@ -97,6 +97,70 @@ async def list_activities(
     )
 
 
+CHAT_TITLE_MAX_CHARS = 120
+
+# How many turns may try to title a chat. A failed or empty attempt left the
+# chat named by its first few words forever ("Can we assume a waiver for").
+CHAT_TITLE_MAX_ATTEMPTS = 3
+
+
+def should_queue_chat_title(meta_summary: Optional[dict]) -> bool:
+    """Whether this turn should ask for a generated chat title.
+
+    Until a title has been generated (``ai_description``), each turn retries,
+    up to ``CHAT_TITLE_MAX_ATTEMPTS``. Never once the user has named the chat.
+    """
+    meta = meta_summary or {}
+    if meta.get("title_user_set") or meta.get("ai_description"):
+        return False
+    return int(meta.get("title_attempts") or 0) < CHAT_TITLE_MAX_ATTEMPTS
+
+
+async def rename_conversation_activity(
+    activity_id: PydanticObjectId,
+    user_id: str,
+    title: str,
+) -> Optional[ActivityEvent]:
+    """Rename a chat in the activity list, and its conversation.
+
+    Only the chat's owner can rename it, as with delete. The name is marked as
+    the user's (``title_user_set``) so the background title generator never
+    replaces it. Returns None when there is no such chat for this user.
+    Raises ValueError for an empty name or an activity that isn't a chat.
+    """
+    name = " ".join((title or "").split())
+    if not name:
+        raise ValueError("A chat name can't be empty.")
+    if len(name) > CHAT_TITLE_MAX_CHARS:
+        raise ValueError(f"Keep chat names to {CHAT_TITLE_MAX_CHARS} characters or fewer.")
+
+    ev = await ActivityEvent.find_one(
+        ActivityEvent.id == activity_id, ActivityEvent.user_id == user_id,
+    )
+    if not ev:
+        return None
+    if ev.type != ActivityType.CONVERSATION.value:
+        raise ValueError("Only chats can be renamed.")
+
+    ev.title = name
+    ev.meta_summary = {
+        **(ev.meta_summary or {}),
+        "title_user_set": True,
+        # Stops the rail's "Generating title…" placeholder for this row.
+        "description_generated": True,
+    }
+    await ev.save()
+
+    if ev.conversation_id:
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == ev.conversation_id,
+        )
+        if conversation:
+            conversation.title = name
+            await conversation.save()
+    return ev
+
+
 async def delete_activity(
     activity_id: PydanticObjectId,
     user_id: str,

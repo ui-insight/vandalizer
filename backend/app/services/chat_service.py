@@ -4353,10 +4353,18 @@ async def _finalize(
             from datetime import datetime, timezone
             ev.finished_at = datetime.now(timezone.utc)
             ev.last_updated_at = datetime.now(timezone.utc)
+            # Ask for a generated title after the first exchange, and again
+            # on later turns if no attempt has produced one yet.
+            from app.services.activity_service import should_queue_chat_title
+            queue_title = should_queue_chat_title(ev.meta_summary)
+            if queue_title:
+                ev.meta_summary = {
+                    **(ev.meta_summary or {}),
+                    "title_attempts": int((ev.meta_summary or {}).get("title_attempts") or 0) + 1,
+                }
             await ev.save()
 
-            # Generate an AI title after the first exchange
-            if ev.message_count <= 2:
+            if queue_title:
                 try:
                     from app.tasks.activity_tasks import generate_activity_description_task
                     generate_activity_description_task.delay(

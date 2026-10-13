@@ -1486,6 +1486,10 @@ html {
 .activity-entry__open--compact { justify-content: center; padding: 10px 4px; }
 .activity-entry__delete { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 32px; min-height: 36px; padding: 8px; border: 0; border-radius: 6px; color: #59616b; background: transparent; cursor: pointer; }
 .activity-entry__delete:hover { color: #b3261e; background: #fff0ee; }
+.activity-entry__rename { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 32px; min-height: 36px; padding: 8px; border: 0; border-radius: 6px; color: #59616b; background: transparent; cursor: pointer; }
+.activity-entry__rename:hover, .activity-entry__rename:focus-visible { color: #202124; background: #e8edf3; }
+.activity-entry__rename-form { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 8px; color: #202124; }
+.activity-entry__rename-input { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid #3b82f6; border-radius: 4px; font: inherit; font-size: 12px; color: #202124; background: #fff; outline: none; }
 
 @container (max-width: 350px) {
   .workflow-editor__header { padding: 12px !important; }

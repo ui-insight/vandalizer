@@ -171,14 +171,17 @@ def generate_activity_description_task(
     # 2-minute client-side fallback fires.
     def _mark_done(description: str | None = None) -> None:
         try:
-            update: dict = {"meta_summary.description_generated": True}
-            if description:
-                update["meta_summary.ai_description"] = description
-                update["title"] = description
             db.activity_event.update_one(
                 {"_id": ObjectId(activity_id)},
-                {"$set": update},
+                {"$set": {"meta_summary.description_generated": True}},
             )
+            if description:
+                # A name the user gave the chat is never replaced, including
+                # one set while this task was running.
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id), "meta_summary.title_user_set": {"$ne": True}},
+                    {"$set": {"meta_summary.ai_description": description, "title": description}},
+                )
         except Exception:
             logger.exception(
                 "Failed to mark description_generated for activity %s",

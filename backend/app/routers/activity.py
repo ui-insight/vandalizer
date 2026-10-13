@@ -4,6 +4,7 @@ import logging
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from app.dependencies import get_current_user
 from app.models.system_config import SystemConfig
@@ -32,6 +33,28 @@ async def get_activity(
     ev = await activity_service.get_activity(
         PydanticObjectId(activity_id), user.user_id, team_ids=team_ids,
     )
+    if not ev:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return {"activity": ev.to_dict()}
+
+
+class RenameActivityRequest(BaseModel):
+    title: str
+
+
+@router.patch("/{activity_id}")
+async def rename_activity(
+    activity_id: str,
+    body: RenameActivityRequest,
+    user: User = Depends(get_current_user),
+):
+    """Rename a chat. The new name shows in the activity list and on the chat."""
+    try:
+        ev = await activity_service.rename_conversation_activity(
+            PydanticObjectId(activity_id), user.user_id, body.title,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     if not ev:
         raise HTTPException(status_code=404, detail="Activity not found")
     return {"activity": ev.to_dict()}

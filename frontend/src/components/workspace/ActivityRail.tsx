@@ -16,10 +16,11 @@ import {
   CircleMinus,
   CircleCheck,
   SquarePen,
+  Pencil,
 } from 'lucide-react'
 import { useActivities } from '../../hooks/useActivities'
 import { useMyReviewCount } from '../../hooks/useMyReviewCount'
-import { deleteActivity } from '../../api/activity'
+import { deleteActivity, renameActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pendingReviewUuid, useOpenActivity } from '../../hooks/useOpenActivity'
 import { useToast } from '../../contexts/ToastContext'
@@ -163,6 +164,26 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
     },
     [refresh, toast, activities, confirm, currentConversationUuid, triggerNewChat],
   )
+
+  // The chat being renamed in place, and the name typed so far.
+  const [renaming, setRenaming] = useState<{ id: string; value: string; original: string } | null>(null)
+  const renameSaving = useRef(false)
+
+  const saveRename = useCallback(async () => {
+    if (!renaming || renameSaving.current) return
+    const value = renaming.value.trim()
+    if (!value || value === renaming.original) { setRenaming(null); return }
+    renameSaving.current = true
+    try {
+      await renameActivity(renaming.id, value)
+      setRenaming(null)
+      refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not rename this chat', 'error')
+    } finally {
+      renameSaving.current = false
+    }
+  }, [renaming, refresh, toast])
 
   const { openActivity: handleClick } = useOpenActivity()
   const [returnActivity, setReturnActivity] = useState(() => {
@@ -313,6 +334,29 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               queued: 'Queued', running: 'Running', completed: 'Completed', failed: 'Failed', canceled: 'Cancelled',
             }[activity.status]
             const failureReason = staleTooltip || (activity.status === 'failed' ? activity.error : '')
+            if (renaming?.id === activity.id && !visualDocked) {
+              return (
+                <div key={activity.id} className="activity-entry">
+                  <form
+                    className="activity-entry__rename-form"
+                    onSubmit={e => { e.preventDefault(); void saveRename() }}
+                  >
+                    <MessageSquare className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <input
+                      autoFocus
+                      aria-label="Chat name"
+                      maxLength={120}
+                      value={renaming.value}
+                      onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+                      onFocus={e => e.currentTarget.select()}
+                      onBlur={() => void saveRename()}
+                      onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) } }}
+                      className="activity-entry__rename-input"
+                    />
+                  </form>
+                </div>
+              )
+            }
             return (
               <div key={activity.id} className="activity-entry">
                 <button
@@ -338,6 +382,19 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
                     </span>
                   )}
                 </button>
+                {!visualDocked && activity.type === 'conversation' && (
+                  <button
+                    type="button"
+                    aria-label={`Rename chat: ${displayTitle}`}
+                    onClick={e => {
+                      e.stopPropagation()
+                      const current = activity.title || ''
+                      setRenaming({ id: activity.id, value: current, original: current })
+                    }}
+                    className="activity-entry__rename"
+                    title="Rename chat"
+                  ><Pencil className="h-4 w-4" aria-hidden="true" /></button>
+                )}
                 {!visualDocked && (
                   <button
                     type="button"
