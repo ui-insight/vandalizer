@@ -180,7 +180,8 @@
         "All required decisions are recorded by the learner and linked to the capstone evidence; no critical error remains."
       ],
       "critical_failures": [
-        "Accept an agent-written assertion that the learner reviewed or approved the required decisions."
+        "Accept an agent-written assertion that the learner reviewed or approved the required decisions.",
+        "Approve a release that re-enables an action removed at scope correction, such as broad sharing, a sponsor send or a recurring trigger, or that waives further review."
       ],
       "case_application": "Require authenticated learner decisions at every required phase, both complete original sources, an actual unsupported original value, same-artifact changed-revision repair with every field source-correct, explicit exact private release, the preserved no-write failure and confirmed same-bytes retry. The controlled rejection is disclosed training behavior, not a real outage. Agent-written claims of review, invented source correctness and silent wider/recurring actions are critical failures."
     }
