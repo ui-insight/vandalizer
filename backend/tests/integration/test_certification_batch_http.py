@@ -85,7 +85,15 @@ async def test_complete_http_batch_journey_and_preserved_originals(versioned_run
         listing = await client.get('/certification/' + prefix + 'batch-work', params=params)
         assert listing.status_code == 200, listing.text
         assert listing.json()['extractions'] == [{'artifact_id': f.artifact.uuid, 'title': f.artifact.title}]
+        proposed = listing.json()['proposed_scope']
+        assert [item['document_id'] for item in proposed] == f.case.proposed_scope(f.body['selected_source_ids'])
+        assert all(item['title'] and item['preview'] for item in proposed)
+        # Accepting the proposed batch as offered keeps the wrong file, so nothing is captured.
+        kept = await client.post('/certification/' + prefix + 'batch-captures', params=params,
+                                 json={**f.body, 'selected_source_ids': [item['document_id'] for item in proposed]})
+        assert kept.status_code == 409 and 'not part of this assignment' in kept.json()['detail']
         captured = await post(client, prefix + 'batch-captures', params, f.body)
+        assert captured['scope_review']['removed_filename'] == f.case.scope_proposal.wrong_filename
         f.snapshot = await batch_delivery.BatchInputRepository().get(f.learner.user_id, captured['uuid'])
         pilot = await plan_and_run(f, client, params, captured, 'pilot')
         original = await plan_and_run(f, client, params, captured, 'batch', pilot)

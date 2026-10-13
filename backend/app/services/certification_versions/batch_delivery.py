@@ -11,9 +11,9 @@ from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .process_delivery import ProcessAssessment
 from .runtime import CourseOperation
 from .batch_approval import BatchScopeRepository
-from .batch_case import load_batch_case
+from .batch_case import COURSE_ASSET, load_batch_case
 from .batch_execution import BatchExecution
-from .batch_inputs import BatchInputRepository
+from .batch_inputs import BatchInputRepository, pdf_pages
 from .batch_preparation import BatchPreparation
 from .batch_recovery import BatchRecovery
 from .batch_reviews import BatchReviewRepository, PROMPT_ID
@@ -54,7 +54,7 @@ class BatchDelivery:
     @staticmethod
     def capture_view(saved):
         return {key: saved[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
-            'case', 'artifact_id', 'artifact_sha256', 'artifact', 'captured_at')} | {
+            'case', 'artifact_id', 'artifact_sha256', 'artifact', 'captured_at', 'scope_review')} | {
             'documents': [{key: value for key, value in source.items() if key != 'source_pdf_base64'} for source in saved['documents']],
             'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
 
@@ -109,7 +109,7 @@ class BatchDelivery:
             'retries': [await self.run_view(BatchPreparation.decode(raw)) for raw in saved['retry_executions']]}
 
     async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
-        enrollment, _, case = await self.course(user_id, enrollment_id)
+        enrollment, package, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'batch_processing'}
         result = {'enrollment_id': enrollment_id, 'module_id': 'batch_processing', 'course_version': enrollment.course_version,
                   'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition()}
@@ -136,16 +136,25 @@ class BatchDelivery:
             result['older_' + kind + '_available'] = len(rows) > 50
         writable = await self.writable(enrollment, delivery_enabled)
         owned = await SearchSet.find({'user_id': user_id, 'set_type': 'extraction'}).sort('-updated_at').limit(51).to_list() if writable else []
-        sources = []
+        sources, proposed = [], []
         if writable:
             progress = await self.repository.read_progress(user_id, enrollment_id)
-            for document_id in progress.modules.get('batch_processing', {}).get('provisioned_docs', []):
+            ids = progress.modules.get('batch_processing', {}).get('provisioned_docs', [])
+            for document_id in ids:
                 document = await owned_source(user_id, document_id, lab_folder_id=progress.lab_folder_id)
                 if document:
                     sources.append({'document_id': document.uuid, 'title': document.title, 'text': document.raw_text,
                                     'processing': document.processing, 'provenance': 'current_owned_workspace_ingestion'})
+            if len(sources) == 3:
+                # Every proposed file is described the same way, so nothing marks the wrong one.
+                text = {item['document_id']: item['text'] for item in sources}
+                wrong = case.scope_proposal.wrong_filename
+                text[COURSE_ASSET + wrong] = '\n\n'.join(pdf_pages(package.read('documents/' + wrong)))
+                titles = {item['document_id']: item['title'] for item in sources} | {COURSE_ASSET + wrong: wrong}
+                proposed = [{'document_id': key, 'title': titles[key], 'preview': ' '.join(text[key].split())[:400]}
+                            for key in case.proposed_scope([item['document_id'] for item in sources])]
         return {**result, 'extractions': [{'artifact_id': item.uuid, 'title': item.title} for item in owned[:50]],
-                'assigned_sources': sources, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
+                'assigned_sources': sources, 'proposed_scope': proposed, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
     async def download(self, user_id, enrollment_id, reference, *, origin, source_id):

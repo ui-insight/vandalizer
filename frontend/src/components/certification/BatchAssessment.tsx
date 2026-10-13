@@ -31,7 +31,8 @@ function BatchWorkspace({ initial, historyOnly }: { initial: BatchList; historyO
   const [listing, setListing] = useState(initial), [view, setView] = useState<BatchSaved | null>(null), [artifact, setArtifact] = useState('')
   const [interpretation, setInterpretation] = useState<{ original: BatchRun; retries: BatchRun[]; previous: string | null; answer: string } | null>(null)
   const [feedbackId, setFeedbackId] = useState(''), [reference, setReference] = useState(''), [referenceKind, setReferenceKind] = useState<ReadKind>('run')
-  const [reading, setReading] = useState(false), [error, setError] = useState('')
+  const [reading, setReading] = useState(false), [error, setError] = useState(''), [removed, setRemoved] = useState<string[]>([])
+  const selected = listing.proposed_scope.map(item => item.document_id).filter(key => !removed.includes(key))
   const sequence = useRef(0), focusSaved = useRef(false), savedRef = useRef<HTMLDivElement>(null), reviewRef = useRef<HTMLDivElement>(null)
   const request = useBatchRequest(listing, value => { focusSaved.current = true; setView(value); setInterpretation(null); setFeedbackId(''); void refresh() }, !historyOnly)
   const canWrite = !historyOnly && listing.can_submit && !request.blocked
@@ -101,13 +102,19 @@ function BatchWorkspace({ initial, historyOnly }: { initial: BatchList; historyO
       </>}
     </div>}
     {interpretation && canWrite && <div ref={reviewRef} tabIndex={-1}><BatchInterpretationForm key={interpretation.previous || interpretation.retries[0].run_id} listing={listing} original={interpretation.original} initialRetries={interpretation.retries} initialAnswer={interpretation.answer} previous={interpretation.previous} locked={locked} send={send} /></div>}
-    {canWrite && <form aria-label="Capture batch extraction" className={box} onSubmit={e => { e.preventDefault(); send({ action: 'capture', body: { request_id: newBatchId(), artifact_id: artifact, case_sha256: listing.case.case_sha256, consent: 'capture_batch_extraction_and_complete_sources' } }) }}>
+    {canWrite && <form aria-label="Capture batch extraction" className={box} onSubmit={e => { e.preventDefault(); send({ action: 'capture', body: { request_id: newBatchId(), artifact_id: artifact, case_sha256: listing.case.case_sha256, selected_source_ids: selected, consent: 'capture_batch_extraction_and_complete_sources' } }) }}>
       <h5 className="font-semibold">Capture your owned extraction</h5><p className="text-sm">Create an extraction with exactly the five field titles below and provision all three course documents. Capturing preserves the complete sources and exact instructions before you approve any work.</p>
+      {listing.proposed_scope.length > 0 && <fieldset className="min-w-0 space-y-2"><legend className="text-sm font-semibold">Proposed batch</legend>
+        <p className="text-sm">The agent proposed these files and selected all of them. Check each against the task and the three assigned proposals, and clear any file that does not belong. Results stay in this course record, one row of the five fields per proposal; nothing is sent anywhere.</p>
+        {listing.proposed_scope.map(item => <label key={item.document_id} className="flex min-w-0 items-start gap-2 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={!removed.includes(item.document_id)} disabled={locked}
+          onChange={e => setRemoved(current => e.target.checked ? current.filter(key => key !== item.document_id) : [...current, item.document_id])} />
+          <span className="min-w-0"><span className="block break-all font-semibold">{item.title}</span><span className="block break-words text-gray-700">{item.preview}</span></span></label>)}
+      </fieldset>}
       <ul className="list-disc space-y-2 pl-5 text-sm">{listing.case.fields.map(field => <li key={field.title}><strong>{field.title}</strong>: {field.meaning}</li>)}</ul>
       <label className="block text-sm">Owned extraction<select className={control} value={artifact} disabled={locked} required onChange={e => setArtifact(e.target.value)}><option value="">Select an extraction</option>{listing.extractions.map(item => <option key={item.artifact_id} value={item.artifact_id}>{item.title}</option>)}</select></label>
       {listing.extractions.filter(item => item.artifact_id === artifact).map(item => <CourseEditorLink key={item.artifact_id} kind="extraction" artifactId={item.artifact_id} title={item.title} disabled={locked} />)}
       {!listing.extractions.length && <p className="text-sm">No owned extraction is available. Create one with the required fields, then refresh choices.</p>}
-      <button className={button} disabled={locked || !id(artifact)}>Capture extraction and three sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh batch choices</button>
+      <button className={button} disabled={locked || !id(artifact) || !selected.length}>Capture extraction and selected sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh batch choices</button>
     </form>}
     <section aria-label="Saved batch history" className={box}><h5 className="font-semibold">Saved batch history</h5>
       {listing.captures.map((item, i) => <button key={item.input_snapshot_id} className={button} disabled={readLocked} onClick={() => { void open('capture', item.input_snapshot_id) }}>Open capture {i + 1}: {item.extraction_name}</button>)}

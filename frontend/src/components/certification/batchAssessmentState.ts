@@ -15,6 +15,8 @@ export function validBatchRequest(v: BatchRequest | null, d: BatchCase): v is Ba
     if (!['execute', 'finalize'].includes(v.action) && (!('case_sha256' in b) || b.case_sha256 !== d.case_sha256)) return false
     switch (v.action) {
       case 'capture': return id(v.body.artifact_id) && v.body.consent === 'capture_batch_extraction_and_complete_sources'
+        && Array.isArray(v.body.selected_source_ids) && v.body.selected_source_ids.length > 0 && v.body.selected_source_ids.length <= 4
+        && v.body.selected_source_ids.every(item => typeof item === 'string' && item.length > 0)
       case 'prepare': return id(v.body.input_snapshot_id) && digest(v.body.input_snapshot_sha256) && v.body.consent === 'prepare_bounded_batch_action'
         && pair(v.body.parent_run_id, v.body.parent_run_sha256) && pair(v.body.previous_retry_id, v.body.previous_retry_sha256)
         && v.body.request_id !== v.body.parent_run_id && v.body.request_id !== v.body.previous_retry_id

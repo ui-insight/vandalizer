@@ -14,6 +14,7 @@ export interface BatchCapture extends BatchIdentity {
   uuid: string; case: BatchCase; input_snapshot_sha256: string; artifact_id: string; artifact_sha256: string; captured_at: string
   artifact: { uuid: string; title: string; fields: { id: string; title: string; searchphrase: string; is_optional: boolean; enum_values: string[] | null }[] }
   documents: { source_id: BatchSourceId; document_id: string; assigned_filename: string; source_sha256: string; pages: string[]; text: string }[]
+  scope_review: { proposed_source_ids: string[]; selected_source_ids: string[]; removed_source_ids: string[]; removed_filename: string; removed_sha256: string }
   execution_authorized: false; credit_awarded: false
 }
 export interface BatchItemCheck {
@@ -53,11 +54,12 @@ export interface BatchList extends BatchIdentity {
   case: BatchCase; can_submit: boolean; read_only_reason: string | null
   extractions: { artifact_id: string; title: string }[]; older_extractions_available: boolean
   assigned_sources: { document_id: string; title: string; text: string; processing: boolean }[]
+  proposed_scope: { document_id: string; title: string; preview: string }[]
   captures: { input_snapshot_id: string; extraction_name: string; captured_at: string }[]; older_captures_available: boolean
   submissions: { submission_id: string; submitted_at: string; run_id: string; previous_submission_id: string | null }[]; older_submissions_available: boolean
   runs: { run_id: string; state: BatchRun['state']; phase: BatchPhase; input_snapshot_id: string; prepared_at: string }[]; older_runs_available: boolean
 }
-export type BatchCaptureBody = { request_id: string; artifact_id: string; case_sha256: string; consent: 'capture_batch_extraction_and_complete_sources' }
+export type BatchCaptureBody = { request_id: string; artifact_id: string; case_sha256: string; selected_source_ids: string[]; consent: 'capture_batch_extraction_and_complete_sources' }
 export type BatchPlanBody = { request_id: string; input_snapshot_id: string; input_snapshot_sha256: string; case_sha256: string; phase: BatchPhase
   parent_run_id: string | null; parent_run_sha256: string | null; failed_source_id: BatchSourceId | null; previous_retry_id: string | null; previous_retry_sha256: string | null; consent: 'prepare_bounded_batch_action' }
 export type BatchScopeBody = { request_id: string; run_id: string; plan_sha256: string; case_sha256: string; choice: 'approve' | 'hold'; reason: string; consent: 'save_bounded_batch_scope_decision' }

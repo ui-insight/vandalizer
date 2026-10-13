@@ -21,6 +21,14 @@ def design():
     return json.loads((DRAFT / 'batch-processing-case.json').read_text())
 
 
+def test_proposed_batch_adds_one_wrong_file_that_learners_are_not_told_about(design):
+    case = BatchCase.model_validate(design)
+    assigned = ['a' * 32, 'b' * 32, 'c' * 32]
+    assert case.proposed_scope(assigned) == ['a' * 32, 'course_asset:nsf-proposal-alpine-ecology.pdf', 'b' * 32, 'c' * 32]
+    assert 'scope_proposal' not in case.public_definition()
+    assert case.scope_proposal.wrong_filename not in [source.filename for source in case.sources]
+
+
 def test_complete_three_source_case_preserves_private_answers_and_separate_approval_phases(design):
     case = BatchCase.model_validate(design)
     contract = OutcomeContract.model_validate_json((DRAFT / 'outcomes.json').read_bytes())
@@ -124,7 +132,7 @@ def test_readable_draft_preserves_every_original_substantive_string_and_proposal
     assert ' '.join(text.split()) == original
 
 
-@pytest.mark.parametrize('change', [None, 'missing_case', 'unknown_case', 'wrong_source', 'wrong_exercise'])
+@pytest.mark.parametrize('change', [None, 'missing_case', 'unknown_case', 'wrong_source', 'wrong_exercise', 'proposal_file'])
 def test_catalog_requires_bound_case_and_every_original_source(tmp_path, change):
     shutil.copytree(CATALOG_ROOT, tmp_path / 'courses')
     version = 'legacy-2026-10-02.1'
@@ -138,7 +146,9 @@ def test_catalog_requires_bound_case_and_every_original_source(tmp_path, change)
         exercises['batch_processing']['batch_case_sha256'] = '0' * 64
     (folder / 'exercises.json').write_text(json.dumps(exercises))
     if change != 'wrong_source':
-        for name in exercises['batch_processing']['documents']:
+        wrong = json.loads((DRAFT / 'batch-processing-case.json').read_text())['scope_proposal']['wrong_filename']
+        # proposal_file keeps the legacy copy of the wrong file, whose bytes differ from the pinned draft.
+        for name in [*exercises['batch_processing']['documents'], *([] if change == 'proposal_file' else [wrong])]:
             shutil.copyfile(DRAFT / 'documents' / name, folder / 'documents' / name)
     if change != 'missing_case':
         (folder / 'batch-cases').mkdir()

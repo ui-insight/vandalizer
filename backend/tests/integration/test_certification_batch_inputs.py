@@ -39,10 +39,11 @@ async def fixture(repo, *, enrolled=None):
         exercises = json.loads((folder / 'exercises.json').read_text())
         exercises['batch_processing'] = json.loads((draft / 'batch-processing-exercise.json').read_text())
         (folder / 'exercises.json').write_text(json.dumps(exercises))
-        for name in exercises['batch_processing']['documents']:
+        documents = [*exercises['batch_processing']['documents'], json.loads((draft / 'batch-processing-case.json').read_text())['scope_proposal']['wrong_filename']]
+        for name in documents:
             shutil.copyfile(draft / 'documents' / name, folder / 'documents' / name)
         manifest = json.loads((folder / 'manifest.json').read_text())
-        for name in ('batch-cases/batch_processing.json', 'exercises.json', *['documents/' + n for n in exercises['batch_processing']['documents']]):
+        for name in ('batch-cases/batch_processing.json', 'exercises.json', *['documents/' + n for n in documents]):
             manifest['artifacts'][name] = hashlib.sha256((folder / name).read_bytes()).hexdigest()
         (folder / 'manifest.json').write_text(json.dumps(manifest))
         registry_path = repo.catalog.root / 'registry.json'
@@ -69,7 +70,7 @@ async def fixture(repo, *, enrolled=None):
     fields = [await SearchSetItem(searchset=artifact.uuid, user_id=learner.user_id, title=field.title,
         searchphrase=field.meaning, searchtype='extraction', is_optional=False).insert() for field in case.fields]
     body = {'request_id': uuid4().hex, 'artifact_id': artifact.uuid, 'case_sha256': case.digest,
-            'consent': 'capture_batch_extraction_and_complete_sources'}
+            'selected_source_ids': [d.uuid for d in documents], 'consent': 'capture_batch_extraction_and_complete_sources'}
     return SimpleNamespace(learner=learner, package=package, case=case, documents=documents, content=content,
         artifact=artifact, fields=fields, body=body, storage=SimpleNamespace(read=AsyncMock(side_effect=lambda path: content[path])))
 
@@ -97,6 +98,9 @@ async def test_all_three_original_sources_and_owned_fields_survive_workspace_del
     assert await BatchInputRepository().get(f.learner.user_id, saved['uuid']) == saved
     assert await BatchInputRepository().get('foreign', saved['uuid']) is None
     assert saved['execution_authorized'] is saved['credit_awarded'] is False
+    wrong = 'course_asset:' + f.case.scope_proposal.wrong_filename
+    assert saved['scope_review']['proposed_source_ids'] == f.case.proposed_scope([d.uuid for d in f.documents])
+    assert saved['scope_review']['removed_source_ids'] == [wrong] and wrong not in saved['scope_review']['selected_source_ids']
     with pytest.raises(EnrollmentConflict, match='not executable'):
         execution_plan(saved, {})
     assert await CertificationLabExecution.get_motor_collection().count_documents({}) == 0
@@ -105,7 +109,7 @@ async def test_all_three_original_sources_and_owned_fields_survive_workspace_del
 
 @pytest.mark.parametrize('change', ['actor', 'foreign_artifact', 'foreign_field', 'foreign_source', 'wrong_folder',
     'wrong_bytes', 'ingestion', 'case', 'consent', 'client_evidence', 'missing_source', 'duplicate_source',
-    'wrong_field', 'duplicate_key', 'attached_text', 'source_race', 'artifact_race'])
+    'wrong_field', 'duplicate_key', 'attached_text', 'source_race', 'artifact_race', 'kept_wrong_file', 'dropped_assigned', 'unlisted_file'])
 async def test_invalid_or_racing_inputs_never_create_a_snapshot(repo, monkeypatch, change):
     f = await fixture(repo)
     inputs = BatchInputRepository()
@@ -150,12 +154,20 @@ async def test_invalid_or_racing_inputs_never_create_a_snapshot(repo, monkeypatc
             await f.fields[0].save()
             return value
         monkeypatch.setattr(inputs, '_read_artifact', racing_artifact)
-    with pytest.raises(ValueError):
+    elif change == 'kept_wrong_file':
+        f.body['selected_source_ids'] = f.case.proposed_scope(f.body['selected_source_ids'])
+    elif change == 'dropped_assigned':
+        f.body['selected_source_ids'] = f.body['selected_source_ids'][:2]
+    elif change == 'unlisted_file':
+        f.body['selected_source_ids'] = [*f.body['selected_source_ids'][:2], uuid4().hex]
+    reasons = {'kept_wrong_file': 'not part of this assignment', 'dropped_assigned': 'Keep every assigned proposal',
+               'unlisted_file': 'only files listed in the proposed batch'}
+    with pytest.raises(ValueError, match=reasons.get(change)):
         await capture(repo, f, inputs, actor='foreign' if change == 'actor' else None)
     assert await CertificationLabInput.get_motor_collection().count_documents({}) == 0
 
 
-@pytest.mark.parametrize('change', ['pdf', 'pages', 'ingestion', 'artifact', 'public_case', 'private_case', 'authority'])
+@pytest.mark.parametrize('change', ['pdf', 'pages', 'ingestion', 'artifact', 'public_case', 'private_case', 'scope_review', 'authority'])
 async def test_rehashed_nested_changes_are_not_valid_original_inputs(repo, change):
     f = await fixture(repo)
     saved = deepcopy(await capture(repo, f))
@@ -171,6 +183,8 @@ async def test_rehashed_nested_changes_are_not_valid_original_inputs(repo, chang
         saved['case']['task'] = 'Changed public task'
     elif change == 'private_case':
         saved['authored_case']['expectations'][0]['expected_value'] = 'An invented PI'
+    elif change == 'scope_review':
+        saved['scope_review']['removed_source_ids'] = []
     else:
         saved['execution_authorized'] = True
     serialized, digest = encode(saved)

@@ -18,18 +18,22 @@ const definition: BatchCase = { id: 'case', revision: 1, module_id: 'batch_proce
     { id: 'recovery_choice', phase: 'before_retry', prompt: 'Explain the exact failure and preserved successes.' }, { id: 'batch_review', phase: 'after_recovery', prompt: 'Reconcile actual results and limitations.' }] }
 const identity = { enrollment_id: 'enrollment', module_id: 'batch_processing' as const, course_version: 'draft', manifest_sha256: 'd'.repeat(64) }
 const artifact = 'e'.repeat(32), snapshotId = 'f'.repeat(32)
-const request: BatchRequest = { action: 'capture', body: { request_id: snapshotId, artifact_id: artifact, case_sha256: definition.case_sha256, consent: 'capture_batch_extraction_and_complete_sources' } }
+const assignedIds = ['1', '2', '3'].map(c => c.repeat(32)), wrongId = 'course_asset:nsf-proposal-alpine-ecology.pdf'
+const request: BatchRequest = { action: 'capture', body: { request_id: snapshotId, artifact_id: artifact, case_sha256: definition.case_sha256, selected_source_ids: assignedIds, consent: 'capture_batch_extraction_and_complete_sources' } }
 const key = `certification-batch-request:enrollment:${definition.case_sha256}`
 const capture: BatchCapture = { ...identity, uuid: snapshotId, case: definition, input_snapshot_sha256: '1'.repeat(64), artifact_id: artifact, artifact_sha256: '2'.repeat(64), captured_at: '2026-10-07', execution_authorized: false, credit_awarded: false,
   artifact: { uuid: artifact, title: 'Original extraction', fields: definition.fields.map((f, i) => ({ id: String(i), title: f.title, searchphrase: f.meaning, is_optional: i === 2, enum_values: [] })) },
-  documents: definition.sources.map((s, i) => ({ source_id: s.id, document_id: String(i + 1).repeat(32), assigned_filename: s.filename, source_sha256: s.sha256, pages: ['Original source page'], text: 'Original source page' })) }
+  documents: definition.sources.map((s, i) => ({ source_id: s.id, document_id: String(i + 1).repeat(32), assigned_filename: s.filename, source_sha256: s.sha256, pages: ['Original source page'], text: 'Original source page' })),
+  scope_review: { proposed_source_ids: [assignedIds[0], wrongId, ...assignedIds.slice(1)], selected_source_ids: assignedIds, removed_source_ids: [wrongId], removed_filename: 'nsf-proposal-alpine-ecology.pdf', removed_sha256: '9'.repeat(64) } }
 const listing: BatchList = { ...identity, case: definition, can_submit: true, read_only_reason: null, extractions: [{ artifact_id: artifact, title: 'Original extraction' }], older_extractions_available: false,
-  assigned_sources: [], captures: [{ input_snapshot_id: snapshotId, extraction_name: 'Original extraction', captured_at: '2026-10-07' }], older_captures_available: false, runs: [], older_runs_available: false, submissions: [], older_submissions_available: false }
+  assigned_sources: [], proposed_scope: [assignedIds[0], wrongId, ...assignedIds.slice(1)].map(document_id => ({ document_id, title: document_id === wrongId ? 'nsf-proposal-alpine-ecology.pdf' : `proposal-${document_id[0]}.pdf`, preview: 'Principal Investigator and budget' })),
+  captures: [{ input_snapshot_id: snapshotId, extraction_name: 'Original extraction', captured_at: '2026-10-07' }], older_captures_available: false, runs: [], older_runs_available: false, submissions: [], older_submissions_available: false }
 beforeEach(() => { vi.restoreAllMocks(); vi.resetAllMocks(); sessionStorage.clear(); vi.mocked(api.getBatchWork).mockResolvedValue(structuredClone(listing)); vi.mocked(api.getBatchCapture).mockResolvedValue(structuredClone(capture)) })
 it('opens original sources in history without capture, expectation forms or mutations', async () => {
   render(<BatchAssessment enrollmentId="enrollment" definition={definition} historyOnly />)
   fireEvent.click(await screen.findByRole('button', { name: 'Open capture 1: Original extraction' }))
   await screen.findByRole('button', { name: 'Download original PROPOSAL_3 PDF' })
+  expect(screen.getByText(/Removed from the proposed batch before capture/)).toHaveTextContent('nsf-proposal-alpine-ecology.pdf')
   expect(screen.queryByRole('form', { name: 'Capture batch extraction' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Prepare two-document pilot' })).not.toBeInTheDocument()
   expect(api.saveBatchWork).not.toHaveBeenCalled()
@@ -142,4 +146,17 @@ it.each(['pilot_quality', 'capture', 'batch', 'source', 'receipt', 'previous_suc
   if (change === 'receipt') run.result!.item_results![0].status = 'failed'
   if (change === 'previous_success') run.previous_retry = structuredClone(completed('retry', completed('batch', completed('pilot'))))
   expect(() => verifyBatchRun(run, listing)).toThrow()
+})
+it('preselects the proposed batch and sends only the files the learner kept', async () => {
+  vi.mocked(api.saveBatchWork).mockResolvedValue(structuredClone(capture))
+  render(<BatchAssessment enrollmentId="enrollment" definition={definition} />)
+  const wrong = await screen.findByRole('checkbox', { name: /nsf-proposal-alpine-ecology\.pdf/ })
+  expect(screen.getAllByRole('checkbox')).toHaveLength(4)
+  expect(screen.getAllByRole('checkbox').every(box => (box as HTMLInputElement).checked)).toBe(true)
+  fireEvent.change(screen.getByRole('combobox', { name: 'Owned extraction' }), { target: { value: artifact } })
+  fireEvent.click(wrong)
+  fireEvent.click(screen.getByRole('button', { name: 'Capture extraction and selected sources' }))
+  await waitFor(() => expect(api.saveBatchWork).toHaveBeenCalledOnce())
+  const sent = vi.mocked(api.saveBatchWork).mock.calls[0][1] as Extract<BatchRequest, { action: 'capture' }>
+  expect(sent.body.selected_source_ids).toEqual(assignedIds)
 })

@@ -26,6 +26,7 @@ function SourceDownload({ capture, source, location }: { capture: BatchCapture; 
 export function BatchCaptureEvidence({ capture, location }: { capture: BatchCapture; location?: BatchLocation }) {
   return <section aria-label="Saved batch inputs" className="min-w-0 space-y-3 text-sm">
     <h5 className="text-base font-semibold">{capture.artifact.title}</h5>
+    <p>Removed from the proposed batch before capture: <span className="break-all">{capture.scope_review.removed_filename}</span></p>
     <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Inspect captured field instructions</summary>{capture.artifact.fields.map(field => <div key={field.id} className="space-y-1 py-2"><h6 className="font-semibold">{field.title}</h6><p>{field.searchphrase}</p><p>{field.is_optional ? 'Optional field' : 'Required field'}</p></div>)}</details>
     {capture.documents.map(source => <section key={source.source_id} className="min-w-0 space-y-2">
       <h6 className="font-semibold">{source.source_id.toUpperCase()} · complete original source</h6>

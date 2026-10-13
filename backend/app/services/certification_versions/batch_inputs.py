@@ -2,7 +2,7 @@
 import base64
 import datetime
 import hashlib
-from typing import Literal
+from typing import Annotated, Literal
 
 import fitz
 from pydantic import Field
@@ -23,6 +23,8 @@ class BatchCaptureRequest(ContractModel):
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     artifact_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     case_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    # The learner's explicit choice from the proposed batch, which preselects one wrong file.
+    selected_source_ids: tuple[Annotated[str, Field(pattern=r'^([a-f0-9]{32}|course_asset:[a-z0-9-]+\.pdf)$')], ...] = Field(min_length=1, max_length=4)
     consent: Literal['capture_batch_extraction_and_complete_sources']
 
 
@@ -46,6 +48,20 @@ def pdf_pages(data):
     return pages
 
 
+def review_scope(case, assigned_ids, selected):
+    """Accept only the assigned inputs out of the proposed batch, and record what was removed."""
+    proposed = case.proposed_scope(list(assigned_ids))
+    wrong = proposed[1]
+    if len(set(selected)) != len(selected) or not set(selected) <= set(proposed):
+        raise EnrollmentConflict('Select only files listed in the proposed batch')
+    if wrong in selected:
+        raise EnrollmentConflict('One selected file is not part of this assignment; compare each proposed file with the task and remove it before capture')
+    if set(selected) != set(assigned_ids):
+        raise EnrollmentConflict('Keep every assigned proposal in the batch')
+    return {'proposed_source_ids': proposed, 'selected_source_ids': list(assigned_ids), 'removed_source_ids': [wrong],
+            'removed_filename': case.scope_proposal.wrong_filename, 'removed_sha256': case.scope_proposal.wrong_sha256}
+
+
 class BatchInputRepository(LabInputRepository):
     @staticmethod
     def decode(raw):
@@ -59,6 +75,7 @@ class BatchInputRepository(LabInputRepository):
                     or saved['request_sha256'] != encode(body.model_dump(mode='json'))[1]
                     or saved['artifact_sha256'] != encode(saved['artifact'])[1]
                     or len(saved['documents']) != 3 or len({s['document_id'] for s in saved['documents']}) != 3
+                    or saved['scope_review'] != review_scope(case, [s['document_id'] for s in saved['documents']], body.selected_source_ids)
                     or saved['execution_status'] != 'not_started' or saved['execution_authorized'] is not False
                     or saved['credit_awarded'] is not False or saved['module_completion_eligible'] is not False
                     or saved['outcomes_awarded'] != []):
@@ -122,6 +139,7 @@ class BatchInputRepository(LabInputRepository):
         if (not isinstance(ids, list) or len(ids) != 3 or not all(isinstance(i, str) for i in ids)
                 or len(set(ids)) != 3 or not progress.lab_folder_id):
             raise EnrollmentConflict('Provision all three distinct assigned sources in this enrollment before capture')
+        scope_review = review_scope(case, ids, body.selected_source_ids)
         artifact = await self._read_artifact(actor_user_id, body.artifact_id)
         sources = []
         originals = []
@@ -153,7 +171,8 @@ class BatchInputRepository(LabInputRepository):
         payload = {**identity, 'schema_version': 1, 'record_kind': 'batch_extraction_input',
             'request': request, 'request_sha256': request_hash, 'case': case.public_definition(), 'authored_case': case.model_dump(mode='json'),
             'rubric_id': package.manifest.rubric_id, 'exercise_sha256': package.manifest.artifacts['exercises.json'],
-            'artifact': artifact, 'artifact_sha256': encode(artifact)[1], 'documents': sources, 'lab_folder_id': progress.lab_folder_id,
+            'artifact': artifact, 'artifact_sha256': encode(artifact)[1], 'documents': sources, 'scope_review': scope_review,
+            'lab_folder_id': progress.lab_folder_id,
             'captured_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'execution_status': 'not_started', 'execution_authorized': False, 'credit_awarded': False,
             'module_completion_eligible': False, 'outcomes_awarded': []}

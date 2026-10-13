@@ -16,6 +16,7 @@ EVIDENCE = {
     'batch_processing.targeted_recovery': {'batch_result_snapshot', 'retry_receipt', 'learner_decision'},
     'batch_processing.resource_choice': {'learner_decision', 'pilot_result_snapshot', 'execution_receipt'},
 }
+COURSE_ASSET = 'course_asset:'
 FieldName = Literal['PI Name', 'Institution', 'Total Budget', 'Research Area', 'Sponsoring Agency']
 SourceId = Literal['proposal_1', 'proposal_2', 'proposal_3']
 
@@ -47,6 +48,14 @@ class BatchQuestion(ContractModel):
     prompt: str = Field(min_length=60, max_length=3000)
 
 
+class BatchScopeProposal(ContractModel):
+    """An agent-proposed batch that adds one unassigned proposal; the learner removes it."""
+    wrong_filename: Literal['nsf-proposal-alpine-ecology.pdf']
+    wrong_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    reason: str = Field(min_length=60, max_length=1500)
+    scope_rule: Literal['proposed_batch_adds_one_unassigned_proposal_learner_removes_it_before_capture']
+
+
 class BatchCase(ContractModel):
     schema_version: Literal[1] = 1
     id: str = Field(pattern=r'^[a-z][a-z0-9_-]{1,99}$')
@@ -66,6 +75,7 @@ class BatchCase(ContractModel):
     questions: tuple[BatchQuestion, ...] = Field(min_length=4, max_length=4)
     expectations: tuple[BatchExpectation, ...] = Field(min_length=15, max_length=15)
     review_guidance: tuple[ProcessReviewGuidance, ...] = Field(min_length=3, max_length=3)
+    scope_proposal: BatchScopeProposal
     coverage_rule: Literal['same_batch_identity_distinct_assigned_document_ids_and_terminal_per_item_receipts_not_counts']
     scaling_rule: Literal['source_checked_complete_pilot_same_captured_revision_models_and_sources_explicit_learner_scope']
     recovery_rule: Literal['exact_confirmed_failed_item_original_batch_and_revision_preserve_completed_receipts_no_implicit_retry']
@@ -96,7 +106,12 @@ class BatchCase(ContractModel):
         return encode(self.model_dump(mode='json'))[1]
 
     def public_definition(self):
-        return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance'}), 'case_sha256': self.digest}
+        # The proposal's reason would name the wrong file; learners see only the proposed batch.
+        return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance', 'scope_proposal'}), 'case_sha256': self.digest}
+
+    def proposed_scope(self, assigned_ids):
+        """The proposed batch, all preselected: the assigned inputs with the wrong file second."""
+        return [assigned_ids[0], COURSE_ASSET + self.scope_proposal.wrong_filename, *assigned_ids[1:]]
 
     def verify_contract(self, contract):
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
@@ -142,6 +157,8 @@ def load_batch_case(package):
         case.verify_exercise(package.json('exercises.json')['batch_processing'])
         if any(package.manifest.artifacts.get('documents/' + s.filename) != s.sha256 for s in case.sources):
             raise ValueError('The case requires all three exact original sources')
+        if package.manifest.artifacts.get('documents/' + case.scope_proposal.wrong_filename) != case.scope_proposal.wrong_sha256:
+            raise ValueError('The proposed batch needs its exact packaged unassigned proposal')
         return case
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise CourseCatalogError('The packaged bounded batch case is invalid') from exc
