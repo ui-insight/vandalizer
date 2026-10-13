@@ -459,7 +459,7 @@ def _round_robin(pools: list[list[dict]]) -> list[dict]:
 
 def _content_key(content: str) -> str:
     normalized = re.sub(r"\s+", " ", (content or "").lower()).strip()[:300]
-    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
+    return hashlib.sha1(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def dedupe_passages(passages: list[dict]) -> list[dict]:
