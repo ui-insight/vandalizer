@@ -435,7 +435,12 @@ def _upstream_sources(inputs: dict, sources: list[str]) -> list[dict]:
     if "step_input" not in sources or not isinstance(inputs, dict):
         return []
     carried = inputs.get("retrieved_sources")
-    return [s for s in carried if isinstance(s, dict)] if isinstance(carried, list) else []
+    carried = [s for s in carried if isinstance(s, dict)] if isinstance(carried, list) else []
+    # Only text that actually cites earns the "keep the citations" rule; told
+    # to keep citations that are not there, a model invents empty ones.
+    if carried and not cites_any(_stringify_context(inputs.get("output")), carried):
+        return []
+    return carried
 
 
 class _GroundedContext:
@@ -521,7 +526,7 @@ def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> 
     passage tags ([KB2]) are replaced with their source lines on arrival.
     """
     text = resolve_passage_tags(call(instruction), sources)
-    if sources and isinstance(text, str) and text.strip() and not cites_any(text, sources):
+    if sources and isinstance(text, str) and text.strip() and not cites_any(text, sources, sections=False):
         if report:
             report("Reply cited no passage — asking once more for citations…")
         again = resolve_passage_tags(call(f"{instruction}\n\n{CITATION_RETRY_NUDGE}"), sources)

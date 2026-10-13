@@ -462,12 +462,26 @@ class TestInlineCitations:
 
     @patch("app.services.workflow_engine.llm_chat_model")
     @patch("app.services.document_manager.get_document_manager")
-    def test_a_section_number_counts_as_a_citation(self, mock_dm_cls, mock_llm):
+    def test_a_section_number_alone_still_earns_the_retry(self, mock_dm_cls, mock_llm):
+        """An output template can fix a section anchor whether or not a
+        passage was used, so only a cited passage tag skips the retry."""
         chunk = _grounding_chunk("§ 200.306 Cost sharing or matching. (a) Under Federal research proposals…")
         mock_dm_cls.return_value = _grounding_dm([chunk])
-        mock_llm.return_value = '{"rationale": "Voluntary committed cost share is not expected under 2 CFR 200.306."}'
-        PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert mock_llm.call_count == 1
+        mock_llm.side_effect = [
+            '{"regulation_anchor": "2 CFR 200.306", "rationale": "Not expected."}',
+            '{"regulation_anchor": "2 CFR 200.306", "rationale": "Not expected [KB1]."}',
+        ]
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert mock_llm.call_count == 2
+        assert "[OMB Uniform Guidance — Subpart C · p. 12]" in result["output"]
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.get_document_manager")
+    def test_native_citation_marks_are_resolved_or_dropped(self, mock_dm_cls, mock_llm):
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.return_value = "Cost share applies【KB1】. Period is fine【】."
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert result["output"] == "Cost share applies[OMB Uniform Guidance — Subpart C · p. 12]. Period is fine."
 
     @patch("app.services.workflow_engine.format_model")
     def test_formatter_keeps_citations_from_its_input(self, mock_format):

@@ -746,9 +746,11 @@ def looks_like_citation(text: str) -> bool:
 # A passage tag as the model cites it: [KB2], [KB1, KB3], [KB1; 3], and the
 # (KB2) a model sometimes writes instead.
 _PASSAGE_TAG_RE = re.compile(
-    r"[\[(]\s*KB\s*(\d{1,3})((?:\s*[,;]\s*(?:KB\s*)?\d{1,3})*)\s*[\])]", re.IGNORECASE,
+    r"[\[(【]\s*(?:†\s*)?KB\s*(\d{1,3})((?:\s*[,;†]\s*(?:KB\s*)?\d{1,3})*)[^\])】\n]{0,40}?[\])】]",
+    re.IGNORECASE,
 )
 _TAG_ONLY_RE = re.compile(r"KB\s*\d{1,3}", re.IGNORECASE)
+_EMPTY_NATIVE_CITE_RE = re.compile(r"\s*【[\s†]*】")
 
 
 def resolve_passage_tags(text: str, sources: list[dict]) -> str:
@@ -761,7 +763,13 @@ def resolve_passage_tags(text: str, sources: list[dict]) -> str:
     task. A tag past the last passage is left as written (and reported as
     an unmatched citation).
     """
-    if not text or not sources or not isinstance(text, str):
+    if not text or not isinstance(text, str):
+        return text
+    # Some models (gpt-oss) emit their own 【…】 citation marks, often empty
+    # when there was nothing to cite: an empty one is dropped, a 【KB2】 is
+    # resolved below like [KB2].
+    text = _EMPTY_NATIVE_CITE_RE.sub("", text)
+    if not sources:
         return text
 
     def sub(m: re.Match) -> str:
@@ -778,16 +786,21 @@ def resolve_passage_tags(text: str, sources: list[dict]) -> str:
     return _PASSAGE_TAG_RE.sub(sub, text)
 
 
-def cites_any(text: str, sources: list[dict]) -> bool:
+def cites_any(text: str, sources: list[dict], *, sections: bool = True) -> bool:
     """Whether ``text`` carries at least one citation that resolves to a
-    retrieved passage: a bracketed source line, or a regulation section
-    number a passage literally contains (what the run UI links)."""
+    retrieved passage: a bracketed source line, or (with ``sections``) a
+    regulation section number a passage literally contains (what the run UI
+    links). The retry asks for ``sections=False``: a task whose output
+    template fixes a section anchor ("regulation_anchor": "2 CFR 200.404")
+    names it whether or not it used a passage."""
     if not text or not sources:
         return False
     for m in _CITATION_RE.finditer(text):
         for part in re.split(r"\s*;\s*", m.group(1)):
             if looks_like_citation(part) and not unmatched_citations(f"[{part}]", sources):
                 return True
+    if not sections:
+        return False
     contents = [str(s.get("content") or "") for s in sources if isinstance(s, dict)]
     for m in _SECTION_REF_RE.finditer(text):
         sec = re.escape(m.group(1))
