@@ -1201,9 +1201,14 @@ def create_agentic_chat_agent(
                 ),
             )
         # "Click the Create workflow button" with no tool call leaves the user
-        # hunting for a card that never rendered; send that reply back once.
-        from app.services.approval_claims import require_approval_card
+        # hunting for a card that never rendered, and "Running a preview of…"
+        # with no tool call leaves the chat stopped; send either reply back once.
+        from app.services.approval_claims import (
+            require_announced_action,
+            require_approval_card,
+        )
         agent.output_validator(require_approval_card)
+        agent.output_validator(require_announced_action)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]

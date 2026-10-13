@@ -72,3 +72,7 @@ class AgenticChatDeps:
     # tool prepared (approval_claims.require_approval_card), so a second miss
     # is accepted instead of failing the turn.
     approval_card_retry_used: bool = False
+
+    # The same once-only flag for a reply that ends by announcing a step it
+    # never took (approval_claims.require_announced_action).
+    announced_action_retry_used: bool = False
