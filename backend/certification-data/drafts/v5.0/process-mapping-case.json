@@ -5,7 +5,7 @@
   "module_id": "process_mapping",
   "provenance": "authored_fictional_design_case_not_execution",
   "notice": "This is a supplied fictional process-design case. No real reports, recipients, institutional decisions or executions are involved. You do not need to disclose your own work.",
-  "task": "Design a bounded process for a grants reviewer who compares three project progress reports each month. Choose a working method and explain its fit. Critique the deliberately flawed proposal, save a corrected process map, and write the task brief you would give an agent. Identify the work an agent can help prepare and the decision that remains with the authorized reviewer. This assignment asks for a reviewable design; do not execute a workflow, contact anyone or invent evidence of a completed run.",
+  "task": "Design a bounded process for a grants reviewer who compares three project progress reports each month. Each report states reported spending beside its approved monthly budget. Choose a working method and explain its fit. Critique the deliberately flawed proposal, save a corrected process map, and write the task brief you would give an agent. Identify the work an agent can help prepare and the decision that remains with the authorized reviewer. This assignment asks for a reviewable design; do not execute a workflow, contact anyone or invent evidence of a completed run.",
   "assigned_inputs": [
     {
       "id": "report-alpine",
@@ -34,6 +34,44 @@
     "A proposed action changes the input set, recipient, authority or intended output."
   ],
   "flawed_proposal": "Authored flawed proposal: Create an automation that searches every available project file each month. Let the assistant decide which projects need attention and mark their reports approved whenever its summary sounds consistent. Email the comparison to an external partner automatically, then ask the grants reviewer to look for errors afterward. If a passage is missing, infer the most likely milestone status so the table always looks complete. Do not retain intermediate references because the final summary is enough.",
+  "suggested_map": [
+    {
+      "kind": "input",
+      "operation": "The reviewer names the three assigned monthly reports; the agent confirms each one is readable and flags any missing passage.",
+      "responsible": "Reviewer, then agent",
+      "evidence": "Report IDs and the page of each flagged passage."
+    },
+    {
+      "kind": "repetitive_preparation",
+      "operation": "The agent extracts reported milestones, spending, approved monthly budget and incomplete activities from each report.",
+      "responsible": "Agent",
+      "evidence": "Each extracted value with its source passage."
+    },
+    {
+      "kind": "deterministic_calculation",
+      "operation": "Code computes each project's spending variance as reported spending minus the approved monthly budget.",
+      "responsible": "Code",
+      "evidence": "Both inputs, the formula and the result for each project."
+    },
+    {
+      "kind": "institutional_judgment",
+      "operation": "The agent decides whether each overspend is justified and marks it resolved so the comparison table is complete.",
+      "responsible": "Agent",
+      "evidence": "The agent's explanation for each overspend."
+    },
+    {
+      "kind": "handoff",
+      "operation": "The agent assembles the internal draft comparison, keeps conflicting and missing passages flagged, and hands it to the grants reviewer.",
+      "responsible": "Agent to reviewer",
+      "evidence": "The draft with every source and intermediate reference."
+    },
+    {
+      "kind": "output",
+      "operation": "The grants reviewer reviews the draft and records a decision; nothing is sent or released.",
+      "responsible": "Grants reviewer",
+      "evidence": "The reviewer's saved decision on the draft."
+    }
+  ],
   "method_comparisons": [
     {
       "id": "one-off-question",
@@ -65,7 +103,7 @@
     {
       "id": "human_checkpoint",
       "outcome_id": "process_mapping.human_checkpoint",
-      "prompt": "Save an ordered map naming each operation, its inputs and outputs, the responsible agent or human, and evidence available for inspection. Identify and correct the flawed proposal. Show what must wait for the reviewer, what the reviewer examines, and how unresolved items stop or return for correction. Describe the correction in your own decision.",
+      "prompt": "Start from the agent-suggested map or your own. Save an ordered map that labels each operation as an input, repetitive preparation, deterministic calculation, institutional judgment, handoff or output, and names its inputs and outputs, the responsible agent, code or human, and evidence available for inspection. Check who is responsible for every suggested step and correct any that gives the wrong party a decision. Identify and correct the flawed proposal. Show what must wait for the reviewer, what the reviewer examines, and how unresolved items stop or return for correction. Describe the corrections in your own decision.",
       "response_kind": "ordered_process_map"
     },
     {
@@ -92,12 +130,13 @@
     {
       "outcome_id": "process_mapping.human_checkpoint",
       "passing_conditions": [
-        "The map identifies who reviews, what evidence they inspect and what must wait for their decision."
+        "The map identifies who reviews, what evidence they inspect and what must wait for their decision.",
+        "The map separates repeated preparation, deterministic calculations and institutional judgment, and corrects any suggested step that gives an agent a decision reserved for the reviewer."
       ],
       "critical_failures": [
         "Place approval after an irreversible action or omit the accountable reviewer."
       ],
-      "case_application": "The learner must correct the proposal that releases first and reviews afterward. The process map should locate source/intermediate evidence, identify the authorized grants reviewer and hold any institutional conclusion or release for that decision. The learning task has no real recipient and performs no send. Merely saying human in the loop without evidence, responsibility and ordering is insufficient. Do not infer a learner correction from an agent draft."
+      "case_application": "The learner must correct the proposal that releases first and reviews afterward. The process map should locate source/intermediate evidence, identify the authorized grants reviewer and hold any institutional conclusion or release for that decision. The learning task has no real recipient and performs no send. Merely saying human in the loop without evidence, responsibility and ordering is insufficient. Do not infer a learner correction from an agent draft. The agent-suggested map is sound except its institutional-judgment step, which lets the agent decide whether an overspend is justified and mark it resolved. The learner's map must return that judgment to the grants reviewer and keep the spending variance as a deterministic calculation with its inputs shown; adopting that step unchanged fails this outcome. Labels alone are not enough: each step's responsible party must fit its kind."
     },
     {
       "outcome_id": "process_mapping.bounded_scope",

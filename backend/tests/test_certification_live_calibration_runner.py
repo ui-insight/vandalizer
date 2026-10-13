@@ -46,7 +46,7 @@ async def run(path, **kwargs):
 def test_plan_covers_all_cases_without_loading_config_or_calling_provider(capsys):
     assert runner.main(['--config', '/nonexistent/private-config.json']) == 0
     report = json.loads(capsys.readouterr().out)
-    assert report['case_count'] == 59
+    assert report['case_count'] == 60
     assert len(report['suites']) == 10
     assert report['release_ready'] is report['credit_awarded'] is False
 

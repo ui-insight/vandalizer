@@ -551,10 +551,12 @@ export interface ProcessCaseDefinition {
   exclusions: string[]
   exception_conditions: string[]
   flawed_proposal: string
+  suggested_map: { kind: ProcessStepKind; operation: string; responsible: string; evidence: string }[]
   method_comparisons: { id: string; situation: string }[]
   method_options: string[]
   questions: { id: string; outcome_id: string; prompt: string; response_kind: string }[]
 }
+export type ProcessStepKind = 'input' | 'repetitive_preparation' | 'deterministic_calculation' | 'institutional_judgment' | 'handoff' | 'output'
 export interface ProcessSubmissionBody {
   request_id: string
   case_sha256: string

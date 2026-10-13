@@ -37,6 +37,23 @@ def test_task_is_self_contained_and_does_not_expose_private_review_guidance(desi
                if module.module_id == 'process_mapping' for outcome in module.outcomes)
 
 
+def test_suggested_map_shows_every_step_kind_and_hands_the_judgment_to_the_agent(design):
+    case = ProcessMappingCase.model_validate(design)
+    judgment = [step for step in case.suggested_map if step.kind == 'institutional_judgment']
+    # The authored boundary mistake: the reviewer's decision is given to the agent.
+    assert len(judgment) == 1 and judgment[0].responsible == 'Agent'
+    assert [step.responsible for step in case.suggested_map if step.kind == 'deterministic_calculation'] == ['Code']
+    assert case.public_definition()['suggested_map'] == [step.model_dump(mode='json') for step in case.suggested_map]
+
+
+@pytest.mark.parametrize('kind', ['input', 'repetitive_preparation', 'deterministic_calculation', 'institutional_judgment', 'handoff', 'output'])
+def test_suggested_map_cannot_omit_a_step_kind(design, kind):
+    design['suggested_map'] = [step for step in design['suggested_map'] if step['kind'] != kind]
+    design['suggested_map'] += [dict(design['suggested_map'][0])] * max(0, 6 - len(design['suggested_map']))
+    with pytest.raises(ValidationError, match='every kind of process step'):
+        ProcessMappingCase.model_validate(design)
+
+
 @pytest.mark.parametrize('change', ['execution_claim', 'injected_run', 'duplicate_input', 'duplicate_question',
     'missing_comparison', 'duplicate_comparison', 'missing_method', 'duplicate_method', 'foreign_outcome',
     'duplicate_guide', 'wrong_response', 'staff_review', 'presence_credit', 'forced_personal_work'])

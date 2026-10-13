@@ -12,6 +12,8 @@ const definition: ProcessCaseDefinition = { id: 'monthly-map', revision: 1, modu
   provenance: 'authored_fictional_design_case_not_execution', notice: 'Fictional case; no personal work is required.', task: 'Choose a method and correct the proposed process.',
   assigned_inputs: [{ id: 'report-a', description: 'Assigned fictional report.' }], intended_output: 'Internal comparison draft.', repetition: 'Monthly review.', authority: 'Reviewer decides before release.',
   exclusions: ['No external sends.'], exception_conditions: ['Missing evidence.'], flawed_proposal: 'Send before asking the reviewer.',
+  suggested_map: [{ kind: 'deterministic_calculation', operation: 'Code computes the spending variance.', responsible: 'Code', evidence: 'Inputs and result.' },
+    { kind: 'institutional_judgment', operation: 'The agent decides whether an overspend is justified.', responsible: 'Agent', evidence: 'Agent explanation.' }],
   method_comparisons: [{ id: 'one-off', situation: 'One source-grounded question.' }], method_options: ['chat', 'workflow'],
   questions: [{ id: 'method_choice', outcome_id: 'process_mapping.method_choice', prompt: 'Explain the selected working method.', response_kind: 'method_and_rationale' },
     { id: 'human_checkpoint', outcome_id: 'process_mapping.human_checkpoint', prompt: 'Correct the ordered map and review point.', response_kind: 'ordered_process_map' },
@@ -37,7 +39,10 @@ beforeEach(() => {
 
 it('shows the fictional task before saving, preserves decisions literally and focuses the saved map', async () => {
   render(<ProcessDesign {...props} />)
-  expect(await screen.findByRole('region', { name: 'Assigned process case' })).toHaveTextContent(definition.notice)
+  const assigned = await screen.findByRole('region', { name: 'Assigned process case' })
+  expect(assigned).toHaveTextContent(definition.notice)
+  expect(assigned).toHaveTextContent('Deterministic calculation: Code computes the spending variance.')
+  expect(assigned).toHaveTextContent('Institutional judgment: The agent decides whether an overspend is justified.Responsible: Agent.')
   expect(api.saveProcessDesign).not.toHaveBeenCalled()
   await fill(); fireEvent.click(screen.getByRole('button', { name: 'Save my reviewed design' }))
   const saved = await screen.findByRole('region', { name: 'Saved process design' })

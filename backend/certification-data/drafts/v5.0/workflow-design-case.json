@@ -7,7 +7,7 @@
   "notice": "This is a fictional design assignment. Save and inspect a workflow configuration; do not execute it, send a report, contact a reviewer or use personal documents. Authored examples are not learner work or execution evidence.",
   "task": "Turn the monthly-review process into one saved, reviewable workflow design. Explicitly choose your original saved process submission or the supplied example. Preserve the chosen map as the input to this attempt; do not silently substitute a newer map or treat it as transferred credit. Critique the flawed proposal, use chat or the editor to configure a corrected workflow, then inspect the same saved revision and record your decisions. Trace the source information through the design, explain the corrected boundary and show how the fictional reviewer could inspect unresolved issues. A reflection or step count does not substitute for the saved configuration.",
   "source_process_case_id": "monthly-report-review-map",
-  "source_process_case_sha256": "25bdff6ca4c49b24e000b2d954d24bac319db1bf87da1dbb1d6dfce3aefbc3fb",
+  "source_process_case_sha256": "e00aba3a58ed97dac110e46d37a7212c282557a73dea1b8f4487e4086ab64234",
   "assigned_inputs": [
     {
       "id": "report-alpine",

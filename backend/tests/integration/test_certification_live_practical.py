@@ -630,6 +630,17 @@ STRONG_METHOD_CHOICE = ('I choose a bounded workflow. The three monthly reports 
     'references, which needs organizing, comparing and formatting stages. Institutional judgment stays with the grants '
     'reviewer, so the workflow ends at the draft. A one-off question would use chat; a repeated fixed-field intake without '
     'narrative would need only a reusable extraction.')
+STRONG_PROCESS_MAP = ('1. Input (reviewer, then agent): the grants reviewer names report-alpine, report-neural and report-water; '
+    'the agent confirms each is readable and flags a missing or unreadable passage by page. 2. Repetitive preparation (agent): '
+    'extract milestones, reported spending, approved monthly budget and incomplete activities from each report, each value with '
+    'its source passage. 3. Deterministic calculation (code): spending variance = reported spending minus approved monthly budget, '
+    'showing both inputs and the result; the model does not estimate it. 4. Institutional judgment (grants reviewer): whether an '
+    'overspend is justified. The suggested map gave this to the agent and let it mark overspends resolved; I moved it to the '
+    'reviewer and the agent closes nothing. 5. Handoff (agent to reviewer): the internal draft comparison with every source and '
+    'intermediate reference, conflicting passages quoted side by side and missing passages flagged. 6. Output (grants reviewer): '
+    'the reviewer inspects the references, variances and flagged items and records a decision; unresolved items return for '
+    'correction and nothing is sent or released. From the flawed proposal I also removed the search of every project file, the '
+    'agent approval, the automatic external email with review afterward and the guessed milestones.')
 STRONG_PROMPT = ('Using only the workflow documents (report-alpine, report-neural and report-water), compare the reported '
     'milestones and spending. Cite the document and passage for every value. List unresolved issues separately. If a '
     'required passage is missing or unreadable, or two passages conflict, do not guess or treat it as zero or agreement: '
@@ -668,6 +679,7 @@ async def test_strong_design_answers_are_accepted_by_the_live_reviewer(repo, tmp
     if module_id == 'process_mapping':
         _, _, _, body = await base.process_design_fixture(repo)
         body['answers']['method_choice'] = STRONG_METHOD_CHOICE
+        body['answers']['human_checkpoint'] = STRONG_PROCESS_MAP
         saved = await base.save_process(repo, learner, package, body)
         prepared = await base.prepare_process_review(repo, learner, package, saved['uuid'])
     else:

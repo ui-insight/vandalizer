@@ -328,7 +328,8 @@
             "process_map_snapshot"
           ],
           "passing_conditions": [
-            "The map identifies who reviews, what evidence they inspect and what must wait for their decision."
+            "The map identifies who reviews, what evidence they inspect and what must wait for their decision.",
+            "The map separates repeated preparation, deterministic calculations and institutional judgment, and corrects any suggested step that gives an agent a decision reserved for the reviewer."
           ],
           "critical_failures": [
             "Place approval after an irreversible action or omit the accountable reviewer."

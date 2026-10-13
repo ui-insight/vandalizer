@@ -3,7 +3,7 @@ import { CourseDraftNotice } from './CourseDraftNotice'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getProcessDesign, getProcessDesigns, saveProcessDesign } from '../../api/certification'
 import { ApiError } from '../../api/client'
-import type { ProcessCaseDefinition, ProcessSubmissionBody, ProcessSubmissionList, SavedProcessSubmission } from '../../types/certification'
+import type { ProcessCaseDefinition, ProcessStepKind, ProcessSubmissionBody, ProcessSubmissionList, SavedProcessSubmission } from '../../types/certification'
 import { PracticalAssessment } from './PracticalAssessment'
 import { SavedAutomaticReviews } from './SavedAutomaticReviews'
 
@@ -11,6 +11,8 @@ const button = 'min-h-11 min-w-0 max-w-full rounded-lg border border-gray-300 bg
 const control = 'mt-1 block min-h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white p-2 text-sm text-gray-900'
 const labels: Record<string, string> = { method_choice: 'Working method and rationale', human_checkpoint: 'Corrected process map', bounded_scope: 'Bounded task brief' }
 const validId = (value: string) => /^[a-f0-9]{32}$/.test(value)
+const stepKinds: Record<ProcessStepKind, string> = { input: 'Input', repetitive_preparation: 'Repetitive preparation', deterministic_calculation: 'Deterministic calculation', institutional_judgment: 'Institutional judgment', handoff: 'Handoff', output: 'Output' }
+
 function validCase(value: ProcessCaseDefinition, expected: ProcessCaseDefinition) {
   return value.module_id === 'process_mapping' && value.provenance === 'authored_fictional_design_case_not_execution'
     && /^[a-f0-9]{64}$/.test(value.case_sha256) && value.case_sha256 === expected.case_sha256
@@ -207,6 +209,10 @@ function ProcessBrief({ definition }: { definition: ProcessCaseDefinition }) {
       <h6 className="mt-3 font-semibold">Reasons to stop or flag an item</h6><ul className="list-disc space-y-2 pl-4">{definition.exception_conditions.map(item => <li key={item}>{item}</li>)}</ul>
     </details>
     <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Inspect the flawed proposal</summary><p>{definition.flawed_proposal}</p></details>
+    <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Inspect the agent-suggested map</summary>
+      <p>An agent drafted this map. Check who is responsible for each step before you use any of it.</p>
+      <ol className="mt-2 list-decimal space-y-3 pl-4">{definition.suggested_map.map((step, i) => <li key={i}><strong>{stepKinds[step.kind]}: </strong>{step.operation}<span className="block">Responsible: {step.responsible}. Evidence: {step.evidence}</span></li>)}</ol>
+    </details>
     <details><summary className="min-h-11 cursor-pointer py-2 font-semibold">Compare the three working-method situations</summary><ol className="list-decimal space-y-3 pl-4">{definition.method_comparisons.map(item => <li key={item.id}>{item.situation}</li>)}</ol></details>
   </section>
 }

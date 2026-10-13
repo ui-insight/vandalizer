@@ -12,6 +12,7 @@ from .attempts import encode
 from .outcomes import ContractModel
 
 OUTCOMES = {'process_mapping.method_choice', 'process_mapping.human_checkpoint', 'process_mapping.bounded_scope'}
+STEP_KINDS = ('input', 'repetitive_preparation', 'deterministic_calculation', 'institutional_judgment', 'handoff', 'output')
 
 
 class ProcessInput(ContractModel):
@@ -22,6 +23,13 @@ class ProcessInput(ContractModel):
 class MethodComparison(ContractModel):
     id: str = Field(pattern=r'^[a-z][a-z0-9_-]{1,99}$')
     situation: str = Field(min_length=30, max_length=1500)
+
+
+class SuggestedMapStep(ContractModel):
+    kind: Literal['input', 'repetitive_preparation', 'deterministic_calculation', 'institutional_judgment', 'handoff', 'output']
+    operation: str = Field(min_length=20, max_length=600)
+    responsible: str = Field(min_length=3, max_length=100)
+    evidence: str = Field(min_length=10, max_length=400)
 
 
 class ProcessQuestion(ContractModel):
@@ -53,6 +61,8 @@ class ProcessMappingCase(ContractModel):
     exclusions: tuple[str, ...] = Field(min_length=1, max_length=10)
     exception_conditions: tuple[str, ...] = Field(min_length=1, max_length=10)
     flawed_proposal: str = Field(min_length=100, max_length=4000)
+    # An agent-suggested map with one authored boundary mistake; review guidance names it.
+    suggested_map: tuple[SuggestedMapStep, ...] = Field(min_length=6, max_length=12)
     method_comparisons: tuple[MethodComparison, ...] = Field(min_length=3, max_length=3)
     method_options: tuple[Literal['chat', 'project', 'reusable_extraction', 'workflow', 'automation'], ...]
     questions: tuple[ProcessQuestion, ...] = Field(min_length=3, max_length=3)
@@ -77,6 +87,8 @@ class ProcessMappingCase(ContractModel):
                  'process_mapping.bounded_scope': 'bounded_task_brief'}
         if any(question.response_kind != kinds[question.outcome_id] for question in self.questions):
             raise ValueError('Each outcome requires its corresponding decision or map artifact')
+        if {step.kind for step in self.suggested_map} != set(STEP_KINDS):
+            raise ValueError('The suggested map must show every kind of process step')
         return self
 
     @property
