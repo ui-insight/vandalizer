@@ -390,3 +390,65 @@ async def test_advanced_nodes_live_parallel_reviews_and_memo(repo, tmp_path, mon
         assert verdicts['advanced_nodes.checked_computation'] != 'supported'
     else:
         assert assessment['status'] == 'requirements_supported', assessment
+
+
+def competent_output_prompts(monkeypatch):
+    """Replace the fixture's placeholder instructions with ones a competent learner writes."""
+    from app.services.certification_versions.output_case import REQUIRED_FIELDS
+    from tests.integration import test_certification_output_workflow_plan as output_plan
+    fields = ', '.join(f'"{name}"' for name in REQUIRED_FIELDS)
+    instruction = ('From the assigned progress report only, return one JSON object with exactly these keys: '
+                   f'{fields}. Copy values as stated in the report, keep currency amounts as written, '
+                   'write "Not stated" when the report does not give a value, and list the pages used in '
+                   '"Source References". Return only the JSON object.')
+    original = output_plan.fixture
+
+    async def fixture(repo, **kwargs):
+        f = await original(repo, **kwargs)
+        f.tasks[0].data['prompt'] = instruction
+        f.tasks[2].data['format_template'] = instruction
+        for task in (f.tasks[0], f.tasks[2]):
+            await task.save()
+        f.body['request_id'] = uuid4().hex
+        f.saved = await output_plan.capture_fixtures.capture(repo, f)
+        return f
+    monkeypatch.setattr(output_plan, 'fixture', fixture)
+
+
+@pytest.mark.parametrize('behavior', ['competent', 'vague'])
+async def test_output_delivery_live_generation_review_and_private_handoff(repo, tmp_path, monkeypatch, behavior):
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from tests.integration import test_certification_output_workflow_inputs as output_inputs
+    from tests.integration import test_certification_output_workflow_execution as output_execution
+    from tests.integration import test_certification_output_outcome_reviews as output
+    learner, package = await enrolled_learner(repo, tmp_path, monkeypatch)
+    runtime_config = live_runtime()
+    LIVE_CALLS.clear()
+    monkeypatch.setattr(base, 'REVIEW_CONFIG', runtime_config)
+    monkeypatch.setattr(base, 'REVIEW_MODEL', LIVE_MODEL)
+    monkeypatch.setattr(output_inputs, 'fixture', partial(output_inputs.fixture, enrolled=(learner, package)))
+    after_fixture(monkeypatch, output_execution, runtime_config)
+    if behavior == 'competent':
+        competent_output_prompts(monkeypatch)
+    else:
+        # Placeholder instructions yield prose, so the generated files fail
+        # validation and release approval must be refused.
+        with pytest.raises(EnrollmentConflict, match='invalid or incomplete generated files'):
+            await output.fixture(repo, monkeypatch)
+        record('output_delivery-vague', {'live_calls': [(n, m, o[:200]) for n, m, o in LIVE_CALLS],
+                                         'refused': 'release approval of unparseable generated files'})
+        assert LIVE_CALLS
+        return
+    f = await output.fixture(repo, monkeypatch)
+    saved = await output.submit(repo, f)
+    prepared = await output.prepare(repo, f, saved['uuid'])
+    reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
+    assessment = reviewed['result']['assessment']
+    record('output_delivery-competent', {'live_calls': [(n, m, o[:300]) for n, m, o in LIVE_CALLS],
+        'handoff_status': f.handoff.get('status'), 'assessment_status': assessment['status'],
+        'verdicts': {item['outcome_id']: item['verdict'] for item in assessment.get('outcomes', [])},
+        'explanations': {item['outcome_id']: item['explanation'] for item in assessment.get('outcomes', [])},
+        'credit_awarded': assessment['credit_awarded']})
+    assert LIVE_CALLS
+    assert assessment['status'] != 'grading_unavailable', assessment.get('reason')
+    assert assessment['credit_awarded'] is False
