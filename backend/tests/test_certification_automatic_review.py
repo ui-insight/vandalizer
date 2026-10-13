@@ -267,6 +267,50 @@ async def test_agent_adapter_lets_the_model_repair_a_misquoted_citation_once(fix
     assert 'Fields stitched' not in seen[1][0]
 
 
+
+async def test_agent_adapter_names_the_evidence_kind_a_supported_verdict_left_uncited():
+    # A vague "cite every kind" retry let the live judge repeat the omission;
+    # the retry must name the outcome, the kind and where that kind lives.
+    from pydantic_ai.messages import ModelResponse, RetryPromptPart, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+    from app.services.certification_versions.automatic_review import _call_model
+    bad = decisions()
+    outcome = bad['outcomes'][0]
+    dropped = outcome['citations'].pop()['evidence_id']
+    seen = []
+
+    def reply(messages, info):
+        retries = [part for message in messages for part in getattr(message, 'parts', []) if isinstance(part, RetryPromptPart)]
+        seen.append([str(part.content) for part in retries])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, decisions() if retries else bad)])
+
+    with patch('app.services.llm_service.get_agent_model', return_value=FunctionModel(reply)):
+        result = await _call_model('synthetic-judge', CONFIG, adapter_payload())
+    assert len(result.outcomes) == len(REQUIRED) and len(seen) == 2
+    assert outcome['outcome_id'] in seen[1][0] and f'cite {dropped} evidence' in seen[1][0]
+    assert repr(dropped) in seen[1][0]
+
+
+@pytest.mark.parametrize('quote,accepted', [
+    ('"actual_value":"177000"', True),           # nested JSON read without escape backslashes
+    ('Total Budget: $1,250,000', True),          # escaped line break read as a space
+    ('"actual_value":"185000"', False),          # a changed value is still fabricated
+    ('Total Budget: $1,350,000', False)])
+async def test_quotes_match_json_evidence_as_a_person_reads_it(quote, accepted):
+    # Evidence records are JSON with JSON nested in strings; the live judge
+    # quoted their readable form and every honest packet came back unavailable.
+    inner = json.dumps({'actual_value': '177000', 'page': 'Total Budget:\n$1,250,000'}, separators=(',', ':'))
+    evidence = packet()
+    evidence[0]['text'] = json.dumps({'record_json': inner}, separators=(',', ':'))
+    answer = decisions(evidence)
+    for outcome in answer['outcomes']:
+        for citation in outcome['citations']:
+            if citation['evidence_id'] == evidence[0]['id']:
+                citation['quote'] = quote
+    result = await review(evidence, AsyncMock(return_value=answer))
+    assert (result['status'] == 'requirements_supported') is accepted
+    assert (result['status'] == 'grading_unavailable') is not accepted
+
 def test_grading_timeout_ends_before_the_recovery_deadline():
     from app.services.certification_versions.automatic_review import REVIEW_TIMEOUT_SECONDS
     from app.services.certification_versions.review_recovery import REVIEW_RECOVERY_SECONDS

@@ -12,6 +12,7 @@ import hashlib
 from importlib.metadata import version
 import json
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -87,6 +88,35 @@ class ReviewResponse(ContractModel):
     outcomes: tuple[OutcomeDecision, ...] = Field(min_length=1, max_length=32)
 
 
+_JSON_ESCAPE = re.compile(r'\\(["\\/bfnrt]|u[0-9a-fA-F]{4})')
+
+
+def _spaced(text):
+    return ' '.join(text.split())
+
+
+def quote_found(quote, text):
+    """Whether a citation is a verbatim span of the evidence as a person reads it.
+
+    Evidence records are JSON, often with JSON nested inside strings, so a
+    faithful quote may drop escape backslashes or turn an escaped line break
+    into a space. Decoding escapes and collapsing whitespace adds no words.
+    """
+    if quote in text:
+        return True
+    needle = _spaced(quote)
+    if not needle:
+        return False
+    for _ in range(3):  # One level per nested JSON encoding.
+        if needle in _spaced(text):
+            return True
+        decoded = _JSON_ESCAPE.sub(lambda match: json.loads('"\\' + match.group(1) + '"'), text)
+        if decoded == text:
+            return False
+        text = decoded
+    return needle in _spaced(text)
+
+
 def validate_decisions(response, outcomes, evidence):
     ids = [decision.outcome_id for decision in response.outcomes]
     if len(set(ids)) != len(ids) or set(ids) != {outcome.id for outcome in outcomes}:
@@ -97,7 +127,7 @@ def validate_decisions(response, outcomes, evidence):
         kinds = set()
         for citation in decision.citations:
             item = by_id.get(citation.evidence_id)
-            if item is None or not citation.quote.strip() or citation.quote not in item.text:
+            if item is None or not citation.quote.strip() or not quote_found(citation.quote, item.text):
                 raise ValueError('The reviewer cited missing or fabricated evidence')
             kinds.add(item.kind)
         if decision.verdict == 'supported' and not requirements[decision.outcome_id] <= kinds:
@@ -160,18 +190,28 @@ def ordering_violations(outcomes, evidence):
     return violations
 
 
-def citation_problems(response, evidence):
-    """Learner-free feedback naming each citation that is not a verbatim span."""
+def citation_problems(response, evidence, outcomes=()):
+    """Learner-free feedback naming each citation that is not a verbatim span,
+    and each supported outcome missing a required evidence kind."""
     by_id = {item.id: item for item in evidence}
+    requirements = {outcome.id: set(outcome.evidence) for outcome in outcomes}
     problems = []
     for decision in response.outcomes:
+        kinds = set()
         for citation in decision.citations:
             item = by_id.get(citation.evidence_id)
             if item is None:
                 problems.append(f'{decision.outcome_id}: evidence ID {citation.evidence_id!r} does not exist.')
-            elif citation.quote not in item.text:
+            elif not quote_found(citation.quote, item.text):
                 problems.append(f'{decision.outcome_id}: the quote from {citation.evidence_id!r} is not an exact '
                                 'contiguous span of that evidence text.')
+            else:
+                kinds.add(item.kind)
+        if decision.verdict == 'supported':
+            for kind in sorted(requirements.get(decision.outcome_id, set()) - kinds):
+                ids = ', '.join(repr(item.id) for item in evidence if item.kind == kind)
+                problems.append(f'{decision.outcome_id}: a supported verdict must also cite {kind} evidence '
+                                f'({ids}); quote the span that supports it, or change the verdict.')
     return problems
 
 
@@ -228,9 +268,9 @@ async def _call_model(model_name, system_config, payload):
     def check_citations(output):
         # Let the model repair a misquoted span once; the caller still
         # re-validates everything independently.
-        problems = citation_problems(output, evidence)
+        problems = citation_problems(output, evidence, outcomes)
         if problems:
-            raise ModelRetry('Fix these citations by copying a shorter span exactly as it appears '
+            raise ModelRetry('Fix these citations. Copy each quote as a short span exactly as it appears '
                              'in one evidence text:\n' + '\n'.join(problems))
         try:
             validate_decisions(output, outcomes, evidence)
