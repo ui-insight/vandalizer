@@ -11,7 +11,7 @@ vi.mock('../../api/validationSuite', () => ({ getValidationWork: vi.fn(), getVal
 vi.mock('./SavedAutomaticReviews', () => ({ SavedAutomaticReviews: () => <p>Saved feedback</p> }))
 const definition: ValidationCase = { id: 'case', revision: 1, module_id: 'validation_qa', case_sha256: 'a'.repeat(64),
   provenance: 'authored_validation_assignment_not_observed_failure_or_retest', notice: 'Draft feedback only', task: 'Check a complete representative suite.',
-  instructions: ['Inspect both sources.'], exclusions: ['No staff review.'], flawed_proposal: 'Use annual totals.',
+  instructions: ['Inspect both sources.'], exclusions: ['No staff review.'], flawed_proposal: 'Use annual totals.', proposed_expectations: [],
   fields: [{ title: 'Principal Investigator', meaning: 'Lead PI', comparison: 'person_name' }, { title: 'Total Project Budget', meaning: 'Full budget', comparison: 'usd_amount' }, { title: 'Named Co-PI', meaning: 'Explicit Co-PI only', comparison: 'person_name_or_explicit_absence' }],
   sources: [{ id: 'nsf', filename: 'nsf.pdf', sha256: 'b'.repeat(64), coverage: 'Annual ambiguity' }, { id: 'nih', filename: 'nih.pdf', sha256: 'c'.repeat(64), coverage: 'Absent Co-PI' }],
   questions: [{ id: 'suite_design', phase: 'before_original_run', prompt: 'Explain coverage and limitations.' }, { id: 'repair_review', phase: 'after_complete_retest', prompt: 'Explain causal repair and full retest.' }] }

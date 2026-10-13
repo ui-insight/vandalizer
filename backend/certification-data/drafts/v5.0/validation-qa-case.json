@@ -8,7 +8,7 @@
   "task": "Build and execute a representative two-source suite for Principal Investigator, Total Project Budget and Named Co-PI. Demonstrate an observed annual-versus-project budget failure, preserve its original evidence, repair the same extraction and rerun the complete unchanged suite with source-supported results.",
   "instructions": [
     "Use both complete assigned synthetic proposals. Compare their project-wide budgets with annual totals, and distinguish an explicitly named Co-PI from a person assigned another role. Do not substitute an unrelated document or an excerpt that removes a difficult value.",
-    "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test.",
+    "Use an owned extraction with exactly the three required field titles. Before running, save your expected result and source justification for every field in both cases. Record an explicit absence for an unnamed role; an empty, skipped or unreviewed expectation is not a test. The form opens with expectations an agent drafted from the extraction; check every value and quote against the complete source and correct any that the source does not support before saving.",
     "Begin with the deliberately flawed budget instruction from this case in your owned extraction. Inspect the saved field instructions, complete sources, expected values, runtime models and bounded scope before explicitly approving the original suite run. The authored flaw is not itself an observed failure.",
     "Run every required case against that exact saved revision. Inspect actual per-field outputs and comparisons. A technical failure is unavailable evidence; it does not establish the semantic mismatch required for this exercise. A favorable quality badge cannot replace a source check.",
     "Preserve the original suite and actual failure. Correct the field instruction in the same owned extraction. Capture its new revision and explain how the change addresses the observed mismatch. Keep the same complete source set and checked expectations; do not delete the failing case, change its answer to match the wrong output or substitute a different artifact.",
@@ -158,6 +158,86 @@
           "quote": "Dr. Raj Patel Co-Investigator 10% Computer Science"
         }
       ]
+    }
+  ],
+  "proposed_expectations": [
+    {
+      "source_id": "nsf",
+      "field": "Principal Investigator",
+      "expected_kind": "value",
+      "expected_value": "Dr. Sarah Chen",
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Principal Investigator: Dr. Sarah Chen"
+        }
+      ],
+      "source_reason": "The proposal labels Dr. Sarah Chen as Principal Investigator."
+    },
+    {
+      "source_id": "nsf",
+      "field": "Total Project Budget",
+      "expected_kind": "value",
+      "expected_value": "177000",
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Total $177,000"
+        }
+      ],
+      "source_reason": "The Total row of the budget table gives the project budget."
+    },
+    {
+      "source_id": "nsf",
+      "field": "Named Co-PI",
+      "expected_kind": "value",
+      "expected_value": "Dr. Michael Torres",
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Co-PI: Dr. Michael Torres"
+        }
+      ],
+      "source_reason": "The proposal labels Dr. Michael Torres as Co-PI."
+    },
+    {
+      "source_id": "nih",
+      "field": "Principal Investigator",
+      "expected_kind": "value",
+      "expected_value": "Dr. James Park",
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Principal Investigator: Dr. James Park"
+        }
+      ],
+      "source_reason": "The proposal labels Dr. James Park as Principal Investigator."
+    },
+    {
+      "source_id": "nih",
+      "field": "Total Project Budget",
+      "expected_kind": "value",
+      "expected_value": "1250000",
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Total Budget: $1,250,000"
+        }
+      ],
+      "source_reason": "The proposal states the total budget on page 1."
+    },
+    {
+      "source_id": "nih",
+      "field": "Named Co-PI",
+      "expected_kind": "explicit_absence",
+      "expected_value": null,
+      "source_references": [
+        {
+          "page": 1,
+          "quote": "Dr. Lisa Yamamoto Co-Investigator 15% Psychology"
+        }
+      ],
+      "source_reason": "The personnel list names Co-Investigators but no one labeled Co-PI."
     }
   ],
   "review_guidance": [

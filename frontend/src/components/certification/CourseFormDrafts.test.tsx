@@ -23,6 +23,18 @@ function form(value = capture, user = 'draft-learner', locked = false) {
 const key = courseDraftKey('draft-learner', ['validation-expectations', capture.enrollment_id, capture.manifest_sha256, capture.uuid, capture.input_snapshot_sha256, capture.case.case_sha256])
 beforeEach(() => { sessionStorage.clear(); vi.restoreAllMocks(); send.mockReset() })
 
+it('opens on the agent draft and sends the learner\'s correction, not the drafted value', () => {
+  render(form())
+  const budget = screen.getAllByLabelText('Expected value')[1]
+  expect(budget).toHaveValue('177000')
+  expect(screen.getAllByLabelText('Exact source quote')[1]).toHaveValue('Total $177,000')
+  fireEvent.change(budget, { target: { value: '485000' } })
+  fireEvent.change(screen.getAllByLabelText('Exact source quote')[1], { target: { value: 'Requested Amount: $485,000' } })
+  fireEvent.change(screen.getByLabelText(capture.case.questions.find(q => q.id === 'suite_design')!.prompt), { target: { value: 'Both complete proposals, every field, including the explicit NIH Co-PI absence.' } })
+  fireEvent.submit(screen.getByRole('form', { name: 'Save representative test expectations' }))
+  expect(send.mock.calls[0][0].body.expectations[1]).toMatchObject({ source_id: 'nsf', field: 'Total Project Budget', expected_value: '485000' })
+  expect(send.mock.calls[0][0].body.expectations[5]).toMatchObject({ source_id: 'nih', field: 'Named Co-PI', expected_kind: 'explicit_absence', expected_value: null })
+})
 it('restores authored expectations and source quotes after unmount without submitting', () => {
   let view = render(form())
   fireEvent.change(screen.getAllByLabelText('Expected value')[0], { target: { value: 'Original expected value' } })
@@ -57,7 +69,8 @@ it.each(['user', 'enrollment', 'manifest', 'capture', 'input', 'case'])('isolate
   if (binding === 'input') changed.input_snapshot_sha256 = 'f'.repeat(64)
   if (binding === 'case') changed.case.case_sha256 = 'f'.repeat(64)
   view.rerender(form(changed, binding === 'user' ? 'another-learner' : 'draft-learner'))
-  expect(screen.getAllByLabelText('Expected value')[0]).toHaveValue('')
+  // A different binding starts again from the agent's draft, never another draft's answers.
+  expect(screen.getAllByLabelText('Expected value')[0]).toHaveValue(capture.case.proposed_expectations[0].expected_value)
   fireEvent.change(screen.getAllByLabelText('Expected value')[0], { target: { value: 'New course answer' } })
   view.rerender(form())
   expect(screen.getAllByLabelText('Expected value')[0]).toHaveValue('Original private answer')
@@ -69,7 +82,7 @@ it('rejects stored expectations for different source fields without submitting o
   sessionStorage.setItem(key, raw)
   render(form())
   expect(screen.getByRole('status')).toHaveTextContent('could not restore a valid draft')
-  expect(screen.getAllByLabelText('Expected value')[0]).toHaveValue('')
+  expect(screen.getAllByLabelText('Expected value')[0]).toHaveValue(capture.case.proposed_expectations[0].expected_value)
   expect(sessionStorage.getItem(key)).toBe(raw)
   expect(send).not.toHaveBeenCalled()
 })

@@ -91,7 +91,15 @@ async def test_rejects_unowned_incomplete_or_untraceable_expectations(repo, chan
         body['consent'] = 'execute_validation'
     elif change == 'client_grade':
         body['passed'] = True
-    with pytest.raises(ValueError):
+    owned, page, absence = 'owned original validation capture', 'found on the stated original source page', 'explicit absence requires null'
+    reasons = {'actor': 'require the authenticated learner', 'foreign_capture': owned, 'missing_capture': owned,
+               'capture_digest': 'exact original captured source and extraction', 'case': 'belong to another assignment',
+               'missing_pair': 'at least 6 items', 'duplicate_pair': 'every required field in both sources',
+               'empty_expected': 'Empty expected values', 'null_as_value': absence, 'text_as_absence': absence,
+               'wrong_page': page, 'fabricated_quote': page, 'blank_reason': 'Explain why the source supports',
+               'blank_design': 'representative coverage and its limits', 'consent': 'save_checked_representative_expectations',
+               'client_grade': 'Extra inputs are not permitted'}
+    with pytest.raises(ValueError, match=reasons[change]):
         await submit(repo, f, body, actor='foreign' if change == 'actor' else None)
     assert await CertificationLearnerDecision.get_motor_collection().count_documents({}) == 0
 

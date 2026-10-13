@@ -4,6 +4,7 @@ export interface ValidationCase {
   id: string; revision: number; module_id: 'validation_qa'; case_sha256: string
   provenance: 'authored_validation_assignment_not_observed_failure_or_retest'
   notice: string; task: string; instructions: string[]; exclusions: string[]; flawed_proposal: string
+  proposed_expectations: ValidationExpectation[]
   fields: { title: ValidationField; meaning: string; comparison: string }[]
   sources: { id: ValidationSourceId; filename: string; sha256: string; coverage: string }[]
   questions: { id: 'suite_design' | 'repair_review'; phase: string; prompt: string }[]

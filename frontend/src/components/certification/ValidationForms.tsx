@@ -7,8 +7,14 @@ import { ValidationRunEvidence, validationButton as button, validationControl as
 export const newValidationId = () => crypto.randomUUID().replaceAll('-', '')
 const box = 'min-w-0 space-y-3 rounded-lg border border-gray-300 px-[6px] py-3 sm:p-3'
 export function ValidationExpectationsForm({ capture, locked, send }: { capture: ValidationCapture; locked: boolean; send: (r: ValidationRequest) => void }) {
+  // The form opens on the agent's draft, which the learner must check; it contains an unsupported value.
+  const drafted = (sourceId: string, title: string) => capture.case.proposed_expectations.find(item => item.source_id === sourceId && item.field === title)
   const initial: { expectations: ValidationExpectation[]; design: string } = {
-    expectations: capture.case.sources.flatMap(source => capture.case.fields.map(field => ({ source_id: source.id, field: field.title, expected_kind: 'value', expected_value: '', source_references: [{ page: 1, quote: '' }], source_reason: '' }))), design: '',
+    expectations: capture.case.sources.flatMap(source => capture.case.fields.map(field => {
+      const draft = drafted(source.id, field.title)
+      return draft ? { ...draft, source_references: [{ ...draft.source_references[0] }] }
+        : { source_id: source.id, field: field.title, expected_kind: 'value' as const, expected_value: '', source_references: [{ page: 1, quote: '' }], source_reason: '' }
+    })), design: '',
   }
   function validDraft(value: unknown): value is typeof initial {
     if (!value || typeof value !== 'object') return false
@@ -29,7 +35,7 @@ export function ValidationExpectationsForm({ capture, locked, send }: { capture:
     ['validation-expectations', capture.enrollment_id, capture.manifest_sha256, capture.uuid, capture.input_snapshot_sha256, capture.case.case_sha256], initial, validDraft)
   const update = (index: number, value: Partial<ValidationExpectation>) => setDraft(draft => ({ ...draft, expectations: draft.expectations.map((e, i) => i === index ? { ...e, ...value } : e) }))
   return <form aria-label="Save representative test expectations" className={box} onSubmit={e => { e.preventDefault(); send({ action: 'suite', body: { request_id: newValidationId(), input_snapshot_id: capture.uuid, input_snapshot_sha256: capture.input_snapshot_sha256, case_sha256: capture.case.case_sha256, expectations, suite_design: design, consent: 'save_checked_representative_expectations_before_execution' } }) }}>
-    <h5 className="text-base font-semibold">Save your expectations before running</h5><p className="text-sm">Read both complete PDFs. For each field, enter the source-supported value or explicit absence, a page quote, and why that evidence supports your choice. Saving does not approve execution or mark your answers correct.</p>
+    <h5 className="text-base font-semibold">Save your expectations before running</h5><p className="text-sm">An agent drafted these expectations from the extraction. Read both complete PDFs and check every value, quote and reason; correct any that the source does not support. Saving does not approve execution or mark your answers correct.</p>
     {expectations.map((item, i) => <fieldset key={`${item.source_id}:${item.field}`} disabled={locked} className={box}><legend className="px-1 text-sm font-semibold">{item.source_id.toUpperCase()} · {item.field}</legend>
       <label className="block text-sm">Expectation type<select className={control} value={item.expected_kind} onChange={e => update(i, { expected_kind: e.target.value as ValidationExpectation['expected_kind'], expected_value: e.target.value === 'explicit_absence' ? null : '' })}><option value="value">Known value</option><option value="explicit_absence">Explicit absence</option></select></label>
       {item.expected_kind === 'value' && <label className="block text-sm">Expected value<input className={control} required maxLength={1000} value={item.expected_value || ''} onChange={e => update(i, { expected_value: e.target.value })} /></label>}

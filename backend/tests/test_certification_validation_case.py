@@ -8,6 +8,7 @@ import shutil
 
 import fitz
 import pytest
+from pydantic import ValidationError
 
 from app.services.certification_versions.catalog import CATALOG_ROOT, CourseCatalog, CourseCatalogError
 from app.services.certification_versions.outcomes import OutcomeContract
@@ -85,6 +86,36 @@ def test_rejects_shortcuts_that_remove_representative_coverage_or_actual_failure
         ValidationCase.model_validate(design)
 
 
+def test_agent_draft_is_wrong_only_on_the_annual_budget(design):
+    case = ValidationCase.model_validate(design)
+    authored = {(e.source_id, e.field): e.expected_value for e in case.expectations}
+    wrong = [p for p in case.proposed_expectations if p.expected_value != authored[(p.source_id, p.field)]]
+    assert [(p.source_id, p.field, p.expected_value) for p in wrong] == [('nsf', 'Total Project Budget', '177000')]
+    assert case.public_definition()['proposed_expectations'][1]['expected_value'] == '177000'
+    assert 'expectations' not in case.public_definition()
+
+
+@pytest.mark.parametrize('change', ['none_wrong', 'two_wrong', 'missing_pair'])
+def test_agent_draft_must_be_wrong_on_exactly_one_value(design, change):
+    if change == 'none_wrong':
+        design['proposed_expectations'][1]['expected_value'] = '485000'
+    elif change == 'two_wrong':
+        design['proposed_expectations'][4]['expected_value'] = '304000'
+    else:
+        design['proposed_expectations'].pop()
+    with pytest.raises(ValidationError):
+        ValidationCase.model_validate(design)
+
+
+def test_agent_draft_quotes_must_be_on_the_source_page(design):
+    data = (DRAFT / 'documents/nsf-proposal-alpine-ecology.pdf').read_bytes()
+    with fitz.open(stream=data, filetype='pdf') as pdf:
+        pages = [p.get_text() for p in pdf]
+    design['proposed_expectations'][1]['source_references'][0]['quote'] = 'Total project budget $177,000'
+    with pytest.raises(ValueError, match='quotes text not on its source page'):
+        ValidationCase.model_validate(design).verify_source('nsf', data, pages)
+
+
 @pytest.mark.parametrize('change', ['source_bytes', 'anchor', 'expected_value', 'exercise_key', 'count_award', 'rubric_evidence'])
 def test_source_exercise_and_rubric_bindings_cannot_be_replaced(design, change):
     data = (DRAFT / 'documents/nsf-proposal-alpine-ecology.pdf').read_bytes()
@@ -98,6 +129,8 @@ def test_source_exercise_and_rubric_bindings_cannot_be_replaced(design, change):
         design['expectations'][0]['anchors'][0]['quote'] = 'An invented original source passage'
     elif change == 'expected_value':
         design['expectations'][1]['expected_value'] = '177000'
+        # Keep the agent draft wrong on exactly one value so the source check is what rejects it.
+        design['proposed_expectations'][1]['expected_value'] = '485000'
         # Preserve a genuine annual figure elsewhere; the whole-project anchor
         # alone must not be accepted as support for that altered value.
         design['expectations'][1]['anchors'] = [design['expectations'][1]['anchors'][0]]

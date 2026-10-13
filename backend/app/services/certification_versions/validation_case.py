@@ -48,6 +48,16 @@ class ValidationExpectation(ContractModel):
         return self
 
 
+class ProposedExpectation(ContractModel):
+    """One agent-drafted expected value shown to the learner before saving."""
+    source_id: Literal['nsf', 'nih']
+    field: Literal['Principal Investigator', 'Total Project Budget', 'Named Co-PI']
+    expected_kind: Literal['value', 'explicit_absence']
+    expected_value: str | None = Field(max_length=1000)
+    source_references: tuple[SourceAnchor, ...] = Field(min_length=1, max_length=1)
+    source_reason: str = Field(min_length=20, max_length=600)
+
+
 class ValidationQuestion(ContractModel):
     id: Literal['suite_design', 'repair_review']
     outcome_id: str
@@ -70,6 +80,8 @@ class ValidationCase(ContractModel):
     flawed_proposal: str = Field(min_length=100, max_length=4000)
     questions: tuple[ValidationQuestion, ...] = Field(min_length=2, max_length=2)
     expectations: tuple[ValidationExpectation, ...] = Field(min_length=6, max_length=6)
+    # Prefilled agent draft; exactly one value disagrees with its source, so accepting it is not a test.
+    proposed_expectations: tuple[ProposedExpectation, ...] = Field(min_length=6, max_length=6)
     review_guidance: tuple[ProcessReviewGuidance, ...] = Field(min_length=2, max_length=2)
     suite_rule: Literal['learner_checked_expectations_for_every_field_and_source_preserved_across_revisions']
     execution_rule: Literal['actual_saved_owned_revision_each_required_case_before_and_after_no_historical_badge']
@@ -94,6 +106,14 @@ class ValidationCase(ContractModel):
             raise ValueError('The learner must design the suite before execution and explain the actual retest afterward')
         if {item.outcome_id for item in self.review_guidance} != set(EVIDENCE):
             raise ValueError('Both practical outcomes require separate guidance')
+        authored = {(item.source_id, item.field): item.expected_value for item in self.expectations}
+        if [(item.source_id, item.field) for item in self.proposed_expectations] != [(s, f) for s in SOURCES for f in FIELDS]:
+            raise ValueError('The agent draft needs one expectation per source and field, in order')
+        if any((item.expected_kind == 'explicit_absence') != (item.expected_value is None) for item in self.proposed_expectations):
+            raise ValueError('An agent-drafted absence must be explicit')
+        wrong = [item for item in self.proposed_expectations if item.expected_value != authored[(item.source_id, item.field)]]
+        if len(wrong) != 1:
+            raise ValueError('The agent draft must disagree with its source on exactly one value')
         return self
 
     @property
@@ -129,6 +149,11 @@ class ValidationCase(ContractModel):
                     token = '$' + f'{int(token):,}'
                 if not any(token in anchor.quote for anchor in expectation.anchors):
                     raise ValueError('The expected value is not supported by its authored source anchors')
+        # Draft quotes are real, including the wrong one: the mistake is reading, not invention.
+        for proposed in (item for item in self.proposed_expectations if item.source_id == source_id):
+            for anchor in proposed.source_references:
+                if anchor.page > len(page_texts) or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split()):
+                    raise ValueError('An agent-drafted expectation quotes text not on its source page')
 
     def verify_exercise(self, exercise):
         if (exercise.get('documents') != [s.filename for s in self.sources]

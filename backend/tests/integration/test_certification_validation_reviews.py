@@ -136,7 +136,14 @@ async def test_source_checks_veto_a_scripted_favorable_model_verdict(repo, wrong
     assessed = await enrollment_fixtures.evaluate_review(repo, f.learner, f.package, prepared['attempt_id'], judge)
     result = assessed['result']['assessment']
     assert result['status'] == 'revision_required' and result['passed'] is False
-    assert any(o['verdict'] == 'contradicted' for o in result['outcomes'])
+    verdicts = {o['outcome_id']: o for o in result['outcomes']}
+    if wrong_expected:
+        # Keeping the agent's drafted 177000 as ground truth fails the test-design outcome itself.
+        assert f.case.proposed_expectations[1].expected_value == '177000'
+        assert verdicts['validation_qa.representative_tests']['verdict'] == 'contradicted'
+        assert 'disagrees with its original source' in verdicts['validation_qa.representative_tests']['explanation']
+    else:
+        assert verdicts['validation_qa.repair_and_retest']['verdict'] == 'contradicted'
     assert all(o['verdict'] == 'supported' for o in result['model_outcomes'])
     assert result['credit_awarded'] is result['staff_review_required'] is False
 

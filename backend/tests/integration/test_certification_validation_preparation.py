@@ -116,8 +116,16 @@ async def test_invalid_plan_never_claims_or_executes_a_run(repo, change):
                            suite_id=f.suite['uuid'], suite_record_sha256=encode(f.suite)[1])
     elif change == 'client_authority':
         f.plan_body['approved'] = True
+    exact = 'exact owned capture and saved source-checked suite'
+    retest = 'both the original run and its exact saved digest'
+    reasons = {'actor': 'Only the authenticated learner', 'capture': exact, 'suite': exact, 'capture_hash': exact, 'suite_hash': exact,
+               'case': 'another representative validation case', 'retest_id_only': retest, 'retest_hash_only': retest,
+               'missing_original': 'exact original failed semantic result',
+               'different_original_revision': 'revision on which the learner designed this suite',
+               'unconfigured_model': 'explicit configured model', 'image_mode': 'requires captured text inputs',
+               'client_authority': 'Extra inputs are not permitted'}
     with patch('app.services.extraction_engine.ExtractionEngine.extract') as provider:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=reasons[change]):
             await prepare(repo, f, config=config, actor='foreign' if change == 'actor' else None)
         provider.assert_not_called()
     assert await CertificationLabExecution.get_motor_collection().count_documents({}) == 0
