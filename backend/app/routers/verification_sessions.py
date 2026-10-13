@@ -16,9 +16,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
-from app.models.extraction_test_case import ExtractionTestCase
 from app.models.user import User
 from app.models.verification_session import VerificationSession
+from app.services import extraction_validation_service as val_svc
 
 router = APIRouter()
 
@@ -140,15 +140,18 @@ async def finalize_session(
             expected_values[f.key] = f.expected
 
     label = body.label or s.label or s.document_title or s.document_uuid
-    tc = ExtractionTestCase(
+    # Through the service, as the editor's Add Documents is: it saves the
+    # document's text with the test case, so it still runs if the document
+    # is deleted or the template is shared. Built here directly, chat-made
+    # test cases had none and the Validate tab warned about it (support ticket).
+    tc = await val_svc.create_test_case(
         search_set_uuid=s.search_set_uuid,
         label=label,
         source_type="document",
+        user_id=user.user_id,
         document_uuid=s.document_uuid,
         expected_values=expected_values,
-        user_id=user.user_id,
     )
-    await tc.insert()
 
     s.status = "completed"
     s.test_case_uuid = tc.uuid
