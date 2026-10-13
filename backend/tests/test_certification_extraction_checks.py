@@ -47,6 +47,13 @@ def test_execution_completeness_is_not_a_claim_of_correct_values(entities, passe
     assert (run, snapshot) == original
 
 
+def test_many_unrelated_output_fields_cannot_stand_in_for_the_requested_ones():
+    run, snapshot = records([{**{f'Unique test field {n}': 'value' for n in range(20)}, 'Budget': '1250000'}])
+    result = check_extraction_execution(CONTRACT, run, snapshot)
+    assert result['passed'] is False and result['status'] == 'revision_required'
+    assert 'every requested field' in result['explanation']
+
+
 @pytest.mark.parametrize('change', ['source', 'artifact', 'approval', 'late_approval', 'result', 'unfinished', 'case', 'case_reference', 'requirement'])
 def test_rejects_unbound_or_reinterpreted_execution_evidence(change):
     run, snapshot = records([{'Budget': '1250000', 'Postdoc': None}])
@@ -72,5 +79,9 @@ def test_rejects_unbound_or_reinterpreted_execution_evidence(change):
         module = next(item for item in value['modules'] if item['module_id'] == 'extraction_engine')
         next(item for item in module['outcomes'] if item['method'] == 'deterministic')['passing_conditions'] = ['A changed requirement not implemented by this checker.']
         contract = OutcomeContract.model_validate(value)
-    with pytest.raises(CourseCatalogError):
+    reasons = {'source': 'document other than the one assigned source', 'artifact': 'saved field revision',
+               'approval': 'lacks the learner approval', 'late_approval': 'lacks the learner approval',
+               'result': 'different run or approval', 'unfinished': 'has not completed', 'case': 'assigned repair example',
+               'case_reference': 'lacks the learner approval', 'requirement': 'no matching verified checker'}
+    with pytest.raises(CourseCatalogError, match=reasons[change]):
         check_extraction_execution(contract, run, snapshot)

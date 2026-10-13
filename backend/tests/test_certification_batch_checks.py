@@ -108,7 +108,17 @@ def test_rejects_unrelated_incomplete_or_invented_receipt_inventory(work, change
         elif change == 'controlled_after_dispatch':
             fail_middle(work)
             results[1]['extraction_started'] = True
-    with pytest.raises(CourseCatalogError):
+    inventory_set, document, run, resources = ('exact distinct assigned input set', 'one assigned input document',
+                                               'different batch, run or attempt', 'no usage, cost or external effect')
+    reasons = {'duplicate': inventory_set, 'missing': inventory_set, 'reordered': inventory_set,
+               'foreign_document': document, 'foreign_source': document, 'artifact': 'captured saved extraction revision',
+               'other_batch': run, 'other_run': run, 'other_item': run, 'other_phase': run,
+               'queued': 'finished as completed or failed', 'unknown_status': 'finished as completed or failed',
+               'fabricated_cost': resources, 'negative_time': resources, 'float_time': resources,
+               'missing_time': 'bounded execution timing', 'no_timezone': 'bounded execution timing', 'external_effect': resources,
+               'invented_success': 'actual started extraction', 'unexplained_failure': 'disclosed failure boundary',
+               'controlled_wrong_source': 'disclosed failure boundary', 'controlled_after_dispatch': 'disclosed failure boundary'}
+    with pytest.raises(CourseCatalogError, match=reasons[change]):
         inventory(work)
 
 

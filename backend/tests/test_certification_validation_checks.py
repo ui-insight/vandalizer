@@ -105,7 +105,10 @@ def test_rejects_unbound_or_incomplete_case_inventory(change):
         results[1] = deepcopy(results[0])
     else:
         cases[0]['expectations'].pop()
-    with pytest.raises(CourseCatalogError):
+    reasons = {'source_id': 'every distinct assigned case', 'source_hash': 'exact source', 'artifact_hash': 'captured artifact revision',
+               'case_removed': 'every distinct assigned case', 'case_duplicated': 'every distinct assigned case',
+               'field_removed': 'required logical field must be represented'}
+    with pytest.raises(CourseCatalogError, match=reasons[change]):
         check_suite(case, snapshot, cases, results)
 
 

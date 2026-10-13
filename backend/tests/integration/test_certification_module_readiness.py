@@ -125,19 +125,22 @@ async def test_cross_owner_cross_module_and_inapplicable_selections_are_rejected
     request_id = uuid4().hex
     await existing.submit_scenario(repo, source, package, bank, answers, request_id)
     reader = ModuleReadiness(repo)
-    for module_id, selected in [('ai_literacy', {'review_attempt_id': request_id}),
-                                ('foundations', {'scenario_attempt_id': request_id}),
-                                ('missing_module', {}), ('ai_literacy', {'scenario_attempt_id': ''})]:
-        with pytest.raises(EnrollmentConflict):
+    for module_id, selected, reason in [('ai_literacy', {'review_attempt_id': request_id}, 'requires scenario answers'),
+                                        ('foundations', {'scenario_attempt_id': request_id}, 'does not require a scenario'),
+                                        ('missing_module', {}, 'no competency outcomes'),
+                                        ('ai_literacy', {'scenario_attempt_id': ''}, 'by its exact identity')]:
+        with pytest.raises(EnrollmentConflict, match=reason):
             await reader.preview(source.user_id, source.uuid, module_id, **selected)
-    with pytest.raises(EnrollmentConflict):
+    with pytest.raises(EnrollmentConflict, match='selected enrollment is unavailable'):
         await reader.preview('foreign', source.uuid, 'ai_literacy', scenario_attempt_id=request_id)
     other = await repo.ensure_initial('another-learner')
-    with pytest.raises(SavedReviewUnavailable):
+    # A copied attempt ID from another learner or module reads as unavailable,
+    # never as that learner's evidence.
+    with pytest.raises(SavedReviewUnavailable, match='scenario assessment is unavailable'):
         await reader.preview(other.user_id, other.uuid, 'ai_literacy', scenario_attempt_id=request_id)
-    with pytest.raises(SavedReviewUnavailable):
+    with pytest.raises(SavedReviewUnavailable, match='scenario assessment is unavailable'):
         await reader.preview(source.user_id, source.uuid, 'validation_qa', scenario_attempt_id=request_id)
-    with pytest.raises(SavedReviewUnavailable):
+    with pytest.raises(SavedReviewUnavailable, match='saved assessment is unavailable'):
         await reader.preview(source.user_id, source.uuid, 'foundations', review_attempt_id=uuid4().hex)
 
 

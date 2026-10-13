@@ -68,7 +68,12 @@ def test_mixed_or_corrupt_run_evidence_is_not_a_grade(monkeypatch, change):
         run['stage_events'][3] = deepcopy(run['stage_events'][1])
     else:
         run['plan']['input_snapshot_sha256'] = 'f' * 64
-    with pytest.raises(CourseCatalogError):
+    reasons = {'state': 'has not completed', 'source': 'source other than the one assigned document',
+               'artifact': 'one saved workflow revision', 'approval': 'lacks the learner approval', 'case': 'assigned case',
+               'context': 'different stage evidence', 'stage_run': 'different stage evidence',
+               'final_output': 'final deliverable differs', 'terminal_stages': 'result references differ',
+               'other_stage_receipt': 'different stage evidence', 'input_snapshot': 'one saved workflow revision'}
+    with pytest.raises(CourseCatalogError, match=reasons[change]):
         check_connected_execution(contract(), case, run)
 
 

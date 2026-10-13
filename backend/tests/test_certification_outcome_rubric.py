@@ -130,7 +130,12 @@ async def test_mismatched_or_incomplete_original_evidence_never_passes(candidate
         value['selected_receipts'][0]['result_sha256'] = None
     else:
         value['credit_awarded'] = True
-    with pytest.raises(CourseCatalogError):
+    pinned, original, summary = 'no longer matches the pinned course', 'differs from its selected original evidence', 'summary is inconsistent'
+    reasons = {'enrollment_id': pinned, 'manifest_sha256': pinned, 'contract_sha256': pinned, 'module_id': pinned,
+               'missing_outcome': 'does not cover every required outcome', 'method': original, 'reference': original,
+               'summary': summary, 'missing_receipt': 'receipts are incomplete', 'missing_result': 'final result is unavailable',
+               'credit': summary}
+    with pytest.raises(CourseCatalogError, match=reasons[change]):
         await evaluate(candidate, monkeypatch, SELECTED, value)
 
 

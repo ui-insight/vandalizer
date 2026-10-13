@@ -118,7 +118,12 @@ async def test_foreign_or_changed_review_cannot_claim_actual_repair(repo, change
     elif change == 'reuse':
         await submit(repo, f)
         f.review_body['answers']['repair_review'] = 'Changed answer cannot replace the original submission.'
-    with pytest.raises(ValueError):
+    execution = 'completed owned validation execution'
+    reasons = {'actor': 'requires the authenticated learner', 'case': 'exact assigned validation case',
+               'result': 'exact saved validation result', 'missing_run': execution, 'original_only': execution,
+               'unknown_parent': 'owned original validation review', 'blank': 'Explain the actual repair',
+               'extra_evidence': 'Extra inputs are not permitted', 'reuse': 'belongs to different answers'}
+    with pytest.raises(ValueError, match=reasons[change]):
         await submit(repo, f, actor='foreign' if change == 'actor' else None)
 
 

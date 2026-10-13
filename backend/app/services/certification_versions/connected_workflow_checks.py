@@ -18,26 +18,33 @@ def verified_chain(case, run):
         plan, result, authorization = run['plan'], run['result'], run['authorization']
         snapshot = plan['input_snapshot']
         scope = authorization['decision']
-        if (run['state'] != 'completed' or result['status'] != 'completed' or plan['module_id'] != 'multi_step'
+        # Each guard names its own reason so a rejection can be traced to it.
+        if run['state'] != 'completed' or result['status'] != 'completed':
+            raise ValueError('The workflow run has not completed, so there is no result to grade')
+        documents = snapshot['documents']
+        if (len(documents) != 1 or documents[0]['source_sha256'] != case.source_sha256
+                or documents[0]['assigned_filename'] != case.source_filename
+                or plan['source_document_id'] != documents[0]['document_id']
+                or hashlib.sha256(documents[0]['text'].encode()).hexdigest() != documents[0]['text_sha256']):
+            raise ValueError('The run executed a source other than the one assigned document')
+        if (plan['module_id'] != 'multi_step'
                 or plan['uuid'] != run['run_id'] or encode(plan)[1] != run['plan_sha256']
                 or plan['case_sha256'] != case.digest or snapshot['case'] != case.public_definition()
                 or any(snapshot[key] != plan[key] or scope[key] != plan[key] for key in IDENTITY_KEYS)
                 or plan['input_snapshot_id'] != snapshot['uuid'] or plan['input_snapshot_sha256'] != encode(snapshot)[1]
-                or snapshot['artifact_sha256'] != encode(snapshot['artifact'])[1]
-                or len(snapshot['documents']) != 1 or snapshot['documents'][0]['source_sha256'] != case.source_sha256
-                or snapshot['documents'][0]['assigned_filename'] != case.source_filename
-                or plan['source_document_id'] != snapshot['documents'][0]['document_id']
-                or hashlib.sha256(snapshot['documents'][0]['text'].encode()).hexdigest() != snapshot['documents'][0]['text_sha256']
-                or result['run_id'] != run['run_id'] or result['plan_sha256'] != run['plan_sha256']
-                or authorization['run_id'] != run['run_id'] or authorization['plan_sha256'] != run['plan_sha256']
+                or snapshot['artifact_sha256'] != encode(snapshot['artifact'])[1]):
+            raise ValueError('The run does not use the assigned case and one saved workflow revision')
+        if (authorization['run_id'] != run['run_id'] or authorization['plan_sha256'] != run['plan_sha256']
                 or authorization['decision_sha256'] != encode(scope)[1] or run['scope_decision_id'] != scope['uuid']
                 or run['scope_decision_sha256'] != encode(scope)[1]
                 or scope['run_id'] != run['run_id'] or scope['plan_sha256'] != run['plan_sha256']
                 or scope['case_sha256'] != case.digest or scope['input_snapshot_sha256'] != plan['input_snapshot_sha256']
                 or scope['submission']['choice'] != 'approve' or scope['run_state_at_submission'] != 'prepared'
-                or scope['submission_channel'] != 'authenticated_learner_request'
+                or scope['submission_channel'] != 'authenticated_learner_request'):
+            raise ValueError('The run lacks the learner approval of this exact run before it started')
+        if (result['run_id'] != run['run_id'] or result['plan_sha256'] != run['plan_sha256']
                 or result['authorization_sha256'] != encode(authorization)[1]):
-            raise ValueError('The run does not bind one approved owned revision and assigned source')
+            raise ValueError('The terminal result belongs to a different run or approval')
         events = run['stage_events']
         serialized, digest = encode(events)
         if result['stage_events_sha256'] != digest or result['stage_event_count'] != len(events):
@@ -55,7 +62,8 @@ def verified_chain(case, run):
     except CourseCatalogError:
         raise
     except (KeyError, TypeError, ValueError, IndexError) as exc:
-        raise CourseCatalogError('The connected execution evidence does not bind one complete approved chain') from exc
+        reason = f': {exc}' if type(exc) is ValueError else ''
+        raise CourseCatalogError(f'The connected execution evidence does not bind one complete approved chain{reason}') from exc
 
 
 def check_connected_execution(contract, case, run):

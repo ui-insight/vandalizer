@@ -25,15 +25,20 @@ def item_id(batch_id, document_id):
 
 def check_item(case, snapshot, result, *, batch_id, run_id, attempt_kind):
     source = next((s for s in snapshot['documents'] if s['source_id'] == result.get('source_id')), None)
+    # Each guard names its own reason so a rejection can be traced to it.
     if (source is None or snapshot['case'] != case.public_definition()
-            or result.get('document_id') != source['document_id'] or result.get('source_sha256') != source['source_sha256']
-            or result.get('artifact_sha256') != snapshot['artifact_sha256']
-            or result.get('batch_id') != batch_id or result.get('run_id') != run_id
-            or result.get('item_id') != item_id(batch_id, source['document_id']) or result.get('attempt_kind') != attempt_kind
-            or result.get('status') not in ('completed', 'failed') or type(result.get('elapsed_ms')) is not int
-            or result['elapsed_ms'] < 0 or result.get('usage') is not None or result.get('cost') is not None
-            or result.get('external_effects') is not False):
-        raise CourseCatalogError('Batch checks require exact original input, revision, run and resource evidence')
+            or result.get('document_id') != source['document_id'] or result.get('source_sha256') != source['source_sha256']):
+        raise CourseCatalogError('A batch item must come from one assigned input document')
+    if result.get('artifact_sha256') != snapshot['artifact_sha256']:
+        raise CourseCatalogError('A batch item must come from the captured saved extraction revision')
+    if (result.get('batch_id') != batch_id or result.get('run_id') != run_id
+            or result.get('item_id') != item_id(batch_id, source['document_id']) or result.get('attempt_kind') != attempt_kind):
+        raise CourseCatalogError('A batch item belongs to a different batch, run or attempt')
+    if result.get('status') not in ('completed', 'failed'):
+        raise CourseCatalogError('A batch item must have finished as completed or failed')
+    if (type(result.get('elapsed_ms')) is not int or result['elapsed_ms'] < 0 or result.get('usage') is not None
+            or result.get('cost') is not None or result.get('external_effects') is not False):
+        raise CourseCatalogError('A batch item must record whole-millisecond timing and no usage, cost or external effect')
     try:
         if any(datetime.datetime.fromisoformat(result[key]).tzinfo is None for key in ('started_at', 'finished_at')):
             raise ValueError('Missing timezone')

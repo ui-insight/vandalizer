@@ -104,7 +104,12 @@ async def test_foreign_or_changed_review_cannot_claim_original_work(repo, change
         f.review_body['retries'].append(f.review_body['retries'][0])
     elif change == 'retry_original':
         f.review_body['retries'][0] = {'run_id': f.original['run_id'], 'result_sha256': encode(f.original['result'])[1]}
-    with pytest.raises(ValueError):
+    saved_result, retry = 'exact complete saved batch or retry result', 'distinct targeted run'
+    reasons = {'actor': 'requires the authenticated learner', 'case': 'exact assigned batch case', 'result': saved_result,
+               'missing': saved_result, 'pilot': saved_result, 'unknown_parent': 'owned original batch review',
+               'blank': 'Explain the actual inventory', 'extra_evidence': 'Extra inputs are not permitted',
+               'reuse': 'belongs to different answers', 'retry_digest': saved_result, 'duplicate_retry': retry, 'retry_original': retry}
+    with pytest.raises(ValueError, match=reasons[change]):
         await submit(repo, f, actor='foreign' if change == 'actor' else None)
 
 

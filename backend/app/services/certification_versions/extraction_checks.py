@@ -21,23 +21,27 @@ def check_extraction_execution(contract, run, snapshot):
     plan, result, authorization = run['plan'], run['result'], run.get('authorization')
     scope = authorization['decision'] if authorization else None
     repair = plan.get('repair_case')
-    if (run['state'] != 'completed' or result is None or result['status'] != 'completed'
-            or plan['module_id'] != 'extraction_engine' or snapshot['module_id'] != 'extraction_engine'
+    # Each guard names its own reason so a rejection can be traced to it.
+    if run['state'] != 'completed' or result is None or result['status'] != 'completed':
+        raise CourseCatalogError('The assigned NIH run has not completed, so there is no result to grade')
+    if (plan['module_id'] != 'extraction_engine' or snapshot['module_id'] != 'extraction_engine'
             or plan['input_snapshot_id'] != snapshot['uuid'] or plan['input_snapshot_sha256'] != encode(snapshot)[1]
-            or encode(snapshot['artifact'])[1] != snapshot['artifact_sha256']
-            or len(snapshot['documents']) != 1 or not repair
-            or result['documents_executed'] != [item['document_id'] for item in snapshot['documents']]
+            or encode(snapshot['artifact'])[1] != snapshot['artifact_sha256'] or not repair
             or repair['input_snapshot_sha256'] != encode(snapshot)[1]
-            or repair['artifact_sha256'] != snapshot['artifact_sha256']
-            or not scope or not plan.get('approval_requirement')
-            or result['run_id'] != run['run_id'] or result['plan_sha256'] != run['plan_sha256']
-            or result.get('authorization_sha256') != encode(authorization)[1]
+            or repair['artifact_sha256'] != snapshot['artifact_sha256']):
+        raise CourseCatalogError('The NIH run evidence does not match the assigned repair example and saved field revision')
+    if len(snapshot['documents']) != 1 or result['documents_executed'] != [item['document_id'] for item in snapshot['documents']]:
+        raise CourseCatalogError('The NIH run executed a document other than the one assigned source')
+    if (not scope or not plan.get('approval_requirement')
             or scope['run_id'] != run['run_id'] or scope['plan_sha256'] != run['plan_sha256']
             or scope['input_snapshot_sha256'] != plan['input_snapshot_sha256']
             or scope['run_state_at_submission'] != 'prepared'
             or scope['submission']['choice'] != plan['approval_requirement']['choice']
             or not repair_reference_matches(repair, scope['submission'].get('repair_case_sha256'))):
-        raise CourseCatalogError('The NIH execution evidence does not bind the approved revision and repair example')
+        raise CourseCatalogError('The NIH run lacks the learner approval of this repair example before it started')
+    if (result['run_id'] != run['run_id'] or result['plan_sha256'] != run['plan_sha256']
+            or result.get('authorization_sha256') != encode(authorization)[1]):
+        raise CourseCatalogError('The NIH result belongs to a different run or approval')
     keys = [field['searchphrase'].strip() for field in snapshot['artifact']['fields']]
     entities = result['entities']
     # A present null optional value is a complete output slot, not a claim of

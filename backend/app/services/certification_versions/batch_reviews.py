@@ -38,9 +38,10 @@ class BatchReviewRequest(ContractModel):
 
     @model_validator(mode='after')
     def complete_answers(self):
+        if len({r.run_id for r in self.retries}) != len(self.retries) or self.run_id in {r.run_id for r in self.retries}:
+            raise ValueError('Each retry must be a distinct targeted run, not a repeat or the original batch')
         if (set(self.answers) != {'batch_review'} or any(not value.strip() for value in self.answers.values())
-                or self.previous_submission_id == self.request_id or len({r.run_id for r in self.retries}) != len(self.retries)
-                or self.run_id in {r.run_id for r in self.retries}):
+                or self.previous_submission_id == self.request_id):
             raise ValueError('Explain the actual inventory and distinct targeted retries; revised answers require a new identity')
         return self
 
