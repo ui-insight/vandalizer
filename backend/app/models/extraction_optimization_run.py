@@ -115,6 +115,13 @@ class ExtractionOptimizationRun(Document):
     excluded_models: list[str] = Field(default_factory=list)
 
     best_config: Optional[dict] = None
+    # The trial ``best_config`` came from. When results tie, the winner is the
+    # setup closest to the current one, not the top scorer, so the UI needs
+    # both to say which is which.
+    best_trial_id: Optional[str] = None
+    # Model the current settings (``baseline_default_score``) were measured
+    # with, so the score can be compared with validation runs on other models.
+    baseline_model: Optional[str] = None
     trials: list[dict] = Field(default_factory=list)
     # Each trial dict shape:
     # {

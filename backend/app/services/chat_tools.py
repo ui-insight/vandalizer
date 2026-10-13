@@ -3840,8 +3840,13 @@ async def get_optimization_run(
     if summary.get("status") == "completed" and not summary.get("applied_at"):
         if summary.get("tied_with_baseline"):
             summary["note"] = (
-                "The best trial is statistically tied with the current config — "
-                "applying would not meaningfully change quality."
+                "No meaningful difference: the top trial is within measurement "
+                "noise of the current settings, so applying would not "
+                "meaningfully change quality. best_config is the simplest setup "
+                "among the tied trials, not the top scorer; give its score "
+                "(best_trial_score_percent) and the top trial's "
+                "(top_trial_score_percent) if you mention it, and quote scores as "
+                "percents (score_percent, baseline_score_percent)."
             )
         else:
             summary["note"] = "Completed and unapplied — offer apply_optimization."
@@ -3984,7 +3989,8 @@ async def apply_optimization(
     baseline = getattr(run, "baseline_default_score", None)
     delta = ""
     if optimized is not None and baseline is not None:
-        delta = f" (score {baseline:.2f} → {optimized:.2f})"
+        # Scores are 0..1; the optimizer screens show whole percents.
+        delta = f" (score {round(baseline * 100)}% → {round(optimized * 100)}%)"
     preview_text = f"Apply the winning autovalidate config to \"{title}\"{delta}."
     if getattr(run, "tied_with_baseline", False):
         preview_text += (

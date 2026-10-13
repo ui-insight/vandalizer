@@ -2064,6 +2064,8 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "excluded_models": getattr(run, "excluded_models", []) or [],
         "judge_model": run.judge_model,
         "best_config": run.best_config,
+        "best_trial_id": getattr(run, "best_trial_id", None),
+        "baseline_model": getattr(run, "baseline_model", None),
         "trials": run.trials,
         "field_breakdown": run.field_breakdown,
         "winner_cross_field_summary": getattr(run, "winner_cross_field_summary", None),

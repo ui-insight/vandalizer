@@ -324,6 +324,7 @@ async def run_optimization(
         await run_doc.save()
 
         default_cfg = effective_extraction_config(ss)
+        run_doc.baseline_model = default_cfg.get("model") or baseline_model
         try:
             default_result = await _run_config_guarded(
                 run_doc,
@@ -610,6 +611,7 @@ async def run_optimization(
                 run_doc.optimized_score_train = winner.get("score")
                 run_doc.optimized_score = winner.get("score")
                 run_doc.best_config = winner.get("config")
+                run_doc.best_trial_id = winner.get("trial_id")
                 best_raw = raw_by_label.get(winner["trial_id"]) or {}
                 run_doc.field_breakdown = list(best_raw.get("field_breakdown") or [])
 
@@ -696,16 +698,6 @@ async def run_optimization(
                     except Exception as e:
                         logger.warning("Holdout re-score (default) failed: %s", e)
 
-                # Generate per-field + cross-field suggestions from the breakdown
-                # + baselines + winner CF rule outcomes.
-                run_doc.suggestions = _generate_suggestions(
-                    field_breakdown=run_doc.field_breakdown,
-                    baseline_no_tool=run_doc.baseline_no_tool_score,
-                    baseline_default=run_doc.baseline_default_score,
-                    optimized=run_doc.optimized_score,
-                    cross_field_rule_breakdown=run_doc.winner_cross_field_rule_breakdown,
-                )
-
                 # Apply-preview rollup (Phase 2): per-field baseline-vs-winner
                 # accuracy deltas so the Apply modal can disclose "K of N
                 # fields will change, R regress" before the override flips.
@@ -788,6 +780,18 @@ async def run_optimization(
             "num_runs": _CERTIFIED_NUM_RUNS,
             "test_cases_needed": max(0, 3 - n_cases),
         }
+
+        # Suggestions quote these scores, so build them from the numbers the
+        # comparison card shows: after the discount above. Built earlier, a
+        # suggestion said "91%" beside a bar reading 92% for the same setup.
+        if run_doc.best_config:
+            run_doc.suggestions = _generate_suggestions(
+                field_breakdown=run_doc.field_breakdown,
+                baseline_no_tool=run_doc.baseline_no_tool_score,
+                baseline_default=run_doc.baseline_default_score,
+                optimized=run_doc.optimized_score,
+                cross_field_rule_breakdown=run_doc.winner_cross_field_rule_breakdown,
+            )
 
         run_doc.status = "completed"
         run_doc.phase = "done"
@@ -1410,7 +1414,7 @@ def _generate_suggestions(
                 "severity": "critical" if accuracy < 0.3 else "warning",
                 "field": name,
                 "message": (
-                    f'Field "{name}" was only right {int(accuracy * 100)}% of the time, even with '
+                    f'Field "{name}" was only right {round(accuracy * 100)}% of the time, even with '
                     "the best settings we tried. Try rewriting its description to be more specific, "
                     "adding example values, or marking it optional if it isn't always present."
                 ),
@@ -1424,7 +1428,7 @@ def _generate_suggestions(
                 "field": name,
                 "message": (
                     f'Field "{name}" gave different answers on different runs '
-                    f"(matched only {int(consistency * 100)}% of the time). Adding 1–2 example "
+                    f"(matched only {round(consistency * 100)}% of the time). Adding 1–2 example "
                     "values to its description usually helps the AI pick the same answer each time."
                 ),
             })
@@ -1441,8 +1445,8 @@ def _generate_suggestions(
             "severity": "info",
             "message": (
                 f"Even with no custom settings at all, the AI already scored "
-                f"{int(baseline_no_tool * 100)}% — about the same as the optimized "
-                f"settings ({int(optimized * 100)}%). For this kind of data, you may not "
+                f"{round(baseline_no_tool * 100)}% — about the same as the optimized "
+                f"settings ({round(optimized * 100)}%). For this kind of data, you may not "
                 "need to fine-tune these settings."
             ),
         })
@@ -1458,7 +1462,7 @@ def _generate_suggestions(
             "kind": "already_good",
             "severity": "info",
             "message": (
-                f"Your current settings already scored {int(baseline_default * 100)}% — "
+                f"Your current settings already scored {round(baseline_default * 100)}% — "
                 "the optimizer barely found anything to improve. Your settings are in good shape."
             ),
         })

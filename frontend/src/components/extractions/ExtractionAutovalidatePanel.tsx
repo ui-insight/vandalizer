@@ -26,6 +26,7 @@ import {
 } from '../../api/extractions'
 import { OptimizationProgressCard, type ProgressRunShape } from '../shared/OptimizationProgressCard'
 import { QualityComparisonCard, type BaselinePoint } from '../shared/QualityComparisonCard'
+import { winnerTrials } from '../../lib/optimizerWinner'
 import { ApplyBackButton } from '../shared/ApplyBackButton'
 import { ApplyPreviewModal } from '../shared/ApplyPreviewModal'
 import { FailedBanner, CancelledBanner, ErrorBanner, PastRunBanner } from '../shared/RunBanners'
@@ -360,6 +361,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
     { id: 'optimized', label: extractionLabels.tuned, score: displayedRun.optimized_score, color: 'var(--workspace-success)', emphasised: true },
   ]
   const isAlreadyApplied = displayedRun.previous_override !== null
+  const { bestTrial, topTrial } = winnerTrials(displayedRun)
 
   // Translate backend suggestions (which carry an extraction-specific 'kind')
   // into the shared component's domain-neutral shape.
@@ -402,6 +404,13 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
         variance={displayedRun.judge_score_se ?? displayedRun.judge_variance ?? 0}
         secondaryBaselineId="no-tool"
       />
+      {displayedRun.baseline_model && (
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: -4 }}>
+          Scores here were measured with {displayedRun.baseline_model}
+          {displayedRun.judge_model ? `, graded by ${displayedRun.judge_model}` : ''}. The Quality score at the top of the
+          editor comes from your last validation run, which may have used a different model, so the two can differ.
+        </div>
+      )}
       {/* The scores above are discounted for a small test set so they sit on the
           same scale as the official quality tile (which applies the same
           discount). Without this, the card read higher than the certified score
@@ -457,6 +466,9 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
       {displayedRun.best_config && (
         <BestConfigCard
           config={displayedRun.best_config}
+          tied={displayedRun.tied_with_baseline}
+          bestTrial={bestTrial}
+          topTrial={topTrial}
           canManage={canManage && !displayedRun.tied_with_baseline}
           isPast={isPast}
           isAlreadyApplied={isAlreadyApplied}
@@ -654,11 +666,18 @@ function IdleHero({
 // Best-config card — structured grid with per-field tooltips (parallel to KB)
 // ---------------------------------------------------------------------------
 
-function BestConfigCard({
-  config, canManage, isPast, isAlreadyApplied,
+const trialPercent = (trial: ExtractionTrial) => `${Math.round((trial.score as number) * 100)}%`
+
+export function BestConfigCard({
+  config, tied, bestTrial, topTrial, canManage, isPast, isAlreadyApplied,
   onApply, applying, onRevert, reverting,
 }: {
   config: Record<string, unknown>
+  /** The top trial was within noise of the current settings. The config is
+   *  then the simplest tied setup, not the highest scorer. */
+  tied: boolean
+  bestTrial: ExtractionTrial | null
+  topTrial: ExtractionTrial | null
   canManage: boolean
   isPast: boolean
   isAlreadyApplied: boolean
@@ -702,7 +721,21 @@ function BestConfigCard({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
-        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
+          {tied ? 'No meaningful difference: simplest equivalent setup' : 'Best configuration'}
+        </span>
+      </div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-12)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+        {bestTrial && <span>This setup scored {trialPercent(bestTrial)} in the trials.</span>}
+        {tied && (
+          <span>
+            The best result was within measurement noise of your current settings, so nothing is recommended over them.
+            This is the simplest of the setups that scored within that range.
+          </span>
+        )}
+        {tied && topTrial && topTrial !== bestTrial && (
+          <span>Top-scoring trial for comparison: {trialPercent(topTrial)} ({summariseExtractionConfig(topTrial.config)}).</span>
+        )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-6)' }}>
         {rows.map(r => (

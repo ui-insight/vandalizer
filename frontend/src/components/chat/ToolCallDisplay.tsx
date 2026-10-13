@@ -370,12 +370,16 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'get_optimization_run': {
       const status = obj.status as string | undefined
-      const score = obj.optimized_score ?? obj.score
-      if (status === 'completed' && typeof score === 'number') {
-        const base = typeof obj.baseline_score === 'number'
-          ? ` (was ${Math.round(obj.baseline_score as number)})`
-          : ''
-        return { text: `Completed, score ${Math.round(score)}/100${base}`, qualityHint: '' }
+      // Run scores are 0..1; score_percent carries the number the optimizer
+      // screens show. Rounding the raw 0.93 read "score 1/100 (was 1)".
+      const percent = (pct: unknown, raw: unknown) => typeof pct === 'number' ? pct
+        : typeof raw === 'number' ? Math.round(raw * 100) : null
+      const score = percent(obj.score_percent, obj.optimized_score ?? obj.score)
+      if (status === 'completed' && score != null) {
+        const was = percent(obj.baseline_score_percent, obj.baseline_score)
+        const base = was != null ? ` (was ${was})` : ''
+        const tie = obj.tied_with_baseline ? ' · no meaningful difference' : ''
+        return { text: `Completed, score ${score}/100${base}${tie}`, qualityHint: '' }
       }
       if (status) {
         const phase = obj.phase ? ` · ${String(obj.phase)}` : ''

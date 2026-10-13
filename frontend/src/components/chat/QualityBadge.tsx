@@ -211,7 +211,8 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
               <span>
                 Tuning found higher-scoring settings on the tested cases
                 {quality.optimization.optimized_score != null && quality.optimization.baseline_score != null
-                  ? ` (${Math.round(quality.optimization.optimized_score)} vs ${Math.round(quality.optimization.baseline_score)} baseline)`
+                  // Optimizer scores are 0..1: 0.93 is 93%, not 1.
+                  ? ` (${Math.round(quality.optimization.optimized_score * 100)}% vs ${Math.round(quality.optimization.baseline_score * 100)}% baseline)`
                   : ''}
                 {' '}(review and apply when ready).
               </span>

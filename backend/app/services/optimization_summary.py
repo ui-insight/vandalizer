@@ -40,8 +40,47 @@ def summarize_kb_run(run: KBOptimizationRun) -> dict:
     }
 
 
+def _percent(score: Optional[float]) -> Optional[int]:
+    """A 0..1 optimizer score as the whole percent the screens show."""
+    return None if score is None else round(score * 100)
+
+
+def with_percent_scores(summary: dict) -> dict:
+    """Add ``score_percent`` / ``baseline_score_percent`` to a run summary.
+
+    Run scores are on a 0..1 scale. Chat rounded 0.93 as if it were already
+    out of 100 and showed "score 1/100 (was 1)"; these fields carry the number
+    the optimizer screens show.
+    """
+    summary["score_percent"] = _percent(summary.get("score"))
+    summary["baseline_score_percent"] = _percent(summary.get("baseline_score"))
+    return summary
+
+
+def _extraction_winner_details(run: ExtractionOptimizationRun) -> dict:
+    """Which trial the reported best configuration is, and the top scorer.
+
+    When the best trial is statistically tied with the current settings, the
+    reported configuration is the tied setup closest to the current one, not
+    the highest-scoring trial; both are returned so neither is mistaken for
+    the other.
+    """
+    completed = [t for t in (run.trials or []) if t.get("status") == "completed" and t.get("score") is not None]
+    top = max(completed, key=lambda t: t["score"], default=None)
+    best = next((t for t in completed if t.get("trial_id") == getattr(run, "best_trial_id", None)), None)
+    if best is None and run.best_config is not None:
+        best = next((t for t in completed if t.get("config") == run.best_config), None)
+    return {
+        "best_trial_score_percent": _percent(best.get("score")) if best else None,
+        "top_trial_score_percent": _percent(top.get("score")) if top else None,
+        "top_trial_is_best": bool(best and top and best.get("trial_id") == top.get("trial_id")),
+        "measured_with_model": getattr(run, "baseline_model", None),
+    }
+
+
 def summarize_extraction_run(run: ExtractionOptimizationRun) -> dict:
     return {
+        **_extraction_winner_details(run),
         "surface": "extraction",
         "run_uuid": run.uuid,
         "item_id": run.search_set_uuid,
@@ -103,7 +142,7 @@ async def latest_optimization_summary(item_kind: str, item_id: str) -> Optional[
         return None
     model, id_field, summarize = entry
     run = await model.find({id_field: item_id}).sort("-started_at").first_or_none()
-    return summarize(run) if run else None
+    return with_percent_scores(summarize(run)) if run else None
 
 
 async def get_run_by_uuid(surface: str, run_uuid: str):
@@ -119,11 +158,11 @@ async def get_run_by_uuid(surface: str, run_uuid: str):
 def summarize_run(run) -> Optional[dict]:
     """Summarize any of the three run document types."""
     if isinstance(run, KBOptimizationRun):
-        return summarize_kb_run(run)
+        return with_percent_scores(summarize_kb_run(run))
     if isinstance(run, ExtractionOptimizationRun):
-        return summarize_extraction_run(run)
+        return with_percent_scores(summarize_extraction_run(run))
     if isinstance(run, WorkflowOptimizationRun):
-        return summarize_workflow_run(run)
+        return with_percent_scores(summarize_workflow_run(run))
     return None
 
 

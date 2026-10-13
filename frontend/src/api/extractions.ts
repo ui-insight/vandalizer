@@ -694,6 +694,11 @@ export interface ExtractionOptimizationRun {
   excluded_models: string[]
   judge_model: string | null
   best_config: Record<string, unknown> | null
+  /** The trial best_config came from. On a tie it is the setup closest to
+   *  the current settings, not the top scorer. Absent on older runs. */
+  best_trial_id?: string | null
+  /** Model the current settings were measured with. Absent on older runs. */
+  baseline_model?: string | null
   trials: ExtractionTrial[]
   field_breakdown: Array<{ field: string; accuracy: number; consistency: number }>
   /** Cross-field rule outcome on the winning config. Null when no rules. */
