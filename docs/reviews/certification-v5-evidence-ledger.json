@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "204174492f46f2a4614bd66b75073bdf693f07d1",
+  "working_head_at_inventory": "56803987f1eb490b8c3ef11e820f9c08c34b757e",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 88379,
-    "sha256": "e951e907f36762399b64c1f17237e0eaa30f7f49868193bdcb30eef2a06036cf"
+    "bytes": 91263,
+    "sha256": "bdae518ad80f036a543637996f2485fcd5dd1521f8718e2ccf6b0dd96def4d8d"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 879028,
-    "sha256": "a59a9f6b9b1a2680545b9a8f348456b6f6b4e48926c380a23701db436819e89d"
+    "bytes": 881413,
+    "sha256": "e4b9038196af026b66b76a543929a3f91017e54afdc07970aa8138dfa2f399a9"
   },
   "counts": {
-    "accepted": 122,
-    "open": 33,
+    "accepted": 128,
+    "open": 27,
     "items": 155,
-    "checkpoints": 356,
+    "checkpoints": 357,
     "browser_runs": 645,
     "recorded_captures_including_diagnostics_and_repeats": 7466,
     "baseline_selected_captures": 151,
@@ -586,8 +586,8 @@
     },
     {
       "id": "C8-M02-04",
-      "accepted": false,
-      "requirement": "P2 · Verify: Connect the map to later work.** Save the learner’s approved process description for Workflow Design, with an option to choose a provided example. Missing personal examples must not block progress or force disclosure of sensitive work."
+      "accepted": true,
+      "requirement": "P2 · Verify: Connect the map to later work.** Save the learner’s approved process description for Workflow Design, with an option to choose a provided example. Missing personal examples must not block progress or force disclosure of sensitive work. Accepted at checkpoint 357: Workflow Design captures either the learner's own saved process submission, preserved exactly, or the supplied example labelled authored_example_not_learner_work. The capture form defaults to the example and lists saved maps, so a missing personal map never blocks progress. The process case is fictional and says no personal work is needed. Integration tests cover both choices and reject substitution."
     },
     {
       "id": "C8-M03-01",
@@ -606,8 +606,8 @@
     },
     {
       "id": "C8-M03-04",
-      "accepted": false,
-      "requirement": "P2 · Verify: Preserve one design across surfaces.** Switching between chat and editor keeps the same artifact/revision and course attempt. The learner can inspect the final design and explain why it fits the intended work."
+      "accepted": true,
+      "requirement": "P2 · Verify: Preserve one design across surfaces.** Switching between chat and editor keeps the same artifact/revision and course attempt. The learner can inspect the final design and explain why it fits the intended work. Accepted at checkpoint 357: a design built in chat, captured, revised through the editor's real task route and captured again keeps the same workflow, task and enrollment with a new revision, and the first capture is unchanged (11b4a23b). Captures show the saved design for inspection, and the approval answers explain its fit."
     },
     {
       "id": "C8-M04-01",
@@ -631,8 +631,8 @@
     },
     {
       "id": "C8-M05-01",
-      "accepted": false,
-      "requirement": "P2 · Improve: Teach inspection of actual data flow.** Follow the assigned subaward through extraction, reasoning and formatting, opening each step’s input/output. Explain both expected chains and valid alternatives without rewarding gratuitous complexity."
+      "accepted": true,
+      "requirement": "P2 · Improve: Teach inspection of actual data flow.** Follow the assigned subaward through extraction, reasoning and formatting, opening each step’s input/output. Explain both expected chains and valid alternatives without rewarding gratuitous complexity. Accepted at checkpoint 357: the chaining lesson lists the editor's input choices, including All Earlier Steps, and the worked example opens each step's saved input and output from the extraction on (eb850eff). The lesson names valid alternative chains (a Formatter reading Step Input or All Earlier Steps) and an invalid one (rereading the documents), and says extra steps earn nothing. The labs accept both valid chains (20417449)."
     },
     {
       "id": "C8-M05-02",
@@ -671,8 +671,8 @@
     },
     {
       "id": "C8-M07-01",
-      "accepted": false,
-      "requirement": "P2 · Improve: Teach audience and output selection.** Match document, structured export and form output to the recipient’s task. Show the real editor handoff for unsupported chat authoring and return to the same course attempt."
+      "accepted": true,
+      "requirement": "P2 · Improve: Teach audience and output selection.** Match document, structured export and form output to the recipient’s task. Show the real editor handoff for unsupported chat authoring and return to the same course attempt. Accepted at checkpoint 357: the audience lesson maps readers to Document Renderer, importing systems to Data Export and fixed-field forms to Form Filler (0f3aec06). It also names the real handoff: chat cannot add Document Renderer or Data Export steps, so the learner uses the panel's \"Open selected workflow in a new tab\" and keeps the attempt open, and the next capture records the saved revision."
     },
     {
       "id": "C8-M07-02",
@@ -796,8 +796,8 @@
     },
     {
       "id": "C8-GRADE-11",
-      "accepted": false,
-      "requirement": "P2 · Improve: Make results explainable and reviewable.** Expose the assessed criteria, evidence references and a clear recheck/support route. A supported correction to grading creates an auditable adjustment rather than silently rewriting history."
+      "accepted": true,
+      "requirement": "P2 · Improve: Make results explainable and reviewable.** Expose the assessed criteria, evidence references and a clear recheck/support route. A supported correction to grading creates an auditable adjustment rather than silently rewriting history. Accepted at checkpoint 357: results show each assessed criterion, verdict, cited evidence and revision instruction, with technical retry. A supported correction now creates an auditable regrade (56803987). A full admin reviews the exact graded result, then submits its digest, a reason and a reference. The automatic reviewer reruns on the original evidence and requirements as a linked attempt whose immutable record names the admin, reason and parent result. The original stays, the learner chooses, and the learner's panel states the reason. The correction is written to the admin audit trail and no one sets a verdict."
     },
     {
       "id": "C8-GRADE-12",
@@ -926,8 +926,8 @@
     },
     {
       "id": "C8-OPS-03",
-      "accepted": false,
-      "requirement": "P1 · Verify: Restrict and audit course administration.** Only authorized roles can publish, migrate, override grading or alter enrollment state. Record actor, reason, target version and before/after references without exposing private lab/document contents unnecessarily."
+      "accepted": true,
+      "requirement": "P1 · Verify: Restrict and audit course administration.** Only authorized roles can publish, migrate, override grading or alter enrollment state. Record actor, reason, target version and before/after references without exposing private lab/document contents unnecessarily. Accepted at checkpoint 357: every state-changing certification admin route is guarded. Completion recovery and grading corrections need a full admin and leave durable records of actor, reason and reviewed digests. Unlock needs admin and writes the admin audit trail with actor, reason and course version. Grading corrections also write the audit trail with references and reason only, no evidence or answers. Publication has no runtime route: releases are repository files verified by check_certification_releases and the CI guard. Credit transfer is learner self-service under versioned rules. No migration tool exists to restrict yet; the MIGRATE items remain open."
     },
     {
       "id": "C8-OPS-04",
@@ -3522,6 +3522,11 @@
     {
       "number": 356,
       "title": "Clean adversarial matrix, chat-built workflows and preserved rubrics on October 14 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 357,
+      "title": "Auditable regrades, design continuity and output teaching on October 14 2026",
       "evidence_directories": []
     }
   ],
