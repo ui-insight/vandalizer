@@ -5745,6 +5745,7 @@ async def get_certification_module(
     assessment_mode = "legacy_reflection" if assessment_keys else "legacy_practical"
     required_outcomes = []
     selected_completion = False
+    scenario_cases = None
     operation = cert_svc.current_operation()
     if operation and 'outcomes.json' in operation.package.manifest.artifacts:
         from app.services.certification_versions.outcomes import package_outcomes
@@ -5756,6 +5757,10 @@ async def get_certification_module(
         required_outcomes = [{'outcome_id': outcome.id, 'statement': outcome.statement,
                               'method': outcome.method} for outcome in required.outcomes]
         selected_completion = selected_outcome_completion_available(operation.package)
+        if f'assessments/{module_id}.json' in operation.package.manifest.artifacts:
+            from app.services.certification_versions.scenario_submissions import module_bank
+            # The real case count, so the agent does not infer one from the outcome list.
+            scenario_cases = len(module_bank(operation.package, module_id).questions)
     return {
         **cert_svc.course_identity(),
         "module_id": module_id,
@@ -5781,6 +5786,7 @@ async def get_certification_module(
         "assessment_mode": assessment_mode,
         "required_outcomes": required_outcomes,
         "selected_outcome_completion": selected_completion,
+        **({"scenario_case_count": scenario_cases} if scenario_cases is not None else {}),
         "assessment_keys": assessment_keys,
         "assessment_questions": assessment_questions,
     }

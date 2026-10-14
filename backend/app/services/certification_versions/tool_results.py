@@ -117,6 +117,7 @@ class ModuleResult(Result):
     assessment_mode: Literal['legacy_reflection', 'legacy_practical', 'selected_saved_outcomes'] | None = None
     required_outcomes: list[RequiredOutcome] = Field(default_factory=list)
     selected_outcome_completion: bool = False
+    scenario_case_count: Count | None = None
 
     @model_validator(mode='after')
     def criteria(self):

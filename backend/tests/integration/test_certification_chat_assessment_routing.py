@@ -13,6 +13,7 @@ from app.services.certification_versions import runtime
 from app.services.certification_versions.catalog import CourseCatalog
 from app.services.certification_versions.enrollments import EnrollmentConflict
 from app.services.certification_versions.outcomes import package_outcomes
+from app.services.certification_versions.scenario_submissions import module_bank
 from tests.integration import test_certification_enrollments as base
 from tests.test_certification_outcome_rubric import candidate, VERSION
 
@@ -67,7 +68,13 @@ async def test_all_module_coaching_routes_are_pinned_and_do_not_write_progress(r
                 {'outcome_id': o.id, 'statement': o.statement, 'method': o.method} for o in required.outcomes]
             assert result['assessment_keys'] == result['assessment_questions'] == []
             assert result['selected_outcome_completion'] is True
+            # The agent states the real number of scenario cases rather than one per outcome.
+            if f'assessments/{module.id}.json' in package.manifest.artifacts:
+                assert result['scenario_case_count'] == len(module_bank(package, module.id).questions)
+            else:
+                assert 'scenario_case_count' not in result
         else:
+            assert 'scenario_case_count' not in result
             exercise = package.json('exercises.json')[module.id]
             assert result['instructions'] == (exercise.get('chat_instructions') or exercise.get('instructions', []))
             assert result['agent_guidance'] == []
