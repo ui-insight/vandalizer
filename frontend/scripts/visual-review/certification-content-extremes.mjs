@@ -65,7 +65,8 @@ async function inspectScrollableTable(root, id) {
 try {
   const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
   await page.setViewportSize({ width: native ? 640 : 320, height: native ? 2200 : 1100 })
-  await page.goto(review.baseURL + '/certification')
+  // Plain /certification now hands off to chat; the pop-out route still shows the panel full screen.
+  await page.goto(review.baseURL + '/certification?panel=fullscreen')
   if (native) await review.setBrowserZoom(2)
   if (process.env.REVIEW_TABLE_LAYOUT === 'auto') {
     const css = '.cert-table-region { container-type: inline-size; } .cert-table-region table { table-layout: auto; width: max-content; min-width: 100%; } .cert-table-region th, .cert-table-region td { min-width: min(9rem,100cqw); max-width: min(24rem,100cqw); }'
@@ -73,7 +74,8 @@ try {
     review.observations.push({ diagnosticOnlyCss: css })
   }
   const panel = page.locator('[data-cert-panel]')
-  await panel.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
+  const position = panel.getByRole('combobox', { name: 'Learning panel position', exact: true })
+  if (await position.count()) await position.selectOption('fullscreen')
   await panel.getByRole('button', { name: new RegExp(`^1 ${module.title}`) }).click()
   for (const [index, lesson] of module.lessons.entries()) {
     if (process.env.REVIEW_VARIANT && lesson.variant !== process.env.REVIEW_VARIANT) continue
