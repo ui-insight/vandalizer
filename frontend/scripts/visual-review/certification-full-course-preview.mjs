@@ -34,13 +34,16 @@ await context.route('**/api/certification/**', route => {
   if (path.endsWith('/credentials')) return route.fulfill({ json: { credentials: [] } })
   const id = path.match(/\/modules\/([^/]+)\//)?.[1]
   if (id && path.endsWith('/exercise')) return route.fulfill({ json: exercises[id] })
+  // A module with practice documents asks for its lab status; the preview has none set up.
+  if (id && path.endsWith('/lab-status')) return route.fulfill({ json: { module_id: id, enrollment_id: course.enrollment_id, course_version: course.course_version,
+    manifest_sha256: course.manifest_sha256, state: 'not_setup', credit_changed: false, folder_id: null, folder_name: null, documents: [] } })
   if (id && path.endsWith('/practical-runs')) return route.fulfill({ json: { enrollment_id: course.enrollment_id, module_id: id, runs: [], older_runs_available: false } })
   if (id && cases[id] && path.endsWith('/' + cases[id][0])) {
     const definition = course.modules.find(module => module.id === id)[cases[id][1]]
     const listing = { enrollment_id: course.enrollment_id, module_id: id, course_version: course.course_version,
       manifest_sha256: course.manifest_sha256, case: definition, can_submit: true, read_only_reason: null,
       records: Object.fromEntries(['capture', 'run', 'correction', 'scope', 'finding', 'memo', 'release', 'handoff', 'review'].map(kind => [kind, { items: [], older_available: false }])) }
-    for (const key of ['submissions', 'workflows', 'process_choices', 'captures', 'runs', 'assigned_sources', 'calculations', 'extractions', 'suites', 'inspections', 'handoffs', 'recovery_submissions', 'calculation_fields']) {
+    for (const key of ['submissions', 'workflows', 'process_choices', 'captures', 'runs', 'assigned_sources', 'calculations', 'extractions', 'suites', 'inspections', 'handoffs', 'recovery_submissions', 'calculation_fields', 'proposed_scope']) {
       listing[key] = []; listing[`older_${key}_available`] = false
     }
     if (id === 'advanced_nodes') listing.calculation_fields = calculationFields
@@ -59,10 +62,12 @@ const native = process.env.REVIEW_NATIVE_PROFILE_ZOOM === '2'
 try {
   for (const width of native ? [780] : [320, 1440]) {
     await page.setViewportSize({ width, height: native ? 1200 : 900 })
-    await page.goto(review.baseURL + '/certification')
+    // Plain /certification now hands off to chat; the pop-out route still shows the panel full screen.
+    await page.goto(review.baseURL + '/certification?panel=fullscreen')
     if (native) await review.setBrowserZoom(2)
     const panel = page.locator('[data-cert-panel="true"]')
-    await panel.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
+    const position = panel.getByRole('combobox', { name: 'Learning panel position', exact: true })
+    if (await position.count()) await position.selectOption('fullscreen')
     await capture(`course-entry-${width}`, panel.getByRole('heading', { name: 'Training Modules', exact: true }))
     for (const module of course.modules) {
       const title = module.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
