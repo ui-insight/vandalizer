@@ -291,8 +291,28 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=record['reviewer']['model_name'],
             system_config=system_config, _parent_attempt_id=parent_attempt_id, _provenance=record.get('provenance'))
 
+    async def prepare_correction(self, operation, parent_attempt_id, request_id, *, correction, system_config):
+        """Regrade graded work after a supported grading correction, keeping the original.
+
+        The child reruns the automatic review on the parent's exact evidence and
+        requirements; the correction record names who asked, why and which
+        result it re-examines. The learner chooses which attempt counts.
+        """
+        parent = await self.get(operation.user_id, parent_attempt_id)
+        if parent is None or parent['state'] != 'evaluated':
+            raise EnrollmentConflict('Only a saved graded assessment can be regraded after a correction')
+        record = parent['record']
+        LabExecutionRepository.check_operation(operation, record)
+        contract = package_outcomes(operation.package)
+        if contract is None or contract.model_dump(mode='json') != record['contract']:
+            raise EnrollmentConflict('A grading correction must preserve the original assessment requirements')
+        return await self.prepare(operation, record['module_id'], record['evidence'], request_id,
+            actor_user_id=operation.user_id, model_name=record['reviewer']['model_name'],
+            system_config=system_config, _parent_attempt_id=parent_attempt_id, _provenance=record.get('provenance'),
+            _correction=correction)
+
     async def prepare(self, operation, module_id, evidence, request_id, *, actor_user_id, model_name, system_config,
-                      _parent_attempt_id=None, _provenance=None):
+                      _parent_attempt_id=None, _provenance=None, _correction=None):
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Automatic review requires the authenticated learner and a request identity')
         if not isinstance(model_name, str) or not model_name.strip() or len(model_name) > 200:
@@ -308,8 +328,10 @@ class ReviewAttemptRepository:
         _, checked, _ = review_packet(contract, module_id, evidence)
         payload = [item.model_dump(mode='json') for item in checked]
         provenance = {'provenance': deepcopy(_provenance)} if _provenance is not None else {}
+        # Present only on corrections, so existing records keep their digests.
+        correction = {'grading_correction': deepcopy(_correction)} if _correction is not None else {}
         request_digest = encode({**identity, 'model_name': model_name, 'evidence': payload,
-                                 **provenance,
+                                 **provenance, **correction,
                                  'parent_attempt_id': _parent_attempt_id})[1]
         existing = await self.records.find_one({'uuid': request_id})
         if existing is not None:
@@ -318,16 +340,18 @@ class ReviewAttemptRepository:
             return self.decode(existing)
         if _parent_attempt_id is not None:
             parent = await self.get(actor_user_id, _parent_attempt_id)
-            if (parent is None or parent['state'] != 'unavailable'
+            expected_state = 'evaluated' if _correction is not None else 'unavailable'
+            if (parent is None or parent['state'] != expected_state
+                    or (_correction is not None and _correction.get('parent_result_sha256') != encode(parent['result'])[1])
                     or any(parent['record'][key] != value for key, value in identity.items() if key != 'uuid')
                     or parent['record']['evidence'] != payload
                     or parent['record'].get('provenance') != _provenance
                     or parent['record']['reviewer']['model_name'] != model_name
                     or parent['record']['contract'] != contract.model_dump(mode='json')
                     or parent['record']['policy'] != AutomaticReviewPolicy().model_dump(mode='json')):
-                raise EnrollmentConflict('A technical retry must preserve the original evidence and requirements')
+                raise EnrollmentConflict('A technical retry or grading correction must preserve the original evidence and requirements')
         record = {**identity, 'request_sha256': request_digest, 'evidence': payload,
-                  **provenance,
+                  **provenance, **correction,
                   'parent_attempt_id': _parent_attempt_id,
                   'contract': contract.model_dump(mode='json'),
                   'policy': AutomaticReviewPolicy().model_dump(mode='json'),

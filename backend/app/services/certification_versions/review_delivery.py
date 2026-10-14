@@ -93,6 +93,9 @@ class ReviewDelivery:
                 **({'budget_review_submission_id': record['provenance']['budget_review_submission_id']} if budget else {}),
                 'finished_at': result.get('finished_at') if result else None,
                 'parent_attempt_id': record.get('parent_attempt_id'), 'status': status, 'outcomes': outcomes,
+                # Learners see why a regrade exists; the administrator's identity stays in support records.
+                **({'grading_correction': {key: record['grading_correction'][key] for key in ('reason', 'reference')}}
+                   if record.get('grading_correction') else {}),
                 'assessment_kind': 'governance_capstone_review_draft' if governance else 'bounded_batch_review_draft' if batch else 'validation_suite_review_draft' if validation else 'output_workflow_review_draft' if output else 'budget_workflow_review_draft' if budget else 'connected_workflow_review_draft' if connected else 'workflow_design_review_draft' if workflow else 'process_design_review_draft' if process else 'practical_review_draft', 'credit_awarded': False,
                 'module_completion_eligible': False, 'staff_review_required': False,
                 'can_request_review': False, 'can_retry_review': False}

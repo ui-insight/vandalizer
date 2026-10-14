@@ -174,3 +174,17 @@ it('rejects a malformed practical run reference before offering work navigation'
   await open(); await screen.findByRole('alert')
   expect(screen.queryByRole('button', { name: 'Open saved work to review' })).not.toBeInTheDocument()
 })
+it('says why a regrade exists and keeps the technical-retry wording for retries', async () => {
+  const regrade = { ...saved, parent_attempt_id: 'd'.repeat(32), status: 'requirements_supported' as const,
+    grading_correction: { reason: 'Quotes from JSON evidence were wrongly rejected.', reference: 'commit 15b7f9a2' } }
+  vi.mocked(api.getAutomaticReview).mockResolvedValue(regrade)
+  const view = render(<SavedAutomaticReviews {...props} />)
+  await open()
+  expect(await screen.findByText(/regrade of your original saved evidence after a supported grading correction: Quotes from JSON evidence were wrongly rejected\. \(commit 15b7f9a2\)/)).toBeInTheDocument()
+  expect(screen.queryByText(/technical retry/)).not.toBeInTheDocument()
+  view.unmount()
+  vi.mocked(api.getAutomaticReview).mockResolvedValue({ ...saved, parent_attempt_id: 'e'.repeat(32) })
+  render(<SavedAutomaticReviews {...props} />)
+  await open()
+  expect(await screen.findByText('This is a technical retry using the original saved evidence.')).toBeInTheDocument()
+})

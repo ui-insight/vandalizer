@@ -101,7 +101,9 @@ export function SavedAutomaticReviews({ enrollmentId, moduleId, initialAttemptId
             {selected.parent_attempt_id && <div><dt>Original assessment reference</dt><dd className="break-all">{selected.parent_attempt_id}</dd></div>}
           </dl>
         </details>
-        {selected.parent_attempt_id && <p className="text-sm text-gray-700">This is a technical retry using the original saved evidence.</p>}
+        {selected.parent_attempt_id && (selected.grading_correction
+          ? <p className="text-sm text-gray-700">This is a regrade of your original saved evidence after a supported grading correction: {selected.grading_correction.reason} ({selected.grading_correction.reference}). The original assessment remains available; choose which one to use.</p>
+          : <p className="text-sm text-gray-700">This is a technical retry using the original saved evidence.</p>)}
         {selected.status === 'grading_unavailable' && <p className="text-sm text-gray-700">A technical problem prevented a final assessment. This is not a failed learner attempt. Your saved work is preserved.</p>}
         {['prepared', 'evaluating'].includes(selected.status) && <p className="text-sm text-gray-700">No final assessment is saved yet. Refresh to check for a result. Reading this page does not start another assessment.</p>}
         {selected.status === 'requirements_supported' && <p className="text-sm text-gray-700">The saved draft checks support these requirements. This result does not complete the module or change earned credit.</p>}

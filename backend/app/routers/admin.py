@@ -3869,6 +3869,50 @@ async def recover_certification_completion(user_id: str, enrollment_id: str, pay
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+class CertificationGradingCorrectionRequest(BaseModel):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    parent_attempt_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    parent_result_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    reason: str = Field(min_length=20, max_length=1000)
+    reference: str = Field(min_length=3, max_length=200)
+
+
+@router.get("/certifications/{user_id}/grading-corrections")
+async def review_certification_grading_correction(user_id: str, enrollment_id: str, attempt_id: str,
+                                                  user: User = Depends(get_current_user)):
+    """Read-only: the exact graded result a correction would re-examine."""
+    await _require_admin(user)
+    from app.services.certification_versions.grading_corrections import GradingCorrections
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        return {**await GradingCorrections().review(user_id, enrollment_id, attempt_id), 'can_apply': bool(user.is_admin)}
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/certifications/{user_id}/grading-corrections")
+async def apply_certification_grading_correction(user_id: str, enrollment_id: str, payload: CertificationGradingCorrectionRequest,
+                                                 user: User = Depends(get_current_user)):
+    """Full admins only: rerun the automatic review as a linked, recorded regrade."""
+    await _require_superadmin(user)
+    from app.services.certification_versions import practical_preparation
+    from app.services.certification_versions.grading_corrections import GradingCorrections
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        result = await GradingCorrections().submit(user.user_id, user_id, enrollment_id, payload.model_dump(),
+                                                   await practical_preparation.configured_runtime())
+    except (EnrollmentConflict, CourseCatalogError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    # References only: the evidence and verdicts stay in the immutable attempt records.
+    await _audit(user, "certification.grading_correction", f"Regraded a certification assessment for user {user_id}",
+                 {"user_id": user_id, "enrollment_id": enrollment_id, "parent_attempt_id": payload.parent_attempt_id,
+                  "parent_result_sha256": payload.parent_result_sha256, "correction_attempt_id": result['attempt_id'],
+                  "reason": payload.reason, "reference": payload.reference, "credit_effect": "none"})
+    return result
+
+
 class CertificationUnlockRequest(AccessChangeRequest):
     pass
 

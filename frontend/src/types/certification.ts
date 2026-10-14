@@ -507,6 +507,7 @@ export interface SavedAutomaticReviewSummary {
   prepared_at: string
   finished_at: string | null
   parent_attempt_id: string | null
+  grading_correction?: { reason: string; reference: string }
   status: AutomaticReviewStatus
 }
 export interface SavedAutomaticReview extends SavedAutomaticReviewSummary {
