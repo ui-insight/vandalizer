@@ -36,13 +36,17 @@ them; and the frontend `modules.ts` fallback, which is pinned to the same panel 
   matches the module's subtitle.
 - Two hardcoded module counts of eleven now derive from the course module list.
 
-## Open, needing a product decision
+## Branding decision (October 14, 2026)
 
-- The unversioned course text promises "an official VWA credential"; the v5 contract promises a narrower
-  supervision competence. Released legacy wording is preserved.
-- The certificate, activity rail, legacy notification and completion email always say "Vandal Workflow
-  Architect", whatever the course title of a v5 credential.
-- Legacy tier themes in the frontend fallback differ from the v5 tiers (fallback only).
-- The presentation deck describes the course as "from your first upload to building validated workflows".
-- The preserved legacy rubric's unused title map still says "Governance"; it is byte-pinned to its release
-  and is no longer read.
+The legacy course keeps the "Vandal Workflow Architect" name; a v5 credential shows its own course title and
+assessed outcomes (`28dce32a`). Applied:
+
+- The certificate PDF for an outcome-based credential uses the course title as its headline and reads "has
+  demonstrated the assessed outcomes of"; legacy certificates are unchanged.
+- The activity rail shows the enrolled course title when the course has a credential scope.
+- Versioned completion notices and email render from the issued record (`completion_notices`); the legacy
+  notification, `certification_complete_email` and the drip copy are legacy-only and keep the brand.
+
+Left as is by that decision: the unversioned course's "official VWA credential" wording, the legacy tier themes
+in the frontend fallback, the presentation deck's description of the built-in course, and the byte-pinned legacy
+rubric's unused title map.
