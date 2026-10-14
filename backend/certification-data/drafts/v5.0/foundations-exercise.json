@@ -5,7 +5,7 @@
   ],
   "instructions": [
     "Use Set Up Lab to add the assigned NSF Alpine Ecology proposal. Open the source and confirm its identity, readable text and saved lab workspace before preparing any extraction.",
-    "Use chat or the editor to create an extraction with PI Name, Institution, Total Budget, Project Period and Sponsoring Agency. Inspect the saved field meanings and selected document. Ask for a proposal and a stop before execution while you review.",
+    "Use chat or the editor to create an extraction with PI Name, Institution, Total Budget, Project Period and Sponsoring Agency. Inspect the saved name, field meanings and selected document. Ask for a proposal and a stop before execution while you review.",
     "Choose your saved extraction in Prepare a practical run. The training proposal deliberately names an unrelated source. Compare the proposed source with the NSF task, select the assigned source and explain your correction in your own words.",
     "Review the captured source, workspace and fields before approving this saved scope. Approval records your decision; use the separate execution action to run it. If the reply is uncertain, inspect the saved run status before requesting another run.",
     "Inspect the actual saved result. Record and check all five required values against the saved assigned source, including the full project budget and project period. Cite the supporting passage for each value; a quality score or fluent answer does not establish correctness.",
@@ -15,7 +15,7 @@
   "chat_instructions": [
     "Use the agent to help author and repair the extraction. Record your own scope decision, source checks and assessment request in the certification panel; the agent cannot provide those decisions on your behalf.",
     "Use Set Up Lab to add the assigned NSF Alpine Ecology proposal. Open the source and confirm its identity, readable text and saved lab workspace before preparing any extraction.",
-    "Use chat or the editor to create an extraction with PI Name, Institution, Total Budget, Project Period and Sponsoring Agency. Inspect the saved field meanings and selected document. Ask for a proposal and a stop before execution while you review.",
+    "Use chat or the editor to create an extraction with PI Name, Institution, Total Budget, Project Period and Sponsoring Agency. Inspect the saved name, field meanings and selected document. Ask for a proposal and a stop before execution while you review.",
     "Choose your saved extraction in Prepare a practical run. The training proposal deliberately names an unrelated source. Compare the proposed source with the NSF task, select the assigned source and explain your correction in your own words.",
     "Review the captured source, workspace and fields before approving this saved scope. Approval records your decision; use the separate execution action to run it. If the reply is uncertain, inspect the saved run status before requesting another run.",
     "Inspect the actual saved result. Record and check all five required values against the saved assigned source, including the full project budget and project period. Cite the supporting passage for each value; a quality score or fluent answer does not establish correctness.",
