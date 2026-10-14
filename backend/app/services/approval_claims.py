@@ -162,3 +162,80 @@ def require_announced_action(ctx: RunContext["AgenticChatDeps"], output: str) ->
     # Once only: a second miss is accepted rather than failing the turn.
     deps.announced_action_retry_used = True
     raise ModelRetry(ANNOUNCE_RETRY_INSTRUCTION)
+
+
+# A reply that calls an attached knowledge base validated when it never was
+# ("Validated — the Subaward Policies page is ready", support ticket). Chat has
+# no tool that validates a knowledge base, so the claim can only be invented.
+# "Not yet validated", "never been validated", "unvalidated" are negated and
+# don't count.
+_VALIDATED = re.compile(r"\bvalidated\b", re.IGNORECASE)
+# A negation shortly before "validated", within the same clause: "not yet
+# validated", "hasn't been validated", "never been validated". ("Unvalidated"
+# has no word boundary before "validated", so it never matches at all.)
+_NEGATION = re.compile(r"(?:\bnot\b|\bnever\b|n't\b|\bno\b|\byet to be\b|\bwithout being\b)[^.!?;:\n]{0,20}$", re.IGNORECASE)
+
+
+def claims_validated(text: str, subjects: list[str] | None = None) -> bool:
+    """Whether *text* says something is validated, outside a negation.
+
+    With ``subjects`` (knowledge base titles), only a claim with one of them,
+    or the words "knowledge base", within 150 characters counts, so "the
+    template was validated last week" is left alone.
+    """
+    text = text or ""
+    names = [s.lower() for s in (subjects or []) if s] + ["knowledge base"]
+    for m in _VALIDATED.finditer(text):
+        if _NEGATION.search(text[max(0, m.start() - 40):m.start()]):
+            continue
+        if subjects is None:
+            return True
+        window = text[max(0, m.start() - 150):m.end() + 150].lower()
+        if any(name in window for name in names):
+            return True
+    return False
+
+
+def _validation_ran_this_turn(messages) -> bool:
+    """Whether a validation tool was called since the user's latest message."""
+    from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
+
+    since_prompt = []
+    for message in messages or []:
+        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
+            since_prompt = []
+        else:
+            since_prompt.append(message)
+    return any(
+        isinstance(part, ToolCallPart) and part.tool_name == "run_validation"
+        for message in since_prompt if isinstance(message, ModelResponse)
+        for part in message.parts
+    )
+
+
+VALIDATION_RETRY_INSTRUCTION = (
+    "Your reply says something is validated, but no validation ran, and the "
+    "attached knowledge base(s) {titles} have never been validated. You cannot "
+    "validate a knowledge base from chat. Rewrite the reply: give the knowledge "
+    "base's real status from the 'Attached knowledge bases: current status' "
+    "section (sources ready and any that failed), say it has not been validated, "
+    "and tell the user knowledge base validation runs from Knowledge, opening the "
+    "knowledge base, then its Validation tab. Do not repeat your previous reply."
+)
+
+
+def require_honest_validation(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply that calls an
+    unvalidated knowledge base validated when no validation ran."""
+    deps = ctx.deps
+    titles = list(getattr(deps, "unvalidated_kb_titles", None) or []) if deps else []
+    if (
+        ctx.partial_output
+        or not titles
+        or getattr(deps, "validation_claim_retry_used", False)
+        or not claims_validated(output, titles)
+        or _validation_ran_this_turn(ctx.messages)
+    ):
+        return output
+    deps.validation_claim_retry_used = True
+    raise ModelRetry(VALIDATION_RETRY_INSTRUCTION.format(titles=", ".join(f'"{t}"' for t in titles)))

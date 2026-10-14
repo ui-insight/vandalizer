@@ -76,3 +76,9 @@ class AgenticChatDeps:
     # The same once-only flag for a reply that ends by announcing a step it
     # never took (approval_claims.require_announced_action).
     announced_action_retry_used: bool = False
+
+    # Attached knowledge bases that have never been validated, and the
+    # once-only flag for sending back a reply that calls one validated
+    # (approval_claims.require_honest_validation).
+    unvalidated_kb_titles: list[str] = field(default_factory=list)
+    validation_claim_retry_used: bool = False

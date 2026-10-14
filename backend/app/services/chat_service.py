@@ -1888,6 +1888,19 @@ async def chat_stream(
     # Excluded in empty-KB mode for parity with the pre-Phase-1 behavior: that
     # mode is a hard "don't invent project contents" stance and the inventory's
     # capability nudges dilute it.
+    # The attached knowledge bases' real state, whatever mode this turn is in:
+    # sources ready and failed, and whether each was ever validated.
+    kb_status_entries: list[dict] = []
+    if active_kbs:
+        try:
+            kb_status_entries = await _kb_status_entries(active_kbs, manifests)
+            kb_status_block = _build_kb_status_block(kb_status_entries)
+        except Exception as e:  # never let status context break a turn
+            logger.warning("KB status block failed: %s", e)
+            kb_status_block = ""
+        if kb_status_block:
+            reminder_blocks.append(kb_status_block)
+
     if inventory and not kb_empty_mode:
         reminder_blocks.append(inventory)
 
@@ -2271,6 +2284,9 @@ async def chat_stream(
             # strictly increases each turn. Write tools require a preview armed
             # on an earlier turn (smaller marker) before they execute.
             turn_marker=len(conversation.messages),
+            unvalidated_kb_titles=[
+                e["title"] for e in kb_status_entries if not e.get("validated_at")
+            ],
         )
         agent = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
@@ -2859,8 +2875,7 @@ def _build_manifest_block(manifest: list[dict]) -> str:
         # filename would not say which one holds the document.
         if kb_title:
             line += f" — {kb_title}"
-        if status and status != "ready":
-            line += " (still indexing)"
+        line += _manifest_status_note(entry)
         if total_chars + len(line) > _MANIFEST_MAX_CHARS:
             break
         lines.append(line)
@@ -2885,7 +2900,100 @@ def _build_manifest_block(manifest: list[dict]) -> str:
         "this project.\n"
         "- A document marked \"(still indexing)\" can't be searched yet — say so if "
         "the user asks about it.\n"
+        "- A document marked \"(failed to index …)\" or \"(skipped …)\" has no searchable "
+        "content and never will until it is fixed and re-added. Never call it indexed, "
+        "ready or searchable; give its reason if the user asks.\n"
     )
+
+
+def _manifest_status_note(entry: dict) -> str:
+    """The suffix a manifest line carries for a source that isn't searchable.
+
+    A source that failed used to read "(still indexing)", as if it were on its
+    way; chat then listed a page the website refused (HTTP 403, 0 chunks) as
+    "indexed".
+    """
+    status = entry.get("status")
+    if not status or status == "ready":
+        return ""
+    reason = " ".join(str(entry.get("error") or "").split())[:160]
+    if status == "error":
+        return f" (failed to index: {reason} — not searchable)" if reason else " (failed to index — not searchable)"
+    if status == "skipped":
+        return f" (skipped: {reason} — not searchable)" if reason else " (skipped — not searchable)"
+    return " (still indexing)"
+
+
+def _build_kb_status_block(kbs: list[dict]) -> str:
+    """Each attached knowledge base's real state: sources ready and failed, and
+    whether it has ever been validated.
+
+    Asked to "validate the Subaward Policies knowledge base", chat answered
+    "Validated — four sources indexed" with no tool call: it had no way to
+    validate a knowledge base, and nothing told it the KB had never been
+    validated or that one of its four sources had failed. ``kbs`` entries carry
+    ``title``, ``total``, ``ready``, ``failed`` (a list of ``(name, reason)``)
+    and ``validated_at`` (a datetime, or None if never validated).
+    """
+    if not kbs:
+        return ""
+    lines = ["## Attached knowledge bases: current status"]
+    for kb in kbs:
+        title = kb.get("title") or "Untitled knowledge base"
+        line = f"- **{title}**: {kb.get('ready', 0)} of {kb.get('total', 0)} sources ready"
+        failed = kb.get("failed") or []
+        if failed:
+            parts = [f"{name} ({reason})" if reason else name for name, reason in failed]
+            line += f"; {len(failed)} not searchable: " + "; ".join(parts)
+        validated_at = kb.get("validated_at")
+        if validated_at:
+            line += f". Last validated {validated_at:%Y-%m-%d}."
+        else:
+            line += ". Never validated."
+        lines.append(line)
+    lines.append(
+        "Report a knowledge base's sources and validation from this list, not from "
+        "the retrieved snippets. You cannot validate a knowledge base: run_validation "
+        "is for extraction templates only. When asked to validate one, say that "
+        "knowledge base validation runs from Knowledge, opening the knowledge base, "
+        "then its Validation tab, and give its current status from this list. Never "
+        "say a knowledge base is validated, tested or scored unless this list shows "
+        "a validation date."
+    )
+    return "\n".join(lines)
+
+
+async def _kb_status_entries(active_kbs: list[tuple[str, str]], manifests: dict[str, list[dict]]) -> list[dict]:
+    """Load ``_build_kb_status_block``'s input for the attached knowledge bases."""
+    from app.models.knowledge import KnowledgeBase
+    # The same "validated?" answer the knowledge base card shows (manual runs
+    # and Autovalidate, newest wins). Imported here: the router imports this
+    # module's neighbours at load time.
+    from app.routers.knowledge import _latest_runs_by_kb
+
+    uuids = [uuid for uuid, _ in active_kbs]
+    docs = {kb.uuid: kb for kb in await KnowledgeBase.find({"uuid": {"$in": uuids}}).to_list()}
+    try:
+        trust = await _latest_runs_by_kb(uuids)
+    except Exception as e:  # status is context, never a reason to fail the turn
+        logger.warning("KB validation lookup failed: %s", e)
+        trust = {}
+    entries: list[dict] = []
+    for uuid, title in active_kbs:
+        kb = docs.get(uuid)
+        manifest = manifests.get(uuid) or []
+        failed = [
+            (m.get("name") or "", (m.get("error") or "").strip())
+            for m in manifest if m.get("status") in ("error", "skipped")
+        ]
+        entries.append({
+            "title": (kb.title if kb else "") or title,
+            "total": kb.total_sources if kb else len(manifest),
+            "ready": kb.sources_ready if kb else sum(1 for m in manifest if m.get("status") == "ready"),
+            "failed": failed,
+            "validated_at": trust[uuid].at if uuid in trust else None,
+        })
+    return entries
 
 
 def _select_diverse_chunks(

@@ -586,6 +586,7 @@ async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
             "document_uuid": s.document_uuid,
             "source_type": s.source_type,
             "status": s.status,
+            "error": (s.error_message or "") if s.status in ("error", "skipped") else "",
         })
     return manifest
 

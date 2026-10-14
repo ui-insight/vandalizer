@@ -3537,6 +3537,9 @@ async def run_validation(
 ) -> dict:
     """Run validation on an extraction set's test cases. Measures accuracy and consistency.
 
+    Extraction templates only. It cannot validate a knowledge base: that runs
+    from Knowledge, opening the knowledge base, then its Validation tab.
+
     Runs extraction N times on each test case and compares against user-verified
     expected values. Returns a unified 0-100 score plus per-field accuracy and
     consistency. Persists a ValidationRun record and updates the extraction set's

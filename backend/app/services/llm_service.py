@@ -1206,9 +1206,12 @@ def create_agentic_chat_agent(
         from app.services.approval_claims import (
             require_announced_action,
             require_approval_card,
+            require_honest_validation,
         )
         agent.output_validator(require_approval_card)
         agent.output_validator(require_announced_action)
+        # "Validated" for a knowledge base no one validated (no chat tool can).
+        agent.output_validator(require_honest_validation)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
