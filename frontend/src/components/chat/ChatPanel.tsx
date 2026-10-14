@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { marked } from 'marked'
 import { conversationEvidence } from './conversationEvidence'
 import { approvalHistoryFor } from './approvalHistory'
@@ -229,9 +230,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // present; the local 90%-of-window ratio is the fallback before the first
   // context_meter chunk arrives.
   useEffect(() => {
-    const low = contextMeter
-      ? contextMeter.state !== 'ok'
-      : contextTokens > 0 && contextWindow > 0 && contextTokens / contextWindow >= 0.9
+    const low = conversationNearMemoryLimit(contextMeter, contextTokens, contextWindow)
     if (low && !contextNudgeShownRef.current) {
       contextNudgeShownRef.current = true
       setShowContextNudge(true)
@@ -1457,14 +1456,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           const routing = contextNotices.filter(
             n => n.action === 'model_routed' || n.action === 'model_not_routed',
           )
+          const partlySent = contextNotices.filter(
+            n => n.action === 'documents_trimmed' || n.action === 'attachments_trimmed',
+          )
           const COMPACTION_ACTIONS = new Set([
-            'auto_compacted', 'autocompact_unavailable', 'attachments_trimmed',
-            'documents_trimmed', 'history_trimmed', 'over_budget',
+            'auto_compacted', 'autocompact_unavailable', 'history_trimmed', 'over_budget',
           ])
           const HANDLED = new Set([
             'documents_not_ready', 'documents_extraction_failed',
             'documents_low_quality', 'kb_retrieval_failed',
             'model_routed', 'model_not_routed',
+            'documents_trimmed', 'attachments_trimmed',
           ])
           const compacted = contextNotices.filter(n => COMPACTION_ACTIONS.has(n.action))
           const other = contextNotices.filter(
@@ -1523,6 +1525,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <div className="font-medium mb-1">Model note</div>
                   <ul className="list-disc pl-4 space-y-0.5">
                     {routing.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {partlySent.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Only part of a large file was sent</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {partlySent.map((n, i) => <li key={i}>{n.detail}</li>)}
                   </ul>
                 </div>
               )}

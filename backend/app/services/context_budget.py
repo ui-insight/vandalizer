@@ -753,6 +753,38 @@ def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
     return head_text, tail_text
 
 
+# Where a file's middle was cut to fit, say so to the model and how to get it
+# back. A bare "[truncated]" left it answering as though it had read the file.
+_DOCUMENT_CUT_MARKER = (
+    "\n\n…[The middle of this document was left out to fit the model's memory. "
+    "Read the omitted part with get_document_text before answering about it.]…\n\n"
+)
+_FILE_CUT_MARKER = (
+    "\n\n…[The middle of this file was left out to fit the model's memory. "
+    "Say so if the answer may depend on it.]…\n\n"
+)
+
+
+def _segment_name(label: str) -> str:
+    """The file or page name inside a segment label such as ``doc:Budget.xlsx``."""
+    return label.split(":", 1)[1] if ":" in label else label
+
+
+def _partly_sent_detail(kept: list[tuple[str, int]]) -> str:
+    """Name each file that was cut and how much of it the model received.
+
+    A bare "Trimmed 95001 tokens from reference documents" on someone's first
+    question read like a memory error, and didn't say which file was cut or
+    that the rest can still be read.
+    """
+    parts = [f'"{name}" (about {pct}%)' for name, pct in kept]
+    files = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    return (
+        f"Too large to send in full, so only part went with your question: {files}. "
+        "Ask about a specific sheet, section or page and chat will read that part."
+    )
+
+
 def _truncate_text_to_tokens(
     text: str,
     max_tokens: int,
@@ -966,9 +998,9 @@ def plan_and_compact_context(
     def _cmt(message: Any) -> int:
         return count_message_tokens(message, model_name, model_config, native=native)
 
-    def _trunc(text: str, max_tokens: int) -> tuple[str, int]:
+    def _trunc(text: str, max_tokens: int, marker: str = "\n\n…[truncated]…\n\n") -> tuple[str, int]:
         return _truncate_text_to_tokens(
-            text, max_tokens, model_name, model_config=model_config, native=native
+            text, max_tokens, model_name, marker=marker, model_config=model_config, native=native
         )
 
     plan.system_tokens = _ct(system_prompt) if system_prompt else 0
@@ -1036,6 +1068,7 @@ def plan_and_compact_context(
     # 2. Trim attachments proportionally.
     if plan.attachments_tokens > attach_target and attachments:
         dropped = 0
+        kept_attachments: list[tuple[str, int]] = []
         scale = attach_target / max(1, plan.attachments_tokens)
         for i, a in enumerate(attachments):
             if a.required:
@@ -1044,8 +1077,9 @@ def plan_and_compact_context(
             allowed = max(256, int(raw * scale))
             if allowed >= raw:
                 continue
-            new_text, loss = _trunc(a.text, allowed)
+            new_text, loss = _trunc(a.text, allowed, _FILE_CUT_MARKER)
             dropped += loss
+            kept_attachments.append((_segment_name(a.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
             attachments[i] = DocumentSegment(
                 label=a.label, text=new_text, required=a.required
             )
@@ -1056,7 +1090,7 @@ def plan_and_compact_context(
             actions.append(
                 CompactionAction(
                     kind="attachments_trimmed",
-                    detail=f"Trimmed {dropped} tokens from attached files.",
+                    detail=_partly_sent_detail(kept_attachments),
                     tokens_dropped=dropped,
                 )
             )
@@ -1064,6 +1098,7 @@ def plan_and_compact_context(
     # 3. Trim documents proportionally.
     if plan.documents_tokens > doc_target and documents:
         dropped = 0
+        kept_documents: list[tuple[str, int]] = []
         scale = doc_target / max(1, plan.documents_tokens)
         for i, d in enumerate(documents):
             if d.required:
@@ -1072,8 +1107,9 @@ def plan_and_compact_context(
             allowed = max(512, int(raw * scale))
             if allowed >= raw:
                 continue
-            new_text, loss = _trunc(d.text, allowed)
+            new_text, loss = _trunc(d.text, allowed, _DOCUMENT_CUT_MARKER)
             dropped += loss
+            kept_documents.append((_segment_name(d.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
             documents[i] = DocumentSegment(
                 label=d.label, text=new_text, required=d.required
             )
@@ -1084,7 +1120,7 @@ def plan_and_compact_context(
             actions.append(
                 CompactionAction(
                     kind="documents_trimmed",
-                    detail=f"Trimmed {dropped} tokens from reference documents.",
+                    detail=_partly_sent_detail(kept_documents),
                     tokens_dropped=dropped,
                 )
             )
@@ -1270,6 +1306,10 @@ class ContextMeter:
     state: str
     percent_until_compact: int
     estimate_source: str  # "usage_anchor" | "token_count"
+    # Tokens the conversation itself (earlier messages) accounts for. When
+    # attached files fill most of the window, trimming the conversation
+    # won't help, so the UI shouldn't say "this conversation is getting long".
+    history_tokens: Optional[int] = None
 
     def to_dict(self) -> dict:
         return {
@@ -1282,6 +1322,7 @@ class ContextMeter:
             "state": self.state,
             "percent_until_compact": self.percent_until_compact,
             "estimate_source": self.estimate_source,
+            "history_tokens": self.history_tokens,
         }
 
 
@@ -1291,6 +1332,7 @@ def build_context_meter(
     context_window: int,
     response_reserve: Optional[int] = None,
     estimate_source: str = "token_count",
+    history_tokens: Optional[int] = None,
 ) -> ContextMeter:
     """Place an estimate on the warn/compact/block escalation ladder."""
     effective = effective_input_window(context_window, response_reserve)
@@ -1335,6 +1377,7 @@ def build_context_meter(
         state=state,
         percent_until_compact=percent,
         estimate_source=estimate_source,
+        history_tokens=history_tokens,
     )
 
 

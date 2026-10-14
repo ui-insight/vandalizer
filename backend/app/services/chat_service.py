@@ -2140,6 +2140,7 @@ async def chat_stream(
             context_window=compacted.plan.context_window,
             response_reserve=compacted.plan.response_reserve,
             estimate_source="usage_anchor",
+            history_tokens=compacted.plan.history_tokens,
         )
     else:
         meter = build_context_meter(
@@ -2147,6 +2148,7 @@ async def chat_stream(
             context_window=compacted.plan.context_window,
             response_reserve=compacted.plan.response_reserve,
             estimate_source="token_count",
+            history_tokens=compacted.plan.history_tokens,
         )
     yield json.dumps({
         "kind": "context_meter",

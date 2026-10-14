@@ -155,6 +155,10 @@ export interface ContextMeterInfo {
   state: 'ok' | 'warning' | 'compact' | 'blocked'
   percent_until_compact: number
   estimate_source: 'usage_anchor' | 'token_count'
+  /** Tokens the conversation's earlier messages account for. Absent from
+   *  older servers. When attached files fill most of the window, trimming the
+   *  conversation won't help, so the "getting long" nudge stays hidden. */
+  history_tokens?: number | null
 }
 
 export interface Citation {
