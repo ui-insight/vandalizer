@@ -8,6 +8,7 @@ from app.services.certification_versions.readers import existing_active_progress
 from app.services.certification_versions.catalog import CourseCatalogError
 from app.services.certification_versions.enrollments import EnrollmentConflict
 from app.models.user import User
+from app.services.certification_service import MODULE_TITLES
 from app.services.email_service import (
     send_email,
     onboarding_drip_email,
@@ -24,22 +25,22 @@ logger = logging.getLogger(__name__)
 _DRIP_MODULES = [
     {
         "id": "ai_literacy",
-        "title": "AI Literacy",
+        "title": MODULE_TITLES["ai_literacy"],
         "description": "start with the fundamentals: what AI actually is, what it's good and bad at, and how it applies to research administration.",
     },
     {
         "id": "foundations",
-        "title": "Foundations: Your First Extraction",
+        "title": MODULE_TITLES["foundations"],
         "description": "it's time to get hands-on. This module walks you through uploading a document and building your first extraction workflow.",
     },
     {
         "id": "process_mapping",
-        "title": "Process Mapping",
+        "title": MODULE_TITLES["process_mapping"],
         "description": "learn to identify which parts of your daily work are good candidates for automation and how to break them into workflow steps.",
     },
     {
         "id": "workflow_design",
-        "title": "Workflow Design",
+        "title": MODULE_TITLES["workflow_design"],
         "description": "build a multi-step workflow with extraction, prompt, and formatting tasks working together.",
     },
 ]

@@ -16,6 +16,8 @@ from app.models.document import SmartDocument
 from app.models.verification import VerificationRequest, VerificationStatus
 from app.services.certification_versions.runtime import course_operation, current_operation
 from app.services.certification_versions.writes import save_progress
+from app.services.certification_versions.catalog import CATALOG_ROOT as _CATALOG_ROOT
+from app.services.certification_versions.rubrics import legacy_20261002 as _legacy
 
 log = logging.getLogger(__name__)
 
@@ -85,70 +87,20 @@ def editorial_notices(lesson_id: str | None, content: str | None = None) -> list
 # XP & Level constants
 # ---------------------------------------------------------------------------
 
-MODULE_XP = {
-    "ai_literacy": 50,
-    "foundations": 100,
-    "process_mapping": 100,
-    "workflow_design": 100,
-    "extraction_engine": 150,
-    "multi_step": 150,
-    "advanced_nodes": 200,
-    "output_delivery": 200,
-    "validation_qa": 250,
-    "batch_processing": 250,
-    "governance": 300,
-}
+# The unversioned course's order, XP, levels and reflection keys are the
+# preserved legacy rubric's own values, and display titles are the served
+# course data, so no second copy can drift from what learners are graded on
+# and shown. Versioned enrollments read their pinned package instead.
 
-LEVELS = [
-    ("novice", 0),
-    ("apprentice", 100),
-    ("builder", 250),
-    ("designer", 400),
-    ("engineer", 600),
-    ("specialist", 800),
-    ("expert", 1050),
-    ("master", 1300),
-    ("architect", 1600),
-]
-
-MODULE_ORDER = [
-    "ai_literacy",
-    "foundations",
-    "process_mapping",
-    "workflow_design",
-    "extraction_engine",
-    "multi_step",
-    "advanced_nodes",
-    "output_delivery",
-    "validation_qa",
-    "batch_processing",
-    "governance",
-]
-
-# Display titles, kept in sync with the frontend MODULES catalog
-# (frontend/src/pages/Certification.tsx). Used by surfaces that only have the
-# module id (chat tools, notifications).
-MODULE_TITLES = {
-    "ai_literacy": "AI Literacy",
-    "foundations": "Foundations",
-    "process_mapping": "Thinking in Workflows",
-    "workflow_design": "Workflow Design",
-    "extraction_engine": "Extraction Engine",
-    "multi_step": "Multi-Step Workflows",
-    "advanced_nodes": "Advanced Nodes",
-    "output_delivery": "Output & Delivery",
-    "validation_qa": "Validation & QA",
-    "batch_processing": "Batch Processing",
-    "governance": "Governance",
-}
-
-# Self-assessment answer keys required by the reflective modules' validators
+MODULE_XP = dict(_legacy.MODULE_XP)
+LEVELS = list(_legacy.LEVELS)
+MODULE_ORDER = list(_legacy.MODULE_ORDER)
+# Used by surfaces that only have the module id (chat tools, notifications).
+MODULE_TITLES = {module["id"]: module["title"]
+                 for module in json.loads((_CATALOG_ROOT.parent / "panel-modules.json").read_text())}
+# Answer keys required by the reflective modules' validators
 # (_validate_ai_literacy / _validate_process_mapping / _validate_workflow_design).
-ASSESSMENT_KEYS = {
-    "ai_literacy": ("experience", "comfort", "concern"),
-    "process_mapping": ("process", "time_sink", "judgment", "outcome"),
-    "workflow_design": ("step_splitting", "pattern", "concern", "human_role"),
-}
+ASSESSMENT_KEYS = dict(_legacy.ASSESSMENT_KEYS)
 
 
 def _compute_level(xp: int) -> str:
