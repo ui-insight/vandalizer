@@ -3,7 +3,7 @@ import { CourseEditorLink } from './CourseEditorLink'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getGovernanceRecord, getGovernanceWork } from '../../api/governanceAssessment'
 import type { GovernanceCase, GovernanceKind, GovernanceList, GovernanceRequest, GovernanceView } from '../../types/governanceAssessment'
-import { connectedId as id } from './connectedWorkflowState'
+import { connectedId as id, extractionId } from './connectedWorkflowState'
 import { governanceId as newId, governanceKinds, governanceLabels, sameGovernanceCase, validGovernanceRequest, verifyGovernanceView } from './governanceAssessmentState'
 import { useGovernanceRequest } from './useGovernanceRequest'
 import { GovernanceEvidence, governanceBox as box, governanceButton as button, governanceControl as control } from './GovernanceEvidence'
@@ -97,7 +97,7 @@ function GovernanceWorkspace({ initial, historyOnly }: { initial: GovernanceList
       <label className="block text-sm">Owned capstone extraction<select className={control} required disabled={locked} value={artifact} onChange={e => setArtifact(e.target.value)}><option value="">Select your extraction</option>{listing.extractions.map(item => <option key={item.artifact_id} value={item.artifact_id}>{item.title}</option>)}</select></label>
       {listing.extractions.filter(item => item.artifact_id === artifact).map(item => <CourseEditorLink key={item.artifact_id} kind="extraction" artifactId={item.artifact_id} title={item.title} disabled={locked} />)}
       {!listing.extractions.length && <p className="text-sm">Create an owned extraction with the six required fields, then refresh your choices.</p>}
-      <button className={button} disabled={locked || !id(artifact)}>Capture extraction and both capstone sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh capstone choices</button>
+      <button className={button} disabled={locked || !extractionId(artifact)}>Capture extraction and both capstone sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh capstone choices</button>
     </form>}
     <section aria-label="Saved capstone history" className={box}><h5 className="font-semibold">Saved capstone history</h5>
       {governanceKinds.map(kind => <details key={kind} open={kind === 'review'}><summary className="min-h-11 cursor-pointer py-2 font-semibold">{governanceLabels[kind]} · {listing.records[kind].items.length} saved</summary><div className="flex flex-wrap gap-2">{listing.records[kind].items.map((item, i) => <button key={item.reference_id} className={button} disabled={readLocked} onClick={() => { void open(kind, item.reference_id) }}>Open {governanceLabels[kind].toLowerCase()} {i + 1}{item.phase ? ` · ${item.phase}` : ''}{item.state ? ` · ${item.state}` : ''}{item.previous_submission_id ? ' · revised answer' : ''}</button>)}</div>{listing.records[kind].older_available && <p className="text-sm">Only the latest 50 are listed. Open older work by its saved reference.</p>}</details>)}

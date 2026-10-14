@@ -1,5 +1,5 @@
 import type { GovernanceCase, GovernanceList, GovernanceRequest, GovernanceView, GovernanceCapture, GovernanceRun, GovernanceRecord, GovernanceKind } from '../../types/governanceAssessment'
-import { connectedId as id, connectedDigest as digest } from './connectedWorkflowState'
+import { connectedId as id, connectedDigest as digest, extractionId } from './connectedWorkflowState'
 import { sameOutputJson as same } from './outputWorkflowState'
 export const governanceId = () => crypto.randomUUID().replaceAll('-', '')
 export const governanceKinds: GovernanceKind[] = ['capture', 'correction', 'run', 'scope', 'finding', 'memo', 'release', 'handoff', 'review']
@@ -17,7 +17,7 @@ export function validGovernanceRequest(r: GovernanceRequest | null, definition: 
     if ('run_id' in b && !id(b.run_id)) return false
     if ('memo_id' in b && (!id(b.memo_id) || !digest(b.memo_sha256) || !digest(b.file_sha256))) return false
     switch (r.action) {
-      case 'capture': return id(r.body.artifact_id) && r.body.consent === 'capture_governance_extraction_and_complete_sources'
+      case 'capture': return extractionId(r.body.artifact_id) && r.body.consent === 'capture_governance_extraction_and_complete_sources'
       case 'correction': return id(r.body.input_snapshot_id) && digest(r.body.input_snapshot_sha256) && r.body.source_document_ids.length === 2
         && new Set(r.body.source_document_ids).size === 2 && r.body.source_document_ids.every(id) && text(r.body.reason, 40)
         && r.body.choice === 'reject_broad_proposal' && r.body.destination_id === 'private_training_inbox' && r.body.audience === 'enrolled_learner_only'
@@ -44,7 +44,7 @@ export function validGovernanceRequest(r: GovernanceRequest | null, definition: 
   } catch { return false }
 }
 function capture(v: GovernanceCapture, l: GovernanceList) {
-  if (!course(v, l) || !sameGovernanceCase(v.case, l.case) || !id(v.uuid) || !id(v.artifact_id) || v.artifact.uuid !== v.artifact_id
+  if (!course(v, l) || !sameGovernanceCase(v.case, l.case) || !id(v.uuid) || !extractionId(v.artifact_id) || v.artifact.uuid !== v.artifact_id
     || !digest(v.input_snapshot_sha256) || !digest(v.artifact_sha256) || v.documents.length !== 2 || new Set(v.documents.map(s => s.document_id)).size !== 2
     || v.documents.some((s, i) => s.source_id !== l.case.sources[i].id || s.source_sha256 !== l.case.sources[i].sha256 || !id(s.document_id) || !s.pages.length)
     || !same(v.artifact.fields.map(f => f.title), l.case.fields.map(f => f.title)) || v.credit_awarded !== false || v.execution_authorized !== false) throw new Error('Different original capstone capture')

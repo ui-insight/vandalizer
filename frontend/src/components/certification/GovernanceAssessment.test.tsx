@@ -207,3 +207,8 @@ it('announces a sent request separately from checking its preserved state after 
   expect(hook.result.current.pending).toEqual(request)
   expect(hook.result.current.canFinish).toBe(false)
 })
+it('accepts a capture of an extraction created in the editor or chat', () => {
+  const realId = '2a6f3c1e-8b4d-4e2f-9a1b-3c5d7e9f0a12'
+  expect(validGovernanceRequest({ ...request, body: { ...request.body, artifact_id: realId } } as GovernanceRequest, definition)).toBe(true)
+  expect(validGovernanceRequest({ ...request, body: { ...request.body, artifact_id: 'not an extraction' } } as GovernanceRequest, definition)).toBe(false)
+})

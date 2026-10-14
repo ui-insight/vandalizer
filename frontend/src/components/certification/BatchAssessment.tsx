@@ -3,7 +3,7 @@ import { CourseEditorLink } from './CourseEditorLink'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getBatchWork, getBatchCapture, getBatchRun, getBatchReview } from '../../api/batchAssessment'
 import type { BatchCase, BatchList, BatchRequest, BatchRun, BatchSaved, BatchCapture, BatchPhase, BatchSourceId } from '../../types/batchAssessment'
-import { connectedId as id } from './connectedWorkflowState'
+import { connectedId as id, extractionId } from './connectedWorkflowState'
 import { sameBatchCase, validBatchRequest, verifyBatchCapture, verifyBatchRun, verifyBatchReview } from './batchAssessmentState'
 import { useBatchRequest } from './useBatchRequest'
 import { BatchCaptureEvidence, BatchRunEvidence, batchButton as button, batchControl as control } from './BatchEvidence'
@@ -114,7 +114,7 @@ function BatchWorkspace({ initial, historyOnly }: { initial: BatchList; historyO
       <label className="block text-sm">Owned extraction<select className={control} value={artifact} disabled={locked} required onChange={e => setArtifact(e.target.value)}><option value="">Select an extraction</option>{listing.extractions.map(item => <option key={item.artifact_id} value={item.artifact_id}>{item.title}</option>)}</select></label>
       {listing.extractions.filter(item => item.artifact_id === artifact).map(item => <CourseEditorLink key={item.artifact_id} kind="extraction" artifactId={item.artifact_id} title={item.title} disabled={locked} />)}
       {!listing.extractions.length && <p className="text-sm">No owned extraction is available. Create one with the required fields, then refresh choices.</p>}
-      <button className={button} disabled={locked || !id(artifact) || !selected.length}>Capture extraction and selected sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh batch choices</button>
+      <button className={button} disabled={locked || !extractionId(artifact) || !selected.length}>Capture extraction and selected sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh batch choices</button>
     </form>}
     <section aria-label="Saved batch history" className={box}><h5 className="font-semibold">Saved batch history</h5>
       {listing.captures.map((item, i) => <button key={item.input_snapshot_id} className={button} disabled={readLocked} onClick={() => { void open('capture', item.input_snapshot_id) }}>Open capture {i + 1}: {item.extraction_name}</button>)}

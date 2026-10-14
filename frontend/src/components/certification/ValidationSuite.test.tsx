@@ -16,7 +16,8 @@ const definition: ValidationCase = { id: 'case', revision: 1, module_id: 'valida
   sources: [{ id: 'nsf', filename: 'nsf.pdf', sha256: 'b'.repeat(64), coverage: 'Annual ambiguity' }, { id: 'nih', filename: 'nih.pdf', sha256: 'c'.repeat(64), coverage: 'Absent Co-PI' }],
   questions: [{ id: 'suite_design', phase: 'before_original_run', prompt: 'Explain coverage and limitations.' }, { id: 'repair_review', phase: 'after_complete_retest', prompt: 'Explain causal repair and full retest.' }] }
 const identity = { enrollment_id: 'enrollment', module_id: 'validation_qa' as const, course_version: 'draft', manifest_sha256: 'd'.repeat(64) }
-const artifact = 'e'.repeat(32), snapshotId = 'f'.repeat(32)
+// The editor, chat and library create extraction sets with hyphenated uuid4 strings.
+const artifact = '2a6f3c1e-8b4d-4e2f-9a1b-3c5d7e9f0a12', snapshotId = 'f'.repeat(32)
 const request: ValidationRequest = { action: 'capture', body: { request_id: snapshotId, artifact_id: artifact, case_sha256: definition.case_sha256, consent: 'capture_validation_extraction_and_complete_sources' } }
 const key = `certification-validation-request:enrollment:${definition.case_sha256}`
 const capture: ValidationCapture = { ...identity, uuid: snapshotId, case: definition, input_snapshot_sha256: '1'.repeat(64), artifact_id: artifact, artifact_sha256: '2'.repeat(64), captured_at: '2026-10-07', execution_authorized: false, credit_awarded: false,

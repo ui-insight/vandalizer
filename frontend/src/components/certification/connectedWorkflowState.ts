@@ -1,6 +1,8 @@
 import type { ConnectedCapture, ConnectedCase, ConnectedIdentity, ConnectedList, ConnectedRequest, ConnectedReview, ConnectedRun, ConnectedSaved, ConnectedRecoveryDecision } from '../../types/connectedWorkflow'
 
 export const connectedId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value)
+// Extraction sets carry hyphenated uuid4 strings from the editor, chat and library.
+export const extractionId = (value: unknown): value is string => typeof value === 'string' && /^([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/.test(value)
 export const connectedDigest = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 export function sameConnectedCase(value: ConnectedCase, expected: ConnectedCase) {
   return value.module_id === 'multi_step' && value.provenance === 'authored_connected_workflow_case_not_execution'

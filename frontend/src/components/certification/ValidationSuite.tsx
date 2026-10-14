@@ -3,7 +3,7 @@ import { CourseEditorLink } from './CourseEditorLink'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getValidationWork, getValidationCapture, getValidationSuite, getValidationRun, getValidationReview } from '../../api/validationSuite'
 import type { ValidationCase, ValidationList, ValidationRequest, ValidationRun, ValidationSaved, ValidationSuiteRecord, ValidationCapture } from '../../types/validationSuite'
-import { connectedId as id } from './connectedWorkflowState'
+import { connectedId as id, extractionId } from './connectedWorkflowState'
 import { sameValidationCase, validValidationRequest, verifyValidationCapture, verifyValidationSuite, verifyValidationRun, verifyValidationReview } from './validationSuiteState'
 import { useValidationRequest } from './useValidationRequest'
 import { ValidationCaptureEvidence, ValidationSuiteEvidence, ValidationRunEvidence, validationButton as button, validationControl as control } from './ValidationEvidence'
@@ -106,7 +106,7 @@ function ValidationWorkspace({ initial, historyOnly }: { initial: ValidationList
       <label className="block text-sm">Owned extraction<select className={control} value={artifact} disabled={locked || !!original} required onChange={e => setArtifact(e.target.value)}><option value="">Select an extraction</option>{listing.extractions.map(item => <option key={item.artifact_id} value={item.artifact_id}>{item.title}</option>)}</select></label>
       {listing.extractions.filter(item => item.artifact_id === artifact).map(item => <CourseEditorLink key={item.artifact_id} kind="extraction" artifactId={item.artifact_id} title={item.title} disabled={locked} />)}
       {!listing.extractions.length && <p className="text-sm">No owned extraction is available. Create one with the required fields, then refresh choices.</p>}
-      <button className={button} disabled={locked || !id(artifact)}>Capture extraction and both sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh validation choices</button>
+      <button className={button} disabled={locked || !extractionId(artifact)}>Capture extraction and both sources</button><button type="button" className={button} disabled={locked} onClick={() => { void refresh() }}>Refresh validation choices</button>
     </form>}
     <section aria-label="Saved validation history" className={box}><h5 className="font-semibold">Saved validation history</h5>
       {listing.captures.map((item, i) => <button key={item.input_snapshot_id} className={button} disabled={readLocked} onClick={() => { void open('capture', item.input_snapshot_id) }}>Open capture {i + 1}: {item.extraction_name}</button>)}

@@ -20,6 +20,9 @@ from .enrollments import EnrollmentConflict
 from .writes import require_lease
 
 MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024
+# Extraction sets are created with hyphenated uuid4 strings by the editor, chat
+# and library; older fixtures used the 32-hex form. Both identify owned work.
+EXTRACTION_ID = r'^([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$'
 
 
 class LabInputRepository:

@@ -14,14 +14,14 @@ from .attempts import encode
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
-from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES
+from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES, EXTRACTION_ID
 from .outcomes import ContractModel
 from .governance_case import FIELDS, GovernanceCase, load_governance_case
 
 
 class GovernanceCaptureRequest(ContractModel):
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
-    artifact_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    artifact_id: str = Field(pattern=EXTRACTION_ID)
     case_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     consent: Literal['capture_governance_extraction_and_complete_sources']
 

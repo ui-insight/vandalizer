@@ -1,5 +1,5 @@
 import type { BatchCase, BatchCapture, BatchIdentity, BatchList, BatchRequest, BatchReview, BatchRun, BatchSaved } from '../../types/batchAssessment'
-import { connectedId as id, connectedDigest as digest } from './connectedWorkflowState'
+import { connectedId as id, connectedDigest as digest, extractionId } from './connectedWorkflowState'
 import { sameOutputJson as same } from './outputWorkflowState'
 const text = (v: unknown, min: number, max: number): v is string => typeof v === 'string' && v.trim().length >= min && v.length <= max
 const course = (v: BatchIdentity, l: BatchList) => v.module_id === 'batch_processing' && v.enrollment_id === l.enrollment_id && v.course_version === l.course_version && v.manifest_sha256 === l.manifest_sha256
@@ -14,7 +14,7 @@ export function validBatchRequest(v: BatchRequest | null, d: BatchCase): v is Ba
     if ('request_id' in b && !id(b.request_id)) return false
     if (!['execute', 'finalize'].includes(v.action) && (!('case_sha256' in b) || b.case_sha256 !== d.case_sha256)) return false
     switch (v.action) {
-      case 'capture': return id(v.body.artifact_id) && v.body.consent === 'capture_batch_extraction_and_complete_sources'
+      case 'capture': return extractionId(v.body.artifact_id) && v.body.consent === 'capture_batch_extraction_and_complete_sources'
         && Array.isArray(v.body.selected_source_ids) && v.body.selected_source_ids.length > 0 && v.body.selected_source_ids.length <= 4
         && v.body.selected_source_ids.every(item => typeof item === 'string' && item.length > 0)
       case 'prepare': return id(v.body.input_snapshot_id) && digest(v.body.input_snapshot_sha256) && v.body.consent === 'prepare_bounded_batch_action'
@@ -34,7 +34,7 @@ export function validBatchRequest(v: BatchRequest | null, d: BatchCase): v is Ba
   } catch { return false }
 }
 export function verifyBatchCapture(v: BatchCapture, l: BatchList) {
-  if (!course(v, l) || !sameBatchCase(v.case, l.case) || !id(v.uuid) || !id(v.artifact_id) || v.artifact.uuid !== v.artifact_id
+  if (!course(v, l) || !sameBatchCase(v.case, l.case) || !id(v.uuid) || !extractionId(v.artifact_id) || v.artifact.uuid !== v.artifact_id
     || !digest(v.input_snapshot_sha256) || !digest(v.artifact_sha256) || v.documents.length !== 3 || new Set(v.documents.map(s => s.document_id)).size !== 3
     || v.documents.some((s, i) => s.source_id !== l.case.sources[i].id || s.source_sha256 !== l.case.sources[i].sha256 || !id(s.document_id) || !s.pages.length)
     || !same(v.artifact.fields.map(f => f.title), l.case.fields.map(f => f.title)) || v.credit_awarded !== false || v.execution_authorized !== false) throw new Error('Different batch capture')

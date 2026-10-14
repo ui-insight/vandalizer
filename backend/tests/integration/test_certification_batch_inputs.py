@@ -66,7 +66,7 @@ async def fixture(repo, *, enrolled=None):
             path=path, downloadpath=path, raw_text=text, folder='batch-lab', processing=False, task_status='completed').insert())
     await repo.progress.update_one({'_id': ObjectId(learner.progress_id)}, {'$set': {
         'lab_folder_id': 'batch-lab', 'modules.batch_processing.provisioned_docs': [d.uuid for d in documents]}})
-    artifact = await SearchSet(uuid=uuid4().hex, title='Owned representative extraction', status='active', set_type='extraction', user_id=learner.user_id).insert()
+    artifact = await SearchSet(uuid=str(uuid4()), title='Owned representative extraction', status='active', set_type='extraction', user_id=learner.user_id).insert()
     fields = [await SearchSetItem(searchset=artifact.uuid, user_id=learner.user_id, title=field.title,
         searchphrase=field.meaning, searchtype='extraction', is_optional=False).insert() for field in case.fields]
     body = {'request_id': uuid4().hex, 'artifact_id': artifact.uuid, 'case_sha256': case.digest,

@@ -1,5 +1,5 @@
 import type { ValidationCase, ValidationCapture, ValidationIdentity, ValidationList, ValidationRequest, ValidationReview, ValidationRun, ValidationSaved, ValidationSuiteRecord } from '../../types/validationSuite'
-import { connectedId as id, connectedDigest as digest } from './connectedWorkflowState'
+import { connectedId as id, connectedDigest as digest, extractionId } from './connectedWorkflowState'
 import { sameOutputJson as same } from './outputWorkflowState'
 const text = (value: unknown, min: number, max: number): value is string => typeof value === 'string' && value.trim().length >= min && value.length <= max
 const course = (v: ValidationIdentity, l: ValidationList) => v.module_id === 'validation_qa' && v.enrollment_id === l.enrollment_id && v.course_version === l.course_version && v.manifest_sha256 === l.manifest_sha256
@@ -12,7 +12,7 @@ export function validValidationRequest(v: ValidationRequest | null, d: Validatio
     if ('request_id' in b && !id(b.request_id)) return false
     if (!['execute', 'finalize'].includes(v.action) && (!('case_sha256' in b) || b.case_sha256 !== d.case_sha256)) return false
     switch (v.action) {
-      case 'capture': return id(v.body.artifact_id) && v.body.consent === 'capture_validation_extraction_and_complete_sources'
+      case 'capture': return extractionId(v.body.artifact_id) && v.body.consent === 'capture_validation_extraction_and_complete_sources'
       case 'suite': return id(v.body.input_snapshot_id) && digest(v.body.input_snapshot_sha256) && v.body.consent === 'save_checked_representative_expectations_before_execution'
         && text(v.body.suite_design, 40, 8000) && v.body.expectations.length === 6 && new Set(v.body.expectations.map(e => `${e.source_id}:${e.field}`)).size === 6
         && v.body.expectations.every(e => d.sources.some(s => s.id === e.source_id) && d.fields.some(f => f.title === e.field)
@@ -30,7 +30,7 @@ export function validValidationRequest(v: ValidationRequest | null, d: Validatio
   } catch { return false }
 }
 export function verifyValidationCapture(v: ValidationCapture, l: ValidationList) {
-  if (!course(v, l) || !sameValidationCase(v.case, l.case) || !id(v.uuid) || !id(v.artifact_id) || v.artifact.uuid !== v.artifact_id
+  if (!course(v, l) || !sameValidationCase(v.case, l.case) || !id(v.uuid) || !extractionId(v.artifact_id) || v.artifact.uuid !== v.artifact_id
     || !digest(v.input_snapshot_sha256) || !digest(v.artifact_sha256) || v.documents.length !== 2
     || v.documents.some((s, i) => s.source_id !== l.case.sources[i].id || s.source_sha256 !== l.case.sources[i].sha256 || !s.pages.length)
     || !same(v.artifact.fields.map(f => f.title), l.case.fields.map(f => f.title)) || v.credit_awarded !== false || v.execution_authorized !== false) throw new Error('Different validation capture')

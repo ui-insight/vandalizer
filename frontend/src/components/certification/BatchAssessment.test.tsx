@@ -17,7 +17,8 @@ const definition: BatchCase = { id: 'case', revision: 1, module_id: 'batch_proce
   questions: [{ id: 'pilot_choice', phase: 'before_pilot', prompt: 'Explain pilot scope.' }, { id: 'scale_choice', phase: 'before_batch', prompt: 'Explain source quality and resource tradeoffs.' },
     { id: 'recovery_choice', phase: 'before_retry', prompt: 'Explain the exact failure and preserved successes.' }, { id: 'batch_review', phase: 'after_recovery', prompt: 'Reconcile actual results and limitations.' }] }
 const identity = { enrollment_id: 'enrollment', module_id: 'batch_processing' as const, course_version: 'draft', manifest_sha256: 'd'.repeat(64) }
-const artifact = 'e'.repeat(32), snapshotId = 'f'.repeat(32)
+// The editor, chat and library create extraction sets with hyphenated uuid4 strings.
+const artifact = '2a6f3c1e-8b4d-4e2f-9a1b-3c5d7e9f0a12', snapshotId = 'f'.repeat(32)
 const assignedIds = ['1', '2', '3'].map(c => c.repeat(32)), wrongId = 'course_asset:nsf-proposal-alpine-ecology.pdf'
 const request: BatchRequest = { action: 'capture', body: { request_id: snapshotId, artifact_id: artifact, case_sha256: definition.case_sha256, selected_source_ids: assignedIds, consent: 'capture_batch_extraction_and_complete_sources' } }
 const key = `certification-batch-request:enrollment:${definition.case_sha256}`
