@@ -1,27 +1,28 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "92847ed401a72af38f6a5ac5ed7823ee216f83a2",
+  "working_head_at_inventory": "204174492f46f2a4614bd66b75073bdf693f07d1",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 69711,
-    "sha256": "6e2519e82fcfddae73dee2632442a8bbcd4a411e69573ed8d451b2a772f3621d"
+    "bytes": 88379,
+    "sha256": "e951e907f36762399b64c1f17237e0eaa30f7f49868193bdcb30eef2a06036cf"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 843743,
-    "sha256": "37818ed6b56a500695ba665123156c11ac633669ec07abf3fea12ccd3701be9d"
+    "bytes": 879028,
+    "sha256": "a59a9f6b9b1a2680545b9a8f348456b6f6b4e48926c380a23701db436819e89d"
   },
   "counts": {
-    "accepted": 86,
-    "open": 76,
-    "items": 162,
-    "checkpoints": 346,
+    "accepted": 122,
+    "open": 33,
+    "items": 155,
+    "checkpoints": 356,
     "browser_runs": 645,
     "recorded_captures_including_diagnostics_and_repeats": 7466,
-    "baseline_selected_captures": 151
+    "baseline_selected_captures": 151,
+    "live_calibration_reports": 25
   },
   "baseline": {
     "report": {
@@ -404,11 +405,6 @@
       "requirement": "P1 · Verify: Maintain visible focus.** All interactive course elements show clear focus under supported themes and after scrolling. Focus is not obscured by the composer, sticky headers, dialogs or split panes. Accepted at checkpoint 338 after the clipped-control repair at 337: all twenty practical forms, shared control types, yellow/purple accent journeys, scrolled chat cards, source dialogs, editor return and completion retain visible unobscured focus. Native zoom and panel modes are covered by the current retained renderer; actual mobile keyboard and assistive-technology release gates remain separate."
     },
     {
-      "id": "C8-A11Y-05",
-      "accepted": false,
-      "requirement": "P1 · Verify: Announce meaningful changes.** A screen reader receives saved answers, grading results, failures and awarded credit without the entire streaming transcript being repeatedly announced. Verify with actual assistive technology, not only an accessibility-tree dump."
-    },
-    {
       "id": "C8-A11Y-06",
       "accepted": true,
       "requirement": "P1 · Verify: Manage modal and handoff focus.** Verification dialogs and celebrations contain focus appropriately; Escape closes the intended layer and restores a useful target. Nonmodal course panels remain usable alongside the workspace. Accepted at checkpoint 329: fullscreen and source-preview dialogs, tier/course celebrations and editor handoffs have actual keyboard containment/exit/return evidence; docked panels permit workspace focus. Current panel checks and 71 focused cases pass. This does not substitute for actual screen-reader announcements or mobile OS keyboard verification."
@@ -485,8 +481,8 @@
     },
     {
       "id": "C8-CONTENT-01",
-      "accepted": false,
-      "requirement": "P1 · Improve: Make agent supervision a course-wide skill.** Thread scope selection, proposal review, source checking, correction, recovery and delivery through the modules. Add assessed outcomes rather than merely rewriting editor steps as chat prompts."
+      "accepted": true,
+      "requirement": "P1 · Improve: Make agent supervision a course-wide skill.** Thread scope selection, proposal review, source checking, correction, recovery and delivery through the modules. Add assessed outcomes rather than merely rewriting editor steps as chat prompts. Accepted at checkpoint 356: supervision is assessed in every module through outcomes, not rewritten editor steps. Scope: ai_literacy.scope_and_authority, foundations.scoped_proposal, process_mapping.bounded_scope, batch resource choice with the proposed batch, capstone. Proposal review: the Foundations wrong source, workflow_design.approval_boundary, the process suggested map, validation's agent-drafted expectations, capstone. Source checking: ai_literacy.source_support, foundations.verified_values, extraction quality_repair, validation tests, multi-step bounded reasoning, advanced checked computation. Correction: extraction repair, multi-step intermediate review, validation repair and retest. Recovery: batch targeted recovery, output delivery outcome, capstone delivery retry. Delivery: three output-delivery outcomes and the governance handoff."
     },
     {
       "id": "C8-CONTENT-02",
@@ -525,8 +521,8 @@
     },
     {
       "id": "C8-CONTENT-09",
-      "accepted": false,
-      "requirement": "P1 · Improve: Build representative practice and failure cases.** Include correct, ambiguous, missing, scanned and incorrect results with documented expected evidence. Every intentionally wrong example is clearly controlled and has a valid recovery path."
+      "accepted": true,
+      "requirement": "P1 · Improve: Build representative practice and failure cases.** Include correct, ambiguous, missing, scanned and incorrect results with documented expected evidence. Every intentionally wrong example is clearly controlled and has a valid recovery path. Accepted at checkpoint 356: practice and failure cases now span all five kinds with documented expected evidence. Correct: honest labs and calibration. Ambiguous: role and value ambiguity, unclear calibration cases. Missing: the NIH Co-PI absence, the unnamed postdoc. Scanned: the Foundations verify-values lesson works a scanned page whose text layer misreads the budget (9880fb03), plus calibration scanned_budget_value_illegible. Incorrect: the authored flawed proposals, the Year 1 budget, the wrong batch file, the suggested map. Each intentional failure is labelled controlled and has a recovery path (targeted retry, repair and retest, delivery retry, scope correction)."
     },
     {
       "id": "C8-CONTENT-10",
@@ -555,18 +551,18 @@
     },
     {
       "id": "C8-M01-01",
-      "accepted": false,
-      "requirement": "P1 · Fix: Reconcile the chat and workflow routes.** Teach creation of a reusable extraction from chat and explain when a workflow wrapper is useful. Both supported routes must have accurate instructions and equivalent completion evidence."
+      "accepted": true,
+      "requirement": "P1 · Fix: Reconcile the chat and workflow routes.** Teach creation of a reusable extraction from chat and explain when a workflow wrapper is useful. Both supported routes must have accurate instructions and equivalent completion evidence. Accepted at checkpoint 356: Foundations teaches creating the reusable extraction from chat or the editor and now says when to wrap it in a workflow (ad63ce16). Both routes have instructions, and the GRADE-12 route test shows a chat-built extraction refined in the editor yields the same captured evidence and checks as an editor-built one."
     },
     {
       "id": "C8-M01-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Inspect the proposed extraction before creation.** Have the learner confirm the sample document, field meanings, artifact name and target scope, and correct a deliberately inappropriate proposed field or target."
+      "accepted": true,
+      "requirement": "P1 · Improve: Inspect the proposed extraction before creation.** Have the learner confirm the sample document, field meanings, artifact name and target scope, and correct a deliberately inappropriate proposed field or target. Accepted at checkpoint 356: the learner inspects the proposed extraction's saved name (added in ad63ce16), field meanings, source and destination before creation. The training proposal deliberately names an unrelated source that must be corrected before execution; selection_matches_run refuses to run otherwise. Live, the honest learner was supported on scoped_proposal."
     },
     {
       "id": "C8-M01-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Grade the actual lab run.** Require the intended extraction revision to run on the assigned NSF sample, and verify required values against the source. Fields or runs on unrelated artifacts cannot satisfy the module."
+      "accepted": true,
+      "requirement": "P1 · Fix: Grade the actual lab run.** Require the intended extraction revision to run on the assigned NSF sample, and verify required values against the source. Fields or runs on unrelated artifacts cannot satisfy the module. Accepted at checkpoint 349: live kimi-k3 run on the assigned NSF sample bound to the approved revision and inputs by the deterministic check; five values verified against source quotes; honest learner passes, a learner accepting a contradicted budget is sent back. Unrelated-run rejection remains covered by the existing practical-check integration tests. Live run with one model only."
     },
     {
       "id": "C8-M01-04",
@@ -580,13 +576,13 @@
     },
     {
       "id": "C8-M02-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Map a process with human decisions.** The learner identifies inputs, repetitive tasks, deterministic calculations, institutional judgment, handoffs and outputs. The agent can suggest a map but the learner must correct an intentional boundary mistake."
+      "accepted": true,
+      "requirement": "P1 · Improve: Map a process with human decisions.** The learner identifies inputs, repetitive tasks, deterministic calculations, institutional judgment, handoffs and outputs. The agent can suggest a map but the learner must correct an intentional boundary mistake. Accepted at checkpoint 352: the case states each report's approved monthly budget and shows an agent-suggested map with one step of each kind: input, repetitive preparation, a code-computed spending variance, institutional judgment, handoff and output (fe8db525). Its institutional-judgment step wrongly lets the agent decide whether an overspend is justified. The map question requires labelled step kinds and correcting that step, and a second human_checkpoint passing condition grades it. Live process-mapping calibration matched 7/7 in three runs, including a new case that adopts the suggestion unchanged and is contradicted. The live strong answer is supported, and the shared thin answer is sent back for exactly this condition. Live run with one model only."
     },
     {
       "id": "C8-M02-03",
-      "accepted": false,
-      "requirement": "P1 · Improve: Assess the process decision.** Require a short rationale for the selected method and human checkpoint, using a rubric for appropriate scope and task fit. Merely entering nonempty reflection answers does not establish this outcome."
+      "accepted": true,
+      "requirement": "P1 · Improve: Assess the process decision.** Require a short rationale for the selected method and human checkpoint, using a rubric for appropriate scope and task fit. Merely entering nonempty reflection answers does not establish this outcome. Accepted at checkpoint 349: the live reviewer returned unclear with specific revision instructions for the shared fixture's label-only method rationale, so a nonempty answer alone does not earn the outcome; the authored calibration suite matched 6/6 live. A strong-answer live pass is not yet recorded."
     },
     {
       "id": "C8-M02-04",
@@ -600,13 +596,13 @@
     },
     {
       "id": "C8-M03-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Require critique of a flawed proposal.** The learner finds a wrong input, unnecessary step, missing human checkpoint or inappropriate output. Record the correction before approving the saved design."
+      "accepted": true,
+      "requirement": "P1 · Improve: Require critique of a flawed proposal.** The learner finds a wrong input, unnecessary step, missing human checkpoint or inappropriate output. Record the correction before approving the saved design. Accepted at checkpoint 350: the workflow-design case supplies a flawed proposal (unrelated prior text as input, discarded references, approval after an external send). Live kimi-k3 grading passes a learner who records the correction to the saved revision before approval, with all three outcomes supported; the same case with thin answers is sent back with revision instructions. Correction-before-approval ordering is enforced by the product. Live run with one model only."
     },
     {
       "id": "C8-M03-03",
-      "accepted": false,
-      "requirement": "P1 · Improve: Assess architecture against the process goal.** Check input/output compatibility, data flow, justified task types and reviewer needs. Reflection can accompany the design but cannot substitute for the assessed artifact and decisions."
+      "accepted": true,
+      "requirement": "P1 · Improve: Assess architecture against the process goal.** Check input/output compatibility, data flow, justified task types and reviewer needs. Reflection can accompany the design but cannot substitute for the assessed artifact and decisions. Accepted at checkpoint 349: the live reviewer returned unclear for a design trace that names the route without following a fact through it or defining a stop path; workflow-design calibration matched 6/6 live. A strong-answer live pass is not yet recorded."
     },
     {
       "id": "C8-M03-04",
@@ -620,18 +616,18 @@
     },
     {
       "id": "C8-M04-02",
-      "accepted": false,
-      "requirement": "P1 · Fix: Replace the unrelated-field passing condition.** Required fields must belong to the assigned extraction revision and produce an assessed result on the NIH lab. Fifteen arbitrary fields, an unexecuted template or fields spread across unrelated templates cannot pass."
+      "accepted": true,
+      "requirement": "P1 · Fix: Replace the unrelated-field passing condition.** Required fields must belong to the assigned extraction revision and produce an assessed result on the NIH lab. Fifteen arbitrary fields, an unexecuted template or fields spread across unrelated templates cannot pass. Accepted at checkpoint 349: live NIH repair run of the assigned revision produced all four required fields (postdoc left absent for TBD) and an assessed result; accepting the $304,000 annual allocation is contradicted. Unrelated-template rejection remains covered by extraction-check integration tests."
     },
     {
       "id": "C8-M04-03",
-      "accepted": false,
-      "requirement": "P1 · Improve: Require correction and guided verification.** Include a wrong budget or investigator value and an absent field. The learner inspects the source, repairs the configuration or expected value appropriately and verifies a new result."
+      "accepted": true,
+      "requirement": "P1 · Improve: Require correction and guided verification.** Include a wrong budget or investigator value and an absent field. The learner inspects the source, repairs the configuration or expected value appropriately and verifies a new result. Accepted at checkpoint 355: the authored flawed NIH example uses a budget instruction that yields the annual value and forces a plausible postdoc name the source does not contain. The learner repairs the fields, approves the exact scope, runs the repaired revision and checks every value. quality_repair requires the new run to resolve the errors. Live, an honest learner was supported and a careless one contradicted on quality_repair (live-practical.json). Live run with one model only."
     },
     {
       "id": "C8-M04-04",
-      "accepted": false,
-      "requirement": "P1 · Fix: Align higher-star checks with their promises.** If categories, optional fields, budget breakdowns or accuracy earn stars, validate those properties explicitly. The summary and individual checks must agree about pass, failure and optional advice."
+      "accepted": true,
+      "requirement": "P1 · Fix: Align higher-star checks with their promises.** If categories, optional fields, budget breakdowns or accuracy earn stars, validate those properties explicitly. The summary and individual checks must agree about pass, failure and optional advice. Accepted at checkpoint 355: in v5 no category, optional-field, budget-breakdown or accuracy property earns a star (star_criteria empty everywhere). The Extraction Engine assesses categories and optional fields explicitly through field_semantics and quality_repair. A result whose summary disagrees with its checks is refused (\"The selected assessment summary is inconsistent\", pinned in 6a88e719)."
     },
     {
       "id": "C8-M05-01",
@@ -645,13 +641,13 @@
     },
     {
       "id": "C8-M05-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Grade one executed workflow.** Require the necessary task types, compatible connections and a successful assessed run on the assigned input. Step counts or task types aggregated across different workflows cannot satisfy the rubric."
+      "accepted": true,
+      "requirement": "P1 · Fix: Grade one executed workflow.** Require the necessary task types, compatible connections and a successful assessed run on the assigned input. Step counts or task types aggregated across different workflows cannot satisfy the rubric. Accepted at checkpoint 349: two live three-stage subaward runs (extraction, reasoning, formatter); the repaired run passes the deterministic chain check and the live reviewer; a rerun without repairing the connection fails the chain check and both outcomes are contradicted. Mixed-chain rejection remains covered by connected-workflow integration tests."
     },
     {
       "id": "C8-M05-04",
-      "accepted": false,
-      "requirement": "P2 · Fix: Reconcile enrichment criteria.** Resolve the four-versus-five-task-type inconsistency and assess useful complexity and output quality on the same workflow. Every star description must match the published rubric."
+      "accepted": true,
+      "requirement": "P2 · Fix: Reconcile enrichment criteria.** Resolve the four-versus-five-task-type inconsistency and assess useful complexity and output quality on the same workflow. Every star description must match the published rubric. Accepted at checkpoint 355: v5 awards no task-type or enrichment stars. Every v5 case loader requires empty star_criteria, the assembler sets one star and zero star XP, and the multi-step assignment states \"Extra tasks and star counts do not earn credit\". Complexity and output quality are assessed on one execution: connected stages, intermediate repair and bounded reasoning on the same run. The legacy four-versus-five mismatch is disclosed by the existing editorial correction because released grading is preserved."
     },
     {
       "id": "C8-M06-01",
@@ -665,13 +661,13 @@
     },
     {
       "id": "C8-M06-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Require executed advanced and parallel work.** Grade a specific workflow/run where the advanced task and intended parallel tasks have real outputs. Configuration presence alone or unrelated tasks in another workflow cannot pass."
+      "accepted": true,
+      "requirement": "P1 · Fix: Require executed advanced and parallel work.** Grade a specific workflow/run where the advanced task and intended parallel tasks have real outputs. Configuration presence alone or unrelated tasks in another workflow cannot pass. Accepted at checkpoint 349: one live budget run with two parallel source reviews and a dependent memo, each a real kimi-k3 output, the memo consuming both; a wrong learner sum is contradicted by the arithmetic veto. Saved plans keep fixture model labels while calls are routed live."
     },
     {
       "id": "C8-M06-04",
-      "accepted": false,
-      "requirement": "P2 · Improve: Assess tool choice and recovery.** Have the learner choose an appropriate node, justify independence for parallel tasks and handle an unavailable or failed capability. Accept a supported safe alternative when the environment lacks an optional integration."
+      "accepted": true,
+      "requirement": "P2 · Improve: Assess tool choice and recovery.** Have the learner choose an appropriate node, justify independence for parallel tasks and handle an unavailable or failed capability. Accept a supported safe alternative when the environment lacks an optional integration. Accepted at checkpoint 355: the advanced-nodes outcomes require an available method with deterministic or explicit learner arithmetic, never unavailable code execution. A safe alternative is accepted: explicit arithmetic passes, and calibration unavailable_code_method is contradicted. Independence and dependency order are assessed in parallel_safety (calibration dependent_report_started_early), and failed tasks have explicit recovery. Live, honest work was supported and careless work contradicted on checked_computation. Live run with one model only."
     },
     {
       "id": "C8-M07-01",
@@ -680,18 +676,18 @@
     },
     {
       "id": "C8-M07-02",
-      "accepted": false,
-      "requirement": "P1 · Fix: Require output from the assessed run.** Tie the output node, executed workflow and downloadable artifact to the same attempt. An output configuration in one workflow and an unrelated executed workflow cannot earn completion."
+      "accepted": true,
+      "requirement": "P1 · Fix: Require output from the assessed run.** Tie the output node, executed workflow and downloadable artifact to the same attempt. An output configuration in one workflow and an unrelated executed workflow cannot earn completion. Accepted at checkpoint 349: live generation, file inspection by exact hash, ZIP and private handoff all tied to one run and attempt; the live reviewer supported all three outcomes. Found and fixed bb3dccc6 (Data Export CSV from JSON text)."
     },
     {
       "id": "C8-M07-03",
-      "accepted": false,
-      "requirement": "P1 · Improve: Verify the delivered artifact.** The learner opens the actual file and checks key values, missing information and intended recipients/scope. Test malformed or missing output as a repairable failure, not successful delivery."
+      "accepted": true,
+      "requirement": "P1 · Improve: Verify the delivered artifact.** The learner opens the actual file and checks key values, missing information and intended recipients/scope. Test malformed or missing output as a repairable failure, not successful delivery. Accepted at checkpoint 349: with placeholder prompts the live output fails validation and release approval is refused as a repairable failure; with competent prompts both files validate and match the source before release."
     },
     {
       "id": "C8-M07-04",
-      "accepted": false,
-      "requirement": "P2 · Fix: Verify bundle and enrichment behavior.** Grade the supported multiple-deliverable ZIP path and its actual contents. Remove reliance on unavailable Package Builder behavior; teach what the download contains and how to retrieve it again."
+      "accepted": true,
+      "requirement": "P2 · Fix: Verify bundle and enrichment behavior.** Grade the supported multiple-deliverable ZIP path and its actual contents. Remove reliance on unavailable Package Builder behavior; teach what the download contains and how to retrieve it again. Accepted at checkpoint 355: output delivery grades the actual marked-step download. verify_generated_artifacts opens the ZIP and checks every member, changed bundle evidence is rejected, and a single file does not satisfy the bundle (test_certification_output_artifacts). The case's bundle rule excludes Package Builder, the capability guard (684abd7d) fails any v5 requirement of a disabled node, and the lesson explains marking output steps, downloading the ZIP and opening its members."
     },
     {
       "id": "C8-M08-01",
@@ -700,33 +696,33 @@
     },
     {
       "id": "C8-M08-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Require grounded test-case creation.** Have the learner inspect and correct expected values against original sources. The assessment must reject simply accepting a wrong agent-proposed answer as ground truth."
+      "accepted": true,
+      "requirement": "P1 · Improve: Require grounded test-case creation.** Have the learner inspect and correct expected values against original sources. The assessment must reject simply accepting a wrong agent-proposed answer as ground truth. Accepted at checkpoint 353: the expectations form now opens on an agent draft of all six values (3b118c46). Five are right; the NSF project budget is the Year 1 total, 177000, quoting the real \"Total $177,000\" row, which is what the flawed instruction extracts. The case requires exactly one drafted value to disagree with its source and every drafted quote to be on its page. Keeping 177000 is vetoed by the source check, and the review test asserts that representative_tests fails with the source-disagreement explanation even when the model is favourable. The learner corrects the value against the source; the frontend test sends the corrected 485000."
     },
     {
       "id": "C8-M08-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Bind checks and validation to one assessment target.** Require the intended test cases and a completed relevant validation run for the assigned template/workflow revision. Counts and run records from unrelated items cannot be combined to pass."
+      "accepted": true,
+      "requirement": "P1 · Fix: Bind checks and validation to one assessment target.** Require the intended test cases and a completed relevant validation run for the assigned template/workflow revision. Counts and run records from unrelated items cannot be combined to pass. Accepted at checkpoint 353: suites bind to one captured revision, and plans bind the exact capture, suite, case and digests. A suite designed on one revision is refused against another capture (\"An original run must execute the revision on which the learner designed this suite\"), and a retest needs the exact original failed run. Foreign or missing captures and suites, unrelated revisions in review (calibration unrelated_assessed_revision) and deleted cases are rejected, and each rejection test now pins its reason (3b118c46, 6a88e719). Validation integration 120 passed."
     },
     {
       "id": "C8-M08-04",
-      "accepted": false,
-      "requirement": "P1 · Improve: Assess response to a failure or regression.** Include a new case that lowers a score or exposes a mismatch. The learner identifies the limitation, makes an appropriate correction and explains the resulting evidence rather than pursuing a higher number blindly."
+      "accepted": true,
+      "requirement": "P1 · Improve: Assess response to a failure or regression.** Include a new case that lowers a score or exposes a mismatch. The learner identifies the limitation, makes an appropriate correction and explains the resulting evidence rather than pursuing a higher number blindly. Accepted at checkpoint 350: live validation lab keeps the controlled original failure (177000 instead of 485000), runs the learner's repaired field live on both complete cases and grades the explanation live. An honest explanation of the mismatch, both receipts and remaining limits passes; a careless \"everything is correct now, works on any proposal\" is contradicted on repair_and_retest for not identifying the mismatch and overclaiming. Live run with one model only."
     },
     {
       "id": "C8-M09-01",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach explicit batch scope.** Before execution, the learner reviews the actual documents, template/workflow revision, destination and expected output. Include one wrongly selected file that must be removed."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach explicit batch scope.** Before execution, the learner reviews the actual documents, template/workflow revision, destination and expected output. Include one wrongly selected file that must be removed. Accepted at checkpoint 352: capture now offers a proposed batch with every file selected: the three assigned proposals plus the Foundations NSF proposal, which would extract cleanly (d089da88). The learner reviews each file's title and preview, the owned extraction and where results go, and must clear the wrong file; capture refuses a selection that keeps it (without naming it), drops an assigned proposal or adds an unlisted file, and the snapshot records what was proposed, kept and removed. The pilot question asks which file was removed and why. Verified by batch integration (128), an HTTP journey that is refused with the file kept and captures without it, the live batch lab and frontend tests; the refusal tests fail with it disabled. Live run with one model only."
     },
     {
       "id": "C8-M09-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Practice partial failure.** Include an unreadable or failed document. Preserve successful outputs and retry only what needs rerunning using supported controls; make failure versus skipped work clear."
+      "accepted": true,
+      "requirement": "P1 · Improve: Practice partial failure.** Include an unreadable or failed document. Preserve successful outputs and retry only what needs rerunning using supported controls; make failure versus skipped work clear. Accepted at checkpoint 350: live batch lab runs real extraction on the assigned inputs with one controlled failed document; the learner retries only that document through the supported control, the original successes keep their receipts, and the live grader supports targeted recovery while citing the preserved failure. Live run with one model only."
     },
     {
       "id": "C8-M09-03",
-      "accepted": false,
-      "requirement": "P1 · Fix: Assess the intended successful batch.** Bind grading to assigned input IDs and per-document terminal results. An unrelated historical batch or documents-touched count without adequate result evidence cannot establish the lab outcome."
+      "accepted": true,
+      "requirement": "P1 · Fix: Assess the intended successful batch.** Bind grading to assigned input IDs and per-document terminal results. An unrelated historical batch or documents-touched count without adequate result evidence cannot establish the lab outcome. Accepted at checkpoint 350: in the live batch lab the deterministic assigned-coverage check binds grading to the assigned input IDs and per-document terminal results and passed on real outputs. Rejection of unrelated or historical batches remains covered by the batch integration tests. Live run with one model only."
     },
     {
       "id": "C8-M09-04",
@@ -735,23 +731,23 @@
     },
     {
       "id": "C8-M10-01",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach ownership and sharing scope.** Include personal, team, project and broader publication decisions using the actual permission model. The learner must identify an inappropriate sharing target and correct it."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach ownership and sharing scope.** Include personal, team, project and broader publication decisions using the actual permission model. The learner must identify an inappropriate sharing target and correct it. Accepted at checkpoint 355: the sharing lesson now teaches the four audiences as the product implements them (2c70fd32). These are the personal library; the team library, where owners and admins manage membership (team_service enforces admin); projects, with viewer or editor collaborators and revocable join links that can admit people outside the team; and \"Share with everyone\", which submits a verification request that stays pending until an examiner decides. Its knowledge check corrects an agent proposal to share with everyone. Correcting an inappropriate target is assessed in the capstone: its flawed proposal includes broad sharing, the rubric fails a release that re-enables it, and calibration contradicts broad_share_as_governance."
     },
     {
       "id": "C8-M10-02",
-      "accepted": false,
-      "requirement": "P1 · Improve: Teach ongoing automation effects.** Review a proposed trigger, input filters, action, outputs and enable/disable state. Assess whether the action should be enabled and how it is stopped or inspected, without requiring real external delivery."
+      "accepted": true,
+      "requirement": "P1 · Improve: Teach ongoing automation effects.** Review a proposed trigger, input filters, action, outputs and enable/disable state. Assess whether the action should be enabled and how it is stopped or inspected, without requiring real external delivery. Accepted at checkpoint 355: the handoff lesson reviews an automation as a standing action (ed610733). It covers the four triggers as labelled, a watched folder's file-type and exclude filters, the action and every output (files, OneDrive, email, webhooks, follow-up automations), the wizard's Save disabled versus Create & enable choice, Run now firing the real outputs, turning Enabled off to stop, and run history to inspect. No real automation is required. Whether one may be enabled is assessed in the capstone, which requires disabling the proposal's recurring trigger and fails a release that re-enables it."
     },
     {
       "id": "C8-M10-03",
-      "accepted": false,
-      "requirement": "P1 · Improve: Assess accountable handoff.** Require a clear artifact description, intended use, limitations and relevant validation evidence. Preserve completion on a valid submission without waiting for examiner availability; examiner acceptance is a separate state."
+      "accepted": true,
+      "requirement": "P1 · Improve: Assess accountable handoff.** Require a clear artifact description, intended use, limitations and relevant validation evidence. Preserve completion on a valid submission without waiting for examiner availability; examiner acceptance is a separate state. Accepted at checkpoint 351: a new calibration case keeps the passing capstone but removes limits, the checked run and the review route from the handoff; the live grader supported it until the rubric fix 46421c63 (it read the audience as a limitation and the memo file revision as evidence), then contradicted it in three of three runs while the honest learner still passes. Grading is automatic-only with no staff queue (assessment-policy.json), so completion never waits for an examiner; no examiner acceptance state exists to gate it. Live run with one model only."
     },
     {
       "id": "C8-M10-04",
-      "accepted": false,
-      "requirement": "P1 · Improve: Add the final supervision capstone.** Use an unfamiliar but supported RA task with one flawed proposed action and one bad result. The learner must identify and repair both, verify sources, inspect delivery and justify scope; agent-created artifacts alone cannot pass."
+      "accepted": true,
+      "requirement": "P1 · Improve: Add the final supervision capstone.** Use an unfamiliar but supported RA task with one flawed proposed action and one bad result. The learner must identify and repair both, verify sources, inspect delivery and justify scope; agent-created artifacts alone cannot pass. Accepted at checkpoint 350: live governance capstone keeps the controlled flawed proposal and the actual $600,000 original value, runs the learner's repaired extraction live on both records and grades the supervision chain live. An honest learner passes; a careless final supervision (\"reliable now and ready for real awards\") is contradicted after the rubric fixes 8f9939dc and 3a44ef0e, and a rerun that is not source-correct (a live date returned as \"March 31, 2029\") is refused before any memo, so agent output alone cannot pass. Live run with one model only."
     },
     {
       "id": "C8-GRADE-01",
@@ -770,8 +766,8 @@
     },
     {
       "id": "C8-GRADE-04",
-      "accepted": false,
-      "requirement": "P1 · Improve: Assess outcomes, not just execution.** A completed job is necessary where required but does not establish correct values, useful output or source verification. Add explicit outcome evidence appropriate to each practical module."
+      "accepted": true,
+      "requirement": "P1 · Improve: Assess outcomes, not just execution.** A completed job is necessary where required but does not establish correct values, useful output or source verification. Add explicit outcome evidence appropriate to each practical module. Accepted at checkpoint 349: in five live labs a completed run with wrong values, an unrepaired connection, a wrong calculation or malformed files was sent back, while honest work passed; deterministic checks and the live reviewer each carry outcome evidence. Batch, validation and governance live runs remain open."
     },
     {
       "id": "C8-GRADE-05",
@@ -794,14 +790,9 @@
       "requirement": "P1 · Improve: Distinguish learner decisions from agent output.** Record the learner’s choices, corrections and review evidence where required. Do not treat an agent’s assertion that the learner checked a source as sufficient proof of that assessed outcome. Accepted at checkpoint 230: explicit authenticated decisions bind the original prompts, sources, runs and corrections; missing reviews remain missing despite agent assurances, and legacy chat reflection routes cannot submit competency evidence. Live judgment calibration remains separate."
     },
     {
-      "id": "C8-GRADE-09",
-      "accepted": false,
-      "requirement": "P1 · Decide: Specify any qualitative grading mechanism.** Prefer deterministic checks where possible; define a rubric, calibration examples and review path for judgment-based work. If model-assisted grading is used, version it and ensure it cannot award or alter deterministic evidence on its own."
-    },
-    {
       "id": "C8-GRADE-10",
-      "accepted": false,
-      "requirement": "P1 · Verify: Prove the rubric rejects invalid work.** Cover wrong source values, no run, wrong document, unrelated field counts, mixed workflows, incomplete validation, copied IDs, missing learner decisions and stale results. Each must fail for the intended reason."
+      "accepted": true,
+      "requirement": "P1 · Verify: Prove the rubric rejects invalid work.** Cover wrong source values, no run, wrong document, unrelated field counts, mixed workflows, incomplete validation, copied IDs, missing learner decisions and stale results. Each must fail for the intended reason. Accepted at checkpoint 351: every parametrized rejection now asserts its specific reason (6a88e719). Wrong source values (batch, validation, calculation checks), no run (extraction \"has not completed\", connected, validation and batch reviews), wrong document (extraction, batch, connected, validation), unrelated field counts (twenty unrelated output fields do not replace the requested ones; v5 cases refuse count-based credit), mixed workflows (connected \"two owned revisions\" plus named chain reasons), incomplete validation (validation suite cases), copied IDs (readiness, outcome-rubric references, delivery references), missing learner decisions (missing value review, late approval, blank answers) and stale results (pinned course, contract and assessment bank). The new assertions fail against the previous checkers."
     },
     {
       "id": "C8-GRADE-11",
@@ -810,8 +801,8 @@
     },
     {
       "id": "C8-GRADE-12",
-      "accepted": false,
-      "requirement": "P1 · Verify: Maintain equivalent standards across routes.** Chat, editor and mixed routes must receive the same result for equivalent evidence. Confirm that neither a specific wording of a prompt nor an optional inaccessible capability becomes an accidental requirement."
+      "accepted": true,
+      "requirement": "P1 · Verify: Maintain equivalent standards across routes.** Chat, editor and mixed routes must receive the same result for equivalent evidence. Confirm that neither a specific wording of a prompt nor an optional inaccessible capability becomes an accidental requirement. Accepted at checkpoint 354: the same extraction built through the editor routes and through the chat tool refined in the editor (the mixed route) captures identically apart from its own identities. The engine receives identical inputs, and the validation checks match apart from per-record digests (684abd7d). Proving this exposed and fixed a blocker: batch, validation and governance capture rejected the hyphenated IDs the product gives every extraction, so work made in the editor or chat could not be captured (1c0d3c53). Those suites now run on real-format IDs (450 passed). A guard reads the palette's disabled nodes and fails if any v5 passing condition, case value or checker requires one. A paraphrased strong workflow prompt was supported on all outcomes in two live runs, like the original. Live run with one model only."
     },
     {
       "id": "C8-VERSION-01",
@@ -840,8 +831,8 @@
     },
     {
       "id": "C8-VERSION-06",
-      "accepted": false,
-      "requirement": "P1 · Improve: Keep old rubrics executable or provide explicit equivalence.** Retain the required versioned grading behavior and supporting lab assets for supported enrollments. A content hash alone is not enough to reproduce a grade."
+      "accepted": true,
+      "requirement": "P1 · Improve: Keep old rubrics executable or provide explicit equivalence.** Retain the required versioned grading behavior and supporting lab assets for supported enrollments. A content hash alone is not enough to reproduce a grade. Accepted at checkpoint 356: grading resolves the rubric from the pinned package. The preserved legacy rubric runs only when byte-identical to the release's rubric.py, with its module order, XP, levels and reflection keys checked (test_installed_rubric_must_match_the_release). Published packages reject any changed file, including lab documents, and a CI guard preserves published and retired definitions. Transfers use explicit versioned credit equivalence rather than a hash."
     },
     {
       "id": "C8-VERSION-07",
@@ -872,11 +863,6 @@
       "id": "C8-VERSION-12",
       "accepted": false,
       "requirement": "P2 · Improve: Show course identity to learners and support.** Chat, panel, grading results, certificates and administrator views expose the correct course/version and update status in plain language. Technical hashes remain in support details rather than the main learning flow."
-    },
-    {
-      "id": "C8-MIGRATE-01",
-      "accepted": false,
-      "requirement": "P1 · Verify: Inventory actual cohorts before rollout.** Count unstarted, active, completed, overridden and inconsistent records, including last activity and in-flight work where available. Use read-only production analysis through authorized access; never infer cohort size from fixtures."
     },
     {
       "id": "C8-MIGRATE-02",
@@ -917,11 +903,6 @@
       "id": "C8-MIGRATE-09",
       "accepted": false,
       "requirement": "P1 · Improve: Prevent duplicate rewards on transfer.** Carry over eligible credit without awarding the same base XP or credential twice. Define how legacy stars, bridge XP and later earned upgrades appear so totals remain explainable."
-    },
-    {
-      "id": "C8-MIGRATE-10",
-      "accepted": false,
-      "requirement": "P1 · Decide: Define legacy support and urgent corrections.** Set any finish window from actual cohort needs and support capacity, with exceptions and an equivalent replacement for unavailable activities. Do not introduce a deadline or mandatory reset without an explicit published policy."
     },
     {
       "id": "C8-MIGRATE-11",
@@ -975,8 +956,8 @@
     },
     {
       "id": "C8-QA-01",
-      "accepted": false,
-      "requirement": "P1 · Verify: Preserve a reproducible baseline and coverage ledger.** Retain the original 151 captures, manifests, contract probes and grades. Record the new source commit, build, course/rubric versions, fixtures and exact state/device coverage separately."
+      "accepted": true,
+      "requirement": "P1 · Verify: Preserve a reproducible baseline and coverage ledger.** Retain the original 151 captures, manifests, contract probes and grades. Record the new source commit, build, course/rubric versions, fixtures and exact state/device coverage separately. Accepted at checkpoint 356: the evidence ledger, rebuilt with scripts/build_certification_qa_ledger.py, retains the original 151 selected baseline captures, the contract probe and the unchanged audit grades. It records the working commit, retained package release and rubric IDs, every browser run's viewport, browser and zoom, and (047cb3e7) every live calibration report with model, contract and runner digests. 0 missing artifacts and 0 invalid manifests."
     },
     {
       "id": "C8-QA-02",
@@ -995,13 +976,13 @@
     },
     {
       "id": "C8-QA-05",
-      "accepted": false,
-      "requirement": "P1 · Verify: Complete every practical lab for real.** Execute the supported extraction, workflow, validation, batch and delivery routes in an isolated environment. Inspect actual outputs and grading evidence; fixture success responses cannot close practical-module acceptance."
+      "accepted": true,
+      "requirement": "P1 · Verify: Complete every practical lab for real.** Execute the supported extraction, workflow, validation, batch and delivery routes in an isolated environment. Inspect actual outputs and grading evidence; fixture success responses cannot close practical-module acceptance. Accepted at checkpoint 350: every practical route has now run against the live model in an isolated database: extraction (Foundations, Extraction repair), workflow (Multi-step, Advanced nodes), validation, batch, delivery (Output delivery) and the governance capstone, with outputs inspected and grading evidence recorded in live-practical.json. Original failures in the validation and governance labs are controlled by design; every success comes from live output. Single model (kimi-k3) and single runs per lab; it does not measure run-to-run variance."
     },
     {
       "id": "C8-QA-06",
-      "accepted": false,
-      "requirement": "P1 · Verify: Run the grading adversarial matrix.** Demonstrate that invalid and unrelated evidence is rejected, correct evidence passes, advisory feedback is coherent and routes remain equivalent. Include no-credit cases as first-class acceptance evidence."
+      "accepted": true,
+      "requirement": "P1 · Verify: Run the grading adversarial matrix.** Demonstrate that invalid and unrelated evidence is rejected, correct evidence passes, advisory feedback is coherent and routes remain equivalent. Include no-credit cases as first-class acceptance evidence. Accepted at checkpoint 356: final-matrix-live-r9.json, on the final rubric and grader, matched 60/60 across 10 modules: 146 outcome expectations (90 supported, 46 contradicted, 10 unclear), zero false support, zero false rejection and zero unavailable after resuming through a provider outage. 50 of the 60 cases carry a no-credit expectation, and every report records credit_awarded false. Invalid and unrelated evidence fails for its pinned reason (GRADE-10, 6a88e719), and unmet outcomes carry revision instructions. Routes stay equivalent (GRADE-12: 684abd7d, 1c0d3c53, 20417449). The r8 false support found on the way was fixed by an ordering veto (a01f9970). Live run with one model only."
     },
     {
       "id": "C8-QA-07",
@@ -1014,11 +995,6 @@
       "requirement": "P1 · Verify: Run responsive and enlargement checks.** Cover 320, 390, 768, 1024 and 1440px plus short viewports, actual 200% zoom and mobile keyboard behavior. Inspect nested clipping, scroll reachability and source/editor handoffs, not only page overflow."
     },
     {
-      "id": "C8-QA-09",
-      "accepted": false,
-      "requirement": "P1 · Verify: Run supported-browser and accessibility checks.** Complete the core journey on supported desktop/mobile engines, use keyboard and an actual screen reader, inspect focus/announcements and run automated scans. Record unsupported or untested environments explicitly."
-    },
-    {
       "id": "C8-QA-10",
       "accepted": false,
       "requirement": "P1 · Verify: Exercise the entire lifecycle state matrix.** Cover new, active, completed, upgraded, legacy, transferring and overridden learners; loading, denied, expired, failed, canceled, duplicate and recovered operations. Verify both chat and panel behavior for each relevant state."
@@ -1029,19 +1005,9 @@
       "requirement": "P1 · Verify: Inspect real certificates and downloads.** Generate/download the issued PDF and practical output files, inspect their rendering and contents, and verify authorization and retrieval after updates. Include long names and preserved historical issuance details."
     },
     {
-      "id": "C8-QA-12",
-      "accepted": false,
-      "requirement": "P1 · Verify: Observe representative learners.** Pilot with a newcomer, an in-progress learner and a legacy graduate, including relevant accessibility needs. Record whether they scope, approve, verify, recover and explain quality correctly without rescue; fix observed blockers and reassess."
-    },
-    {
       "id": "C8-QA-13",
       "accepted": false,
       "requirement": "P1 · Verify: Rehearse publication and operational recovery.** Run draft-to-published promotion, default-version switch, migration restart, notification deduplication and rollback without affecting real learners. Confirm support can diagnose an active-course incident and preserve work."
-    },
-    {
-      "id": "C8-QA-14",
-      "accepted": false,
-      "requirement": "P1 · Verify: Regrade and publish the acceptance report.** Score all six dimensions and all eleven module alignments against the stated outcomes using current evidence. Require each score to be at least 8, no unresolved P0/P1 blocker and no hidden missing acceptance evidence; open gaps remain open rather than being averaged away."
     }
   ],
   "checkpoints": [
@@ -3497,6 +3463,66 @@
       "evidence_directories": [
         "certification-live-calibration-2026-10-12"
       ]
+    },
+    {
+      "number": 347,
+      "title": "Remove human-dependent gates from scope and resolve the live-model environment on October 12 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 348,
+      "title": "First live grading calibration and two grader repairs on October 12 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
+    },
+    {
+      "number": 349,
+      "title": "Live practical labs, final grader calibration and test repairs on October 12 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
+    },
+    {
+      "number": 350,
+      "title": "Live batch, validation, governance and strong-design labs; two grader fixes on October 13 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
+    },
+    {
+      "number": 351,
+      "title": "Handoff rubric, named rejection reasons and an execution regression on October 13 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
+    },
+    {
+      "number": 352,
+      "title": "Batch scope review and process-map boundaries on October 13 2026",
+      "evidence_directories": [
+        "certification-live-calibration-2026-10-12"
+      ]
+    },
+    {
+      "number": 353,
+      "title": "Agent-drafted test expectations and one assessment target on October 13 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 354,
+      "title": "Route equivalence, a capture blocker and unavailable capabilities on October 14 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 355,
+      "title": "Sharing and automation teaching, an ordering veto and reconciled star promises on October 14 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 356,
+      "title": "Clean adversarial matrix, chat-built workflows and preserved rubrics on October 14 2026",
+      "evidence_directories": []
     }
   ],
   "source_records": [
@@ -322885,6 +322911,769 @@
     "768x700": 28,
     "768x850": 24
   },
+  "live_grading": {
+    "scope": "Synthetic cases and labs with one configured model; not release verification or learner evidence",
+    "calibration_reports": [
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r2.json",
+          "available": true,
+          "bytes": 382217,
+          "sha256": "f605ab12eaf4c9c55a38ac85d4ffeaa7c7c1958de217a671b8a8c072e41e0598"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "185988a81bc99ade4ad4902c93f7c25dbad14a556baf8693c13ea4a903ced8d2",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 57,
+        "matched": 56,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r3.json",
+          "available": true,
+          "bytes": 257624,
+          "sha256": "af262a9b934f60b7ce73afa7f86f4fc89ab0b57c47d53f0b4378ebfa19bf1f53"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "185988a81bc99ade4ad4902c93f7c25dbad14a556baf8693c13ea4a903ced8d2",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "provider_unavailable",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery"
+        ],
+        "cases": 40,
+        "matched": 38,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [
+          "output_delivery/source_instructions_cannot_change_grading"
+        ],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible",
+          "output_delivery/source_instructions_cannot_change_grading"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r4.json",
+          "available": true,
+          "bytes": 369993,
+          "sha256": "c0fa489ed8caa5975d7401d974d7d5f70ab5ad62f35038a45854425190c3fe49"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "185988a81bc99ade4ad4902c93f7c25dbad14a556baf8693c13ea4a903ced8d2",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 57,
+        "matched": 56,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r5.json",
+          "available": true,
+          "bytes": 232735,
+          "sha256": "adefad7023399707aaf857a26a58b17fb593532b620430433b538f3afef371b6"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "185988a81bc99ade4ad4902c93f7c25dbad14a556baf8693c13ea4a903ced8d2",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "provider_unavailable",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery"
+        ],
+        "cases": 36,
+        "matched": 34,
+        "false_support": [
+          "governance/broad_share_as_governance"
+        ],
+        "false_rejection": [],
+        "unavailable": [
+          "output_delivery/download_link_is_not_content_review"
+        ],
+        "mismatched": [
+          "governance/broad_share_as_governance",
+          "output_delivery/download_link_is_not_content_review"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r6.json",
+          "available": true,
+          "bytes": 372285,
+          "sha256": "d4182503e2818e524ee539a3e1e18a355779b50a7b677acfaa793af75605bd81"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "ccd49f655f8930bc630220a142611e6b92f39d7ed15b66196b4398f4ea74e0e6",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 57,
+        "matched": 56,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r7.json",
+          "available": true,
+          "bytes": 380784,
+          "sha256": "2aa8cf96586baa356fe59397069071c636b1f9b6aefb8bb2d762da56da0308df"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "8cd36d8c3cbfa2ebb3df04b03648658542923bda8bf875ede8db836ac6271e8a",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 58,
+        "matched": 57,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r8.json",
+          "available": true,
+          "bytes": 409526,
+          "sha256": "b087d22c17eb8d37d2ff259d607e302951a4a1acab1891030d72734fdc8cd7fe"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "ffd80f90a6e81962fc627fdf1d398f3afa41311935533a212e10399dd446a159",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 60,
+        "matched": 58,
+        "false_support": [
+          "workflow_design/external_send_before_review"
+        ],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/scanned_budget_value_illegible",
+          "workflow_design/external_send_before_review"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live-r9.json",
+          "available": true,
+          "bytes": 439650,
+          "sha256": "7653b1f34083a2f3001802a26c7e5efa119df46bdbf7b6369f082af2ed7ef7d0"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "434e43453a346a4b971647034f42c7e27dcd8e64f1f799b79f97c0ffad31ca3b",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 60,
+        "matched": 60,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/final-matrix-live.json",
+          "available": true,
+          "bytes": 370801,
+          "sha256": "ae75d2632f236835cf70622664c7a807ba909edbea5e1528f522c7f91c089af4"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "185988a81bc99ade4ad4902c93f7c25dbad14a556baf8693c13ea4a903ced8d2",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 57,
+        "matched": 53,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "advanced_nodes/calculation_record_unreadable",
+          "batch_processing/pilot_quality_unavailable",
+          "foundations/scanned_budget_value_illegible",
+          "validation_qa/retest_receipt_unavailable"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/foundations-live-r2.json",
+          "available": true,
+          "bytes": 3980,
+          "sha256": "1349e2c0d69a826ab539b379a5edee3c280fcc4ac64fa54fc3c3a8414edb3a5f"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "076cb484b2849c8e5a2a905f2b4cd29415deaf1b228ec027a9e91beef9edac3c",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "provider_unavailable",
+        "modules": [
+          "foundations"
+        ],
+        "cases": 1,
+        "matched": 0,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [
+          "foundations/corrected_scope_and_checked_values"
+        ],
+        "mismatched": [
+          "foundations/corrected_scope_and_checked_values"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/foundations-live-r3.json",
+          "available": true,
+          "bytes": 40249,
+          "sha256": "9dc07695a5644d652884416881952063165aff27dfdee5beb0fd7fc64835e40b"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "076cb484b2849c8e5a2a905f2b4cd29415deaf1b228ec027a9e91beef9edac3c",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "foundations"
+        ],
+        "cases": 6,
+        "matched": 5,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "foundations/budget_source_check_unresolved"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/foundations-live.json",
+          "available": true,
+          "bytes": 19408,
+          "sha256": "a34cb5aa11da4a59d93a0fa8b6fec05f3045fc3d2a59ccbb802567c1da748659"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "2a9cd9b6dec0cc025a6178eb6ce24efb05bb4ee8aeb09f219af40a09adfb8371",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "provider_unavailable",
+        "modules": [
+          "foundations"
+        ],
+        "cases": 3,
+        "matched": 1,
+        "false_support": [
+          "foundations/approval_recorded_after_execution"
+        ],
+        "false_rejection": [],
+        "unavailable": [
+          "foundations/approved_wrong_document"
+        ],
+        "mismatched": [
+          "foundations/approval_recorded_after_execution",
+          "foundations/approved_wrong_document"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/full-matrix-live.json",
+          "available": true,
+          "bytes": 369338,
+          "sha256": "bc810a104c59cdfe5fa2be007ffc08e34248030fd7ac3520bfe0b740417f4d24"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "076cb484b2849c8e5a2a905f2b4cd29415deaf1b228ec027a9e91beef9edac3c",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "advanced_nodes",
+          "batch_processing",
+          "extraction_engine",
+          "foundations",
+          "governance",
+          "multi_step",
+          "output_delivery",
+          "process_mapping",
+          "validation_qa",
+          "workflow_design"
+        ],
+        "cases": 56,
+        "matched": 50,
+        "false_support": [
+          "extraction_engine/source_check_record_unavailable",
+          "multi_step/stage_review_record_unavailable",
+          "output_delivery/retry_receipt_unavailable",
+          "workflow_design/approval_time_unavailable"
+        ],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "advanced_nodes/calculation_record_unreadable",
+          "extraction_engine/source_check_record_unavailable",
+          "foundations/budget_source_check_unresolved",
+          "multi_step/stage_review_record_unavailable",
+          "output_delivery/retry_receipt_unavailable",
+          "workflow_design/approval_time_unavailable"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r1.json",
+          "available": true,
+          "bytes": 40531,
+          "sha256": "8e19ca653b7deda5c5f7b0c10795ac41ccd5f751f74b51a729c24baf344021aa"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "8cd36d8c3cbfa2ebb3df04b03648658542923bda8bf875ede8db836ac6271e8a",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "provider_unavailable",
+        "modules": [
+          "governance"
+        ],
+        "cases": 6,
+        "matched": 5,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [
+          "governance/handoff_omits_limits_and_evidence"
+        ],
+        "mismatched": [
+          "governance/handoff_omits_limits_and_evidence"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r2.json",
+          "available": true,
+          "bytes": 52869,
+          "sha256": "c5dc72bcf4cf340a50c3b5ad329e197a435cfa4d209a5629e4018b7e37a62854"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "8cd36d8c3cbfa2ebb3df04b03648658542923bda8bf875ede8db836ac6271e8a",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "governance"
+        ],
+        "cases": 7,
+        "matched": 6,
+        "false_support": [
+          "governance/handoff_omits_limits_and_evidence"
+        ],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "governance/handoff_omits_limits_and_evidence"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r3.json",
+          "available": true,
+          "bytes": 52762,
+          "sha256": "1e447a3ae027cd17eaf5bcc7be29ba6ccb1cc0758896d1e4301675a28a04dcc7"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "8cd36d8c3cbfa2ebb3df04b03648658542923bda8bf875ede8db836ac6271e8a",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "governance"
+        ],
+        "cases": 7,
+        "matched": 6,
+        "false_support": [
+          "governance/handoff_omits_limits_and_evidence"
+        ],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": [
+          "governance/handoff_omits_limits_and_evidence"
+        ]
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r4.json",
+          "available": true,
+          "bytes": 51250,
+          "sha256": "b5c95f39d0266fd4e33a1b3b758283d257ff19f985f3efd4f77369f4c9191682"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "4e778f074381cbf17a9bc1d84e570d2646e6c12973a5508f60fb92c663928006",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "governance"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r5.json",
+          "available": true,
+          "bytes": 50638,
+          "sha256": "2d48ef7ab8945872bb90818a6803cee4bac2369bf2dc563ae8b29ea990dd80e7"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "4e778f074381cbf17a9bc1d84e570d2646e6c12973a5508f60fb92c663928006",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "governance"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/governance-handoff-r6.json",
+          "available": true,
+          "bytes": 52496,
+          "sha256": "f1c9f22196790d762e6bc8f4e80d30cbb0dfddf32575e46f1a576f175d2b17e5"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "4e778f074381cbf17a9bc1d84e570d2646e6c12973a5508f60fb92c663928006",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "governance"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/process-boundary-r1.json",
+          "available": true,
+          "bytes": 53289,
+          "sha256": "718e30508aa8b18449069bdf638459addea953e8f9e53ba365f2afa74631ae7f"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "ffd80f90a6e81962fc627fdf1d398f3afa41311935533a212e10399dd446a159",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "process_mapping"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/process-boundary-r2.json",
+          "available": true,
+          "bytes": 53922,
+          "sha256": "83ef865e2099d2817d8c4bfc8cf9dcd15db423f1fd22da94a148b62f8cba7bca"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "ffd80f90a6e81962fc627fdf1d398f3afa41311935533a212e10399dd446a159",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "process_mapping"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/process-boundary-r3.json",
+          "available": true,
+          "bytes": 53922,
+          "sha256": "7ee934601a4eccd59d688f29795fe0df2103f15da5608c38077663a98aa3c47f"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "ffd80f90a6e81962fc627fdf1d398f3afa41311935533a212e10399dd446a159",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "process_mapping"
+        ],
+        "cases": 7,
+        "matched": 7,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/workflow-ordering-r1.json",
+          "available": true,
+          "bytes": 40021,
+          "sha256": "40f0ae9e0c711013003b5de773af48f197530f01c098b9630ee6b53cadc5f44e"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "434e43453a346a4b971647034f42c7e27dcd8e64f1f799b79f97c0ffad31ca3b",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "workflow_design"
+        ],
+        "cases": 6,
+        "matched": 6,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/workflow-ordering-r2.json",
+          "available": true,
+          "bytes": 40171,
+          "sha256": "d7ede7808e4ee3c7e99ad431a15ad80266a086a432b22a7df3b38daaaa58e0f2"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "434e43453a346a4b971647034f42c7e27dcd8e64f1f799b79f97c0ffad31ca3b",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "workflow_design"
+        ],
+        "cases": 6,
+        "matched": 6,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/workflow-ordering-r3.json",
+          "available": true,
+          "bytes": 40603,
+          "sha256": "f21500da88081cffa277f8c3233576989ec5d7ab5eeeaa882f6e2a1097106570"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "contract_sha256": "434e43453a346a4b971647034f42c7e27dcd8e64f1f799b79f97c0ffad31ca3b",
+        "runner_sha256": "e795b5b1d5a7fa1b4760fb40f50bf8048ca240b721fbf0d1c5d73a79a0d3ed71",
+        "stop_reason": "completed",
+        "modules": [
+          "workflow_design"
+        ],
+        "cases": 6,
+        "matched": 6,
+        "false_support": [],
+        "false_rejection": [],
+        "unavailable": [],
+        "mismatched": []
+      }
+    ],
+    "live_labs": [
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/live-practical.json",
+          "available": true,
+          "bytes": 63115,
+          "sha256": "5e8affba39f63ea29d150b009b7b875c4ad90902d7aa5f69374fffb8c560c981"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "labs": {
+          "advanced_nodes": "requirements_supported",
+          "advanced_nodes-careless": "revision_required",
+          "batch_processing": "revision_required",
+          "extraction_engine-careless": "revision_required",
+          "extraction_engine-honest": "requirements_supported",
+          "foundations-careless": "revision_required",
+          "foundations-honest": "requirements_supported",
+          "governance-careless": "revision_required",
+          "governance-honest": "requirements_supported",
+          "multi_step": "requirements_supported",
+          "multi_step-careless": "revision_required",
+          "output_delivery-competent": "requirements_supported",
+          "output_delivery-vague": null,
+          "process_mapping": "revision_required",
+          "process_mapping-strong": "requirements_supported",
+          "validation_qa-careless": "revision_required",
+          "validation_qa-honest": "requirements_supported",
+          "workflow_design": "requirements_supported",
+          "workflow_design-strong": "requirements_supported"
+        }
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/route-wording-r1.json",
+          "available": true,
+          "bytes": 4256,
+          "sha256": "391431ba63cd02e450e5239fbbdbf9dc56019ccc28df53a585fdd2bcec819815"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "labs": {
+          "workflow_design-strong": "requirements_supported",
+          "workflow_design_paraphrased-strong": "requirements_supported"
+        }
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/route-wording-r2.json",
+          "available": true,
+          "bytes": 4604,
+          "sha256": "ce8052c68e81a28c38257fbb00b7de6cbd1ac84341e731d360478386de2aa353"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "labs": {
+          "workflow_design-strong": "requirements_supported",
+          "workflow_design_paraphrased-strong": "requirements_supported"
+        }
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/workflow-design-thin-rerun-1.json",
+          "available": true,
+          "bytes": 2886,
+          "sha256": "f84e415afd1c5b214f52c481f74434e848e95f08023c8033a9f52be82699ac08"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "labs": {
+          "workflow_design": "revision_required"
+        }
+      },
+      {
+        "report": {
+          "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/workflow-design-thin-rerun-2.json",
+          "available": true,
+          "bytes": 2218,
+          "sha256": "981fa745bbcdcfed3281c4ceb3ce95ce0fb1e8910148dccf1b2a654f822b528d"
+        },
+        "model_name": "moonshotai/kimi-k3",
+        "labs": {
+          "workflow_design": "revision_required"
+        }
+      }
+    ]
+  },
   "missing_artifacts": [],
   "invalid_manifests": [],
   "limits": [
@@ -322893,6 +323682,7 @@
     "A commit plus dirty-tree fingerprint is not a complete source archive. Missing build provenance is not reconstructed or claimed.",
     "Original selected baseline assets are SHA256-hashed. Later capture files are inventoried for presence and size; their manifests are hashed.",
     "Browser fixtures do not prove durable persistence, real grading, lab execution, assistive technology or learner comprehension.",
-    "Live-model calibration remains deferred. Actual cohort reconciliation, rollout, live labs, assistive technology and learner observation remain open."
+    "Live grading has run with one configured model on synthetic calibration cases and labs; see the live grading tables. A matched case is not release verification, and one model is not a model-independence claim.",
+    "Actual cohort reconciliation, rollout, assistive technology and learner observation remain open."
   ]
 }
