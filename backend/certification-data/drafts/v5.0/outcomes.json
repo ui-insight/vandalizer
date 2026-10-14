@@ -472,6 +472,20 @@
               "path": "boundary",
               "status_key": "approval_record_status"
             }
+          ],
+          "ordering_checks": [
+            {
+              "earlier": {
+                "kind": "learner_decision",
+                "key": "approved_at"
+              },
+              "later": {
+                "kind": "proposal_snapshot",
+                "key": "execution_started_at"
+              },
+              "critical_failure": "Execute a proposed send or share before reviewing its target and scope.",
+              "revision_instruction": "Correct and save the destination, approve that saved design, and only then let anything run; an action that started before your approval is not covered by it."
+            }
           ]
         },
         {

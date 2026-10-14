@@ -114,6 +114,18 @@ async def test_biased_judge_detects_false_passes_and_false_rejections(suite, fix
     assert result['all_cases_matched'] is result['release_ready'] is result['credit_awarded'] is False
 
 
+def test_a_send_that_ran_before_approval_is_contradicted_in_code():
+    # A live judge once excused this case; the timestamp order now decides it.
+    suite = next(suite for suite in SUITES if suite.module_id == 'workflow_design')
+    for case in suite.cases:
+        outcomes, evidence = review_packet(CONTRACT, suite.module_id, case.evidence)[:2]
+        vetoed = automatic_review.ordering_violations(outcomes, evidence)
+        if case.id == 'external_send_before_review':
+            assert vetoed['workflow_design.approval_boundary']['verdict'] == 'contradicted'
+        if case.expected.get('workflow_design.approval_boundary') == 'supported':
+            assert 'workflow_design.approval_boundary' not in vetoed, case.id
+
+
 @pytest.mark.parametrize('suite', SUITES, ids=lambda suite: suite.module_id)
 async def test_unavailable_judge_is_not_a_learner_rejection(suite):
     call = AsyncMock(side_effect=RuntimeError('synthetic provider outage'))
