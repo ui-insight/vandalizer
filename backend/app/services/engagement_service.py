@@ -41,7 +41,7 @@ _DRIP_MODULES = [
     {
         "id": "workflow_design",
         "title": MODULE_TITLES["workflow_design"],
-        "description": "build a multi-step workflow with extraction, prompt, and formatting tasks working together.",
+        "description": "turn a process map into a workflow design: which task types fit each step and how data should flow between them.",
     },
 ]
 

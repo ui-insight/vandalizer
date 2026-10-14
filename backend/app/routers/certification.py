@@ -181,6 +181,7 @@ async def download_certificate(user: User = Depends(get_current_user), enrollmen
         level=prog.level,
         certified_at=prog.certified_at,
         credential_id=str(prog.id)[-8:].upper(),
+        module_count=len(svc.MODULE_ORDER),
     )
     return Response(
         content=pdf,

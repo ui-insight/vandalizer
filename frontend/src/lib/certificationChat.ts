@@ -1,4 +1,5 @@
 import type { CertificationProgress, CourseDefinition } from '../types/certification'
+import { MODULES as LEGACY_MODULES } from '../components/certification/modules'
 
 /**
  * The certification course runs in chat (certification tools + cards). Every
@@ -27,9 +28,9 @@ export function certificationChatEntry(
     ? moduleIds.map(id => progress?.modules[id])
     : Object.values(progress?.modules ?? {})
   const completedCount = selectedModules.filter(module => module?.completed).length
-  // Eleven is the unversioned continuation course only. Versioned metadata
-  // supplies both membership and the denominator for the selected course.
-  const total = progress?.modules_total ?? course?.modules.length ?? 11
+  // Versioned metadata supplies membership and the denominator; the fallback
+  // is the unversioned course's own module list, not a separate number.
+  const total = progress?.modules_total ?? course?.modules.length ?? LEGACY_MODULES.length
   const hasSavedWork = completedCount > 0 || !!progress?.learning_position || !!progress?.pending_completions?.length
     || selectedModules.some(module => module?.scenario_attempt_id || module?.self_assessment || module?.provisioned_docs?.length)
   if (hasSavedWork) {
