@@ -1,5 +1,5 @@
 import { apiFetch, ApiError, rawFetch } from './client'
-import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PositionSaved, ScenarioSubmission, SavedScenarioSubmission } from '../types/certification'
+import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PositionSaved, ScenarioSubmission, SavedScenarioSubmission, ChatPracticeJudgment, ChatPracticeResult } from '../types/certification'
 
 function enrolledPath(path: string, enrollmentId?: string) {
   return enrollmentId ? `${path}?enrollment_id=${encodeURIComponent(enrollmentId)}` : path
@@ -178,6 +178,12 @@ async function downloadPdf(path: string, filename = 'vandal-workflow-architect-c
   URL.revokeObjectURL(url)
 }
 
+
+export function checkChatPractice(enrollmentId: string, body: { passage_quote: string; page: number; value: string; unanswerable_judgment: ChatPracticeJudgment }) {
+  return apiFetch<ChatPracticeResult>(enrolledPath('/api/certification/modules/ai_literacy/chat-practice-check', enrollmentId), {
+    method: 'POST', body: JSON.stringify(body),
+  })
+}
 
 export function submitScenarios(enrollmentId: string, moduleId: string, requestId: string, bankSha256: string, answers: Record<string, string>) {
   return apiFetch<ScenarioSubmission>(enrolledPath(`/api/certification/modules/${encodeURIComponent(moduleId)}/scenarios`, enrollmentId), {

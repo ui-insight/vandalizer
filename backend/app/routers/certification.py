@@ -24,6 +24,7 @@ from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.runtime import current_operation
 from app.services.certification_versions.credentials import CredentialRepository, CredentialSnapshot
 from app.services.certification_versions.catalog import CourseCatalogError
+from app.services.certification_versions.chat_practice import ChatPracticeCheck
 from app.services.certification_versions.learner_decisions import DecisionSubmission, DecisionValidationError, LearnerDecisionRepository, load_prompt
 from app.services.certification_versions.practical_preparation import PreparationSubmission
 from app.services.certification_versions.practical_execution import ExecutionSubmission
@@ -258,6 +259,20 @@ async def get_exercise(module_id: str, user: User = Depends(get_current_user), e
     if not exercise:
         raise HTTPException(status_code=404, detail=f"No exercise for module {module_id}")
     return exercise
+
+
+@router.post('/modules/ai_literacy/chat-practice-check')
+@course_operation(http=True)
+async def check_chat_practice(payload: ChatPracticeCheck, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+    """Check the Module 0 scoped chat practice against the packaged document; saves nothing."""
+    from app.services.certification_versions.batch_inputs import pdf_pages
+    from app.services.certification_versions.chat_practice import ChatPractice, check_practice
+    operation = current_operation()
+    raw = operation.package.json('exercises.json').get('ai_literacy', {}).get('chat_practice') if operation else None
+    if not raw:
+        raise HTTPException(status_code=404, detail='This course does not offer the scoped chat practice')
+    practice = ChatPractice.model_validate(raw)
+    return check_practice(practice, pdf_pages(operation.package.read('documents/' + practice.document)), payload)
 
 
 @router.get('/modules/{module_id}/scenarios')

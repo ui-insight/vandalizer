@@ -102,7 +102,8 @@ def assemble(output, release_id, *, data_root=DATA):
     if (recognition.get('assessment_method') != 'authenticated_scenario_recognition'
             or recognition.get('scenario_bank_id') != bank.bank_id
             or recognition.get('scenario_bank_sha256') != bank.digest
-            or recognition.get('documents') != []):
+            or recognition.get('documents') not in ([], [(recognition.get('chat_practice') or {}).get('document')])):
+        # The optional chat practice may provision one document; the recognition assessment never needs it.
         raise ValueError('AI Literacy must bind its original recognition bank without workspace prerequisites')
 
     output.parent.mkdir(parents=True, exist_ok=True)

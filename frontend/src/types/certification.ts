@@ -36,6 +36,14 @@ export interface CertExercise {
   expected_fields: string[]
   expected_values: Record<string, string[]>
   star_criteria: Record<string, string>
+  chat_practice?: ChatPracticeDefinition
+}
+
+export interface ChatPracticeDefinition { document: string; bounded_question: string; unanswerable_question: string }
+export type ChatPracticeJudgment = 'supported_by_source' | 'not_stated_in_source'
+export interface ChatPracticeResult {
+  passage_found: boolean; quote_supports_value: boolean; value_matches: boolean; judgment_correct: boolean
+  practice_complete: boolean; feedback: string[]; saved: false; credit_awarded: false
 }
 
 export interface CertificationLabStatus extends CourseIdentity {

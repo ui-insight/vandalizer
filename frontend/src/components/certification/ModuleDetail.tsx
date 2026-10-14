@@ -21,6 +21,7 @@ import { SelfAssessment, MODULE_ASSESSMENTS } from './SelfAssessment'
 import { LessonStepper } from './LessonStepper'
 import { EditorialCorrection } from './EditorialCorrection'
 import { ScenarioAssessment } from './ScenarioAssessment'
+import { ChatPracticeCheck } from './ChatPracticeCheck'
 import { PracticalReview } from './PracticalReview'
 import { ProcessDesign } from './ProcessDesign'
 import { WorkflowDesign } from './WorkflowDesign'
@@ -274,13 +275,15 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               prepareEnabled={module.practicalPreparation === true}
               repairAssignment={module.repairAssignment}
               assignment={exercise}
-            /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.scenarioAssessment ? (enrollmentId ? <ScenarioAssessment
+            /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.scenarioAssessment ? (enrollmentId ? <div className="space-y-6">
+              {exercise?.chat_practice && <ChatPracticeCheck enrollmentId={enrollmentId} practice={exercise.chat_practice} />}
+              <ScenarioAssessment
               key={`${enrollmentId}:${module.scenarioAssessment.bank_sha256}`}
               definition={module.scenarioAssessment}
               enrollmentId={enrollmentId}
               attemptId={moduleProgress?.scenario_attempt_id}
               onSaved={onScenarioSaved}
-            /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : <>
+            /></div> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : <>
             {/* Challenge overview */}
             {exercise?.overview && (
               <div className="cert-lesson-markdown text-sm text-gray-600 mb-5 leading-relaxed"
