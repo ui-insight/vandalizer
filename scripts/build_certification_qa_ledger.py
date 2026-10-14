@@ -102,6 +102,36 @@ def checked_items(checklist_text, progress_text):
     return items
 
 
+def live_grading(root):
+    """Index retained live grading runs; a matched calibration is not release verification."""
+    reports, labs = [], []
+    for directory in sorted((root / 'artifacts/visual-review').glob('certification-live-calibration-*')):
+        for path in sorted(directory.glob('*.json')):
+            try:
+                data = json.loads(path.read_text())
+            except (ValueError, OSError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            if 'attempts' in data and 'reviewer' in data:
+                final = {}
+                for attempt in data['attempts']:  # A resumed retry replaces the earlier attempt.
+                    final[f"{attempt['module_id']}/{attempt['case_id']}"] = attempt
+                reports.append({'report': reference(root, relative(root, path)), 'model_name': data['reviewer'].get('model_name'),
+                                'contract_sha256': data['plan'].get('contract_sha256'), 'runner_sha256': data.get('runner_sha256'),
+                                'stop_reason': data.get('stop_reason'), 'modules': sorted({key.split('/')[0] for key in final}),
+                                'cases': len(final), 'matched': sum(bool(a['matches']) for a in final.values()),
+                                'false_support': sorted(k for k, a in final.items() if a.get('false_supported_outcomes')),
+                                'false_rejection': sorted(k for k, a in final.items() if a.get('false_rejected_outcomes')),
+                                'unavailable': sorted(k for k, a in final.items() if a.get('grading_unavailable')),
+                                'mismatched': sorted(k for k, a in final.items() if not a['matches'])})
+            elif 'modules' in data and 'model' in data:
+                labs.append({'report': reference(root, relative(root, path)), 'model_name': data['model'],
+                             'labs': {name: value.get('assessment_status') for name, value in sorted(data['modules'].items())}})
+    return {'scope': 'Synthetic cases and labs with one configured model; not release verification or learner evidence',
+            'calibration_reports': reports, 'live_labs': labs}
+
+
 def build(root):
     checklist = root / 'docs/certification-v5-upgrade-checklist.md'
     progress = root / 'docs/certification-v5-implementation-progress.md'
@@ -152,6 +182,7 @@ def build(root):
         data = json.loads(path.read_text())
         packages.append({'manifest': reference(root, relative(root, path)), 'release_id': data.get('release_id'),
                          'rubric_id': data.get('rubric_id'), 'scope': 'retained local package; not a publication assertion'})
+    grading = live_grading(root)
     try:
         head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
     except (OSError, subprocess.CalledProcessError):
@@ -163,14 +194,15 @@ def build(root):
         'counts': {'accepted': sum(item['accepted'] for item in items), 'open': sum(not item['accepted'] for item in items),
                    'items': len(items), 'checkpoints': len(checkpoints), 'browser_runs': len(runs),
                    'recorded_captures_including_diagnostics_and_repeats': sum(len(run['captures']) for run in runs),
-                   'baseline_selected_captures': len(baseline_captures)},
+                   'baseline_selected_captures': len(baseline_captures),
+                   'live_calibration_reports': len(grading['calibration_reports'])},
         'baseline': {'report': reference(root, relative(root, report)), 'selected_runs': list(BASELINE_RUNS),
                      'expected_selected_captures': 151, 'excludes_capture_id': 'blocked',
                      'contract_probe': reference(root, 'artifacts/visual-review/certification-2026-10-02-run2/contracts.json'),
                      'grades': 'Original six dimension and eleven module grades remain in the unchanged linked report.'},
         'course_registry': reference(root, 'backend/certification-data/courses/registry.json'),
         'retained_packages': packages, 'items': items, 'checkpoints': checkpoints, 'source_records': sources,
-        'browser_runs': runs, 'recorded_viewports': dict(sorted(views.items())),
+        'browser_runs': runs, 'recorded_viewports': dict(sorted(views.items())), 'live_grading': grading,
         'missing_artifacts': sorted(set(missing)), 'invalid_manifests': invalid,
         'limits': [
             'Repeated states, old builds and failed diagnostics are retained. Counts do not establish acceptance or a quality score.',
@@ -178,7 +210,8 @@ def build(root):
             'A commit plus dirty-tree fingerprint is not a complete source archive. Missing build provenance is not reconstructed or claimed.',
             'Original selected baseline assets are SHA256-hashed. Later capture files are inventoried for presence and size; their manifests are hashed.',
             'Browser fixtures do not prove durable persistence, real grading, lab execution, assistive technology or learner comprehension.',
-            'Live-model calibration remains deferred. Actual cohort reconciliation, rollout, live labs, assistive technology and learner observation remain open.',
+            'Live grading has run with one configured model on synthetic calibration cases and labs; see the live grading tables. A matched case is not release verification, and one model is not a model-independence claim.',
+            'Actual cohort reconciliation, rollout, assistive technology and learner observation remain open.',
         ],
     }
 
@@ -196,6 +229,15 @@ def render(ledger, *, prefix='../..', json_name='certification-v5-evidence-ledge
         rows.append(f'<tr><td>{link(path, path.removeprefix("artifacts/visual-review/"))}<small>{escape(context)}</small></td>'
                     f'<td>{len(run["captures"])}</td><td>{escape(widths)}</td><td>{escape(str(run["browser"]))}<br>Native zoom {run["native_profile_zoom"]}×; text {run["reported_text_scale"]}×</td>'
                     f'<td>{escape(provenance)}<small>{escape(str(run["reported_scope"]))}</small></td></tr>')
+    grading = ledger.get('live_grading') or {'calibration_reports': [], 'live_labs': []}
+    calibration_rows = ''.join(
+        f'<tr><td>{link(item["report"]["path"], item["report"]["path"].rsplit("/", 1)[-1])}<small>{escape(", ".join(item["modules"]))}</small></td>'
+        f'<td>{escape(str(item["model_name"]))}</td><td>{item["matched"]} of {item["cases"]}</td><td>{len(item["false_support"])}</td>'
+        f'<td>{len(item["false_rejection"])}</td><td>{len(item["unavailable"])}</td><td>{escape(str(item["stop_reason"]))}'
+        f'<small>{escape(", ".join(item["mismatched"]))}</small></td></tr>' for item in grading['calibration_reports'])
+    lab_rows = ''.join(
+        f'<tr><td>{link(item["report"]["path"], item["report"]["path"].rsplit("/", 1)[-1])}</td><td>{escape(str(item["model_name"]))}</td>'
+        f'<td>{"<br>".join(escape(name + ": " + str(status)) for name, status in item["labs"].items())}</td></tr>' for item in grading['live_labs'])
     missing = ''.join(f'<li>{escape(path)}</li>' for path in ledger['missing_artifacts']) or '<li>No missing referenced capture files or evidence directories found.</li>'
     return f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Certification QA evidence ledger</title><style>body{{font:16px/1.6 system-ui,sans-serif;color:#172033;background:#fff;margin:0 auto;padding:24px;max-width:1200px}}a{{color:#234eb0}}h1{{line-height:1.2}}small{{display:block;color:#475569}}input{{font:inherit;padding:10px;width:min(90%,650px);border:1px solid #64748b;border-radius:6px}}.table{{overflow:auto}}table{{border-collapse:collapse;width:100%;font-size:14px}}th,td{{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid #cbd5e1}}td:first-child{{overflow-wrap:anywhere;min-width:210px}}:focus-visible{{outline:3px solid #1d4ed8;outline-offset:3px}}.note{{padding:16px;background:#f1f5f9;border:1px solid #cbd5e1}}li{{overflow-wrap:anywhere}}</style>
@@ -205,6 +247,9 @@ def render(ledger, *, prefix='../..', json_name='certification-v5-evidence-ledge
 <h2>Evidence limits</h2><ul>{''.join('<li>'+escape(item)+'</li>' for item in ledger['limits'])}</ul>
 <h2>Retained browser runs</h2><label for="filter">Filter by checkpoint, state family, browser or evidence directory</label><p><input id="filter" type="search"></p><p id="count" role="status"></p>
 <div class="table" role="region" aria-label="Browser evidence table" tabindex="0"><table><thead><tr><th scope="col">Evidence and checkpoint</th><th scope="col">States</th><th scope="col">CSS widths</th><th scope="col">Browser and enlargement</th><th scope="col">Build and execution scope</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
+<h2>Live grading</h2><p class="note">{escape(grading.get('scope', ''))}. Mismatched cases are listed under each run's stop reason.</p>
+<div class="table" role="region" aria-label="Live calibration runs" tabindex="0"><table><thead><tr><th scope="col">Calibration run and modules</th><th scope="col">Model</th><th scope="col">Matched</th><th scope="col">False support</th><th scope="col">False rejection</th><th scope="col">Unavailable</th><th scope="col">Stop reason and mismatches</th></tr></thead><tbody>{calibration_rows}</tbody></table></div>
+<div class="table" role="region" aria-label="Live practical labs" tabindex="0"><table><thead><tr><th scope="col">Live lab report</th><th scope="col">Model</th><th scope="col">Latest result per lab</th></tr></thead><tbody>{lab_rows}</tbody></table></div>
 <h2>Missing evidence files</h2><ul>{missing}</ul></main><script>const rows=[...document.querySelectorAll('tbody tr')],input=document.querySelector('#filter'),status=document.querySelector('#count');function filter(){{const term=input.value.trim().toLowerCase();for(const row of rows)row.hidden=!row.textContent.toLowerCase().includes(term);status.textContent=rows.filter(row=>!row.hidden).length+' of '+rows.length+' retained runs shown';}}input.addEventListener('input',filter);filter();</script></html>'''
 
 

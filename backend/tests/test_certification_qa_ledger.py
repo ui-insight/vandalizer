@@ -83,3 +83,29 @@ def test_tracking_drift_is_rejected_before_evidence_generation(failure):
         checklist = '0/0 items complete; 0 remain open.'
     with pytest.raises(ValueError, match='summary disagrees|unique acceptance item IDs'):
         ledger.checked_items(checklist, progress)
+
+
+def test_live_grading_counts_the_final_attempt_and_names_every_miss(tmp_path):
+    directory = tmp_path / 'artifacts/visual-review/certification-live-calibration-2026-10-12'
+    directory.mkdir(parents=True)
+    attempt = lambda case, **values: {'module_id': 'governance', 'case_id': case, 'matches': True, 'false_supported_outcomes': [],
+                                      'false_rejected_outcomes': [], 'grading_unavailable': False, **values}
+    (directory / 'matrix.json').write_text(json.dumps({
+        'plan': {'contract_sha256': 'c' * 64}, 'reviewer': {'model_name': 'synthetic-model'}, 'runner_sha256': 'r' * 64,
+        'stop_reason': 'completed', 'attempts': [
+            attempt('retried', matches=False, grading_unavailable=True), attempt('retried'),
+            attempt('overclaim', matches=False, false_supported_outcomes=['governance.capstone_supervision'])]}))
+    (directory / 'labs.json').write_text(json.dumps({'model': 'synthetic-model', 'modules': {
+        'governance-honest': {'assessment_status': 'requirements_supported'}, '<b>lab</b>': {'assessment_status': 'revision_required'}}}))
+    (directory / 'notes.txt').write_text('not a report')
+    grading = ledger.live_grading(tmp_path)
+    [report] = grading['calibration_reports']
+    assert (report['cases'], report['matched']) == (2, 1)
+    assert report['unavailable'] == [] and report['false_support'] == report['mismatched'] == ['governance/overclaim']
+    assert grading['live_labs'][0]['labs']['governance-honest'] == 'requirements_supported'
+    value = {'counts': {'accepted': 1, 'items': 2, 'open': 1, 'baseline_selected_captures': 0,
+                        'recorded_captures_including_diagnostics_and_repeats': 0, 'browser_runs': 0},
+             'limits': [], 'missing_artifacts': [], 'browser_runs': [], 'live_grading': grading}
+    html = ledger.render(value)
+    assert '<td>1 of 2</td>' in html and 'governance/overclaim' in html
+    assert '<b>lab</b>' not in html and '&lt;b&gt;lab&lt;/b&gt;' in html
