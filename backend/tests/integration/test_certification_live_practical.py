@@ -646,6 +646,12 @@ STRONG_PROMPT = ('Using only the workflow documents (report-alpine, report-neura
     'required passage is missing or unreadable, or two passages conflict, do not guess or treat it as zero or agreement: '
     'mark the affected conclusion BLOCKED, quote the passages involved and leave it for the grants reviewer. Produce an '
     'internal draft only; do not approve, send, share or schedule anything.')
+# The same instruction in other words: wording must not be an accidental requirement.
+PARAPHRASED_PROMPT = ('Read report-alpine, report-neural and report-water, the workflow documents and nothing else. Build an '
+    'internal side-by-side of each project\'s milestones and spending, and give the report and passage behind every figure. '
+    'Keep open issues in their own list. When a passage the comparison needs is absent or illegible, or two passages '
+    'disagree, flag that item UNRESOLVED, quote what you found and hand it to the grants reviewer instead of estimating, '
+    'counting it as zero or picking one. This is a draft for internal review: send, share, schedule and approve nothing.')
 STRONG_WORKFLOW_ANSWERS = {
     'data_flow': 'I chose my original saved process submission. The one saved Prompt step takes the workflow documents as its '
         'input, which at run time are only report-alpine, report-neural and report-water, and compares them directly: a prompt '
@@ -666,7 +672,7 @@ STRONG_WORKFLOW_ANSWERS = {
         'have not executed it.'}
 
 
-@pytest.mark.parametrize('module_id', ['process_mapping', 'workflow_design'])
+@pytest.mark.parametrize('module_id', ['process_mapping', 'workflow_design', 'workflow_design_paraphrased'])
 async def test_strong_design_answers_are_accepted_by_the_live_reviewer(repo, tmp_path, monkeypatch, module_id):
     # The counterpart to the thin-answer test: the same saved case, explained
     # against each passing condition, must not be sent back.
@@ -684,12 +690,15 @@ async def test_strong_design_answers_are_accepted_by_the_live_reviewer(repo, tmp
         prepared = await base.prepare_process_review(repo, learner, package, saved['uuid'])
     else:
         _, _, _, _, _, task, capture_body = await base.workflow_design_capture_fixture(repo)
-        task.data = {**task.data, 'prompt': STRONG_PROMPT}
+        paraphrased = module_id == 'workflow_design_paraphrased'
+        task.data = {**task.data, 'prompt': PARAPHRASED_PROMPT if paraphrased else STRONG_PROMPT}
         await task.save()
         snapshot = await base.capture_workflow_design(repo, learner, package, capture_body)
+        answers = ({key: value.replace('BLOCKED', 'UNRESOLVED') for key, value in STRONG_WORKFLOW_ANSWERS.items()}
+                   if paraphrased else STRONG_WORKFLOW_ANSWERS)
         body = {'request_id': uuid4().hex, 'input_snapshot_id': snapshot['uuid'], 'input_snapshot_sha256': encode(snapshot)[1],
             'case_sha256': snapshot['case']['case_sha256'], 'consent': 'approve_saved_workflow_design_for_assessment',
-            'answers': STRONG_WORKFLOW_ANSWERS}
+            'answers': answers}
         saved = await base.approve_workflow_design(repo, learner, package, body)
         prepared = await base.prepare_workflow_review(repo, learner, package, saved['uuid'])
     reviewed = await base.evaluate_review(repo, learner, package, prepared['attempt_id'], config=runtime_config)
