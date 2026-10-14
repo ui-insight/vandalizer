@@ -123,3 +123,37 @@ async def test_a_chat_built_connected_workflow_captures_and_plans(repo):
     stages = prepared['plan']['stage_plans'] if 'plan' in prepared else prepared['stage_plans']
     assert [stage['task_type'] for stage in stages] == ['Extraction', 'Prompt', 'Formatter']
     assert stages[2]['effective_input_sources'] == ['earlier_steps'] and stages[2]['receives_previous_stage'] is True
+
+
+async def test_one_design_survives_switching_from_chat_to_the_editor(repo):
+    """M03-04: chat builds the design, the editor revises it, and both captures name one workflow and attempt."""
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+    from app.routers.workflows import router as workflow_router
+    from app.services.certification_versions.workflow_design_inputs import WorkflowDesignInputRepository
+    from app.services.chat_tools import create_workflow
+    source, package, _, _, _, _, body = await base.workflow_design_capture_fixture(repo)
+    await init_beanie(database=SearchSet.get_motor_collection().database, document_models=ALL_MODELS)
+    user = User(user_id=source.user_id)
+    ctx = _make_context(user_id=source.user_id, team_id=None, user=user, model_name='fixture-model')
+    built = await create_workflow(ctx, 'Monthly comparison draft', [
+        {'name': 'Compare reports', 'type': 'prompt', 'prompt': 'Compare the three assigned reports and cite every value.', 'is_output': True}], confirmed=True)
+    assert built.get('workflow_id'), built
+    request = {**body, 'workflow_id': built['workflow_id'], 'handoff': 'supplied_example', 'process_submission_id': None}
+    first = await base.capture_workflow_design(repo, source, package, {**request, 'request_id': uuid4().hex})
+    task_id = first['artifact']['steps'][0]['tasks'][0]['id']
+    app = FastAPI()
+    app.include_router(workflow_router, prefix='/api/workflows')
+    app.dependency_overrides[get_current_user] = lambda: user
+    revised_prompt = 'Compare the three assigned reports, cite every value and mark conflicts UNRESOLVED for the reviewer.'
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        data = {**first['artifact']['steps'][0]['tasks'][0]['data'], 'prompt': revised_prompt}
+        response = await client.patch(f'/api/workflows/tasks/{task_id}', json={'data': data})
+        assert response.status_code == 200, response.text
+    second = await base.capture_workflow_design(repo, source, package, {**request, 'request_id': uuid4().hex})
+    assert second['artifact_id'] == first['artifact_id'] == built['workflow_id']
+    assert second['enrollment_id'] == first['enrollment_id'] == source.uuid
+    assert second['artifact']['steps'][0]['tasks'][0]['id'] == task_id
+    assert second['artifact']['steps'][0]['tasks'][0]['data']['prompt'] == revised_prompt
+    assert second['artifact_sha256'] != first['artifact_sha256']
+    assert await WorkflowDesignInputRepository().get(source.user_id, first['uuid']) == first
