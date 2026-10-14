@@ -104,6 +104,22 @@ def _find_by_id(entries: list[dict], entry_id: str) -> int:
     return -1
 
 
+def context_window_status(model: dict) -> str:
+    """Whether a model's context window is known, for the Config page.
+
+    "detected": the serving endpoint reported it. "entered": an admin typed
+    it (or accepted a preset). "unconfirmed": a value with no record of where
+    it came from, which is what the model form's old 128,000 placeholder
+    saved for every model nobody probed. "missing": no value at all, so the
+    context budget guesses from the model name or assumes 65,536 tokens.
+    """
+    window = model.get("context_window")
+    if not isinstance(window, int) or window <= 0:
+        return "missing"
+    source = model.get("context_window_source")
+    return source if source in ("detected", "entered") else "unconfirmed"
+
+
 def _sanitize_models(models: list[dict]) -> list[dict]:
     """Replace api_key values with '***' in model config dicts."""
     sanitized = []
@@ -113,6 +129,7 @@ def _sanitize_models(models: list[dict]) -> list[dict]:
         if key:
             # Decrypt to check if a real value exists, then mask it
             m_copy["api_key"] = "***" if decrypt_value(key) else ""
+        m_copy["context_window_status"] = context_window_status(m_copy)
         sanitized.append(m_copy)
     return sanitized
 
@@ -349,7 +366,12 @@ class ModelAddRequest(BaseModel):
     supports_structured: bool = True
     multimodal: bool = False
     supports_pdf: bool = False
-    context_window: int = 128000
+    # The serving window, in tokens. No default: the form used to send
+    # 128,000 for every model nobody probed, and every budget and memory
+    # warning was then wrong for a model serving 32K or 1M.
+    context_window: Optional[int] = None
+    # Where it came from: "detected" (the endpoint reported it) or "entered".
+    context_window_source: Optional[Literal["detected", "entered"]] = None
     # Optional per-model overrides (None = use system default / computed value).
     # request_timeout_seconds replaces the shared LLM read timeout for this model;
     # response_reserve_tokens sets the output cap (tokens reserved for the answer).
@@ -1752,7 +1774,11 @@ async def add_model(
             "supports_structured": body.supports_structured,
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
-            "context_window": body.context_window,
+            "context_window": body.context_window if body.context_window and body.context_window > 0 else None,
+            "context_window_source": (
+                (body.context_window_source or "entered")
+                if body.context_window and body.context_window > 0 else None
+            ),
             "request_timeout_seconds": body.request_timeout_seconds,
             "response_reserve_tokens": body.response_reserve_tokens,
             "temperature": body.temperature,
@@ -1941,13 +1967,20 @@ async def update_model(
     for field in (
         "external", "thinking", "endpoint", "api_protocol", "speed", "tier",
         "privacy", "supports_structured", "multimodal", "supports_pdf",
-        "context_window", "request_timeout_seconds", "response_reserve_tokens",
+        "context_window", "context_window_source", "request_timeout_seconds", "response_reserve_tokens",
         "temperature", "cost_per_1m_input", "cost_per_1m_output",
     ):
         if field not in sent:
             continue
         value = getattr(body, field)
         merged[field] = (value or "") if field in _blank_to_empty else value
+    # A window sent without saying where it came from was typed by an admin.
+    if "context_window" in sent:
+        if not (isinstance(merged.get("context_window"), int) and merged["context_window"] > 0):
+            merged["context_window"] = None
+            merged["context_window_source"] = None
+        elif "context_window_source" not in sent or not merged.get("context_window_source"):
+            merged["context_window_source"] = "entered"
     cfg.available_models[index] = merged
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
@@ -3262,6 +3295,65 @@ async def probe_model(
         model_name=(body.name or "").strip(),
     )
     return result.to_dict()
+
+
+class SavedModelProbeRequest(BaseModel):
+    # Replace a window an admin entered with the detected one. Without it, an
+    # entered value that differs is reported, not overwritten.
+    force: bool = False
+
+
+@router.post("/config/models/{model_id}/context-window/probe")
+async def probe_saved_model_context_window(
+    model_id: str,
+    body: SavedModelProbeRequest,
+    user: User = Depends(get_current_user),
+):
+    """Ask a saved model's endpoint for its context window and record it.
+
+    The one-click fix for models the Config page flags as unconfirmed or
+    missing. Saves the detected window unless an admin entered a different
+    one and ``force`` is false.
+    """
+    await _require_superadmin(user)
+
+    from app.services.model_probe import probe_context_window
+
+    cfg = await SystemConfig.get_config()
+    await _ensure_config_ids(cfg)
+    index = _find_by_id(cfg.available_models, model_id)
+    if index == -1:
+        raise HTTPException(status_code=404, detail="Model not found")
+    model = cfg.available_models[index]
+    result = await probe_context_window(
+        endpoint=(model.get("endpoint") or "").strip(),
+        api_protocol=(model.get("api_protocol") or "").strip(),
+        api_key=decrypt_value(model.get("api_key") or "") or "",
+        model_name=(model.get("name") or "").strip(),
+    )
+    detected = result.context_window if result.context_window and result.context_window > 0 else None
+    applied = False
+    entered_differs = (
+        detected is not None
+        and context_window_status(model) == "entered"
+        and model.get("context_window") != detected
+    )
+    if detected is not None and (not entered_differs or body.force):
+        cfg.available_models[index] = {
+            **model, "context_window": detected, "context_window_source": "detected",
+        }
+        cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        cfg.updated_by = user.user_id
+        await cfg.save()
+        clear_agent_caches()
+        await _audit(user, "probe_model_context_window", f"{model.get('name')}: context window {detected} detected")
+        applied = True
+    return {
+        "probe": result.to_dict(),
+        "applied": applied,
+        "entered_differs": entered_differs and not applied,
+        "models": _sanitize_models(cfg.available_models),
+    }
 
 
 # ---------------------------------------------------------------------------

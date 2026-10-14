@@ -1,5 +1,5 @@
 import { useConfigDraft } from './configDrafts'
-import { useImperativeHandle, useState, type Ref } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {
   Cpu, Plus, Trash2, Pencil, RefreshCw,
   CheckCircle2, XCircle, ChevronDown, ChevronUp, Play, Star,
@@ -8,8 +8,9 @@ import { DiagnosticsPanel, type DiagnosticFact } from './DiagnosticsPanel'
 import { useConfirm } from '../../shared/useConfirm'
 import {
   addModel, updateModel, deleteModel, setDefaultModel, setLongDocumentModel, setValidationJudgeModel, testModel, probeModel,
+  probeSavedModelContextWindow,
 } from '../../../api/admin'
-import type { ModelTestResult, SystemConfigData } from '../../../api/admin'
+import type { ContextWindowSource, ModelTestResult, SystemConfigData } from '../../../api/admin'
 import { ModelCharacterBars } from '../../ModelEffortPicker'
 import { getModelIdentityError } from '../../../utils/modelIdentity'
 import type { ModelInfo } from '../../../types/workflow'
@@ -60,7 +61,11 @@ type ModelDraft = {
   supports_structured: boolean
   multimodal: boolean
   supports_pdf: boolean
+  // 0 = not set yet. Required to save: every context budget and memory
+  // warning depends on it, so it is detected from the endpoint or entered,
+  // never defaulted.
   context_window: number
+  context_window_source: ContextWindowSource | ''
   // Optional per-model overrides. 0 = unset (backend uses system default /
   // computed value).
   request_timeout_seconds: number
@@ -73,7 +78,7 @@ type ModelDraft = {
 const EMPTY_MODEL_DRAFT: ModelDraft = {
   name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '',
   speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false,
-  context_window: 128000, request_timeout_seconds: 0, response_reserve_tokens: 0, temperature: null,
+  context_window: 0, context_window_source: '', request_timeout_seconds: 0, response_reserve_tokens: 0, temperature: null,
 }
 
 // Provider presets power the "Add a Model" wizard. Selecting one fills in the
@@ -241,6 +246,12 @@ export function ModelEditor({
   const [newModel, setNewModel] = useState<ModelDraft>({ ...EMPTY_MODEL_DRAFT })
   const [probingContext, setProbingContext] = useState(false)
   const [probeResult, setProbeResult] = useState<{ ok: boolean; message: string } | null>(null)
+  // The endpoint reported a window different from one the admin typed. Never
+  // overwritten silently: a vLLM server started with a smaller
+  // --max-model-len is exactly when the model card's number is wrong.
+  const [contextMismatch, setContextMismatch] = useState<{ detected: number; source: string } | null>(null)
+  // Per saved model: the result of its one-click "Check" from the list.
+  const [windowChecks, setWindowChecks] = useState<Record<string, { busy: boolean; message?: string }>>({})
   // Add-a-Model wizard: step 1 = pick provider, step 2 = configure + save + test.
   const [wizardStep, setWizardStep] = useState<1 | 2>(1)
   const [wizardProviderId, setWizardProviderId] = useState<string | null>(null)
@@ -249,28 +260,79 @@ export function ModelEditor({
 
   const modelDraft = useConfigDraft('Model editor', newModel, showModelForm)
 
-  const handleProbeContextWindow = async () => {
+  // Probes read the latest draft, and only the newest probe's answer counts:
+  // typing in the name field starts a probe per pause.
+  const draftRef = useRef(newModel)
+  draftRef.current = newModel
+  const probeSeq = useRef(0)
+
+  /** Ask the endpoint for its window and fill it in, unless the admin typed a
+   *  different one. Returns the window to save with and where it came from. */
+  const runProbe = useCallback(async (auto: boolean): Promise<{ window: number; source: ContextWindowSource } | null> => {
+    const draft = draftRef.current
+    const seq = ++probeSeq.current
     setProbingContext(true)
-    setProbeResult(null)
+    if (!auto) setProbeResult(null)
     try {
-      const existingModelId = editingModelId
       const result = await probeModel({
-        name: newModel.name,
-        endpoint: newModel.endpoint,
-        api_protocol: newModel.api_protocol,
-        api_key: newModel.api_key,
-        existing_model_id: existingModelId,
+        name: draft.name,
+        endpoint: draft.endpoint,
+        api_protocol: draft.api_protocol,
+        api_key: draft.api_key,
+        existing_model_id: editingModelId,
       })
-      if (result.context_window && result.context_window > 0) {
-        setNewModel(prev => ({ ...prev, context_window: result.context_window as number }))
-        setProbeResult({ ok: true, message: `Detected ${result.context_window.toLocaleString()} tokens (${result.source}).` })
-      } else {
-        setProbeResult({ ok: false, message: result.detail || `No context length reported (${result.source}).` })
+      if (seq !== probeSeq.current) return null
+      const detected = result.context_window && result.context_window > 0 ? result.context_window : null
+      const current = draftRef.current
+      if (detected == null) {
+        setProbeResult({
+          ok: false,
+          message: `${result.detail || `The server didn't report a context window (${result.source}).`} Enter it from the model card.`,
+        })
+        return current.context_window > 0 ? { window: current.context_window, source: current.context_window_source || 'entered' } : null
       }
+      if (current.context_window_source === 'entered' && current.context_window > 0 && current.context_window !== detected) {
+        setContextMismatch({ detected, source: result.source })
+        setProbeResult(null)
+        return { window: current.context_window, source: 'entered' }
+      }
+      setContextMismatch(null)
+      setNewModel(prev => ({ ...prev, context_window: detected, context_window_source: 'detected' }))
+      setProbeResult({ ok: true, message: `Detected ${detected.toLocaleString()} tokens from the server (${result.source}).` })
+      return { window: detected, source: 'detected' }
     } catch (e) {
-      setProbeResult({ ok: false, message: e instanceof Error ? e.message : 'Probe failed' })
+      if (seq === probeSeq.current) setProbeResult({ ok: false, message: e instanceof Error ? e.message : 'Probe failed' })
+      return null
     } finally {
-      setProbingContext(false)
+      if (seq === probeSeq.current) setProbingContext(false)
+    }
+  }, [editingModelId])
+
+  const handleProbeContextWindow = () => { void runProbe(false) }
+
+  // Probe automatically once there is enough to reach the server, so nobody
+  // has to remember the button. Waits for a pause in typing.
+  const wizardProvider = MODEL_PROVIDERS.find(p => p.id === wizardProviderId) ?? null
+  const probeReady = showModelForm && wizardStep === 2 && newModel.name.trim() !== ''
+    && (!(wizardProvider?.needsEndpoint ?? false) || newModel.endpoint.trim() !== '')
+  useEffect(() => {
+    if (!probeReady) return
+    const timer = setTimeout(() => { void runProbe(true) }, 800)
+    return () => clearTimeout(timer)
+  }, [probeReady, newModel.name, newModel.endpoint, newModel.api_protocol, newModel.api_key, runProbe])
+
+  const handleCheckSavedWindow = async (modelId: string, force = false) => {
+    setWindowChecks(prev => ({ ...prev, [modelId]: { busy: true } }))
+    try {
+      const res = await probeSavedModelContextWindow(modelId, force)
+      if (res.applied) onConfigPatch({ available_models: res.models })
+      const detected = res.probe.context_window
+      const message = res.applied && detected ? `Detected ${detected.toLocaleString()} tokens from the server.`
+        : res.entered_differs && detected ? `The server reports ${detected.toLocaleString()} tokens. Your entered value was kept; edit the model to change it.`
+        : `${res.probe.detail || "The server didn't report a context window."} Edit the model and enter it from the model card.`
+      setWindowChecks(prev => ({ ...prev, [modelId]: { busy: false, message } }))
+    } catch (e) {
+      setWindowChecks(prev => ({ ...prev, [modelId]: { busy: false, message: e instanceof Error ? e.message : 'Check failed' } }))
     }
   }
 
@@ -278,6 +340,7 @@ export function ModelEditor({
   const openAddModelWizard = () => {
     setNewModel({ ...EMPTY_MODEL_DRAFT })
     setProbeResult(null)
+    setContextMismatch(null)
     setModelTest(null)
     setWizardProviderId(null)
     setWizardStep(1)
@@ -296,6 +359,7 @@ export function ModelEditor({
   const closeModelForm = () => {
     setNewModel({ ...EMPTY_MODEL_DRAFT })
     setProbeResult(null)
+    setContextMismatch(null)
     setModelTest(null)
     setWizardProviderId(null)
     setWizardStep(1)
@@ -312,6 +376,7 @@ export function ModelEditor({
     setWizardProviderId(p.id)
     setNewModel(prev => ({ ...EMPTY_MODEL_DRAFT, name: prev.name, ...p.apply }))
     setProbeResult(null)
+    setContextMismatch(null)
     setModelTest(null)
     onError(null)
     setWizardStep(2)
@@ -337,6 +402,16 @@ export function ModelEditor({
       onError(identityError)
       return
     }
+    // A window is required. Try the server first if none is set yet.
+    let windowToSave = newModel.context_window > 0
+      ? { window: newModel.context_window, source: (newModel.context_window_source || 'entered') as ContextWindowSource }
+      : await runProbe(false)
+    if (!windowToSave || !(windowToSave.window > 0)) {
+      onError("Enter the model's context window (tokens). The server didn't report one, so take it from the model card or your server's settings.")
+      return
+    }
+    if (contextMismatch) windowToSave = { window: newModel.context_window, source: 'entered' }
+    const payload = { ...newModel, context_window: windowToSave.window, context_window_source: windowToSave.source }
     setSavingModel(true)
     onError(null)
     setModelTest(null)
@@ -357,9 +432,9 @@ export function ModelEditor({
           setSavingModel(false)
           return
         }
-        res = await updateModel(modelId, newModel)
+        res = await updateModel(modelId, payload)
       } else {
-        res = await addModel(newModel)
+        res = await addModel(payload)
       }
       modelDraft.markSaved()
       const resDefault = (res as { default_model?: string }).default_model
@@ -427,12 +502,14 @@ export function ModelEditor({
       supports_structured: m.supports_structured !== false,
       multimodal: !!m.multimodal,
       supports_pdf: !!m.supports_pdf,
-      context_window: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : 128000,
+      context_window: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : 0,
+      context_window_source: m.context_window_source ?? '',
       request_timeout_seconds: typeof m.request_timeout_seconds === 'number' && m.request_timeout_seconds > 0 ? m.request_timeout_seconds : 0,
       response_reserve_tokens: typeof m.response_reserve_tokens === 'number' && m.response_reserve_tokens > 0 ? m.response_reserve_tokens : 0,
       temperature: typeof m.temperature === 'number' ? m.temperature : null,
     })
     setProbeResult(null)
+    setContextMismatch(null)
     setModelTest(null)
     setWizardProviderId(inferProviderId(m))
     setWizardStep(2)          // edit skips the provider picker
@@ -586,6 +663,25 @@ export function ModelEditor({
                     )}
                     {m.endpoint && (
                       <span style={{ fontSize: 11, color: '#4b5563', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
+                    )}
+                    {(m.context_window_status === 'unconfirmed' || m.context_window_status === 'missing') && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 4px 2px 8px', borderRadius: 9999, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>
+                        {m.context_window_status === 'missing'
+                          ? 'Context window not set'
+                          : `Context window not confirmed (${(m.context_window ?? 0).toLocaleString()})`}
+                        <button
+                          type="button"
+                          onClick={() => void handleCheckSavedWindow(m.id)}
+                          disabled={windowChecks[m.id]?.busy}
+                          aria-label={`Check ${m.name}'s context window with its server`}
+                          style={{ fontSize: 11, padding: '1px 8px', borderRadius: 9999, border: '1px solid #b45309', background: '#fff', color: '#92400e', cursor: 'pointer' }}
+                        >
+                          {windowChecks[m.id]?.busy ? 'Checking…' : 'Check'}
+                        </button>
+                      </span>
+                    )}
+                    {windowChecks[m.id]?.message && (
+                      <span role="status" style={{ fontSize: 11, color: '#4b5563' }}>{windowChecks[m.id]?.message}</span>
                     )}
                   </div>
                   {/* Characteristic bars (replaces speed / tier / privacy pills) */}
@@ -809,6 +905,77 @@ export function ModelEditor({
                     </div>
                   )}
 
+                  <div>
+                    <label htmlFor="admin-model-context-window" style={labelStyle}>Context window (tokens)</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                      <input
+                        id="admin-model-context-window"
+                        type="number"
+                        min={1}
+                        required
+                        value={newModel.context_window > 0 ? newModel.context_window : ''}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10)
+                          setNewModel(prev => ({ ...prev, context_window: Number.isFinite(v) && v > 0 ? v : 0, context_window_source: 'entered' }))
+                          setProbeResult(null)
+                          setContextMismatch(null)
+                        }}
+                        placeholder={probingContext ? 'Asking the server…' : 'e.g. 131072'}
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleProbeContextWindow}
+                        disabled={probingContext || !newModel.name.trim()}
+                        title="Ask the endpoint what context window it actually serves. Catches the case where the model card says 131k but the deployment was launched with a smaller --max-model-len."
+                        style={{
+                          padding: '0 14px', borderRadius: 'var(--ui-radius, 12px)',
+                          border: '1px solid #d1d5db', background: '#fff', fontSize: 13,
+                          cursor: probingContext || !newModel.name.trim() ? 'not-allowed' : 'pointer',
+                          opacity: probingContext || !newModel.name.trim() ? 0.6 : 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {probingContext ? 'Probing…' : 'Probe endpoint'}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+                      Required. Filled in automatically when the server reports it. Otherwise use the serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-document check use this to decide what fits.
+                    </div>
+                    {contextMismatch && (
+                      <div role="status" aria-live="polite" style={{
+                        marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                        background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', fontSize: 12,
+                        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
+                      }}>
+                        <span>
+                          The server reports {contextMismatch.detected.toLocaleString()} tokens; you entered {newModel.context_window.toLocaleString()}. Use the server&rsquo;s?
+                        </span>
+                        <button type="button" onClick={() => {
+                          const detected = contextMismatch.detected
+                          setNewModel(prev => ({ ...prev, context_window: detected, context_window_source: 'detected' }))
+                          setContextMismatch(null)
+                        }} style={{ fontSize: 12, padding: '2px 10px', borderRadius: 999, border: '1px solid #b45309', background: '#fff', cursor: 'pointer', color: '#92400e' }}>
+                          Use {contextMismatch.detected.toLocaleString()}
+                        </button>
+                        <button type="button" onClick={() => setContextMismatch(null)} style={{ fontSize: 12, padding: '2px 10px', borderRadius: 999, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', color: '#374151' }}>
+                          Keep mine
+                        </button>
+                      </div>
+                    )}
+                    {probeResult && (
+                      <div role="status" aria-live="polite" style={{
+                        marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                        background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
+                        border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
+                        color: probeResult.ok ? '#065f46' : '#92400e',
+                        fontSize: 12,
+                      }}>
+                        {probeResult.message}
+                      </div>
+                    )}
+                  </div>
+
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <label style={checkboxLabel}>
                       <input type="checkbox" checked={newModel.multimodal} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, multimodal: v, supports_pdf: v ? prev.supports_pdf : false })) }} style={checkStyle} />
@@ -876,52 +1043,6 @@ export function ModelEditor({
                       )}
                     </div>
 
-                    <div>
-                      <label htmlFor="admin-model-context-window" style={labelStyle}>Context window (tokens)</label>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                        <input
-                          id="admin-model-context-window"
-                          type="number"
-                          min={1}
-                          value={newModel.context_window}
-                          onChange={e => {
-                            const v = parseInt(e.target.value, 10)
-                            setNewModel(prev => ({ ...prev, context_window: Number.isFinite(v) && v > 0 ? v : 0 }))
-                            setProbeResult(null)
-                          }}
-                          placeholder="e.g. 65536"
-                          style={{ ...inputStyle, flex: 1 }}
-                        />
-                        <button
-                          onClick={handleProbeContextWindow}
-                          disabled={probingContext || !newModel.name.trim()}
-                          title="Ask the endpoint what context window it actually serves. Catches the case where the model card says 131k but the deployment was launched with a smaller --max-model-len."
-                          style={{
-                            padding: '0 14px', borderRadius: 'var(--ui-radius, 12px)',
-                            border: '1px solid #d1d5db', background: '#fff', fontSize: 13,
-                            cursor: probingContext || !newModel.name.trim() ? 'not-allowed' : 'pointer',
-                            opacity: probingContext || !newModel.name.trim() ? 0.6 : 1,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {probingContext ? 'Probing…' : 'Probe endpoint'}
-                        </button>
-                      </div>
-                      <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
-                        The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
-                      </div>
-                      {probeResult && (
-                        <div role="status" aria-live="polite" style={{
-                          marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
-                          background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
-                          border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
-                          color: probeResult.ok ? '#065f46' : '#92400e',
-                          fontSize: 12,
-                        }}>
-                          {probeResult.message}
-                        </div>
-                      )}
-                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
                       <div>

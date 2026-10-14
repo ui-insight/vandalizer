@@ -61,6 +61,18 @@ async def get_version(settings: Settings = Depends(get_settings)):
     }
 
 
+def _model_context_window(model: dict) -> int:
+    """The window the context budget will use for this model.
+
+    A model saved without a window stores None; ``m.get(..., 128000)`` then
+    returned None and failed the response schema. This is the same number the
+    budget planner uses: the configured window, else its name-based guess.
+    """
+    from app.services.context_budget import resolve_context_window
+
+    return resolve_context_window(model.get("name", ""), model)
+
+
 @router.get("/models", response_model=list[ModelInfo])
 async def get_models(user: User = Depends(get_current_user)):
     models = await get_llm_models()
@@ -74,7 +86,7 @@ async def get_models(user: User = Depends(get_current_user)):
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )
@@ -98,7 +110,7 @@ async def get_user_config(user: User = Depends(get_current_user)):
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )
@@ -149,7 +161,7 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )

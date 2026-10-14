@@ -367,7 +367,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
+  available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number | null; context_window_source?: ContextWindowSource | null; context_window_status?: ContextWindowStatus; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
   default_model: string
   long_document_model?: string
   /** The model that grades every validation run; empty = the default model. */
@@ -470,6 +470,13 @@ export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_
 
 // Models
 
+/** Where a model's context window came from. */
+export type ContextWindowSource = 'detected' | 'entered'
+/** Whether a saved model's context window is known (computed by the server).
+ *  "unconfirmed" is a value with no recorded source, which is what the model
+ *  form's old 128,000 placeholder saved; "missing" means no value at all. */
+export type ContextWindowStatus = ContextWindowSource | 'unconfirmed' | 'missing'
+
 export type ModelFormData = {
   name: string
   tag: string
@@ -485,6 +492,7 @@ export type ModelFormData = {
   multimodal?: boolean
   supports_pdf?: boolean
   context_window?: number
+  context_window_source?: ContextWindowSource | ''
   request_timeout_seconds?: number | null
   response_reserve_tokens?: number | null
   temperature?: number | null
@@ -521,6 +529,20 @@ export function probeModel(data: {
   return apiFetch<ProbeModelResult>('/api/admin/config/probe-model', {
     method: 'POST',
     body: JSON.stringify(data),
+  })
+}
+
+/** Probe a saved model's endpoint and record the window it reports. A window
+ *  an admin entered is only replaced with force. */
+export function probeSavedModelContextWindow(modelId: string, force = false) {
+  return apiFetch<{
+    probe: ProbeModelResult
+    applied: boolean
+    entered_differs: boolean
+    models: SystemConfigData['available_models']
+  }>(`/api/admin/config/models/${encodeURIComponent(modelId)}/context-window/probe`, {
+    method: 'POST',
+    body: JSON.stringify({ force }),
   })
 }
 
