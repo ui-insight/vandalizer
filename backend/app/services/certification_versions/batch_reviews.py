@@ -26,6 +26,11 @@ class BatchRetryReference(ContractModel):
     result_sha256: Digest
 
 
+class FlaggedCell(ContractModel):
+    source_id: Literal['proposal_1', 'proposal_2', 'proposal_3']
+    field: Literal['PI Name', 'Institution', 'Total Budget', 'Research Area', 'Sponsoring Agency']
+
+
 class BatchReviewRequest(ContractModel):
     request_id: Identity
     run_id: Identity
@@ -33,6 +38,8 @@ class BatchReviewRequest(ContractModel):
     case_sha256: Digest
     retries: tuple[BatchRetryReference, ...] = Field(min_length=1, max_length=3)
     answers: dict[str, Answer] = Field(min_length=1, max_length=1)
+    # Cells of the agent-consolidated table the learner found unsupported by the sources.
+    flagged_cells: tuple[FlaggedCell, ...] = Field(max_length=15)
     previous_submission_id: Identity | None = None
     consent: Literal['save_batch_recovery_interpretation']
 
@@ -40,6 +47,8 @@ class BatchReviewRequest(ContractModel):
     def complete_answers(self):
         if len({r.run_id for r in self.retries}) != len(self.retries) or self.run_id in {r.run_id for r in self.retries}:
             raise ValueError('Each retry must be a distinct targeted run, not a repeat or the original batch')
+        if len({(c.source_id, c.field) for c in self.flagged_cells}) != len(self.flagged_cells):
+            raise ValueError('Flag each consolidated cell at most once')
         if (set(self.answers) != {'batch_review'} or any(not value.strip() for value in self.answers.values())
                 or self.previous_submission_id == self.request_id):
             raise ValueError('Explain the actual inventory and distinct targeted retries; revised answers require a new identity')

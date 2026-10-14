@@ -34,9 +34,22 @@ async def prepare(repo, f, actor=None, config=None):
             LAB_RUNTIME if config is None else config, actor_user_id=actor or f.learner.user_id)
 
 
+# What an honest learner records before each phase, as each scope question asks.
+SCOPE_REASONS = {
+    'pilot': 'I inspected both pilot sources, all five fields and this resolved model. The shared layout limits generalization.',
+    'batch': ('The pilot on proposals 1 and 3 returned Dr. Maria Lopez, University of Idaho, 320000, Environmental Science and NSF, '
+              'and Dr. Amara Okafor, University of Idaho, 410000, Chemistry and NSF; all ten values match their sources. It took the '
+              'elapsed time shown on its receipts with the one configured model. That quality justifies the same revision and model '
+              'for all three assigned proposals at this small scale; token cost is unmeasured, and one template and sponsor do not '
+              'establish reliability on other layouts.'),
+    'retry': ('Only proposal 2 failed, rejected by the disclosed training gate before dispatch. Retry that one item with the same '
+              'revision and model; proposals 1 and 3 keep their original successful receipts.'),
+}
+
+
 async def scope(repo, f, run, *, choice='approve', body=None):
     body = body or {'request_id': uuid4().hex, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
-        'case_sha256': f.case.digest, 'choice': choice, 'reason': 'I inspected both pilot sources, all five fields and this resolved model. The shared layout limits generalization.',
+        'case_sha256': f.case.digest, 'choice': choice, 'reason': SCOPE_REASONS[run['plan']['phase']],
         'consent': 'save_bounded_batch_scope_decision'}
     async with repo.write_boundary(f.learner.user_id, f.learner.uuid, operation='approve_batch_action') as progress:
         return await BatchScopeRepository().submit(CourseOperation(f.learner.user_id, f.package, progress, True), body,

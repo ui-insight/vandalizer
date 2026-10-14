@@ -106,6 +106,7 @@ async def test_complete_http_batch_journey_and_preserved_originals(versioned_run
             'run_id': original['run_id'], 'result_sha256': original['result_sha256'], 'case_sha256': f.case.digest,
             'retries': [{'run_id': retry['run_id'], 'result_sha256': retry['result_sha256']}],
             'answers': {'batch_review': 'All three original input IDs have terminal receipts. Proposal 2 was the disclosed training rejection before model dispatch, and only that item was retried. Proposals 1 and 3 remain unchanged. The recovered five values support the source and preserve the original failure. This shared-template pilot does not establish reliability on other layouts; elapsed time is measured but usage and cost remain unknown.'},
+            'flagged_cells': [{'source_id': 'proposal_3', 'field': 'Research Area'}],
             'consent': 'save_batch_recovery_interpretation'})
         assert reviewed['reconciliation']['targeted_recovery_supported']
         if technical_retry:

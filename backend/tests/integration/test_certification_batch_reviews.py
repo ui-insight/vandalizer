@@ -31,7 +31,8 @@ async def fixture(repo, *, wrong=False, incomplete=False, failed=False):
         f.retry = await execution.execute(repo, f)
     f.review_body = {'request_id': uuid4().hex, 'run_id': f.original['run_id'], 'result_sha256': encode(f.original['result'])[1],
         'case_sha256': f.case.digest, 'retries': [{'run_id': f.retry['run_id'], 'result_sha256': encode(f.retry['result'])[1]}],
-        'answers': {'batch_review': 'The original batch has three distinct terminal input receipts. Proposal 2 was rejected by the disclosed training gate before model dispatch; proposals 1 and 3 retain their original successful receipt hashes. Only proposal 2 was retried, and its five source-checked values reconcile the inventory. Terminal coverage alone did not mean usable success. The two-source pilot uses one template and sponsor, so elapsed time does not prove wider reliability, and unmeasured cost remains unknown.'},
+        'answers': {'batch_review': 'The original batch has three distinct terminal input receipts. Proposal 2 was rejected by the disclosed training gate before model dispatch; proposals 1 and 3 retain their original successful receipt hashes. Only proposal 2 was retried, and its five source-checked values reconcile the inventory. Terminal coverage alone did not mean usable success. The two-source pilot uses one template and sponsor, so elapsed time does not prove wider reliability, and unmeasured cost remains unknown. Before export I spot-checked the consolidated table: it gave proposal 3\'s Research Area as Biological Sciences, but the proposal says Chemistry; Biological Sciences is only its directorate line, so I flagged that cell.'},
+        'flagged_cells': [{'source_id': 'proposal_3', 'field': 'Research Area'}],
         'consent': 'save_batch_recovery_interpretation'}
     return f
 
@@ -124,6 +125,28 @@ async def test_wrong_or_failed_retry_vetoes_favorable_model_but_preserves_termin
     assert assessment['deterministic_outcomes'][0]['passed'] is True
     assert next(o for o in assessment['outcomes'] if o['outcome_id'] == 'batch_processing.targeted_recovery')['verdict'] == 'contradicted'
     assert all(o['verdict'] == 'supported' for o in assessment['model_outcomes'])
+
+
+@pytest.mark.parametrize('flagged, spotted', [
+    ([('proposal_3', 'Research Area')], True),
+    ([], False),
+    ([('proposal_3', 'Research Area'), ('proposal_1', 'Total Budget')], False),
+    ([('proposal_1', 'PI Name')], False)])
+async def test_accepting_the_wrong_consolidated_cell_fails_the_spot_check(repo, flagged, spotted):
+    f = await fixture(repo)
+    assert f.case.draft_errors() == [('proposal_3', 'Research Area')]
+    f.review_body['flagged_cells'] = [{'source_id': source_id, 'field': field} for source_id, field in flagged]
+    saved = await submit(repo, f)
+    prepared = await prepare(repo, f, saved['uuid'])
+    assessed = await enrollments.evaluate_review(repo, f.learner, f.package, prepared['attempt_id'], AsyncMock(side_effect=enrollments.supported_review))
+    assessment = assessed['result']['assessment']
+    choice = next(o for o in assessment['outcomes'] if o['outcome_id'] == 'batch_processing.resource_choice')
+    if spotted:
+        assert assessment['status'] == 'requirements_supported' and choice['verdict'] == 'supported'
+    else:
+        assert assessment['status'] == 'revision_required' and choice['verdict'] == 'contradicted'
+        assert 'source does not support' in choice['explanation']
+        assert all(o['verdict'] == 'supported' for o in assessment['model_outcomes'])
 
 
 async def test_unavailable_output_is_not_a_learner_failure(repo):

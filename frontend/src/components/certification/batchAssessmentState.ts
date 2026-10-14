@@ -28,6 +28,9 @@ export function validBatchRequest(v: BatchRequest | null, d: BatchCase): v is Ba
       case 'finalize': return id(v.body.run_id) && digest(v.body.plan_sha256) && digest(v.body.authorization_sha256) && digest(v.body.item_events_sha256) && v.body.consent === 'finalize_saved_batch_results_without_reexecution'
       case 'review': return id(v.body.run_id) && digest(v.body.result_sha256) && text(v.body.answers.batch_review, 1, 8000)
         && Object.keys(v.body.answers).length === 1 && v.body.retries.length >= 1 && v.body.retries.length <= 3
+        && Array.isArray(v.body.flagged_cells) && v.body.flagged_cells.length <= 15
+        && v.body.flagged_cells.every(cell => d.consolidated_draft.some(item => item.source_id === cell.source_id && item.field === cell.field))
+        && new Set(v.body.flagged_cells.map(cell => `${cell.source_id}:${cell.field}`)).size === v.body.flagged_cells.length
         && v.body.retries.every(r => id(r.run_id) && digest(r.result_sha256) && r.run_id !== v.body.run_id) && new Set(v.body.retries.map(r => r.run_id)).size === v.body.retries.length
         && (v.body.previous_submission_id === null || id(v.body.previous_submission_id) && v.body.previous_submission_id !== v.body.request_id) && v.body.consent === 'save_batch_recovery_interpretation'
     }

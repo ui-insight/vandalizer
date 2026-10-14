@@ -112,6 +112,19 @@ async def assemble_batch_review(operation, submission_id, *, actor_user_id):
         'explanation': 'The exact retry restores source-supported values while preserving original successful receipts; learner reasoning still requires review.' if passed else
             'The selected recovery leaves failed or source-incorrect results in the assigned inventory.',
         'revision_instruction': '' if passed else 'Inspect the original and linked item results, address unresolved failures or incorrect values, and preserve successful original receipts before claiming usable recovery.'}]
+    flagged = sorted((cell['source_id'], cell['field']) for cell in saved['submission']['flagged_cells'])
+    draft_check = 'batch-consolidated-draft-check:' + submission_id
+    spotted = flagged == sorted(case.draft_errors())
+    add('learner_decision', draft_check, {**binding, 'actor_user_id': actor_user_id,
+        'consolidated_draft': [cell.model_dump(mode='json') for cell in case.consolidated_draft],
+        'flagged_cells': [{'source_id': source_id, 'field': field} for source_id, field in flagged],
+        'draft_spot_check_matches_sources': spotted,
+        'notice': 'The agent-consolidated table is an authored draft to check before export, not engine output.'})
+    supporting.append({'outcome_id': 'batch_processing.resource_choice', 'check_id': 'consolidated-draft-spot-check.1',
+        'passed': spotted, 'evidence_id': draft_check, 'quote': encode({'draft_spot_check_matches_sources': spotted})[0][1:-1],
+        'explanation': 'The flagged cells are exactly those the sources do not support; learner reasoning still requires review.' if spotted else
+            'The consolidated table was accepted with a value its source does not support, or a supported value was flagged.',
+        'revision_instruction': '' if spotted else 'Spot-check every consolidated value against its proposal and flag exactly the cells the source does not support before export.'})
     try:
         outcomes, checked, digest = review_packet(contract, case.module_id, evidence)
     except (ValueError, TypeError) as exc:

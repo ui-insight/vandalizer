@@ -8,6 +8,7 @@ import shutil
 
 import fitz
 import pytest
+from pydantic import ValidationError
 
 from app.services.certification_versions.batch_case import BatchCase, load_batch_case
 from app.services.certification_versions.catalog import CATALOG_ROOT, CourseCatalog, CourseCatalogError
@@ -27,6 +28,22 @@ def test_proposed_batch_adds_one_wrong_file_that_learners_are_not_told_about(des
     assert case.proposed_scope(assigned) == ['a' * 32, 'course_asset:nsf-proposal-alpine-ecology.pdf', 'b' * 32, 'c' * 32]
     assert 'scope_proposal' not in case.public_definition()
     assert case.scope_proposal.wrong_filename not in [source.filename for source in case.sources]
+
+
+def test_consolidated_draft_is_wrong_in_one_cell_that_a_misread_header_explains(design):
+    case = BatchCase.model_validate(design)
+    assert case.draft_errors() == [('proposal_3', 'Research Area')]
+    assert next(c.value for c in case.consolidated_draft if (c.source_id, c.field) == ('proposal_3', 'Research Area')) == 'Biological Sciences'
+    assert case.public_definition()['consolidated_draft'] == [c.model_dump(mode='json') for c in case.consolidated_draft]
+    for change in ('none_wrong', 'two_wrong'):
+        broken = json.loads(json.dumps(design))
+        cell = next(c for c in broken['consolidated_draft'] if (c['source_id'], c['field']) == ('proposal_3', 'Research Area'))
+        if change == 'none_wrong':
+            cell['value'] = 'Chemistry'
+        else:
+            broken['consolidated_draft'][0]['value'] = 'Dr. Someone Else'
+        with pytest.raises(ValidationError, match='exactly one cell'):
+            BatchCase.model_validate(broken)
 
 
 def test_complete_three_source_case_preserves_private_answers_and_separate_approval_phases(design):
@@ -101,6 +118,8 @@ def test_original_sources_exercise_and_deterministic_coverage_cannot_be_substitu
         design['expectations'][0]['anchors'][0]['quote'] = 'An invented original source passage'
     elif change == 'wrong_value':
         design['expectations'][2]['expected_value'] = '999999'
+        # Keep the consolidated draft wrong in exactly one cell so the source check is what rejects it.
+        design['consolidated_draft'][2]['value'] = '999999'
     elif change == 'exercise_digest':
         exercise['batch_case_sha256'] = '0' * 64
     elif change == 'count_award':

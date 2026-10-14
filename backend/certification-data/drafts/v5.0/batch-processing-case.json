@@ -13,7 +13,7 @@
     "After a complete source-supported pilot, record your quality/resource tradeoff and approve the exact same revision and model for all three assigned proposals. Use actual elapsed time and available measurements; leave token usage, price and wider generalizations unknown when not measured.",
     "Run the complete approved batch. The second item is deliberately rejected before model dispatch on this first full-batch attempt. Inspect each actual terminal receipt and its assigned document ID, including failures. Terminal inventory coverage is distinct from usable successful coverage.",
     "Inspect the saved confirmed failure and verify its source, original batch and unchanged extraction settings. The training gate permits one explicitly approved attempt of that failed item. Preserve every successful original item; never launch the entire batch again as a recovery shortcut. Unknown or in-flight outcomes require reading the original receipt first.",
-    "After the targeted retry, reconcile the three assigned input IDs with their original or linked retry receipts and inspect all fifteen source-supported values. Retain the original failure. Explain actual recovery, remaining exceptions and the pilot limitations without claiming a larger production rollout or external delivery."
+    "After the targeted retry, reconcile the three assigned input IDs with their original or linked retry receipts and inspect all fifteen source-supported values. Retain the original failure. Explain actual recovery, remaining exceptions and the pilot limitations without claiming a larger production rollout or external delivery. Before export, spot-check the agent-consolidated table against the sources and flag every value they do not support."
   ],
   "exclusions": [
     "Use only the three assigned synthetic proposals; no real institutional or sponsor data is required.",
@@ -96,7 +96,7 @@
     {
       "id": "batch_review",
       "phase": "after_recovery",
-      "prompt": "Reconcile every assigned document with its original or linked retry result. Explain the original failure, preserved successful items, actual source quality, remaining exceptions and pilot limitations. Distinguish terminal coverage from successful usable results."
+      "prompt": "Reconcile every assigned document with its original or linked retry result. Explain the original failure, preserved successful items, actual source quality, remaining exceptions and pilot limitations. Distinguish terminal coverage from successful usable results. Before export, spot-check the agent-consolidated table against the sources, flag every cell the source does not support and say what the source shows instead."
     }
   ],
   "expectations": [
@@ -304,6 +304,83 @@
     "reason": "The NSF Alpine Ecology proposal belongs to the Foundations assignment. It is a complete proposal with every requested field, so it would extract cleanly and nothing in the output would flag it; only checking each file against the assigned set catches it.",
     "scope_rule": "proposed_batch_adds_one_unassigned_proposal_learner_removes_it_before_capture"
   },
+  "consolidated_draft": [
+    {
+      "source_id": "proposal_1",
+      "field": "PI Name",
+      "value": "Dr. Maria Lopez"
+    },
+    {
+      "source_id": "proposal_1",
+      "field": "Institution",
+      "value": "University of Idaho"
+    },
+    {
+      "source_id": "proposal_1",
+      "field": "Total Budget",
+      "value": "320000"
+    },
+    {
+      "source_id": "proposal_1",
+      "field": "Research Area",
+      "value": "Environmental Science"
+    },
+    {
+      "source_id": "proposal_1",
+      "field": "Sponsoring Agency",
+      "value": "National Science Foundation"
+    },
+    {
+      "source_id": "proposal_2",
+      "field": "PI Name",
+      "value": "Dr. Robert Kim"
+    },
+    {
+      "source_id": "proposal_2",
+      "field": "Institution",
+      "value": "University of Idaho"
+    },
+    {
+      "source_id": "proposal_2",
+      "field": "Total Budget",
+      "value": "275000"
+    },
+    {
+      "source_id": "proposal_2",
+      "field": "Research Area",
+      "value": "Computer Science"
+    },
+    {
+      "source_id": "proposal_2",
+      "field": "Sponsoring Agency",
+      "value": "National Science Foundation"
+    },
+    {
+      "source_id": "proposal_3",
+      "field": "PI Name",
+      "value": "Dr. Amara Okafor"
+    },
+    {
+      "source_id": "proposal_3",
+      "field": "Institution",
+      "value": "University of Idaho"
+    },
+    {
+      "source_id": "proposal_3",
+      "field": "Total Budget",
+      "value": "410000"
+    },
+    {
+      "source_id": "proposal_3",
+      "field": "Research Area",
+      "value": "Biological Sciences"
+    },
+    {
+      "source_id": "proposal_3",
+      "field": "Sponsoring Agency",
+      "value": "National Science Foundation"
+    }
+  ],
   "coverage_rule": "same_batch_identity_distinct_assigned_document_ids_and_terminal_per_item_receipts_not_counts",
   "scaling_rule": "source_checked_complete_pilot_same_captured_revision_models_and_sources_explicit_learner_scope",
   "recovery_rule": "exact_confirmed_failed_item_original_batch_and_revision_preserve_completed_receipts_no_implicit_retry",

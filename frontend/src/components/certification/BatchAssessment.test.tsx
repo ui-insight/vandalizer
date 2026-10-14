@@ -1,9 +1,10 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../../api/batchAssessment'
 import { ApiError } from '../../api/client'
 import type { BatchCapture, BatchCase, BatchList, BatchRequest, BatchRun, BatchItemResult } from '../../types/batchAssessment'
 import { BatchAssessment } from './BatchAssessment'
+import { BatchInterpretationForm } from './BatchForms'
 import { useBatchRequest } from './useBatchRequest'
 import { validBatchRequest, verifyBatchResponse, verifyBatchRun } from './batchAssessmentState'
 vi.mock('../../api/batchAssessment', () => ({ getBatchWork: vi.fn(), getBatchCapture: vi.fn(), getBatchAssessment: vi.fn(), getBatchRun: vi.fn(), getBatchScope: vi.fn(), getBatchReview: vi.fn(), saveBatchWork: vi.fn(), getBatchSource: vi.fn() }))
@@ -12,6 +13,7 @@ const definition: BatchCase = { id: 'case', revision: 1, module_id: 'batch_proce
   provenance: 'authored_batch_assignment_not_pilot_coverage_or_recovery_evidence', notice: 'Draft feedback only', task: 'Check a bounded pilot and recover an exact failed batch item.',
   instructions: ['Inspect all sources.'], exclusions: ['No staff review.'], pilot_limitations: 'One shared template cannot establish wider reliability.',
   pilot_source_ids: ['proposal_1', 'proposal_3'], controlled_failure_source_id: 'proposal_2',
+  consolidated_draft: [1, 2, 3].flatMap(i => ['PI Name', 'Institution', 'Total Budget', 'Research Area', 'Sponsoring Agency'].map(field => ({ source_id: `proposal_${i}` as 'proposal_1' | 'proposal_2' | 'proposal_3', field, value: i === 3 && field === 'Research Area' ? 'Biological Sciences' : `${field} ${i}` }))),
   fields: ['PI Name', 'Institution', 'Total Budget', 'Research Area', 'Sponsoring Agency'].map(title => ({ title, meaning: title, comparison: 'exact_text' })),
   sources: [1, 2, 3].map(i => ({ id: `proposal_${i}` as 'proposal_1' | 'proposal_2' | 'proposal_3', filename: `proposal-${i}.pdf`, sha256: String(i).repeat(64), coverage: 'Assigned source' })),
   questions: [{ id: 'pilot_choice', phase: 'before_pilot', prompt: 'Explain pilot scope.' }, { id: 'scale_choice', phase: 'before_batch', prompt: 'Explain source quality and resource tradeoffs.' },
@@ -160,4 +162,20 @@ it('preselects the proposed batch and sends only the files the learner kept', as
   await waitFor(() => expect(api.saveBatchWork).toHaveBeenCalledOnce())
   const sent = vi.mocked(api.saveBatchWork).mock.calls[0][1] as Extract<BatchRequest, { action: 'capture' }>
   expect(sent.body.selected_source_ids).toEqual(assignedIds)
+})
+it('sends the consolidated cells the learner flags with the interpretation', async () => {
+  const original = completed('batch', completed('pilot')), retry = completed('retry', original)
+  vi.mocked(api.getBatchRun).mockResolvedValue(structuredClone(retry))
+  const send = vi.fn()
+  render(<BatchInterpretationForm listing={listing} original={original} initialRetries={[retry]} initialAnswer="Proposal 2 was retried; the consolidated research area for proposal 3 is wrong." locked={false} send={send} />)
+  const table = await screen.findByRole('group', { name: 'Agent-consolidated table to check before export' })
+  expect(within(table).getAllByRole('checkbox')).toHaveLength(15)
+  fireEvent.click(within(table).getByRole('checkbox', { name: /Research Area: Biological Sciences/ }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save batch interpretation' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Save batch interpretation' }))
+  expect(send).toHaveBeenCalledOnce()
+  const sent = send.mock.calls[0][0] as Extract<BatchRequest, { action: 'review' }>
+  expect(sent.body.flagged_cells).toEqual([{ source_id: 'proposal_3', field: 'Research Area' }])
+  expect(validBatchRequest(sent, definition)).toBe(true)
+  expect(validBatchRequest({ ...sent, body: { ...sent.body, flagged_cells: [{ source_id: 'proposal_3', field: 'Invented field' }] } }, definition)).toBe(false)
 })

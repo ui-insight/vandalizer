@@ -48,6 +48,12 @@ class BatchQuestion(ContractModel):
     prompt: str = Field(min_length=60, max_length=3000)
 
 
+class DraftCell(ContractModel):
+    source_id: SourceId
+    field: FieldName
+    value: str = Field(min_length=1, max_length=200)
+
+
 class BatchScopeProposal(ContractModel):
     """An agent-proposed batch that adds one unassigned proposal; the learner removes it."""
     wrong_filename: Literal['nsf-proposal-alpine-ecology.pdf']
@@ -76,6 +82,8 @@ class BatchCase(ContractModel):
     expectations: tuple[BatchExpectation, ...] = Field(min_length=15, max_length=15)
     review_guidance: tuple[ProcessReviewGuidance, ...] = Field(min_length=3, max_length=3)
     scope_proposal: BatchScopeProposal
+    # An agent-consolidated table of all fifteen values; exactly one cell is wrong.
+    consolidated_draft: tuple[DraftCell, ...] = Field(min_length=15, max_length=15)
     coverage_rule: Literal['same_batch_identity_distinct_assigned_document_ids_and_terminal_per_item_receipts_not_counts']
     scaling_rule: Literal['source_checked_complete_pilot_same_captured_revision_models_and_sources_explicit_learner_scope']
     recovery_rule: Literal['exact_confirmed_failed_item_original_batch_and_revision_preserve_completed_receipts_no_implicit_retry']
@@ -99,7 +107,15 @@ class BatchCase(ContractModel):
             raise ValueError('Pilot, scaling and recovery decisions must occur before their distinct actions')
         if {g.outcome_id for g in self.review_guidance} != set(EVIDENCE):
             raise ValueError('Every required batch outcome needs its original review guidance')
+        if [(c.source_id, c.field) for c in self.consolidated_draft] != [(s, f) for s in SOURCES for f in FIELDS]:
+            raise ValueError('The consolidated draft needs one cell per proposal and field, in order')
+        if len(self.draft_errors()) != 1:
+            raise ValueError('The consolidated draft must disagree with its sources in exactly one cell')
         return self
+
+    def draft_errors(self):
+        expected = {(e.source_id, e.field): e.expected_value for e in self.expectations}
+        return [(c.source_id, c.field) for c in self.consolidated_draft if c.value != expected[(c.source_id, c.field)]]
 
     @property
     def digest(self):

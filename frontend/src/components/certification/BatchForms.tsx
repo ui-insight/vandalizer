@@ -29,7 +29,9 @@ export function BatchInterpretationForm({ listing, original, initialRetries, ini
   const { answer, reference } = draft
   const setAnswer = (answer: string) => setDraft(value => ({ ...value, answer }))
   const setReference = (reference: string) => setDraft(value => ({ ...value, reference }))
-  const [reading, setReading] = useState(false), [error, setError] = useState('')
+  const [reading, setReading] = useState(false), [error, setError] = useState(''), [flagged, setFlagged] = useState<string[]>([])
+  const cellKey = (cell: { source_id: string; field: string }) => `${cell.source_id}:${cell.field}`
+  const toggle = (key: string, on: boolean) => setFlagged(current => on ? [...current, key] : current.filter(item => item !== key))
   async function include() {
     if (reading || restoring || restoreError || locked || !id(reference)) return
     setReading(true); setError('')
@@ -51,7 +53,16 @@ export function BatchInterpretationForm({ listing, original, initialRetries, ini
     <form className="space-y-2" onSubmit={e => { e.preventDefault(); void include() }}><label className="block text-sm">Additional saved retry reference<input className={control} disabled={locked || reading || restoring || !!restoreError} value={reference} onChange={e => setReference(e.target.value.trim())} pattern="[a-f0-9]{32}" required /></label><button className={button} disabled={locked || reading || restoring || !!restoreError || !id(reference)}>Read and include saved retry</button></form>
     {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
     <form aria-label="Save batch recovery interpretation" className="space-y-3" onSubmit={e => { e.preventDefault(); if (locked || reading || restoring || restoreError || !retries.length) return; send({ action: 'review', body: { request_id: newBatchId(), run_id: original.run_id, result_sha256: original.result_sha256!, case_sha256: listing.case.case_sha256,
-      retries: retries.map(r => ({ run_id: r.run_id, result_sha256: r.result_sha256! })), answers: { batch_review: answer }, previous_submission_id: previous, consent: 'save_batch_recovery_interpretation' } }) }}>
+      retries: retries.map(r => ({ run_id: r.run_id, result_sha256: r.result_sha256! })), answers: { batch_review: answer },
+      flagged_cells: listing.case.consolidated_draft.filter(cell => flagged.includes(cellKey(cell))).map(cell => ({ source_id: cell.source_id, field: cell.field })),
+      previous_submission_id: previous, consent: 'save_batch_recovery_interpretation' } }) }}>
+      <fieldset className="min-w-0 space-y-3"><legend className="text-sm font-semibold">Agent-consolidated table to check before export</legend>
+        <p className="text-sm">An agent combined all fifteen values into one table. Check each value against its proposal and flag every value the source does not support.</p>
+        {listing.case.sources.map(source => <div key={source.id} className="min-w-0"><p className="text-sm font-semibold">{source.id.replace('_', ' ')}</p>
+          <ul className="space-y-1">{listing.case.consolidated_draft.filter(cell => cell.source_id === source.id).map(cell => <li key={cellKey(cell)}><label className="flex min-w-0 items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={flagged.includes(cellKey(cell))} disabled={locked || reading || restoring || !!restoreError} onChange={e => toggle(cellKey(cell), e.target.checked)} />
+            <span className="min-w-0 break-words">{cell.field}: {cell.value} <span className="text-gray-700">(flag as unsupported)</span></span></label></li>)}</ul></div>)}
+      </fieldset>
       <label className="block text-sm">{listing.case.questions.find(q => q.id === 'batch_review')?.prompt}<textarea className={control} rows={7} required maxLength={8000} disabled={locked || reading || restoring || !!restoreError} value={answer} onChange={e => setAnswer(e.target.value)} /></label><CourseDraftNotice status={status} /><button className={button} disabled={locked || reading || restoring || !!restoreError || !retries.length}>Save batch interpretation</button>
     </form>
   </section>

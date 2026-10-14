@@ -7,6 +7,7 @@ export interface BatchCase {
   fields: { title: string; meaning: string; comparison: string }[]
   sources: { id: BatchSourceId; filename: string; sha256: string; coverage: string }[]
   pilot_source_ids: BatchSourceId[]; controlled_failure_source_id: 'proposal_2'
+  consolidated_draft: { source_id: BatchSourceId; field: string; value: string }[]
   questions: { id: 'pilot_choice' | 'scale_choice' | 'recovery_choice' | 'batch_review'; phase: string; prompt: string }[]
 }
 export interface BatchIdentity { enrollment_id: string; module_id: 'batch_processing'; course_version: string; manifest_sha256: string }
@@ -66,7 +67,7 @@ export type BatchScopeBody = { request_id: string; run_id: string; plan_sha256: 
 export type BatchExecuteBody = { run_id: string; plan_sha256: string; scope_decision_id: string; scope_decision_sha256: string; consent: 'execute_approved_bounded_batch_action' }
 export type BatchFinalizeBody = { run_id: string; plan_sha256: string; authorization_sha256: string; item_events_sha256: string; consent: 'finalize_saved_batch_results_without_reexecution' }
 export type BatchReviewBody = { request_id: string; run_id: string; result_sha256: string; case_sha256: string; retries: { run_id: string; result_sha256: string }[]
-  answers: { batch_review: string }; previous_submission_id: string | null; consent: 'save_batch_recovery_interpretation' }
+  answers: { batch_review: string }; flagged_cells: { source_id: BatchSourceId; field: string }[]; previous_submission_id: string | null; consent: 'save_batch_recovery_interpretation' }
 export type BatchRequest = { action: 'capture'; body: BatchCaptureBody } | { action: 'prepare'; body: BatchPlanBody } | { action: 'scope'; body: BatchScopeBody }
   | { action: 'execute'; body: BatchExecuteBody } | { action: 'finalize'; body: BatchFinalizeBody } | { action: 'review'; body: BatchReviewBody }
 export type BatchSaved = BatchCapture | BatchRun | BatchReview
