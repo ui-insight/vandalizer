@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "56803987f1eb490b8c3ef11e820f9c08c34b757e",
+  "working_head_at_inventory": "90208dacacfaf30f58ea75a23b99a19b4d3b1b3a",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 91263,
-    "sha256": "bdae518ad80f036a543637996f2485fcd5dd1521f8718e2ccf6b0dd96def4d8d"
+    "bytes": 92578,
+    "sha256": "e15291b75153090160623e14e5aac8d5834803bb5a78c6a9801a0b7176c355ae"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 881413,
-    "sha256": "e4b9038196af026b66b76a543929a3f91017e54afdc07970aa8138dfa2f399a9"
+    "bytes": 884264,
+    "sha256": "e4e4d7fa62043bb9a759568a59249f2faabda87e42a5f2d6b51893e5218d09df"
   },
   "counts": {
-    "accepted": 128,
-    "open": 27,
+    "accepted": 130,
+    "open": 25,
     "items": 155,
-    "checkpoints": 357,
+    "checkpoints": 358,
     "browser_runs": 645,
     "recorded_captures_including_diagnostics_and_repeats": 7466,
     "baseline_selected_captures": 151,
@@ -251,8 +251,8 @@
     },
     {
       "id": "C8-DEF-04",
-      "accepted": false,
-      "requirement": "P1 · Improve: Establish the authoritative course manifest.** Derive module order, stable IDs, lesson counts, objectives, XP, prerequisites, required checks and learner-facing criteria from one published definition. Remove independently maintained constants where they can drift."
+      "accepted": true,
+      "requirement": "P1 · Improve: Establish the authoritative course manifest.** Derive module order, stable IDs, lesson counts, objectives, XP, prerequisites, required checks and learner-facing criteria from one published definition. Remove independently maintained constants where they can drift. Accepted at checkpoint 358: versioned enrollments read module order, IDs, lessons, objectives, XP, prerequisites and criteria from their pinned package. The unversioned course now has one definition (4f0981f8): certification_service takes order, XP, levels and reflection keys from the preserved legacy rubric and titles from the served panel data, and the drip emails take their titles from it. This fixed two drifted titles. Guard tests pin the service, the drip and the frontend MODULES fallback to those sources, and a planted change fails. Remaining hardcoded module counts now derive from the course (90208dac)."
     },
     {
       "id": "C8-DEF-05",
@@ -726,8 +726,8 @@
     },
     {
       "id": "C8-M09-04",
-      "accepted": false,
-      "requirement": "P2 · Improve: Assess source sampling and consolidated output.** Require spot-checking representative values and identifying an intentionally wrong result before export. Provide sufficient safe sample documents for every published higher-star target."
+      "accepted": true,
+      "requirement": "P2 · Improve: Assess source sampling and consolidated output.** Require spot-checking representative values and identifying an intentionally wrong result before export. Provide sufficient safe sample documents for every published higher-star target. Accepted at checkpoint 358: before export the learner spot-checks an agent-consolidated table of all fifteen batch values and flags the cells the sources do not support (8d858654). One authored cell is intentionally wrong: proposal 3's Research Area is drafted from its directorate line, Biological Sciences, instead of Chemistry. A deterministic check vetoes resource_choice unless the flags are exactly that cell, even when the model is favourable; four integration cases cover this and batch integration (132) passes. The safe synthetic samples are the three assigned proposals, and v5 publishes no higher-star targets. A live batch rerun was blocked by a provider outage and is still pending."
     },
     {
       "id": "C8-M10-01",
@@ -3527,6 +3527,11 @@
     {
       "number": 357,
       "title": "Auditable regrades, design continuity and output teaching on October 14 2026",
+      "evidence_directories": []
+    },
+    {
+      "number": 358,
+      "title": "One course definition, batch spot-check and a surface inventory on October 14 2026",
       "evidence_directories": []
     }
   ],
@@ -323601,8 +323606,8 @@
         "report": {
           "path": "artifacts/visual-review/certification-live-calibration-2026-10-12/live-practical.json",
           "available": true,
-          "bytes": 63115,
-          "sha256": "5e8affba39f63ea29d150b009b7b875c4ad90902d7aa5f69374fffb8c560c981"
+          "bytes": 62547,
+          "sha256": "748828b51ecec792dc8baf28ea726944120100f2acc47f1e0c3a2e16381e4799"
         },
         "model_name": "moonshotai/kimi-k3",
         "labs": {
