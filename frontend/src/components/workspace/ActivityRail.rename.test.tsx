@@ -15,6 +15,7 @@ const chat = (overrides: Partial<ActivityEvent> = {}): ActivityEvent => ({
   meta_summary: { description_generated: true }, ...overrides,
 })
 let activities: ActivityEvent[] = []
+let certification: Record<string, unknown> = { progress: null, course: null }
 
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }))
 vi.mock('../../hooks/useActivities', () => ({
@@ -38,7 +39,7 @@ vi.mock('../../hooks/useOpenActivity', () => ({
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast }) }))
 vi.mock('../shared/useConfirm', () => ({ useConfirm: () => vi.fn() }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
-  useCertificationPanel: () => ({ openInChat: vi.fn(), progress: null }),
+  useCertificationPanel: () => ({ openInChat: vi.fn(), ...certification }),
 }))
 
 import { ActivityRail } from './ActivityRail'
@@ -46,6 +47,7 @@ import { ActivityRail } from './ActivityRail'
 beforeEach(() => {
   vi.clearAllMocks()
   activities = [chat()]
+  certification = { progress: null, course: null }
 })
 
 function startRename() {
@@ -99,5 +101,20 @@ describe('renaming a chat in the activity list (ticket)', () => {
     activities = [chat({ id: 'run-1', type: 'workflow_run', title: 'Workflow: NOA', conversation_id: null })]
     render(<ActivityRail />)
     expect(screen.queryByRole('button', { name: /^Rename chat:/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('certified label', () => {
+  const certified = { certified: true, level: 'architect', total_xp: 1850, modules: {} }
+  it('names an outcome-based course by its own title', () => {
+    certification = { progress: certified, course: { course_title: 'Vandalizer 5.0 certification', credential_scope: { promise: 'Supervise a bounded task.' } } }
+    render(<ActivityRail />)
+    expect(screen.getByRole('button', { name: 'Open certification in chat' })).toHaveAttribute('title', 'Vandalizer 5.0 certification')
+    expect(screen.queryByText('Vandal Workflow Architect')).not.toBeInTheDocument()
+  })
+  it('keeps the legacy title for the legacy course', () => {
+    certification = { progress: certified, course: { course_title: 'Vandal Workflow Architect — current course', credential_scope: null } }
+    render(<ActivityRail />)
+    expect(screen.getByRole('button', { name: 'Open certification in chat' })).toHaveAttribute('title', 'Vandal Workflow Architect')
   })
 })

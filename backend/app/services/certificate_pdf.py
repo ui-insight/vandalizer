@@ -108,7 +108,11 @@ def render_certificate_pdf(
     buf = BytesIO()
     width, height = landscape(letter)
     c = Canvas(buf, pagesize=(width, height))
-    c.setTitle(f"Vandal Workflow Architect certificate - {name}")
+    # Outcome-based credentials (they carry a credential promise) are titled by
+    # their own course; the legacy course keeps the title it awarded.
+    outcome_based = bool(credential_promise and course_title)
+    headline = course_title if outcome_based else "Vandal Workflow Architect"
+    c.setTitle(f"{headline} certificate - {name}")
     c.setAuthor("Vandalizer")
     _dejavu_charmap()  # Embed Latin fonts; do not rely on a viewer's font substitution.
 
@@ -157,22 +161,30 @@ def render_certificate_pdf(
 
     c.setFillColor(muted)
     c.setFont("DejaVuSans", 14)
-    c.drawCentredString(cx, height - 4.1 * inch, "has a preserved certification record for" if legacy_unknown else f"has completed all {module_count} modules and earned the title")
+    c.drawCentredString(cx, height - 4.1 * inch, "has a preserved certification record for" if legacy_unknown
+                        else "has demonstrated the assessed outcomes of" if outcome_based
+                        else f"has completed all {module_count} modules and earned the title")
 
     c.setFillColor(gold)
-    c.setFont("DejaVuSans-Bold", 24)
-    c.drawCentredString(cx, height - 4.7 * inch, "Vandal Workflow Architect")
+    headline_font = _font_for(headline, bold=True)
+    headline_size = 24
+    while headline_size > 12 and c.stringWidth(headline, headline_font, headline_size) > width - 2 * inch:
+        headline_size -= 1
+    if c.stringWidth(headline, headline_font, headline_size) > width - 2 * inch:
+        raise ValueError('Course title exceeds the certificate title area')
+    c.setFont(headline_font, headline_size)
+    c.drawCentredString(cx, height - 4.7 * inch, headline)
 
     c.setFillColor(muted)
     c.setFont("DejaVuSans", 12)
-    if course_title:
-        caption = course_title + (f' | {course_version}' if course_version else '')
+    caption = (course_version or '') if outcome_based else course_title + (f' | {course_version}' if course_version else '') if course_title else ''
+    if caption:
         label = Paragraph(escape(caption), ParagraphStyle('course', fontName=_font_for(caption), fontSize=11, leading=14, alignment=1, textColor=muted))
         _label_width, label_height = label.wrap(width - 2 * inch, 42)
         if label_height > 42:
             raise ValueError('Course title exceeds the certificate course area')
         label.drawOn(c, inch, height - 5.2 * inch - label_height + 14)
-    else:
+    elif not outcome_based:
         c.drawCentredString(
             cx, height - 5.15 * inch,
             "for completing the course's document workflow requirements",

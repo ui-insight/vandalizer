@@ -127,3 +127,23 @@ def test_unknown_legacy_date_and_version_are_not_invented():
     assert 'historical version unknown' in text
     assert 'has a preserved certification record' in text
     assert 'all 0 modules' not in text
+
+
+def test_outcome_credential_is_titled_by_its_course_and_legacy_keeps_its_title():
+    promise = 'A graduate can supervise a bounded research-administration document task.'
+    v5 = _text(render_certificate_pdf(name='Ada Example', level='architect', certified_at=datetime.datetime(2026, 10, 14),
+        credential_id='ABC12345', course_title='Vandalizer 5.0 certification', course_version='v5.0.1',
+        module_count=11, credential_promise=promise))
+    assert 'has demonstrated the assessed outcomes of' in v5 and 'Vandalizer 5.0 certification' in v5
+    assert 'Vandal Workflow Architect' not in v5 and 'modules and earned the title' not in v5
+    assert 'v5.0.1' in v5 and 'supervise a bounded' in v5
+    legacy = _text(render_certificate_pdf(name='Ada Example', level='architect', certified_at=datetime.datetime(2026, 10, 14),
+        credential_id='ABC12345', course_title='Vandal Workflow Architect — current course', course_version='legacy-2026-10-02.1',
+        module_count=11))
+    assert 'has completed all 11 modules and earned the title' in legacy and 'Vandal Workflow Architect' in legacy
+
+
+def test_an_overlong_course_title_is_refused_rather_than_clipped():
+    with pytest.raises(ValueError, match='certificate title area'):
+        render_certificate_pdf(name='Ada', level='novice', certified_at=None, credential_id='X',
+            course_title='A very long course title ' * 12, credential_promise='Supervise a bounded task.')

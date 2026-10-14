@@ -91,9 +91,11 @@ async function capture(id) {
 }
 try {
   if (touch) await page.setViewportSize({ width: widths[0], height: 844 })
-  await page.goto(review.baseURL + '/certification')
+  // Plain /certification now hands off to chat; the pop-out route still shows the panel full screen.
+  await page.goto(review.baseURL + '/certification?panel=fullscreen')
   if (touch) assert.deepEqual(await page.evaluate(() => ({ touch: navigator.maxTouchPoints > 0, hover: matchMedia('(hover: hover)').matches, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches })), { touch: true, hover: false, reducedMotion: true })
-  await page.getByRole('combobox', { name: 'Learning panel position', exact: true }).selectOption('fullscreen')
+  const position = page.getByRole('combobox', { name: 'Learning panel position', exact: true })
+  if (await position.count()) await position.selectOption('fullscreen')
   await activate(page.getByRole('button', { name: new RegExp(`^${module.number} ${module.title}`) }))
   for (const width of widths) {
     await page.setViewportSize({ width, height: nativeZoom ? 1000 : width < 500 ? 844 : 1000 })

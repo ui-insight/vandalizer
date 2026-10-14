@@ -107,7 +107,9 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { openInChat, progress } = useCertificationPanel()
+  const { openInChat, progress, course } = useCertificationPanel()
+  // An outcome-based course awards its own credential; the legacy course keeps its title.
+  const certTitle = course?.credential_scope && course.course_title ? course.course_title : 'Vandal Workflow Architect'
   const confirm = useConfirm()
   const deletePending = useRef(false)
   const [deleting, setDeleting] = useState(false)
@@ -417,7 +419,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           type="button"
           aria-label="Open certification in chat"
           onClick={() => { onNavigate?.(); openInChat() }}
-          title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
+          title={certCertified ? certTitle : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
           style={{
             borderRadius: 'var(--ui-radius, 12px)',
@@ -434,7 +436,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           {!visualDocked && (
             certCertified ? (
               <span className="text-xs font-semibold text-yellow-400 title-shimmer">
-                Vandal Workflow Architect
+                {certTitle}
               </span>
             ) : certStarted ? (
               <>
