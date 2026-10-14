@@ -10,7 +10,7 @@ from .lab_execution import implementation_digest as extraction_implementation_di
 
 INPUT_KEYS = {'input_sources', 'input_source', 'selected_document_uuid'}
 TASK_INPUT_KEYS = INPUT_KEYS | {'override_step_input'}
-SOURCES = {'step_input', 'workflow_documents', 'select_document'}
+from .stage_inputs import STAGE_SOURCES as SOURCES, reads_previous_stage
 TASK_KEYS = {
     'Extraction': TASK_INPUT_KEYS | {'model', 'extractions', 'search_set_uuid'},
     'Prompt': TASK_INPUT_KEYS | {'model', 'prompt'},
@@ -106,6 +106,8 @@ def connected_workflow_plan(snapshot, case, system_config, *, default_model):
                 raise EnrollmentConflict('A selected document is outside the captured assigned source')
             if 'select_document' in sources and selected != source['document_id']:
                 raise EnrollmentConflict('Select the captured assigned source explicitly before using selected-document input')
+            if 'earlier_steps' in sources and task['name'] == 'Extraction':
+                raise EnrollmentConflict('An extraction stage reads documents, not earlier step results')
             if data.get('model') is not None and not isinstance(data['model'], str):
                 raise EnrollmentConflict('The saved task model is not a supported model identity')
             model = data.get('model') or base_model
@@ -118,7 +120,7 @@ def connected_workflow_plan(snapshot, case, system_config, *, default_model):
             stage = {'step_id': step['id'], 'task_id': task['id'], 'step_name': step['name'],
                      'task_type': task['name'], 'effective_input_sources': sources,
                      'selected_document_id': selected or None, 'requested_model': model,
-                     'receives_previous_stage': index > 0 and 'step_input' in sources}
+                     'receives_previous_stage': index > 0 and reads_previous_stage(sources)}
             if task['name'] == 'Extraction':
                 data['require_complete_extraction'] = True
                 reference = data.get('search_set_uuid')

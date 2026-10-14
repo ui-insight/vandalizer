@@ -5,6 +5,7 @@ from pathlib import Path
 from .attempts import encode
 from .catalog import CourseCatalogError
 from .connected_workflow_checkpoints import decode_checkpoints
+from .stage_inputs import reads_previous_stage
 
 OUTCOME_ID = 'multi_step.connected_execution'
 REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions', 'critical_failures')
@@ -74,7 +75,7 @@ def check_connected_execution(contract, case, run):
         raise CourseCatalogError('The connected-workflow requirement has no matching verified checker')
     snapshot, completed = verified_chain(case, run)
     stages = run['plan']['stage_plans']
-    connected = all('step_input' in stage['effective_input_sources'] and stage['receives_previous_stage'] is True for stage in stages[1:])
+    connected = all(reads_previous_stage(stage['effective_input_sources']) and stage['receives_previous_stage'] is True for stage in stages[1:])
     outputs = [item['receipt']['result'].get('output') for item in completed]
     nonempty = all(bool(value.strip()) if isinstance(value, str) else bool(value) for value in outputs)
     passed = connected and nonempty
@@ -107,7 +108,7 @@ def compare_connected_runs(case, original, corrected):
             'original_result_sha256': encode(original['result'])[1], 'corrected_result_sha256': encode(corrected['result'])[1],
             'configuration_changed': before['artifact_sha256'] != after['artifact_sha256'],
             'original_formatter_rereads_source': before_stage['effective_input_sources'] == ['workflow_documents'],
-            'corrected_formatter_receives_reasoning': 'step_input' in after_stage['effective_input_sources'],
+            'corrected_formatter_receives_reasoning': reads_previous_stage(after_stage['effective_input_sources']),
             'original_final_output': original['result']['final_output'], 'corrected_final_output': corrected['result']['final_output'],
             'source_document_id': before['documents'][0]['document_id'], 'source_sha256': case.source_sha256,
             'notice': 'These are actual configuration/result differences, not a correctness judgment or learner credit.'}

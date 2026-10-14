@@ -8,6 +8,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
+from .stage_inputs import saved_history, stage_inputs
 
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 
@@ -62,9 +63,11 @@ def validate_event(event, previous, run):
         upstream = ({'step_name': 'Document', 'output': [plan['source_document_id']], 'input': None}
                     if stage_index == 0 else review_output(previous, plan))
         data = plan['engine_steps'][stage_index + 1]['tasks'][task_index]['data']
+        sources = task['effective_input_sources']
+        history = saved_history(plan, [upstream] if stage_index == 1 else [])
         if (event['task'] != task or event['upstream_result'] != upstream
                 or event['upstream_result_sha256'] != encode(upstream)[1]
-                or event['consumed_context'] != _build_combined_context(data, upstream, task['effective_input_sources'])):
+                or event['consumed_context'] != _build_combined_context(data, stage_inputs(upstream, sources, history), sources)):
             raise ValueError('Consumed evidence differs from the assigned source, calculations or completed branches')
     else:
         if (len(same_task) != 1 or same_task[0]['receipt']['kind'] != 'task_started'

@@ -11,10 +11,11 @@ from app.services.certification_versions.enrollments import EnrollmentConflict
 from tests.test_certification_connected_workflow_plan import fixture, plan, reseal, RUNTIME
 
 
-def approved_run(*, original=False, snapshot_id='b' * 32, run_id='c' * 32, decision_id='d' * 32, mutate_snapshot=None, failure_practice=False):
+def approved_run(*, original=False, earlier=False, snapshot_id='b' * 32, run_id='c' * 32, decision_id='d' * 32, mutate_snapshot=None, failure_practice=False):
     case, snapshot = fixture()
-    if original:
-        snapshot['artifact']['steps'][2]['step']['data']['input_sources'] = ['workflow_documents']
+    if original or earlier:
+        # Chat wires a format step to every earlier step's output.
+        snapshot['artifact']['steps'][2]['step']['data']['input_sources'] = ['workflow_documents' if original else 'earlier_steps']
         reseal(snapshot)
     if mutate_snapshot is not None:
         mutate_snapshot(snapshot)
@@ -54,6 +55,29 @@ def providers(monkeypatch):
     for name, provider in zip(('data_extraction_model', 'llm_chat_model', 'format_model'), (extraction, reasoning, formatting)):
         monkeypatch.setattr(workflow_engine, name, provider)
     return extraction, reasoning, formatting
+
+
+def test_a_formatter_reading_all_earlier_steps_records_what_it_actually_received(monkeypatch):
+    from app.services.certification_versions.connected_workflow_checkpoints import validate_event
+    case, run = approved_run(earlier=True)
+    extraction, reasoning, formatting = providers(monkeypatch)
+    events = []
+    result = execute_approved_chain(run, case, deepcopy(RUNTIME), checkpoint=lambda value, digest: events.append((value, digest)), should_stop=lambda: False)
+    assert result['final_output'] == 'Internal draft'
+    formatter_start = events[4][0]
+    assert formatter_start['stage']['effective_input_sources'] == ['earlier_steps']
+    assert formatter_start['stage']['receives_previous_stage'] is True
+    # The formatter saw both the extraction and the reasoning, and the receipt says so.
+    assert formatter_start['consumed_context']['value'] == formatting.call_args.args[2]
+    assert '$185,000' in formatter_start['consumed_context']['value'] and 'Reporting obligations differ' in formatter_start['consumed_context']['value']
+    previous = []
+    for value, digest in events:
+        validate_event(value, previous, run)
+        previous.append({'receipt': value, 'receipt_sha256': digest})
+    tampered = deepcopy(formatter_start)
+    tampered['consumed_context']['value'] = 'Only the reasoning output'
+    with pytest.raises(ValueError, match='consumed inputs'):
+        validate_event(tampered, previous[:4], run)
 
 
 @pytest.mark.parametrize('original', [False, True])

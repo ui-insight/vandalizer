@@ -77,10 +77,11 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
             sources = workflow_engine._resolve_input_sources(task.data, task.inputs.get('step_name'))
             if sources != spec['effective_input_sources'] or encode(task.data)[1] != spec['effective_settings_sha256']:
                 raise EnrollmentConflict('Actual task inputs differ from the approved budget plan')
-            # The engine also hands every step the earlier steps' outputs; the
-            # approved sources never read them, so they are not consumed evidence.
+            # The engine hands every step the earlier steps' outputs. They are
+            # consumed evidence only when the approved sources read them.
             upstream = {key: value for key, value in task.inputs.items() if key != workflow_engine.EARLIER_STEPS_KEY}
-            context = workflow_engine._build_combined_context(task.data, upstream, sources)
+            consumed = task.inputs if 'earlier_steps' in sources else upstream
+            context = workflow_engine._build_combined_context(task.data, consumed, sources)
             identity = {'stage_index': stage_index, 'task_index': offset, 'task_id': spec['task_id'],
                         'output_key': stage_plan['output_key']}
             start = emit({**identity, 'kind': 'task_started', 'task': spec,

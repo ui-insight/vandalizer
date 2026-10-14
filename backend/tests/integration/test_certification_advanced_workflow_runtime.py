@@ -17,8 +17,8 @@ pytestmark = pytest.mark.skipif(not os.environ.get('CERTIFICATION_TEST_MONGO_URL
 repo = preparation_fixtures.repo
 
 
-async def fixture(repo):
-    f = await preparation_fixtures.fixture(repo)
+async def fixture(repo, **options):
+    f = await preparation_fixtures.fixture(repo, **options)
     run = await preparation_fixtures.prepare(repo, f)
     await preparation_fixtures.decide(repo, f, preparation_fixtures.scope_body(f, run))
     current = await AdvancedWorkflowPreparation().get(f.learner.user_id, run['run_id'])
@@ -69,6 +69,33 @@ async def test_preserves_each_actual_parallel_result_and_memo_consumed_context(r
     assert 'RESULT: Review source purposes' in memo['consumed_context']
     assert 'RESULT: Review source conflicts' in memo['consumed_context']
     assert '45001.00' in memo['consumed_context']
+
+
+async def test_a_memo_reading_all_earlier_steps_records_and_verifies_what_it_received(repo, monkeypatch):
+    from app.services import workflow_engine
+    from app.services.certification_versions.advanced_workflow_checkpoints import validate_event
+    # Chat wires a format step to every earlier step; the memo still needs the source.
+    f = await fixture(repo, memo_sources=('earlier_steps', 'workflow_documents'))
+    events, provider_contexts = [], {}
+
+    def provider(**kwargs):
+        provider_contexts[kwargs['prompt']] = deepcopy(kwargs['data'])
+        return 'RESULT: ' + kwargs['prompt']
+
+    monkeypatch.setattr(workflow_engine, 'llm_chat_model', provider)
+    result = execute(f, lambda payload, digest: events.append(deepcopy(payload)))
+    assert result['status'] == 'completed'
+    memo = next(e for e in events if e['kind'] == 'task_started' and e['stage_index'] == 1)
+    assert memo['task']['effective_input_sources'] == ['earlier_steps', 'workflow_documents']
+    assert memo['consumed_context'] == provider_contexts['Write the internal memo']
+    assert 'RESULT: Review source purposes' in memo['consumed_context'] and 'RESULT: Review source conflicts' in memo['consumed_context']
+    previous = []
+    for event in events:
+        validate_event(event, previous, f.run)
+        previous.append({'receipt': event, 'receipt_sha256': encode(event)[1]})
+    altered = {**memo, 'consumed_context': 'RESULT: Review source purposes only'}
+    with pytest.raises(ValueError, match='Consumed evidence differs'):
+        validate_event(altered, [item for item in previous if item['receipt']['stage_index'] == 0], f.run)
 
 
 @pytest.mark.parametrize('failure', ['exception', 'empty', 'checkpoint'])

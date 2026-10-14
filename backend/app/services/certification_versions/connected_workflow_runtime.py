@@ -12,6 +12,7 @@ from .connected_workflow_approval import ConnectedScopeRepository
 from .connected_workflow_plan import connected_workflow_plan
 from .connected_failure_practice import approval_question, is_failure_practice, stopped_stage_result, ControlledTrainingStop
 from .enrollments import EnrollmentConflict
+from .stage_inputs import history_entry, stage_inputs
 
 MAX_STAGE_BYTES = 8 * 1024 * 1024
 
@@ -54,7 +55,7 @@ def execute_approved_chain(run, case, system_config, *, checkpoint, should_stop)
         user_id=plan['user_id'], system_config_doc=deepcopy(system_config), allow_code_execution=False)
     nodes, output_keys = engine.get_topological_order(), engine.step_output_keys()
     index, upstream, started = 0, None, None
-    completed = []
+    completed, history = [], []
 
     def emit(event):
         payload = {**event, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
@@ -86,7 +87,8 @@ def execute_approved_chain(run, case, system_config, *, checkpoint, should_stop)
                     {'text': text, 'metadata': metadata}
                     for text, metadata in workflow_engine._build_extraction_inputs(data, upstream, sources)]}
             else:
-                context = {'kind': 'combined_context', 'value': workflow_engine._build_combined_context(data, upstream, sources)}
+                inputs = stage_inputs(upstream, sources, history)
+                context = {'kind': 'combined_context', 'value': workflow_engine._build_combined_context(data, inputs, sources)}
             started = emit({'kind': 'stage_started', 'stage_index': index - 1, 'output_key': output_keys[index],
                 'stage': stage, 'consumed_context': context, 'upstream_result_sha256': encode(upstream)[1],
                 'previous_stage_receipt_sha256': completed[-1]['receipt_sha256'] if completed else None})
@@ -110,6 +112,7 @@ def execute_approved_chain(run, case, system_config, *, checkpoint, should_stop)
             completed.append({'receipt': payload, 'receipt_sha256': digest})
             started = None
         upstream = output
+        history.append(history_entry(node.name, output))
         index += 1
 
     final, _ = engine.execute(workflow_result_updater=update, should_cancel=should_stop)

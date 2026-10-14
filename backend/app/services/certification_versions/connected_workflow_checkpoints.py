@@ -9,6 +9,7 @@ from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
 from .connected_failure_practice import is_failure_practice, stopped_stage_result
+from .stage_inputs import saved_history, stage_inputs
 
 # Plan + checkpoint log + terminal result each cap at 4 MiB, keeping the single
 # MongoDB document below its 16 MiB limit even with metadata and encoded strings.
@@ -43,7 +44,8 @@ def validate_event(event, previous, run):
             expected = {'kind': 'extraction_documents', 'documents': [{'text': text, 'metadata': metadata}
                 for text, metadata in _build_extraction_inputs(data, upstream, sources)]}
         else:
-            expected = {'kind': 'combined_context', 'value': _build_combined_context(data, upstream, sources)}
+            history = saved_history(plan, [item['receipt']['result'] for item in previous[1::2]])
+            expected = {'kind': 'combined_context', 'value': _build_combined_context(data, stage_inputs(upstream, sources, history), sources)}
         if (event['stage'] != stage or event['consumed_context'] != expected
                 or event['upstream_result_sha256'] != encode(upstream)[1]
                 or event['previous_stage_receipt_sha256'] != (previous[-1]['receipt_sha256'] if previous else None)

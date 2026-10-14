@@ -102,3 +102,24 @@ async def test_editor_and_chat_built_extractions_receive_the_same_checks(version
     assert engine_inputs['editor'] == engine_inputs['chat_then_editor'] and len(engine_inputs['editor']) == 2
     checks = [without_identity_hash(run['result']['checks']) for run in (editor_run, mixed_run)]
     assert checks[0] == checks[1] and checks[0]['observed_semantic_failure']
+
+
+
+async def test_a_chat_built_connected_workflow_captures_and_plans(repo):
+    """Chat wires its format step to every earlier step; the connected lab must accept that route."""
+    from app.services.chat_tools import create_workflow
+    fixture = await base.connected_workflow_fixture(repo)
+    source = fixture[0]
+    ctx = _make_context(user_id=source.user_id, team_id=None, user=User(user_id=source.user_id), model_name='fixture-model')
+    built = await create_workflow(ctx, 'Chat subaward chain', [
+        {'name': 'Extract terms', 'type': 'extraction', 'extractions': ['Extract the subaward amount.']},
+        {'name': 'Separate obligations', 'type': 'prompt', 'prompt': 'Separate source obligations from interpretation.'},
+        {'name': 'Internal summary', 'type': 'format', 'format_template': 'Preserve the supported terms and unresolved questions.', 'is_output': True},
+    ], confirmed=True)
+    assert built.get('workflow_id'), built
+    chat_fixture = (*fixture[:7], {**fixture[7], 'request_id': uuid4().hex, 'workflow_id': built['workflow_id']})
+    snapshot = await base.capture_connected(repo, chat_fixture)
+    prepared = await base.prepare_connected(repo, chat_fixture, base.connected_plan_body(snapshot))
+    stages = prepared['plan']['stage_plans'] if 'plan' in prepared else prepared['stage_plans']
+    assert [stage['task_type'] for stage in stages] == ['Extraction', 'Prompt', 'Formatter']
+    assert stages[2]['effective_input_sources'] == ['earlier_steps'] and stages[2]['receives_previous_stage'] is True

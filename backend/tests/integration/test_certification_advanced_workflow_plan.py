@@ -16,7 +16,7 @@ repo = capture_fixtures.repo
 RUNTIME = {'available_models': [{'name': 'review-model'}, {'name': 'memo-model'}]}
 
 
-async def fixture(repo, *, parallel=True):
+async def fixture(repo, *, parallel=True, memo_sources=('step_input', 'workflow_documents')):
     f = await capture_fixtures.fixture(repo)
     f.step.data = {'input_sources': ['workflow_documents']}
     f.task.data = {'prompt': 'Review source purposes', 'model': 'review-model'}
@@ -27,7 +27,7 @@ async def fixture(repo, *, parallel=True):
     await f.step.save()
     memo = await WorkflowStepTask(name='Prompt', data={'prompt': 'Write the internal memo', 'model': 'memo-model'}).insert()
     memo_step = await WorkflowStep(name='Internal memo', tasks=[memo.id],
-        data={'input_sources': ['step_input', 'workflow_documents']}, is_output=True).insert()
+        data={'input_sources': list(memo_sources)}, is_output=True).insert()
     f.workflow.steps.append(memo_step.id)
     await f.workflow.save()
     f.saved = await capture_fixtures.capture(repo, f)

@@ -19,8 +19,8 @@ pytestmark = pytest.mark.skipif(not os.environ.get('CERTIFICATION_TEST_MONGO_URL
 repo = planning_fixtures.repo
 
 
-async def fixture(repo):
-    f = await planning_fixtures.fixture(repo)
+async def fixture(repo, **options):
+    f = await planning_fixtures.fixture(repo, **options)
     f.plan_body = {'request_id': uuid4().hex, 'input_snapshot_id': f.saved['uuid'],
         'input_snapshot_sha256': encode(f.saved)[1], 'case_sha256': f.case.digest,
         'consent': 'prepare_budget_workflow_plan'}

@@ -13,6 +13,7 @@ from .advanced_workflow_inputs import AdvancedWorkflowInputRepository
 from .attempts import encode
 from .catalog import CourseCatalogError
 from .connected_workflow_plan import INPUT_KEYS, TASK_KEYS, checked_sources
+from .stage_inputs import reads_previous_stage
 from .enrollments import EnrollmentConflict
 from .lab_execution import runtime_digest
 
@@ -102,9 +103,9 @@ def advanced_workflow_plan(snapshot, case, system_config, *, default_model):
                 if 'select_document' in sources and selected != source['document_id']:
                     raise EnrollmentConflict('Select the exact assigned budget explicitly')
                 # Never silently wire in missing branch/calculation evidence.
-                if index == 0 and 'step_input' in sources:
+                if index == 0 and ('step_input' in sources or 'earlier_steps' in sources):
                     raise EnrollmentConflict('Independent source review must explicitly use the assigned workflow documents')
-                if 'workflow_documents' not in sources or (index == 1 and 'step_input' not in sources):
+                if 'workflow_documents' not in sources or (index == 1 and not reads_previous_stage(sources)):
                     raise EnrollmentConflict('Source review needs saved source/calculations; the memo also needs every preceding review result')
                 requested = data.get('model')
                 if requested is not None and (not isinstance(requested, str) or not requested):
