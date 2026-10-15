@@ -1744,6 +1744,24 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     return final_output
 
 
+def _approved_artifact(approval_doc: dict):
+    """What the steps after an approval gate receive: the reviewer's edit if
+    there is one, otherwise the snapshot taken at the gate.
+
+    A step output that isn't a dict, such as a Prompt's markdown, is stored on
+    the review as ``{"value": <output>}``, and the review screen saves an edit
+    of it the same way. Both are unwrapped here. Support ticket: replaying the
+    wrapper made a Prompt → Approval run's final output the JSON text
+    ``{"value": "## Document Summary\\n..."}``, which chat's run card showed
+    raw.
+    """
+    edited = approval_doc.get("edited_artifact")
+    artifact = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
+    if isinstance(artifact, dict) and list(artifact) == ["value"]:
+        return artifact["value"]
+    return artifact
+
+
 @celery_app.task(
     bind=True,
     name="tasks.workflow.resume_after_approval",
@@ -1795,10 +1813,7 @@ def resume_workflow_after_approval(self, approval_uuid):
     user_doc = db.user.find_one({"user_id": user_id}) if user_id else None
     is_admin = bool(user_doc and user_doc.get("is_admin"))
 
-    # If the reviewer edited the artifact, downstream steps see the edited
-    # version. Otherwise replay the original snapshot.
-    edited = approval_doc.get("edited_artifact")
-    saved_output = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
+    saved_output = _approved_artifact(approval_doc)
     initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
 
     # Update result to running. Refuse if the run was canceled while it sat at

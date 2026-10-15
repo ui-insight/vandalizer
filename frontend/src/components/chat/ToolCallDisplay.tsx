@@ -1111,11 +1111,24 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
 }
 
 /** Workflow final_output may be wrapped as `{ output: ... }` — unwrap to match WorkflowOutput's contract. */
-function unwrapWorkflowOutput(final: unknown): unknown {
-  if (final && typeof final === 'object' && !Array.isArray(final) && 'output' in (final as Record<string, unknown>)) {
-    return (final as Record<string, unknown>).output
+export function unwrapWorkflowOutput(final: unknown): unknown {
+  let output = final
+  if (output && typeof output === 'object' && !Array.isArray(output) && 'output' in (output as Record<string, unknown>)) {
+    output = (output as Record<string, unknown>).output
   }
-  return final
+  // Runs resumed after an approval gate used to end on the review's storage
+  // wrapper, serialized: '{"value": "## Summary\n..."}'. Show the text inside.
+  if (typeof output === 'string' && output.trimStart().startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(output)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const keys = Object.keys(parsed)
+        const value = (parsed as Record<string, unknown>).value
+        if (keys.length === 1 && keys[0] === 'value' && typeof value === 'string') return value
+      }
+    } catch { /* not JSON; show as is */ }
+  }
+  return output
 }
 
 interface VerificationLauncherActions {
