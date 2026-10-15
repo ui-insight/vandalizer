@@ -298,6 +298,7 @@ _APPROVE_BUTTON_LABELS = {
     "create_extraction_from_document": "Create extraction",
     "run_workflow": "Run workflow",
     "run_validation": "Run validation",
+    "complete_certification_module": "Complete module",
 }
 
 
@@ -6299,8 +6300,16 @@ async def complete_certification_module(
     enrollment_id: str | None = None,
     request_id: str | None = None,
     expected_attempts: int | None = None,
+    confirmed: bool = False,
 ) -> dict:
     """Complete a supported legacy module under its pinned rubric and XP rules.
+
+    Completion awards course credit, so the learner approves it: call this
+    only when the learner asks to complete the module, or accepts your offer
+    to. The first call checks the module and, if it passes, shows the learner
+    an approval card; nothing is awarded. Call again with confirmed=true only
+    after they approve. If the check doesn't pass, no card is shown and the
+    failing checks are returned: tell the learner what is missing.
 
     Re-runs the module's validator first — if it doesn't pass, nothing is
     awarded and the failing checks are returned. On success, returns XP
@@ -6319,6 +6328,7 @@ async def complete_certification_module(
         enrollment_id: Enrollment returned by get_certification_progress; required for a versioned course.
         expected_attempts: Required for a new submission: pass the expected_attempts value from the check_certification_module result for this module (or attempts from freshly read progress or module details). Never infer or increment it, and never ask the learner for it. After a conflict, run the check again and use its new value. Recorded requests can replay without it.
         request_id: Optional 32-character lowercase hexadecimal retry identity. Reuse it after an uncertain response; use a new identity for a new assessed submission.
+        confirmed: Must be true to actually complete. If false, checks the module and shows the learner an approval card.
     """
     from app.services import certification_service as cert_svc
 
@@ -6327,6 +6337,42 @@ async def complete_certification_module(
             f"Unknown module '{module_id}'.",
             hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
+    # Completing awards credit, and it ran with no approval: answering Module
+    # 3's reflection questions, a learner watched chat try to complete the
+    # module before their answers were even saved (support ticket). The card
+    # only appears once the module's check passes, so approving it never
+    # meets a failing check.
+    title = cert_svc.course_module_titles().get(module_id, module_id)
+    check = await cert_svc.validate_module(context.deps.user_id, module_id)
+    if not check.get("passed"):
+        return {
+            **cert_svc.course_identity(),
+            "error": f"\"{title}\" isn't ready to complete: its check doesn't pass yet.",
+            "module_id": module_id,
+            "validation": check,
+            "next_step": (
+                "Tell the learner which checks are failing and what to do about "
+                "them. Don't complete the module or offer to until the check passes."
+            ),
+        }
+    stars = int(check.get("stars") or 0)
+    gate = await _confirm_gate(
+        context,
+        tool_name="complete_certification_module",
+        key={"module_id": module_id, "enrollment_id": enrollment_id},
+        confirmed=confirmed,
+        preview={
+            "action": "complete_certification_module",
+            "module_id": module_id,
+            "title": title,
+            "preview": (
+                f"Complete \"{title}\" and record it on your certification. "
+                f"Its check passes{f' with {stars} star' + ('s' if stars != 1 else '') if stars else ''}."
+            ),
+        },
+    )
+    if gate is not None:
+        return gate
     if request_id is None:
         conversation = getattr(context.deps, 'conversation', None)
         conversation_id = getattr(conversation, 'uuid', None)
@@ -6439,8 +6485,10 @@ async def submit_certification_assessment(
         "module_id": module_id,
         "message": "Answers saved.",
         "next_step": (
-            "Run check_certification_module, then complete_certification_module "
-            "to bank the XP."
+            "Run check_certification_module and tell the learner the result. "
+            "Saving is not completion: if the check passes, offer to complete "
+            "the module, and call complete_certification_module only if they "
+            "say yes. It shows them an approval card."
         ),
     }
 

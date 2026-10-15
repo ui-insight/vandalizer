@@ -449,8 +449,20 @@ async def test_check_module_unknown_id_errors():
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def approved():
+    """The learner already approved completion of a module whose check passes.
+
+    Completion runs only after an approval card (see
+    test_chat_cert_completion_approval.py); these tests cover what happens next.
+    """
+    with patch("app.services.certification_service.validate_module", new=AsyncMock(return_value={"passed": True, "stars": 2, "checks": []})), \
+         patch("app.services.chat_tools._confirm_gate", new=AsyncMock(return_value=None)):
+        yield
+
+
 @pytest.mark.asyncio
-async def test_complete_success_adds_title():
+async def test_complete_success_adds_title(approved):
     completion = {
         "module_id": "foundations",
         "stars": 2,
@@ -475,7 +487,7 @@ async def test_complete_success_adds_title():
 
 
 @pytest.mark.asyncio
-async def test_complete_failure_returns_validation():
+async def test_complete_failure_returns_validation(approved):
     failure = {
         "error": "Validation did not pass",
         "validation": {"passed": False, "stars": 0, "checks": [{"name": "x", "passed": False, "detail": ""}]},
@@ -491,7 +503,7 @@ async def test_complete_failure_returns_validation():
 
 
 @pytest.mark.asyncio
-async def test_a_missing_counter_tells_the_model_what_to_do_not_the_learner_to_reload():
+async def test_a_missing_counter_tells_the_model_what_to_do_not_the_learner_to_reload(approved):
     from app.services.certification_versions.completion_preconditions import CompletionReviewRequired
 
     with patch(
@@ -509,7 +521,7 @@ async def test_a_missing_counter_tells_the_model_what_to_do_not_the_learner_to_r
 
 
 @pytest.mark.asyncio
-async def test_a_changed_counter_says_to_check_again():
+async def test_a_changed_counter_says_to_check_again(approved):
     from app.services.certification_versions.completion_preconditions import CompletionChanged
 
     with patch(

@@ -29,7 +29,7 @@
       "stored": true,
       "module_id": "ai_literacy",
       "message": "Answers saved.",
-      "next_step": "Run check_certification_module, then complete_certification_module to bank the XP."
+      "next_step": "Run check_certification_module and tell the learner the result. Saving is not completion: if the check passes, offer to complete the module, and call complete_certification_module only if they say yes. It shows them an approval card."
     }
   },
   {

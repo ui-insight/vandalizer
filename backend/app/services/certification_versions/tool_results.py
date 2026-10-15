@@ -293,6 +293,11 @@ def certification_result(schema: type[Result]):
                 result = await function(*args, **kwargs)
                 if isinstance(result, dict) and isinstance(result.get('error'), str) and result['error'].strip():
                     return result
+                # An approval preview awards nothing and has no result to
+                # check; validated against the result schema it read as an
+                # unconfirmable response.
+                if isinstance(result, dict) and result.get('needs_confirmation') is True:
+                    return result
                 schema.model_validate(result)
                 return result
             except (ValidationError, KeyError, TypeError, AttributeError):

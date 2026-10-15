@@ -96,3 +96,15 @@ it.each([
 ])('rejects invalid or contradictory required-outcome instructions %j', change => {
   expect(issue('get_certification_module', { ...outcomeModule, ...change })).not.toBeNull()
 })
+
+it('treats a completion approval card as an approval, not a broken result', () => {
+  // Support ticket: chat completed a module on its own. Completion now shows
+  // an approval card first, which carries no XP or stars yet.
+  const preview = {
+    action: 'complete_certification_module', module_id: 'workflow_design', title: 'Workflow Design',
+    preview: 'Complete "Workflow Design" and record it on your certification. Its check passes with 2 stars.',
+    needs_confirmation: true, status: 'awaiting_user_confirmation',
+  }
+  expect(issue('complete_certification_module', preview)).toBeNull()
+  expect(issue('complete_certification_module', { ...preview, needs_confirmation: false })).not.toBeNull()
+})

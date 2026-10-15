@@ -39,6 +39,8 @@ export function certificationPayloadIssue(name: string, value: unknown): string 
   if (!object(value)) return invalid
   if (value.code === 'certification_response_invalid') return invalid
   if (text(value.error)) return null // Explicit service errors use the existing recovery UI.
+  // An approval card (completing a module) awards nothing yet; the result is checked when it runs.
+  if (value.needs_confirmation === true) return null
   if (value.enrollment_id !== undefined && !['enrollment_id', 'course_version', 'course_title', 'manifest_sha256'].every(k => text(value[k]))) return invalid
   if (value.maximum_stars !== undefined || value.credit_basis !== undefined) {
     if (!number(value.maximum_stars) || value.maximum_stars < 1 || value.maximum_stars > 3

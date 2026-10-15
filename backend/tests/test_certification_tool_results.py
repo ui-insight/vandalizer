@@ -86,7 +86,9 @@ async def test_explicit_check_roles_preserve_advice_and_reject_contradictory_sum
 @pytest.mark.asyncio
 async def test_uncertain_completion_does_not_repeat_the_already_invoked_write(caplog):
     completion = AsyncMock(return_value={'module_id': 'foundations', 'total_xp': 125, 'private_source': 'DO NOT LOG THIS SOURCE'})
-    with patch.object(service, 'complete_module', new=completion):
+    with patch.object(service, 'complete_module', new=completion), \
+         patch.object(service, 'validate_module', new=AsyncMock(return_value={'passed': True, 'stars': 1, 'checks': []})), \
+         patch.object(tools, '_confirm_gate', new=AsyncMock(return_value=None)):
         saved = await tools.complete_certification_module(_make_context(), 'foundations', request_id='a' * 32, expected_attempts=0)
     completion.assert_awaited_once_with('user1', 'foundations', request_id='a' * 32, expected_attempts=0, require_attempt_counter=True)
     assert saved['code'] == 'certification_response_invalid'
@@ -111,7 +113,7 @@ def test_course_identity_and_count_contradictions_are_rejected():
 
 def test_tool_signature_still_exposes_the_original_typed_arguments():
     signature = inspect.signature(tools.complete_certification_module)
-    assert list(signature.parameters) == ['context', 'module_id', 'enrollment_id', 'request_id', 'expected_attempts']
+    assert list(signature.parameters) == ['context', 'module_id', 'enrollment_id', 'request_id', 'expected_attempts', 'confirmed']
     assert signature.parameters['module_id'].annotation is str
 
 

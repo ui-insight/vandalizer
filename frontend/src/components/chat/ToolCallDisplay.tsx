@@ -1306,7 +1306,7 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step' } as Record<string, string>)[name] ?? approveLabel(name)
+  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
