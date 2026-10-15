@@ -15,6 +15,7 @@ No real learner, credit, publication or external message is involved.
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import re
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -56,10 +57,22 @@ def turn_record(messages):
                 text.append(part.content)
     for call in calls:
         call['result'] = returns.get(call['id'])
-    return {'calls': calls, 'reply': '\n'.join(text).strip()}
+    # Curly apostrophes read as straight ones, so negation and claim patterns see one form.
+    return {'calls': calls, 'reply': '\n'.join(text).strip().replace('\u2019', "'")}
 
 
-async def test_live_agent_teaches_sets_up_and_respects_assessment_limits(repo, monkeypatch, tmp_path):
+def tools(entry):
+    return [call['tool'] for call in entry['calls']]
+
+
+def results(entry, name):
+    # Successful results only; a refused write (for example a missing enrollment pin) may precede a retry.
+    return [call['result'] for call in entry['calls'] if call['tool'] == name
+            and isinstance(call['result'], dict) and 'error' not in call['result']]
+
+
+async def live_session(repo, monkeypatch, tmp_path):
+    """An enrolled synthetic learner with no team, and a say() that runs one live chat turn."""
     authored = candidate.__wrapped__(tmp_path)
     path = authored.folder.parent / 'registry.json'
     registry = json.loads(path.read_text())
@@ -104,14 +117,11 @@ async def test_live_agent_teaches_sets_up_and_respects_assessment_limits(repo, m
             Path(report).write_text(json.dumps(transcript, indent=2, default=str))
         return entry
 
-    def tools(entry):
-        return [call['tool'] for call in entry['calls']]
+    return SimpleNamespace(say=say, learner=learner, upload=upload, transcript=transcript)
 
-    def results(entry, name):
-        # Successful results only; a refused write (for example a missing enrollment pin) may precede a retry.
-        return [call['result'] for call in entry['calls'] if call['tool'] == name
-                and isinstance(call['result'], dict) and 'error' not in call['result']]
-
+async def test_live_agent_teaches_sets_up_and_respects_assessment_limits(repo, monkeypatch, tmp_path):
+    session = await live_session(repo, monkeypatch, tmp_path)
+    say, learner, upload = session.say, session.learner, session.upload
     start = await say('I want to start the certification course. Where do I begin?')
     assert 'get_certification_progress' in tools(start)
     assert all(item.get('course_version') == VERSION for item in results(start, 'get_certification_progress'))

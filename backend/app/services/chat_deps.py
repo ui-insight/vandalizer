@@ -82,3 +82,7 @@ class AgenticChatDeps:
     # (approval_claims.require_honest_validation).
     unvalidated_kb_titles: list[str] = field(default_factory=list)
     validation_claim_retry_used: bool = False
+
+    # Set once require_available_nodes has sent back a reply describing an
+    # unavailable workflow node, so the retry happens at most once per turn.
+    unavailable_node_retry_used: bool = False

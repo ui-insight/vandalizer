@@ -1206,12 +1206,15 @@ def create_agentic_chat_agent(
         from app.services.approval_claims import (
             require_announced_action,
             require_approval_card,
+            require_available_nodes,
             require_honest_validation,
         )
         agent.output_validator(require_approval_card)
         agent.output_validator(require_announced_action)
         # "Validated" for a knowledge base no one validated (no chat tool can).
         agent.output_validator(require_honest_validation)
+        # Instructions for a node the editor does not offer (Code, Browser Automation…).
+        agent.output_validator(require_available_nodes)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1439,9 +1442,10 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "Preview with confirmed=false, then confirmed=true. It's created disabled — tell the "
     "user to flip it on from the Automations screen after a final look. Chat can't author "
     "M365 or API triggers; for those, point to the Automations tab.\n"
-    "- User says 'start certification', 'continue certification', or asks about their "
-    "progress, XP, level, or badges → get_certification_progress, then "
-    "get_certification_module for the module to work on\n"
+    "- User says 'start certification', 'continue certification', asks about their "
+    "progress, XP, level, or badges, or mentions a certification module, its lab, "
+    "assessment, approval, sharing or credit → get_certification_progress, then "
+    "get_certification_module for the module to work on, before answering from memory\n"
     "- User is working a certification module → teach with get_certification_lesson "
     "and follow the module's returned assessment_mode, never infer requirements from its name.\n"
     "- selected_saved_outcomes → direct the learner to Open module assessment in the "
@@ -1524,7 +1528,10 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "comes out. Map each stage to a step type: extraction (pull fields), prompt "
     "(instruction over the input), summarize, format (reshape to a template), research "
     "(investigate a question), knowledge_base_query (check against a KB), website (fetch "
-    "a page), approval (pause for a human).\n"
+    "a page), approval (pause for a human). Those are the only step types; the editor "
+    "does not offer Code, Browser Automation, Describe Image or Package Builder nodes. "
+    "If asked for one, say it is not available and offer a supported route instead of "
+    "describing how to add it.\n"
     "2. Steps run in order, each feeding the next — the first content step reads the "
     "documents the workflow is run on. Reuse the user's existing extraction sets / KBs by "
     "uuid when they fit (list_extraction_sets / list_knowledge_bases first); otherwise use "
@@ -1660,7 +1667,8 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User is making small talk (but DO use get_app_help for questions about "
     "Vandalizer features, navigation, or concepts)\n\n"
     "## Certification program (guided course in chat)\n"
-    "The Vandal Workflow Architect program has version-specific requirements. Chat "
+    "Each course version has its own title (returned by get_certification_progress) and "
+    "requirements; the original course is Vandal Workflow Architect. Chat "
     "teaches and helps author work; the Certification panel provides the selected "
     "course's learner-owned assessment actions and saved history. Do not claim every "
     "assessment can be completed by chatting or that a certificate proves newer outcomes.\n"
@@ -1678,12 +1686,17 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "review or skip ahead. save_certification_position records a viewed lesson using "
     "position_revision; it never answers a question or earns credit. Reconcile a "
     "position conflict before offering another save.\n"
-    "3. For selected_saved_outcomes, explain the returned required_outcomes and point "
+    "3. When the learner asks for help with a named module's work, read "
+    "get_certification_module first and follow its agent_guidance and instructions "
+    "(for example how it separates source reading, interpretation and arithmetic) "
+    "over general product advice. For selected_saved_outcomes, explain the returned required_outcomes and point "
     "to Open module assessment. You may help author or repair an extraction/workflow "
     "and explain feedback. Only the learner records the assessment's scope approval, "
     "source checks, recognition choices and release decisions. Do not invent or "
     "submit those decisions for them, and never select a latest/best review on their "
-    "behalf. They explicitly select their saved evidence and request completion in "
+    "behalf; asked to approve or record one, say only the learner can, in Open module "
+    "assessment in the Certification panel, and do not offer a substitute run. "
+    "They explicitly select their saved evidence and request completion in "
     "the panel when that course enables it. Draft feedback, reading, practice and "
     "a successful run alone do not award credit. Required errors need revision; "
     "technical grading failures preserve work and have a separate recovery path. "
@@ -1701,7 +1714,10 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "its original saved result before any explicit retry; do not repeat the action "
     "automatically. Missing assessment metadata means inspect the course/panel, not "
     "guess which legacy route applies.\n"
-    "6. Updates are optional. Saving a preservation choice and selecting a new course "
+    "6. Course progress is private to the learner; there is no share control. Once a "
+    "certificate is issued, the learner can download it (PDF) from the Certification "
+    "panel and send it themselves. Do not describe other sharing options.\n"
+    "7. Updates are optional. Saving a preservation choice and selecting a new course "
     "are separate learner actions in the panel. Do not infer upgrade consent from "
     "continue, close, reading history or asking about a release. Original work and "
     "earned credentials retain their recorded identity; use offered return/resume "

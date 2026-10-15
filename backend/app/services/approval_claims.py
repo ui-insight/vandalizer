@@ -239,3 +239,55 @@ def require_honest_validation(ctx: RunContext["AgenticChatDeps"], output: str) -
         return output
     deps.validation_claim_retry_used = True
     raise ModelRetry(VALIDATION_RETRY_INSTRUCTION.format(titles=", ".join(f'"{t}"' for t in titles)))
+
+
+# ---------------------------------------------------------------------------
+# Nodes the workflow editor does not offer
+# ---------------------------------------------------------------------------
+# The palette marks these enabled: false. Asked for one, a model sometimes
+# writes step-by-step instructions (and sample Python) for adding it, though
+# the prompt says it is unavailable (live certification runs, October 2026).
+# A reply that also says the node is unavailable passes; only instructions
+# with no such statement are sent back, once per turn.
+
+_UNAVAILABLE_NODE = r"(?:code|browser automation|describe image|package builder)\s+(?:node|step)"
+_ADD_INSTRUCTION = re.compile(
+    rf"\b(?:select|choose|click|drag|add|insert|pick)\b[^.!?\n]{{0,40}}{_UNAVAILABLE_NODE}"
+    rf"|{_UNAVAILABLE_NODE}[^.!?\n]{{0,30}}\b(?:allows you to|lets you|is perfect)"
+    r"|\bselect\s+`?code`?\s+as the step type",
+    re.IGNORECASE,
+)
+_SAYS_UNAVAILABLE = re.compile(
+    r"not available|unavailable|not (?:a )?supported|(?:does not|doesn't|do not|don't) (?:have|offer|support)"
+    r"|(?:can't|cannot|can not) add|disabled"
+    rf"|\bno\s+{_UNAVAILABLE_NODE}",
+    re.IGNORECASE,
+)
+
+UNAVAILABLE_NODE_RETRY_INSTRUCTION = (
+    "Your reply explains how to add a workflow node that Vandalizer's editor does not "
+    "offer (Code, Browser Automation, Describe Image and Package Builder are unavailable). "
+    "Rewrite it: say that node is not available and offer a supported route instead, such "
+    "as extraction, prompt, format, research, knowledge base query, website or approval "
+    "steps, or the course's own method when a certification module applies."
+)
+
+
+def describes_unavailable_node(text: str) -> bool:
+    plain = text.replace("’", "'")
+    return bool(_ADD_INSTRUCTION.search(plain)) and not _SAYS_UNAVAILABLE.search(plain)
+
+
+def require_available_nodes(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, instructions for adding a
+    node the workflow editor does not offer."""
+    deps = ctx.deps
+    if (
+        ctx.partial_output
+        or deps is None
+        or getattr(deps, "unavailable_node_retry_used", False)
+        or not describes_unavailable_node(output)
+    ):
+        return output
+    deps.unavailable_node_retry_used = True
+    raise ModelRetry(UNAVAILABLE_NODE_RETRY_INSTRUCTION)
