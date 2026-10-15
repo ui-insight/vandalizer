@@ -22,6 +22,10 @@ class EnrollmentConflict(ValueError):
     pass
 
 
+def initial_enrollment_id(user_id: str) -> str:
+    return uuid5(NAMESPACE_URL, 'vandalizer:certification:initial:' + user_id).hex
+
+
 class EnrollmentRepository:
     def __init__(self, catalog: CourseCatalog | None = None):
         self.catalog = catalog or CourseCatalog()
@@ -58,7 +62,7 @@ class EnrollmentRepository:
         current = await self.current(user_id)
         if current is not None:
             return current
-        initial_id = uuid5(NAMESPACE_URL, 'vandalizer:certification:initial:' + user_id).hex
+        initial_id = initial_enrollment_id(user_id)
         existing = await self.enrollments.find_one({'uuid': initial_id, 'user_id': user_id})
         if existing is None:
             legacy = await self.progress.find({'user_id': user_id, 'enrollment_id': None}).limit(2).to_list(2)
