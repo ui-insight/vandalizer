@@ -37,11 +37,14 @@ _DECORATION = r"[\s*_`\"'“”‘’]*"
 _PROMISES = [
     # "the **Create workflow** button", "Confirm button"
     re.compile(rf"\b{_LABEL}{_DECORATION}\s+button\b", re.IGNORECASE),
-    # "click the Create workflow", "press **Approve**"
+    # "click the Create workflow", "press **Approve**", "use **Create workflow**"
     re.compile(
-        rf"\b(?:click|press|tap|hit|select)\b(?:\s+on)?(?:\s+the)?{_DECORATION}{_LABEL}\b",
+        rf"\b(?:click|press|tap|hit|select|use)\b(?:\s+on)?(?:\s+the)?{_DECORATION}{_LABEL}\b",
         re.IGNORECASE,
     ),
+    # "review the card", "review the workflow card", "the preview card".
+    # Not a bare "the card below": a run or extraction card is a card too.
+    re.compile(r"\breview\s+the\s+(?:[a-z]+\s+)?card\b|\b(?:preview|confirmation)\s+card\b", re.IGNORECASE),
     # "[Create workflow]" written as a button (not a link, not [ACTION:…] markup)
     re.compile(rf"\[\s*{_LABEL}\s*\](?!\()", re.IGNORECASE),
     re.compile(r"\bapproval card\b", re.IGNORECASE),
@@ -75,6 +78,23 @@ RETRY_INSTRUCTION = (
     "create_knowledge_base, with the details you described), then say in one "
     "sentence what you prepared. Do not repeat your previous reply."
 )
+
+
+# Added after a reply that still points at an approval card once the model
+# has had its retry. Support ticket: "I've prepared the workflow — review the
+# card and use Create workflow" with no tool call, no card and no way to
+# finish. The streamed text can't be taken back, so the user is told plainly.
+UNPREPARED_CARD_NOTE = (
+    "\n\n_Note: no approval card was actually prepared for this reply, so "
+    "nothing has been created or run. Ask me to try again._"
+)
+
+
+def unprepared_card_note(text: str, deps: "AgenticChatDeps | None") -> str | None:
+    """The note to add when *text* points at an approval card that doesn't exist."""
+    if deps is None or not promises_approval_button(text) or approval_card_is_live(deps):
+        return None
+    return UNPREPARED_CARD_NOTE
 
 
 def require_approval_card(ctx: RunContext["AgenticChatDeps"], output: str) -> str:

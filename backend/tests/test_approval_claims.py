@@ -8,9 +8,11 @@ from pydantic_ai.messages import RetryPromptPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 from app.services.approval_claims import (
+    UNPREPARED_CARD_NOTE,
     approval_card_is_live,
     promises_approval_button,
     require_approval_card,
+    unprepared_card_note,
 )
 
 # The support ticket's reply, verbatim apart from the workflow description.
@@ -26,6 +28,9 @@ TICKET_REPLY = (
     "Press the Confirm button to proceed.",
     "Use the approval card below to create it.",
     "Hit “Approve create knowledge base” and I'll build it.",
+    # Second support ticket (kimi-k3), verbatim.
+    "I've prepared the workflow — review the card and use **Create workflow** if it looks right:",
+    "Review the workflow card, then approve it.",
 ])
 def test_recognizes_a_promised_approval_button(text):
     assert promises_approval_button(text)
@@ -38,6 +43,9 @@ def test_recognizes_a_promised_approval_button(text):
     "[Create workflow](https://example.org/docs) explains the editor.",
     "[ACTION:build-workflow]Build a workflow[/ACTION]",
     "Want me to create the workflow?",
+    "See the run card below for the results.",
+    "Use approved budget templates when you can.",
+    "You can use the confirmation from the sponsor.",
 ])
 def test_ignores_other_buttons_and_plain_offers(text):
     assert not promises_approval_button(text)
@@ -137,3 +145,16 @@ async def test_the_chat_agent_sends_such_a_reply_back(monkeypatch):
         llm_service._agentic_chat_agent_cache.clear()
     assert len(requests) == 2
     assert "RetryPromptPart" in requests[1]
+
+
+def test_a_reply_still_pointing_at_a_missing_card_gets_a_plain_note():
+    reply = "I've prepared the workflow — review the card and use **Create workflow** if it looks right:"
+    assert unprepared_card_note(reply, _deps()) == UNPREPARED_CARD_NOTE
+    assert "nothing has been created" in UNPREPARED_CARD_NOTE
+
+
+def test_no_note_when_the_card_exists_or_nothing_was_promised():
+    reply = "Review the card and use **Create workflow** if it looks right."
+    assert unprepared_card_note(reply, _deps(10)) is None
+    assert unprepared_card_note("Want me to build that workflow?", _deps()) is None
+    assert unprepared_card_note(reply, None) is None

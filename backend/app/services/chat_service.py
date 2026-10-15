@@ -44,6 +44,7 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
+from app.services.approval_claims import unprepared_card_note
 from app.services.kb_answer_grounding import tool_output_as_source, unsupported_figures
 from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
@@ -2515,6 +2516,17 @@ async def chat_stream(
 
             if agent_run.result:
                 usage = agent_run.result.usage()
+                # The model was sent back once for pointing at an approval card
+                # it never prepared; if the reply still does, say so instead of
+                # leaving the user hunting for the button.
+                note = unprepared_card_note("".join(full_response), deps)
+                if note:
+                    full_response.append(note)
+                    if streamed_segments and streamed_segments[-1].get("kind") == "text":
+                        streamed_segments[-1]["content"] += note
+                    else:
+                        streamed_segments.append({"kind": "text", "content": note})
+                    yield json.dumps({"kind": "text", "content": note}) + "\n"
                 # Safety-net: strip any residual think tags the parser missed
                 # Stored with the model's own 【…】 citation syntax rewritten as
                 # plain "(file, p. N)" text, which is also what names the file
