@@ -301,6 +301,43 @@ class TestListKnowledgeBases:
         assert "Unknown scope" in result["error"]
         assert "mine" in result["error"]
 
+    @pytest.mark.asyncio
+    async def test_a_ready_kb_with_a_failed_source_says_so(self):
+        """Support ticket: chat called "Subaward Policies" "ready with 4 sources
+        indexed" while its card read "3 of 4 sources ready · 1 needs attention".
+        """
+        import datetime
+        from types import SimpleNamespace
+
+        from app.services.chat_tools import _add_source_health, _kb_entry
+
+        subaward = SimpleNamespace(
+            uuid="kb-sub", title="Subaward Policies", description="", status="ready",
+            total_sources=4, sources_ready=3, sources_failed=1, total_chunks=212,
+        )
+        clean = SimpleNamespace(
+            uuid="kb-ok", title="Effort", description="", status="ready",
+            total_sources=2, sources_ready=2, sources_failed=0, total_chunks=40,
+        )
+        # A KB that is both mine and shared with the team is listed twice.
+        entries = [_kb_entry(subaward, "mine"), _kb_entry(subaward, "team"), _kb_entry(clean, "mine")]
+        manifest = [
+            {"name": "2 CFR 200.331", "status": "ready", "error": ""},
+            {"name": "FDP Subaward Forms", "status": "error", "error": "HTTP 403 Forbidden"},
+        ]
+        validated = SimpleNamespace(at=datetime.datetime(2026, 10, 2, 15, 0))
+        with patch("app.services.knowledge_service.get_kb_manifest", AsyncMock(return_value=manifest)) as get_manifest, \
+             patch("app.routers.knowledge._latest_runs_by_kb", AsyncMock(return_value={"kb-ok": validated})):
+            await _add_source_health(entries)
+
+        get_manifest.assert_awaited_once_with("kb-sub")
+        for entry in entries[:2]:
+            assert (entry["sources_ready"], entry["total_sources"]) == (3, 4)
+            assert entry["failed_sources"] == [{"name": "FDP Subaward Forms", "reason": "HTTP 403 Forbidden"}]
+            assert entry["last_validated"] is None
+        assert "failed_sources" not in entries[2]
+        assert entries[2]["last_validated"] == "2026-10-02"
+
 
 # ---------------------------------------------------------------------------
 # get_document_text

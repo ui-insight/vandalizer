@@ -841,10 +841,45 @@ def _kb_entry(kb: KnowledgeBase, group: str, **extra) -> dict:
         "description": kb.description,
         "status": kb.status,
         "total_sources": kb.total_sources,
+        "sources_ready": kb.sources_ready,
+        "sources_failed": kb.sources_failed,
         "total_chunks": kb.total_chunks,
         "group": group,
         **extra,
     }
+
+
+async def _add_source_health(entries: list[dict]) -> None:
+    """Name each listed KB's failed sources and give its last validation.
+
+    A KB's status is "ready" once it can be searched, even with a source that
+    failed. Given only that and total_sources, chat told a user who asked to
+    validate "Subaward Policies" that it was "ready with 4 sources indexed"
+    while the card read "3 of 4 sources ready · 1 needs attention": the FDP
+    forms page had been refused (HTTP 403, 0 chunks). The validation date is
+    the card's answer too (manual runs and Autovalidate, newest wins).
+    """
+    from app.routers.knowledge import _latest_runs_by_kb
+    from app.services.knowledge_service import get_kb_manifest
+
+    uuids = list(dict.fromkeys(e["uuid"] for e in entries))
+    failing = list(dict.fromkeys(e["uuid"] for e in entries if e.get("sources_failed")))
+    failed: dict[str, list[dict]] = {}
+    for uuid, manifest in zip(failing, await asyncio.gather(*(get_kb_manifest(u) for u in failing))):
+        failed[uuid] = [
+            {"name": m["name"], "reason": " ".join((m.get("error") or "").split())[:160]}
+            for m in manifest if m.get("status") in ("error", "skipped")
+        ]
+    try:
+        trust = await _latest_runs_by_kb(uuids)
+    except Exception as e:  # context, never a reason to fail the listing
+        logger.warning("KB validation lookup failed: %s", e)
+        trust = {}
+    for entry in entries:
+        if entry["uuid"] in failed:
+            entry["failed_sources"] = failed[entry["uuid"]]
+        run = trust.get(entry["uuid"])
+        entry["last_validated"] = run.at.date().isoformat() if run else None
 
 
 def _kb_matches(kb: KnowledgeBase, search: Optional[str]) -> bool:
@@ -940,10 +975,18 @@ async def list_knowledge_bases(
         )
     if not team_id:
         notes.append("The user has no current team, so the team group is empty.")
+    listed = [entry for g in selected for entry in groups[g]]
+    await _add_source_health(listed)
+    notes.append(
+        'status "ready" means a KB can be searched, not that every source indexed. '
+        "Give a KB's sources as sources_ready of total_sources and name each of "
+        "failed_sources with its reason; never call a failed source indexed. "
+        "last_validated null means the KB was never validated."
+    )
     return {
         "scope": scope,
         "counts": counts,
-        "knowledge_bases": [entry for g in selected for entry in groups[g]],
+        "knowledge_bases": listed,
         "note": " ".join(notes),
     }
 
