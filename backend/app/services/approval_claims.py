@@ -196,8 +196,8 @@ def claims_validated(text: str, subjects: list[str] | None = None) -> bool:
     return False
 
 
-def _validation_ran_this_turn(messages) -> bool:
-    """Whether a validation tool was called since the user's latest message."""
+def _tools_called_this_turn(messages) -> set[str]:
+    """Names of the tools called since the user's latest message."""
     from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
 
     since_prompt = []
@@ -206,11 +206,16 @@ def _validation_ran_this_turn(messages) -> bool:
             since_prompt = []
         else:
             since_prompt.append(message)
-    return any(
-        isinstance(part, ToolCallPart) and part.tool_name == "run_validation"
+    return {
+        part.tool_name
         for message in since_prompt if isinstance(message, ModelResponse)
-        for part in message.parts
-    )
+        for part in message.parts if isinstance(part, ToolCallPart)
+    }
+
+
+def _validation_ran_this_turn(messages) -> bool:
+    """Whether a validation tool was called since the user's latest message."""
+    return "run_validation" in _tools_called_this_turn(messages)
 
 
 VALIDATION_RETRY_INSTRUCTION = (
@@ -358,3 +363,52 @@ def require_learner_route(ctx: RunContext["AgenticChatDeps"], output: str) -> st
         return output
     deps.learner_route_retry_used = True
     raise ModelRetry(LEARNER_ACTION_RETRY_INSTRUCTION[kind])
+
+
+# ---------------------------------------------------------------------------
+# Course entry
+# ---------------------------------------------------------------------------
+# Every certification entry point (the /certification URL, the rail badge, the
+# account menu, the home CTA, a card's action link) sends one of these kickoff
+# messages (frontend/src/lib/certificationChat.ts). A reply that never read the
+# learner's course is a generic answer dressed as the course; it is sent back
+# once with an instruction to read the enrollment first.
+
+COURSE_ENTRY_MESSAGES = frozenset({
+    "Start the Vandalizer certification course — show me where to begin.",
+    "Continue my certification — show my progress and the next module.",
+    "Show my completed certification and what each module covered.",
+})
+_ASKS_COURSE_ENTRY = re.compile(
+    r"^\W*(?:please\s+)?(?:start|begin|continue|resume|open)\b[^.?!\n]{0,30}\b(?:certification|course)\b",
+    re.IGNORECASE,
+)
+
+COURSE_ENTRY_RETRY_INSTRUCTION = (
+    "The learner opened the certification course, but you answered without reading their "
+    "enrollment. Call get_certification_progress now and answer from its result: the course "
+    "title, where the learner stands, and the one next action it names (the next lesson, module "
+    "or assessment). If the tool returns an error, say what it says and how to recover; do not "
+    "describe the course from memory."
+)
+
+
+def is_course_entry(message: str) -> bool:
+    text = " ".join(message.split())
+    return text in COURSE_ENTRY_MESSAGES or bool(_ASKS_COURSE_ENTRY.search(text))
+
+
+def require_course_read(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a course-entry reply that
+    called no certification read tool."""
+    deps = ctx.deps
+    if (
+        ctx.partial_output
+        or deps is None
+        or getattr(deps, "course_entry_retry_used", False)
+        or not is_course_entry(getattr(deps, "user_message", "") or "")
+        or any(name.startswith("get_certification_") for name in _tools_called_this_turn(ctx.messages))
+    ):
+        return output
+    deps.course_entry_retry_used = True
+    raise ModelRetry(COURSE_ENTRY_RETRY_INSTRUCTION)

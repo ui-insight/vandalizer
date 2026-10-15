@@ -1206,6 +1206,7 @@ def create_agentic_chat_agent(
         from app.services.approval_claims import (
             require_announced_action,
             require_approval_card,
+            require_course_read,
             require_available_nodes,
             require_honest_validation,
             require_learner_route,
@@ -1218,6 +1219,8 @@ def create_agentic_chat_agent(
         agent.output_validator(require_available_nodes)
         # Approve/share requests for course work must name the learner's real route.
         agent.output_validator(require_learner_route)
+        # A course-entry message must be answered from the learner's enrollment.
+        agent.output_validator(require_course_read)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]

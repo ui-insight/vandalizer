@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic_ai import ModelRetry
 
-from app.services.approval_claims import learner_only_request, names_learner_route, require_learner_route
+from app.services.approval_claims import is_course_entry, learner_only_request, names_learner_route, require_learner_route
 
 DATA = json.loads((Path(__file__).parent / 'fixtures/learner_route_replies.json').read_text())
 CORPUS = DATA['replies']
@@ -61,3 +61,17 @@ def test_a_share_retry_names_the_certificate():
     deps = SimpleNamespace(user_message='Share my certification progress with my manager.', learner_route_retry_used=False)
     with pytest.raises(ModelRetry, match='certificate PDF'):
         require_learner_route(context(deps), 'Sharing is handled in the Certification panel.')
+
+
+@pytest.mark.parametrize('message, entry', [
+    ('Start the Vandalizer certification course — show me where to begin.', True),
+    ('Continue my certification — show my progress and the next module.', True),
+    ('Show my completed certification and what each module covered.', True),
+    ('Please resume my certification', True),
+    ('start the course', True),
+    ('Continue the workflow run from step 2.', False),
+    ('What does the certification cover?', False),
+    ('Start an extraction on the NSF proposal.', False),
+])
+def test_course_entry_messages(message, entry):
+    assert is_course_entry(message) is entry

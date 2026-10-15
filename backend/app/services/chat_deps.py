@@ -92,3 +92,5 @@ class AgenticChatDeps:
     # approval_claims.require_learner_route.
     user_message: str = ""
     learner_route_retry_used: bool = False
+    # Once-only flag for approval_claims.require_course_read.
+    course_entry_retry_used: bool = False
