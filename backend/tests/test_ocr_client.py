@@ -530,3 +530,50 @@ class TestOutageEscalation:
         # The service's own number, not our 1s/2s exponential default.
         assert [c[0][0] for c in mock_sleep.call_args_list] == [7.0, 7.0]
         assert exc.value.retry_after == 7.0
+
+
+class TestLayoutJsonToText:
+    """Layout-mode OCR (dots.ocr) answers with region JSON; save only its text."""
+
+    PAGE_1 = [
+        {"bbox": [72, 60, 900, 120], "category": "Title", "text": "Research Strategy"},
+        {"bbox": [72, 767, 1377, 912], "category": "Text", "text": "This project employs two-photon imaging."},
+        {"bbox": [72, 950, 600, 1300], "category": "Picture"},
+    ]
+    PAGE_2 = [
+        {"bbox": [72, 60, 900, 120], "category": "Section-header", "text": "Aim 1"},
+        {"bbox": [72, 200, 1377, 400], "category": "List-item", "text": "- Map cortical circuits (July 2024 – June 2029)."},
+    ]
+
+    def test_the_ticket_region_becomes_its_text(self):
+        body = '{"bbox": [72, 767, 1377, 912], "category": "Text", "text": "This project employs…"}'
+        assert ocr_client.layout_json_to_text(body) == "This project employs…"
+
+    def test_pages_of_regions_read_in_order_without_layout_code(self):
+        text = ocr_client.layout_json_to_text(json.dumps([self.PAGE_1, self.PAGE_2]))
+        assert text == (
+            "# Research Strategy\n\nThis project employs two-photon imaging.\n\n"
+            "## Aim 1\n\n- Map cortical circuits (July 2024 – June 2029)."
+        )
+        for code in ("bbox", "category", "{", '"'):
+            assert code not in text
+
+    def test_text_between_pages_is_kept(self):
+        body = f"Page 1\n{json.dumps(self.PAGE_1)}\n\nPage 2\n{json.dumps(self.PAGE_2)}"
+        text = ocr_client.layout_json_to_text(body)
+        assert text.startswith("Page 1\n# Research Strategy")
+        assert "\n\nPage 2\n## Aim 1" in text
+        assert "bbox" not in text
+
+    def test_other_text_and_json_are_left_alone(self):
+        body = 'Budget table [1]: {"total": 250000, "category": "direct"}'
+        assert ocr_client.layout_json_to_text(body) == body
+        assert ocr_client.layout_json_to_text("plain OCR text") == "plain OCR text"
+
+    def test_raw_convert_returns_the_text(self, pdf):
+        client = MagicMock()
+        client.post.return_value = _response(
+            200, text=json.dumps(self.PAGE_1), headers={"Content-Type": "application/json"},
+        )
+        result = ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example/dotsocr", provider="raw")
+        assert result == "# Research Strategy\n\nThis project employs two-photon imaging."
