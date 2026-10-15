@@ -107,12 +107,17 @@ def retire(catalog: CourseCatalog, release_id: str):
         write_registry(catalog.root, registry)
 
 
-def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False):
+def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False, reviews_root=None):
     """Set initialization policy only; existing selections are never updated."""
     with authoring_lock(catalog.root):
         package = catalog.load(release_id, new_enrollment=not legacy_continuation)
         if legacy_continuation and package.manifest.historical_provenance != 'continuation-baseline':
             raise CourseCatalogError('Unknown legacy history requires a continuation baseline')
+        if not legacy_continuation:
+            # Offering an authored course to new learners advertises it as
+            # current; that needs a recorded review of this exact manifest.
+            from .compatibility_reviews import REVIEWS_ROOT, require_compatible
+            require_compatible(package, reviews_root or REVIEWS_ROOT)
         registry = catalog.registry()
         key = 'legacy_continuation' if legacy_continuation else 'new_enrollment_default'
         registry[key] = release_id
