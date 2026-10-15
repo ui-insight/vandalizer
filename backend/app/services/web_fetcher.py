@@ -115,7 +115,7 @@ def _extract_title(html: str, fallback_url: str) -> str:
     return urlparse(fallback_url).netloc
 
 
-def _extract_main_text(html: str) -> str:
+def _trafilatura_text(html) -> str:
     text = trafilatura.extract(
         html,
         include_links=False,
@@ -123,8 +123,57 @@ def _extract_main_text(html: str) -> str:
         include_tables=True,
         favor_recall=True,
     )
+    return _normalize_whitespace(text) if text else ""
+
+
+# Elements the page never displays. ``hidden`` is the Bootstrap/Tailwind
+# display:none class; a token like ``md:block`` beside it means the element
+# is shown at some width, so those are left alone.
+_HIDDEN_XPATH = (
+    "//*[@hidden"
+    " or contains(translate(@style, ' ', ''), 'display:none')"
+    " or (contains(concat(' ', normalize-space(@class), ' '), ' hidden ')"
+    "     and not(contains(@class, ':')))]"
+)
+
+
+def _without_hidden_elements(html: str):
+    """*html* parsed with its never-displayed elements removed, or None if it has none."""
+    try:
+        from trafilatura.utils import load_html
+
+        tree = load_html(html)
+        if tree is None:
+            return None
+        hidden = tree.xpath(_HIDDEN_XPATH)
+        if not hidden:
+            return None
+        for el in hidden:
+            parent = el.getparent()
+            if parent is not None:
+                parent.remove(el)
+        return tree
+    except Exception:
+        return None
+
+
+def _extract_main_text(html: str) -> str:
+    text = _trafilatura_text(html)
+    # Trafilatura can pick a hidden block as the page's main content: eCFR
+    # ships its search-help modal (class "hidden") in every page, and a
+    # section page came back as that help text — 434 characters — with the
+    # regulation itself, server-rendered beside it, dropped (support ticket:
+    # §200.332 added to a KB showed Ready with none of the rule). Extract
+    # again without what the page never displays and keep the longer result.
+    # Not unconditional: collapsed tab panels and accordions are hidden too,
+    # and on those pages the hidden text is the content.
+    visible = _without_hidden_elements(html)
+    if visible is not None:
+        visible_text = _trafilatura_text(visible)
+        if len(visible_text) > len(text):
+            text = visible_text
     if text:
-        return _normalize_whitespace(text)
+        return text
     # Trafilatura returned nothing — fall back to a permissive BeautifulSoup
     # strip so we always return *something* rather than silently dropping the
     # page (matches the older behavior of workflow_engine._extract_text_from_html).

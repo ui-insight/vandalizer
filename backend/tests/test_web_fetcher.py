@@ -6,6 +6,7 @@ or real browser is required — httpx and the Playwright import path are
 mocked.
 """
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -720,3 +721,66 @@ def test_sync_wrapper_forwards_max_chars():
         fetch_url_sync("https://example.com/reg", max_chars=5_000_000)
 
     assert captured["max_chars"] == 5_000_000
+
+
+# ---------------------------------------------------------------------------
+# Hidden elements: the main-content pick must not be text the page never shows
+# ---------------------------------------------------------------------------
+
+_ECFR_FIXTURE = Path(__file__).parent / "fixtures" / "ecfr_section_200_332.html"
+
+
+@pytest.mark.asyncio
+async def test_ecfr_section_page_yields_the_rule_not_its_search_help():
+    """eCFR's hidden search-help modal was extracted in place of the regulation.
+
+    The fixture is the page as eCFR served it (2026-10-15). A KB source for
+    §200.332 showed Ready with one chunk of "Navigate by entering citations…"
+    and none of the rule.
+    """
+    settings = Settings(web_fetcher_browser_enabled=False)
+    url = "https://www.ecfr.gov/current/title-2/section-200.332"
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(_ECFR_FIXTURE.read_text())), \
+         patch("app.services.web_fetcher.validate_outbound_url", return_value=url):
+        result = await fetch_url(url, settings=settings)
+
+    assert "A pass-through entity must" in result.text
+    assert "(i) Consider taking enforcement action against noncompliant subrecipients" in result.text
+    assert "Navigate by entering citations" not in result.text
+
+
+_TABBED_PAGE_HTML = """<!DOCTYPE html>
+<html><head><title>Cost Sharing</title></head>
+<body>
+<div role="tablist"><button>Overview</button><button>Details</button></div>
+<div role="tabpanel"><p>See the details tab.</p></div>
+<div role="tabpanel" hidden>
+<p>Cost sharing commitments made in a proposal become binding conditions of
+the award once it is accepted, and must be documented in the institution's
+accounting records with the same rigor as charges to the sponsor.</p>
+<p>Voluntary committed cost sharing should be avoided unless the sponsor
+requires it, because every committed dollar must later be tracked, reported,
+and supported by source documentation during an audit.</p>
+</div>
+</body></html>
+"""
+
+
+def test_hidden_tab_panel_is_kept_when_it_holds_the_content():
+    """Collapsed tabs and accordions are hidden too; pruning them must not win."""
+    from app.services.web_fetcher import _extract_main_text
+
+    text = _extract_main_text(_TABBED_PAGE_HTML)
+
+    assert "binding conditions of the award" in text
+
+
+def test_responsive_hidden_class_is_not_treated_as_hidden():
+    """Tailwind's ``hidden md:block`` is shown on desktop."""
+    from app.services.web_fetcher import _without_hidden_elements
+
+    html = '<html><body><div class="hidden md:block"><p>Shown on desktop.</p></div></body></html>'
+
+    assert _without_hidden_elements(html) is None
