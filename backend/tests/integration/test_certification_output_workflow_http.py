@@ -1,11 +1,15 @@
 """Authenticated output journey, actual file downloads and preserved history."""
+import csv
 import hashlib
+import io
 import json
 import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
+import zipfile
 
+import fitz
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 import pytest
@@ -154,6 +158,23 @@ async def test_full_http_output_journey_with_real_downloads_private_retry_and_sa
         assert saved['file_review']['run']['can_execute'] is False and saved['file_review']['run']['can_inspect'] is False
         for kind, index in [('source', 0), ('file', 0), ('file', 1), ('bundle', 0)]:
             response = await client.get(f'/certification/output-files/review/{reviewed["uuid"]}/{kind}', params={**params, 'file_index': index})
+            assert response.content == expected[(kind, index)]
+        # The downloaded files themselves: the PDF renders the saved values, the CSV parses, the zip holds both.
+        files = {file['file_type']: expected[('file', index)] for index, file in enumerate(artifacts['files'])}
+        pdf_text = ' '.join(page.get_text() for page in fitz.open(stream=files['pdf'], filetype='pdf'))
+        assert all(value in ' '.join(pdf_text.split()) for value in record().values())
+        assert fitz.open(stream=files['pdf'], filetype='pdf')[0].get_pixmap(dpi=40).width > 0
+        assert next(csv.DictReader(io.StringIO(files['csv'].decode('utf-8-sig'))))
+        with zipfile.ZipFile(io.BytesIO(expected[('bundle', 0)])) as bundle:
+            assert sorted(bundle.read(name) for name in bundle.namelist()) == sorted(files.values())
+        # A newer course published as the default changes nothing for this learner's saved files.
+        # (Switching away needs an explicit disposition for saved practical work; the switch itself refuses.)
+        enrollment_fixtures.add_published_version(repo, target_id='newer-course-after-output')
+        assert (await repo.current(f.learner.user_id)).uuid == f.learner.uuid
+        assert (await client.get(read_path, params=params)).json()['submission'] == reviewed['submission']
+        for kind, index in [('source', 0), ('file', 0), ('file', 1), ('bundle', 0)]:
+            response = await client.get(f'/certification/output-files/review/{reviewed["uuid"]}/{kind}', params={**params, 'file_index': index})
+            assert response.status_code == 200, response.text
             assert response.content == expected[(kind, index)]
         assert (await client.post('/certification/' + prefix + 'output-handoffs', params=params, json=retry_body)).status_code == 404
         f.app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(user_id='foreign')

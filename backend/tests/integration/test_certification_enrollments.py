@@ -56,8 +56,7 @@ async def repo(tmp_path):
         client.close()
 
 
-def add_published_version(repo, *, revise_teaching=False):
-    target_id = 'parallel-course-test'
+def add_published_version(repo, *, revise_teaching=False, target_id='parallel-course-test'):
     path = repo.catalog.root / target_id
     shutil.copytree(repo.catalog.root / VERSION, path)
     manifest = json.loads((path / 'manifest.json').read_text())
