@@ -3449,6 +3449,7 @@ async def create_extraction_from_document(
     context: RunContext[AgenticChatDeps],
     document_uuids: list[str],
     title: Optional[str] = None,
+    fields: Optional[list[str]] = None,
     domain: Optional[str] = None,
     pin_to_active_project: bool = True,
     confirmed: bool = False,
@@ -3470,11 +3471,19 @@ async def create_extraction_from_document(
     call again with the SAME arguments and confirmed=true after the user
     approves — that creates exactly what the preview showed.
 
+    When the user has named or agreed on the fields ("just PI name,
+    institution and total budget"), pass them as ``fields``: exactly those
+    are created and no fields are discovered. To change the fields before
+    approval, call again with confirmed=false and the new list; that shows a
+    new card.
+
     Args:
         context: The call context.
         document_uuids: Document(s) to analyze. Max 5 documents per call.
         title: Optional name for the new extraction set. When omitted, the
             name is suggested from the documents' content during the preview.
+        fields: The exact field names to create, in order, when the user has
+            chosen them. Omit to have fields discovered from the documents.
         domain: Optional domain hint — one of 'nsf', 'nih', 'dod', 'doe'.
             Activates domain-specific extraction prompts.
         pin_to_active_project: When a project is open and the user can manage
@@ -3562,12 +3571,26 @@ async def create_extraction_from_document(
     ):
         active_project = None  # viewer — don't pin
 
+    # Fields the user chose in chat. Support ticket: 5 agreed fields became a
+    # 30-field card, because the tool could only discover its own.
+    chosen_fields: list[str] = []
+    for name in fields or []:
+        name = str(name).strip()
+        if name and name.casefold() not in {f.casefold() for f in chosen_fields}:
+            chosen_fields.append(name)
+
     gate_key = {
         "docs": sorted(d.uuid for d in docs),
         "title": title,
         "project": active_project.uuid if active_project else None,
+        "fields": chosen_fields or None,
     }
     proposal = _armed_stash(context, "create_extraction_from_document", gate_key)
+    if proposal is None and chosen_fields:
+        proposal = {
+            "title": title or f"Extraction from {docs[0].title or doc_uuids[0]}",
+            "fields": chosen_fields,
+        }
     if proposal is None:
         try:
             fields, suggested_title = await svc.suggest_fields_from_documents(

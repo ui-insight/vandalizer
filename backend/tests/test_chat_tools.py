@@ -1229,6 +1229,44 @@ class TestCreateExtractionAutoPin:
         assert done["field_count"] == 1
 
     @pytest.mark.asyncio
+    async def test_fields_the_user_chose_are_created_exactly(self):
+        """Support ticket: 5 fields agreed in chat became a 30-field card."""
+        from app.services import search_set_service
+        from app.services.chat_tools import create_extraction_from_document
+
+        class _Conversation:
+            pending_confirmations: list = []
+
+            async def save(self):
+                pass
+
+        agreed = ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"]
+        ctx = _make_context(team_id="team1", user_id="user1",
+                            conversation=_Conversation(), turn_marker=5)
+        with self._patches(self._ss(), project=None, can_manage=False):
+            preview = await create_extraction_from_document(
+                ctx, ["d1"], title="Alpine Ecology Basics", fields=agreed + [" pi name "],
+            )
+            assert preview["proposed_fields"] == agreed
+            assert preview["field_count"] == 5
+
+            # Changing the list before approval shows a new card.
+            trimmed = await create_extraction_from_document(
+                ctx, ["d1"], title="Alpine Ecology Basics", fields=agreed[:3],
+            )
+            assert trimmed["needs_confirmation"] is True
+            assert trimmed["proposed_fields"] == agreed[:3]
+
+            ctx.deps.turn_marker = 6
+            done = await create_extraction_from_document(
+                ctx, ["d1"], title="Alpine Ecology Basics", fields=agreed[:3], confirmed=True,
+            )
+            search_set_service.suggest_fields_from_documents.assert_not_awaited()
+            search_set_service.add_fields.assert_awaited_once_with("ss-new", agreed[:3], "user1")
+            assert search_set_service.create_search_set.await_args.kwargs["title"] == "Alpine Ecology Basics"
+        assert done["field_count"] == 3
+
+    @pytest.mark.asyncio
     async def test_approval_instruction_names_the_real_button(self):
         from app.services.chat_tools import create_extraction_from_document
 
