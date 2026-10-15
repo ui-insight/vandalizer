@@ -1,6 +1,10 @@
 """Dry-run, apply and reconcile the legacy enrollment backfill on synthetic cohorts."""
+import asyncio
 import datetime
 import json
+import os
+from pathlib import Path
+import sys
 
 from bson import json_util
 import pytest
@@ -157,3 +161,29 @@ async def test_changed_records_or_missing_continuation_refuse_to_apply(repo):
     with pytest.raises(CourseCatalogError):
         await legacy_backfill.apply(repo, repo.progress.database, expected_plan_sha256=unconfigured['plan_sha256'])
     assert await snapshot(repo) == before
+
+
+async def test_operator_script_dry_runs_then_applies_only_the_reviewed_plan(repo):
+    await seed(repo)
+    script = Path(__file__).resolve().parents[3] / 'scripts/backfill_certification_enrollments.py'
+    base = [sys.executable, str(script), '--database', repo.progress.database.name, '--catalog-root', str(repo.catalog.root)]
+    env = {**os.environ, 'CERTIFICATION_BACKFILL_MONGO_URL': os.environ['CERTIFICATION_TEST_MONGO_URL']}
+
+    async def run(*extra, environment=env):
+        process = await asyncio.create_subprocess_exec(*base, *extra, env=environment,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+        return process.returncode, out.decode(), err.decode()
+
+    before = await snapshot(repo)
+    code, _, err = await run(environment={k: v for k, v in env.items() if k != 'CERTIFICATION_BACKFILL_MONGO_URL'})
+    assert code == 1 and 'mongodb://' not in err
+    code, out, _ = await run()
+    plan = json.loads(out)
+    assert code == 0 and plan['dry_run'] is True and plan['statuses']['ready'] == 4
+    assert await snapshot(repo) == before
+    code, _, _ = await run('--apply')
+    assert code == 2 and await snapshot(repo) == before  # An unreviewed apply is refused.
+    code, out, _ = await run('--apply', '--expected-plan-sha256', plan['plan_sha256'])
+    result = json.loads(out)
+    assert code == 0 and result['reconciled'] is True and result['backfilled_users'] == 4
