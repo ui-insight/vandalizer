@@ -4152,6 +4152,58 @@ async def _checked_save_sources(sources: list[dict], context) -> list[dict]:
     return rows
 
 
+# A Markdown table cell that is a number: "$120,000", "-$1,500.50",
+# "($2,000)" (accounting negative), "12.5%", "1,250". Thousands separators
+# must be real groups, and a leading zero ("02134", an ID or ZIP code) keeps
+# the cell as text.
+_XLSX_NUMBER_RE = re.compile(
+    r"^(?P<open>\()?(?P<sign>[-−])?(?P<dollar>\$)?\s*"
+    r"(?P<int>0|[1-9]\d{0,2}(?:,\d{3})+|[1-9]\d*)(?:\.(?P<frac>\d+))?"
+    r"(?P<pct>%)?(?P<close>\))?$"
+)
+# A whole cell wrapped in emphasis: **bold**, __bold__, *italic*, _italic_.
+_XLSX_BOLD_RE = re.compile(r"^(\*\*|__)(.+)\1$")
+_XLSX_ITALIC_RE = re.compile(r"^([*_])(?!\1)(.+)(?<!\1)\1$")
+
+
+def _xlsx_cell(text: str) -> tuple[object, Optional[str], bool, bool]:
+    """A Markdown table cell as (value, number_format, bold, italic) for openpyxl.
+
+    Chat writes tables for people to read, so a budget arrives as "$120,000"
+    and a total as "**$1,250,000**". Copied into a spreadsheet verbatim, every
+    amount was text that =SUM skipped and the totals kept their asterisks
+    (support ticket: a year-by-year R01 budget). Emphasis becomes the cell's
+    font, and a cell that is wholly a number is stored as one, formatted the
+    way it was written.
+    """
+    value = text.strip()
+    bold = italic = False
+    if m := _XLSX_BOLD_RE.match(value):
+        value, bold = m.group(2).strip(), True
+    if m := _XLSX_ITALIC_RE.match(value):
+        value, italic = m.group(2).strip(), True
+    if (m := _XLSX_BOLD_RE.match(value)) and not bold:
+        value, bold = m.group(2).strip(), True
+    m = _XLSX_NUMBER_RE.match(value)
+    if not m or bool(m.group("open")) != bool(m.group("close")):
+        return value, None, bold, italic
+    frac = m.group("frac") or ""
+    number = float(f"{m.group('int').replace(',', '')}.{frac}" if frac else m.group("int").replace(",", ""))
+    if m.group("sign") or m.group("open"):
+        number = -number
+    decimals = "." + "0" * len(frac) if frac else ""
+    if m.group("pct"):
+        return number / 100, f"0{decimals}%", bold, italic
+    if not frac:
+        number = int(number)
+    if m.group("dollar"):
+        fmt = f'"$"#,##0{decimals}'
+        return number, (f"{fmt};({fmt})" if m.group("open") else fmt), bold, italic
+    if "," in m.group("int"):
+        return number, f"#,##0{decimals}", bold, italic
+    return number, None, bold, italic
+
+
 def _render_saved_file(ext: str, title: str, content: str, source_rows: list[dict]) -> bytes:
     """The bytes save_to_folder writes for *ext*, with a Sources section when given."""
     import io
@@ -4186,11 +4238,16 @@ def _render_saved_file(ext: str, title: str, content: str, source_rows: list[dic
     wb = Workbook()
     sheet = wb.active
     sheet.title = (re.sub(r"[\\/*?:\[\]]", " ", title.rsplit(".", 1)[0]).strip() or "Table")[:31]
-    for row in rows:
-        sheet.append(row)
-    if rows:
-        for cell in sheet[1]:
-            cell.font = Font(bold=True)
+    for r, row in enumerate(rows, start=1):
+        for c, text in enumerate(row, start=1):
+            value, number_format, bold, italic = _xlsx_cell(text)
+            if r == 1:  # headers stay text, whatever they look like
+                value, number_format, bold = text.strip().strip("*_").strip(), None, True
+            cell = sheet.cell(row=r, column=c, value=value)
+            if number_format:
+                cell.number_format = number_format
+            if bold or italic:
+                cell.font = Font(bold=bold, italic=italic)
     if source_rows:
         src_sheet = wb.create_sheet("Sources")
         src_sheet.append(SOURCE_HEADERS)

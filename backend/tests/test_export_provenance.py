@@ -132,9 +132,41 @@ class TestChatSavesDeliverables:
         wb = load_workbook(io.BytesIO(data))
         assert wb.sheetnames == ["Budget check", "Sources"]
         assert [[c.value for c in r] for r in wb["Budget check"].iter_rows()] == [
-            ["Item", "Draft", "Cap"], ["Direct costs", "$200,000", "$180,000"],
+            ["Item", "Draft", "Cap"], ["Direct costs", 200000, 180000],
         ]
         assert [c.value for c in wb["Sources"][2]] == ["Cap", "notice.pdf", "p. 3", "q", "quote found"]
+
+    def test_a_budget_table_saves_amounts_as_numbers_and_bold_as_bold(self):
+        """Support ticket: a year-by-year R01 budget saved from chat was all text.
+
+        Every amount was the string "$120,000", so =SUM skipped it, and the
+        Total row kept its Markdown asterisks.
+        """
+        table = (
+            "| Category | Year 1 | Year 2 | Total |\n"
+            "|---|---:|---:|---:|\n"
+            "| Personnel | $120,000 | $123,600.50 | $243,600.50 |\n"
+            "| Indirect (F&A) rate | 52% | 52.5% | — |\n"
+            "| Award number | R01NS012345 | 02134 | (1,200) |\n"
+            "| **Total** | **$304,000** | ($2,000) | **$1,250,000** |\n"
+        )
+        wb = load_workbook(io.BytesIO(chat_tools._render_saved_file("xlsx", "NIH R01 Year-by-Year Budget.xlsx", table, [])))
+        sheet = wb.active
+        values = [[c.value for c in r] for r in sheet.iter_rows()]
+        assert values[1] == ["Personnel", 120000, 123600.5, 243600.5]
+        assert values[2] == ["Indirect (F&A) rate", 0.52, 0.525, "—"]
+        # An ID with a leading zero stays text; an accounting negative is a number.
+        assert values[3] == ["Award number", "R01NS012345", "02134", -1200]
+        assert values[4] == ["Total", 304000, -2000, 1250000]
+        assert not any("*" in str(v) for row in values for v in row)
+
+        assert sheet["B2"].number_format == '"$"#,##0'
+        assert sheet["C2"].number_format == '"$"#,##0.00'
+        assert sheet["B3"].number_format == "0%" and sheet["C3"].number_format == "0.0%"
+        assert sheet["C5"].number_format == '"$"#,##0;("$"#,##0)'
+        assert sheet["A5"].font.b and sheet["B5"].font.b and sheet["D5"].font.b
+        assert not sheet["C5"].font.b and not sheet["A2"].font.b
+        assert all(c.font.b for c in sheet[1])
 
     def test_a_word_memo_ends_with_its_sources(self):
         rows = [{"item": "Cap", "document": "notice.pdf", "page": "p. 3", "quote": "q", "status": "quote found"}]
