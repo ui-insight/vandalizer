@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
   "scope": "Local evidence inventory; not a QA acceptance decision or reassessment",
-  "working_head_at_inventory": "441e8a6d7839e73218a630c37542782a700ef499",
+  "working_head_at_inventory": "903bd88c953ef7576f9e86e957e214131b48ef7d",
   "checklist": {
     "path": "docs/certification-v5-upgrade-checklist.md",
     "available": true,
-    "bytes": 93963,
-    "sha256": "73140bb8306d06b3ba4c8706bb0a3152b87ae93c39f5a6b278d6bb4b3dc52b4f"
+    "bytes": 95342,
+    "sha256": "dd0d48f5d4c0448cc2b3a63daaf2eabfec147444c8e4f4ae5ffb690dc646571b"
   },
   "progress_log": {
     "path": "docs/certification-v5-implementation-progress.md",
     "available": true,
-    "bytes": 886882,
-    "sha256": "2dbf5f91b3ceb08fcc229836ba171ebd91f26cbcf7a60963494f816517fdac7c"
+    "bytes": 890508,
+    "sha256": "b9df996fb942a2828b5b080e4f569ac47e9bfba8bdb970ef3e1aafdcd1647aa0"
   },
   "counts": {
-    "accepted": 133,
-    "open": 22,
+    "accepted": 135,
+    "open": 20,
     "items": 155,
-    "checkpoints": 359,
+    "checkpoints": 360,
     "browser_runs": 675,
     "recorded_captures_including_diagnostics_and_repeats": 8807,
     "baseline_selected_captures": 151,
@@ -580,8 +580,8 @@
     },
     {
       "id": "C8-M01-04",
-      "accepted": false,
-      "requirement": "P2 · Fix: Make star criteria truthful.** Publish exact required and enrichment fields from the rubric, and assess them on the same attempt. Show missing evidence and support field repair followed by re-execution."
+      "accepted": true,
+      "requirement": "P2 · Fix: Make star criteria truthful.** Publish exact required and enrichment fields from the rubric, and assess them on the same attempt. Show missing evidence and support field repair followed by re-execution. Accepted at checkpoint 360: the 5.0 Foundations exercise publishes exactly the five required fields and no star or enrichment criteria, and the package validator rejects any other field list or star criteria (`scope_proposal.verify_exercise`); the verified-values outcome requires every source check on the same run. A missing source check is named as missing evidence. `c03a3e05` adds the repair test: the learner revises the same extraction, captures a new revision, approves and re-runs it, and each run keeps its own output and value review (fails when the run filter is dropped). The legacy course's star rules stay as released."
     },
     {
       "id": "C8-M02-01",
@@ -985,8 +985,8 @@
     },
     {
       "id": "C8-QA-04",
-      "accepted": false,
-      "requirement": "P1 · Verify: Exercise live agent tutoring.** Use the supported configured model with synthetic lab data to start, teach, ask checks, provision, grade and complete. Verify the agent respects course/version, learner answers, approvals and the limits of its tools."
+      "accepted": true,
+      "requirement": "P1 · Verify: Exercise live agent tutoring.** Use the supported configured model with synthetic lab data to start, teach, ask checks, provision, grade and complete. Verify the agent respects course/version, learner answers, approvals and the limits of its tools. Accepted at checkpoint 360: `test_certification_live_tutoring.py` drives the production agentic chat agent with moonshotai/kimi-k3 on the full 5.0 course: start, lesson 1, a quiz with a corrected wrong answer, Foundations lab setup, refusals of credit-for-reading and of answering the scenarios, and a faithful report of the learner's own saved answers with the panel completion steps. Every tool result names the pinned version; no XP, completion or attempt is saved. Two defects found and fixed (`2816f91c`, `67ce08e9`). Live grading for every module is in the live practical tests and the 60/60 calibration (r9); completion is the learner's panel action, as the agent says. Transcripts in `artifacts/certification-live-tutoring-2026-10-14/`."
     },
     {
       "id": "C8-QA-05",
@@ -3552,8 +3552,14 @@
       "number": 359,
       "title": "Branding, the Module 0 chat practice and a full-course capture on October 14 2026",
       "evidence_directories": [
-        "certification-full-course-2026-10-14"
+        "certification-full-course-2026-10-14",
+        "certification-live-calibration-2026-10-12"
       ]
+    },
+    {
+      "number": 360,
+      "title": "Live agent tutoring, Foundations repair and capability limits on October 14 2026",
+      "evidence_directories": []
     }
   ],
   "source_records": [
