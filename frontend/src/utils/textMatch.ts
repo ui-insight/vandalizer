@@ -16,7 +16,13 @@ const FOLD_MAP: Record<string, string> = {
   '\uFB01': 'fi', '\uFB02': 'fl',
 }
 // soft hyphen, BOM, zero-width space / non-joiner / joiner
-const DROP_CHARS = new Set(['\u00AD', '\uFEFF', '\u200B', '\u200C', '\u200D'])
+//
+// Plus the markdown marks document conversion adds: bold/italic asterisks,
+// heading hashes, table pipes and code backticks. Extraction quotes come from
+// the stored markdown ("**FOA Number:** PA-23-152") while the PDF text layer
+// has none of them, so Inspect source showed "passage not matched". Both sides
+// are normalized, so a real asterisk or hash in a PDF still lines up.
+const DROP_CHARS = new Set(['\u00AD', '\uFEFF', '\u200B', '\u200C', '\u200D', '*', '#', '|', '`'])
 
 // Lowercase + fold + collapse whitespace, keeping a map from each normalized
 // char back to its source index so matches project onto real text offsets.
