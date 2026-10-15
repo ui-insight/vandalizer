@@ -3,7 +3,7 @@ import os
 import hashlib
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -57,7 +57,10 @@ async def test_panel_direct_lesson_and_chat_keep_original_teaching_and_expose_sa
     direct = await delivery.lesson('user1', 'a' * 32, module_id, lesson_id)
     token = _operation.set(CourseOperation('user1', package, SimpleNamespace(enrollment_id='a' * 32), False))
     try:
-        chat = await get_certification_lesson(SimpleNamespace(deps=SimpleNamespace(user_id='user1')), module_id, lesson_id=lesson_id, enrollment_id='a' * 32)
+        # Delivery parity, not lesson order: the guided course's order check
+        # (test_guided_course.py) is off for this fetch of any lesson.
+        with patch('app.services.certification_service.lesson_gate', AsyncMock(return_value=None)):
+            chat = await get_certification_lesson(SimpleNamespace(deps=SimpleNamespace(user_id='user1')), module_id, lesson_id=lesson_id, enrollment_id='a' * 32)
     finally:
         _operation.reset(token)
     assert chat.get('error') is None

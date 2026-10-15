@@ -297,6 +297,115 @@ async def lessons_read_for(user_id: str, module_id: str) -> list[str]:
     return await mark_lessons_read(user_id, module_id, [])
 
 
+# Guided course in chat: a module's lessons come before its exercise, answers,
+# check and completion. Support ticket: the course was only rules for the
+# model, so learners' paths depended on the model that day (lessons skipped,
+# offered as "jump to the exercise", all six pushed at once). The chat tools
+# enforce the order with lesson_gate; the panel is the learner's own route and
+# is not gated.
+
+def _module_started(module_data: dict) -> bool:
+    """Whether a module was already under way before lessons were tracked
+    (October 2026): completed, attempted, lab provisioned or answers saved.
+    Such learners are not sent back to lesson 1."""
+    return bool(
+        module_data.get("completed") or module_data.get("attempts")
+        or module_data.get("provisioned_docs") or module_data.get("self_assessment")
+    )
+
+
+async def lesson_gate(user_id: str, module_id: str) -> dict | None:
+    """The module's unread lessons when chat must teach them first, else None.
+
+    None when every lesson is read, the module has no lessons, the learner is
+    admin-unlocked, or the module was already under way. Never raises: a
+    progress read that fails leaves the course ungated rather than stuck.
+    """
+    lessons = (get_lessons(module_id) or {}).get("lessons", [])
+    if not lessons:
+        return None
+    try:
+        prog = await get_progress(user_id)
+    except Exception:
+        log.warning("lesson_gate could not read progress for %s/%s", user_id, module_id, exc_info=True)
+        return None
+    modules = getattr(prog, "modules", None) or {}
+    if getattr(prog, "unlocked", False) or _module_started(modules.get(module_id) or {}):
+        return None
+    read = list((getattr(prog, "lessons_read", None) or {}).get(module_id, []))
+    # The saved place counts as reached, with every lesson before it: a
+    # learner who stopped at lesson 5 resumes there, not at lesson 1.
+    position = getattr(prog, "learning_position", None)
+    if isinstance(position, dict) and position.get("module_id") == module_id:
+        ids = [row.get("id") for row in lessons]
+        if position.get("lesson_id") in ids:
+            read += ids[: ids.index(position["lesson_id"]) + 1]
+    reading = lesson_reading(module_id, read)
+    if not reading["unread_lessons"]:
+        return None
+    return {**reading, "next_lesson": reading["unread_lessons"][0], "lesson_count": len(lessons)}
+
+
+@course_operation()
+async def guided_step(user_id: str) -> dict | None:
+    """Where the learner is in the guided course: the module they are on and,
+    while its lessons are unread, the next one. None when there is no module
+    left to take. The module is the saved learning position's, else the first
+    module in course order not yet completed.
+    """
+    prog = await get_progress(user_id)
+    modules = getattr(prog, "modules", None) or {}
+    position = getattr(prog, "learning_position", None)
+    position = position if isinstance(position, dict) else {}
+    module_id = position.get("module_id")
+    if module_id not in course_module_xp() or (modules.get(module_id) or {}).get("completed"):
+        module_id = next((m for m in course_module_order() if not (modules.get(m) or {}).get("completed")), None)
+    if module_id is None:
+        return None
+    return {
+        "module_id": module_id,
+        "title": course_module_titles().get(module_id, module_id),
+        "gate": await lesson_gate(user_id, module_id),
+    }
+
+
+def guided_step_block(step: dict | None) -> str:
+    """The guided course's current step, for the chat model's instructions."""
+    if not step:
+        return ""
+    title, gate = step["title"], step["gate"]
+    lines = ["## Certification: current step (set by the app)"]
+    if gate:
+        read = ", ".join(map(str, gate["lessons_read"])) or "none"
+        lines.append(
+            f"{title}: lesson {gate['next_lesson']} of {gate['lesson_count']} is next "
+            f"(read: {read}). Show only that lesson this turn with get_certification_lesson. "
+            "The exercise, lab, answers, check and completion open after the last lesson; "
+            "their tools refuse until then. Answer questions about lessons already read, "
+            "but do not skip, reorder or retell lessons."
+        )
+    else:
+        lines.append(
+            f"{title}: lessons done. Help with the exercise, then ask the module's questions "
+            "one per turn and save the learner's own answers, then check. Completion is the "
+            "learner's decision: offer it only after a passing check."
+        )
+    return "\n".join(lines)
+
+
+def lesson_gate_error(module_id: str, gate: dict, action: str) -> dict:
+    """The refusal a gated chat tool returns, in plain words for the learner."""
+    title = course_module_titles().get(module_id, module_id)
+    n, total = gate["next_lesson"], gate["lesson_count"]
+    return {
+        "error": f"{action} opens after the lessons. {title} has lessons left: next is lesson {n} of {total}.",
+        "code": "lessons_first",
+        "next_lesson": n,
+        "unread_lessons": gate["unread_lessons"],
+        "hint": f"Show lesson {n} with get_certification_lesson, one lesson per turn, before this step.",
+    }
+
+
 def lesson_reading(module_id: str, read_ids: list[str]) -> dict:
     """Which of a module's lessons are read and unread, by 1-based number."""
     lessons = (get_lessons(module_id) or {}).get("lessons", [])

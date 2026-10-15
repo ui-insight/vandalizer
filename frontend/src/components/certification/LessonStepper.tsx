@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { markLessonRead } from '../../api/certification'
 import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Loader2, Target, Upload } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
@@ -134,6 +135,12 @@ export function LessonStepper({
       return new Set([...prev, safeIndex])
     })
   }, [safeIndex])
+
+  // And record it, so chat's guided course knows the panel taught it.
+  const shownLessonId = lessons[safeIndex]?.id
+  useEffect(() => {
+    if (shownLessonId) markLessonRead(moduleId, shownLessonId, enrollmentId).catch(() => {})
+  }, [moduleId, shownLessonId, enrollmentId])
 
   const allRead = readLessons.size >= lessons.length
   const [showChallengePreview, setShowChallengePreview] = useState(false)

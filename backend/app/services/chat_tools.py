@@ -6093,6 +6093,26 @@ async def get_certification_module(
     }
 
 
+def lessons_first(action: str):
+    """Refuse a course step until the module's lessons are read (guided course).
+
+    Applied inside the course operation, so it reads the pinned enrollment.
+    """
+    import functools
+
+    def decorate(function):
+        @functools.wraps(function)
+        async def wrapped(context, module_id, *args, **kwargs):
+            from app.services import certification_service as cert_svc
+
+            gate = await cert_svc.lesson_gate(context.deps.user_id, module_id)
+            if gate is not None:
+                return cert_svc.lesson_gate_error(module_id, gate, action)
+            return await function(context, module_id, *args, **kwargs)
+        return wrapped
+    return decorate
+
+
 @course_operation(tool=True)
 @certification_result(LessonResult)
 async def get_certification_lesson(
@@ -6145,6 +6165,15 @@ async def get_certification_lesson(
         return _err(
             f"lesson_number must be 1..{len(lessons)} for '{module_id}'.",
         )
+    gate = await cert_svc.lesson_gate(context.deps.user_id, module_id)
+    if gate is not None and lesson_number > gate["next_lesson"]:
+        return {
+            **cert_svc.lesson_gate_error(module_id, gate, f"Lesson {lesson_number}"),
+            "error": (
+                f"Lessons are taught in order: lesson {gate['next_lesson']} of "
+                f"{gate['lesson_count']} comes before lesson {lesson_number}."
+            ),
+        }
     lesson = lessons[lesson_number - 1]
     read_ids = await cert_svc.mark_lessons_read(context.deps.user_id, module_id, [lesson.get("id")])
     return {
@@ -6197,6 +6226,7 @@ async def save_certification_position(
 
 @course_operation(write=True, tool=True)
 @certification_result(ProvisionResult)
+@lessons_first("The lab")
 async def provision_certification_lab(
     context: RunContext[AgenticChatDeps],
     module_id: str,
@@ -6249,6 +6279,7 @@ async def provision_certification_lab(
 
 @course_operation(tool=True)
 @certification_result(CheckResult)
+@lessons_first("Checking the module")
 async def check_certification_module(
     context: RunContext[AgenticChatDeps],
     module_id: str,
@@ -6294,6 +6325,7 @@ async def check_certification_module(
 
 @course_operation(write=True, tool=True)
 @certification_result(CompletionResult)
+@lessons_first("Completing the module")
 async def complete_certification_module(
     context: RunContext[AgenticChatDeps],
     module_id: str,
@@ -6434,6 +6466,7 @@ async def complete_certification_module(
 
 @course_operation(write=True, tool=True)
 @certification_result(ReflectionResult)
+@lessons_first("Saving answers")
 async def submit_certification_assessment(
     context: RunContext[AgenticChatDeps],
     module_id: str,

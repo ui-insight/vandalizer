@@ -1921,6 +1921,20 @@ async def chat_stream(
     if inventory and not kb_empty_mode:
         reminder_blocks.append(inventory)
 
+    # Guided certification: the learner's step, worked out from saved
+    # progress, so the course path doesn't depend on the model's reading of
+    # the rules. The chat tools enforce the same order.
+    if getattr(conversation, "is_certification", False):
+        try:
+            from app.services import certification_service as cert_svc
+
+            step_block = cert_svc.guided_step_block(await cert_svc.guided_step(user_id))
+        except Exception as e:  # never let course context break a turn
+            logger.warning("Certification step block failed: %s", e)
+            step_block = ""
+        if step_block:
+            reminder_blocks.append(step_block)
+
     # Expose open documents to the agent so tools like run_extraction can
     # reference them by UUID without a blind search_documents call. Without
     # this, the model has to search by filename — which is both fragile and
