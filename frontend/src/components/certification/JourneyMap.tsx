@@ -3,6 +3,8 @@ import { cn } from '../../lib/cn'
 import type { ModuleDefinition, CertificationProgress, TierDefinition } from '../../types/certification'
 import { TIERS } from './constants'
 import { ModuleCard } from './ModuleCard'
+import { hasOutcomeAssessment } from '../../lib/certificationAssessment'
+import { moduleMaxXp } from './moduleXp'
 
 export function JourneyMap({
   modules,
@@ -12,6 +14,8 @@ export function JourneyMap({
   isModuleLocked,
   onModuleClick,
   prerequisites,
+  starBonusXp,
+  maximumStars,
 }: {
   modules: ModuleDefinition[]
   tiers?: TierDefinition[]
@@ -20,6 +24,9 @@ export function JourneyMap({
   isModuleLocked: (moduleId: string) => boolean
   onModuleClick: (moduleId: string) => void
   prerequisites?: Record<string, string[]>
+  /** Per-star XP and the star scale; a module's card shows its full XP range. */
+  starBonusXp?: number
+  maximumStars?: number
 }) {
   return (
     <div className="space-y-8">
@@ -128,6 +135,9 @@ export function JourneyMap({
                           onClick={() => onModuleClick(module.id)}
                           previousModuleTitle={prevModule?.title}
                           lockedReason={lockedReason}
+                          starBonusXp={starBonusXp}
+                          maxXp={starBonusXp && maximumStars && !hasOutcomeAssessment(module)
+                            ? moduleMaxXp(module.xp, starBonusXp, maximumStars) : undefined}
                         />
                       </div>
                     </div>

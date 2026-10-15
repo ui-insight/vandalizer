@@ -94,6 +94,9 @@ export interface CourseDefinition {
   modules_total: number
   maximum_xp: number
   optional_update_available?: boolean | null
+  /** XP each star adds on completion; 0 when stars carry no bonus. */
+  star_bonus_xp?: number
+  maximum_stars?: number
   modules: ModuleDefinition[]
   prerequisites: Record<string, string[]>
   levels: { name: string; xp: number }[]

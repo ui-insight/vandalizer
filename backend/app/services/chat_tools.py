@@ -5965,6 +5965,7 @@ async def get_certification_progress(
             "module_id": mid,
             "title": cert_svc.course_module_titles().get(mid, mid),
             "xp": cert_svc.course_module_xp()[mid],
+            "max_xp": cert_svc.course_module_max_xp()[mid],
             "completed": completed,
             "stars": data.get("stars", 0),
             "attempts": data.get("attempts", 0),
@@ -6059,6 +6060,8 @@ async def get_certification_module(
         "module_id": module_id,
         "title": cert_svc.course_module_titles().get(module_id, module_id),
         "xp": cert_svc.course_module_xp()[module_id],
+        "max_xp": cert_svc.course_module_max_xp()[module_id],
+        "star_bonus_xp": cert_svc.course_star_bonus_xp(),
         "completed": completed,
         "stars": data.get("stars", 0),
         "attempts": data.get("attempts", 0),
@@ -6368,6 +6371,9 @@ async def complete_certification_module(
             **({'failure_kind': result['failure_kind']} if result.get('failure_kind') else {}),
         }
     result["title"] = cert_svc.course_module_titles().get(module_id, module_id)
+    # So the card can say what made up the award: base XP and the per-star bonus.
+    result["base_xp"] = cert_svc.course_module_xp()[module_id]
+    result["star_bonus_xp"] = cert_svc.course_star_bonus_xp()
     return result
 
 

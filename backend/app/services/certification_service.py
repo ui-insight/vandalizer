@@ -148,6 +148,32 @@ def course_module_xp() -> dict[str, int]:
     return {module.id: module.base_xp for module in operation.package.manifest.modules} if operation else MODULE_XP
 
 
+# The original (unversioned) course's rubric: 25 XP per star, up to 3 stars.
+LEGACY_STAR_BONUS_XP = 25
+LEGACY_MAXIMUM_STARS = 3
+
+
+def course_star_bonus_xp() -> int:
+    """XP each star adds on completion. 5.0 has no star bonus (0)."""
+    operation = current_operation()
+    return operation.package.manifest.star_bonus_xp if operation else LEGACY_STAR_BONUS_XP
+
+
+def course_maximum_stars() -> int:
+    operation = current_operation()
+    return operation.package.manifest.maximum_stars if operation else LEGACY_MAXIMUM_STARS
+
+
+def course_module_max_xp() -> dict[str, int]:
+    """The most XP each module can award: base XP plus every star's bonus.
+
+    A module listed at its base XP awarded more on completion (AI Literacy:
+    50 shown, 125 awarded for 3 stars), with nothing saying stars add XP.
+    """
+    bonus = course_star_bonus_xp() * course_maximum_stars()
+    return {module_id: xp + bonus for module_id, xp in course_module_xp().items()}
+
+
 def course_module_titles() -> dict[str, str]:
     operation = current_operation()
     return {module.id: module.title for module in operation.package.manifest.modules} if operation else MODULE_TITLES
@@ -177,6 +203,8 @@ async def get_course_definition(user_id: str, *, enrollment_id: str | None = Non
     return {
         **course_identity(), 'versioned': True,
         'modules': public_modules(operation.package),
+        # Per-star XP, so a module can show what completing it can award.
+        'star_bonus_xp': manifest.star_bonus_xp,
         'prerequisites': {module.id: list(module.prerequisites) for module in manifest.modules},
         **operation.package.json('course-structure.json'),
         'selected_outcome_completion': selected_outcome_completion_available(operation.package),
@@ -549,9 +577,7 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
         xp_earned = course_module_xp()[module_id]
     # Bonus XP for star upgrades
     if stars > old_stars and not transferred:  # Carried credit is not a second star reward.
-        operation = current_operation()
-        bonus = operation.package.manifest.star_bonus_xp if operation else 25
-        xp_earned += (stars - old_stars) * bonus
+        xp_earned += (stars - old_stars) * course_star_bonus_xp()
 
     prog.modules[module_id] = {
         **module_data,  # Preserve provisioned_docs

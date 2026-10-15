@@ -35,6 +35,7 @@ import { XpMilestones } from './XpMilestones'
 import { useModuleLock } from './useModuleLock'
 import { MODULES as LEGACY_MODULES } from './modules'
 import { FocusTrap } from '../shared/PanelFocusTrap'
+import { LEGACY_MAXIMUM_STARS, LEGACY_STAR_BONUS_XP } from './moduleXp'
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -633,6 +634,8 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
           modules={MODULES}
           tiers={TIERS}
           prerequisites={course?.prerequisites}
+          starBonusXp={course ? course.star_bonus_xp : LEGACY_STAR_BONUS_XP}
+          maximumStars={course ? course.maximum_stars : LEGACY_MAXIMUM_STARS}
           progress={progress}
           activeModule={activeModule}
           isModuleLocked={isModuleLocked}

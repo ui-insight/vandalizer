@@ -20,6 +20,7 @@ import { ChatModuleLessons } from './ChatModuleLessons'
 import { hasOutcomeAssessment } from '../../lib/certificationAssessment'
 import { isCourseProgressionPolicy } from '../../lib/certificationPayload'
 import { CourseLearningPolicy } from '../certification/CourseLearningPolicy'
+import { moduleXpExplanation, moduleXpLabel } from '../certification/moduleXp'
 
 const ACCENT = 'var(--highlight-color, #eab308)'
 
@@ -27,6 +28,8 @@ interface ModuleRow {
   module_id: string
   title: string
   xp: number
+  /** Base XP plus every star's bonus; absent on cards saved before it existed. */
+  max_xp?: number
   completed: boolean
   stars: number
 }
@@ -168,7 +171,10 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
             </span>
             <Stars count={m.completed ? m.stars : 0} content={content} />
             <span style={{ flex: 1 }} />
-            <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--cert-text-muted)' }}>{m.xp} XP</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--cert-text-muted)' }}
+              title={m.completed ? undefined : moduleXpExplanation(m.xp, m.max_xp)}>
+              {m.completed ? `${m.xp} XP` : moduleXpLabel(m.xp, m.max_xp)}
+            </span>
           </li>
         ))}
       </ul>
@@ -212,6 +218,8 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
   const prerequisitesMet = !!required && required.every(id => progress?.modules[id]?.completed)
   const title = String(content.title ?? content.module_id ?? 'Module')
   const xp = Number(content.xp ?? 0)
+  const maxXp = typeof content.max_xp === 'number' ? content.max_xp : undefined
+  const starBonusXp = typeof content.star_bonus_xp === 'number' ? content.star_bonus_xp : undefined
   const completed = Boolean(content.completed)
   const stars = Number(content.stars ?? 0)
   const overview = String(content.overview ?? '')
@@ -242,8 +250,8 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
           whiteSpace: 'nowrap', flexShrink: 0, fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 999,
           background: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, white)',
           color: '#806600',
-        }}>
-          {xp} XP
+        }} title={completed ? undefined : moduleXpExplanation(xp, maxXp, starBonusXp)}>
+          {completed ? `${xp} XP` : moduleXpLabel(xp, maxXp)}
         </span>
       </div>
 
@@ -426,6 +434,13 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
   const xpEarned = Number(content.xp_earned ?? 0)
   const totalXp = Number(content.total_xp ?? 0)
   const stars = Number(content.stars ?? 0)
+  // A first completion awards base XP plus each star's bonus; say so, or
+  // "+125 XP" reads as a mistake beside a module listed at 50.
+  const baseXp = typeof content.base_xp === 'number' ? content.base_xp : null
+  const perStar = typeof content.star_bonus_xp === 'number' ? content.star_bonus_xp : 0
+  const xpBreakdown = baseXp != null && perStar > 0 && stars > 0 && xpEarned === baseXp + stars * perStar
+    ? ` (${baseXp} for completing + ${stars * perStar} for ${stars} star${stars === 1 ? '' : 's'})`
+    : ''
   const level = String(content.level ?? '')
   const levelUp = Boolean(content.level_up)
   const certified = Boolean(content.certified)
@@ -452,7 +467,7 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
           <Stars count={stars} content={content} />
         </div>
         <div style={{ lineHeight: 1.6 }}>
-          {content.credit_origin === 'transferred' ? <>{Number(content.xp_carried ?? 0)} XP carried · no new XP reward · </> : xpEarned > 0 ? <>+{xpEarned} XP · </> : null}
+          {content.credit_origin === 'transferred' ? <>{Number(content.xp_carried ?? 0)} XP carried · no new XP reward · </> : xpEarned > 0 ? <>+{xpEarned} XP{xpBreakdown} · </> : null}
           {totalXp.toLocaleString()} XP total ·{' '}
           <span style={{ textTransform: 'capitalize' }}>
             {levelUp ? <strong>level up — {level}!</strong> : `level: ${level}`}

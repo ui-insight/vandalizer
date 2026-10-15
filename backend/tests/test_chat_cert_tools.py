@@ -116,6 +116,38 @@ async def test_progress_reports_next_module_and_counts():
 
 
 @pytest.mark.asyncio
+async def test_each_module_shows_the_most_xp_it_can_award():
+    """Ticket: AI Literacy showed 50 XP and awarded 125 (3 stars x 25), with
+    nothing saying stars add XP."""
+    with patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value=_progress({})),
+    ):
+        result = await get_certification_progress(_make_context())
+
+    by_id = {m["module_id"]: m for m in result["modules"]}
+    assert (by_id["ai_literacy"]["xp"], by_id["ai_literacy"]["max_xp"]) == (50, 125)
+    assert (by_id["foundations"]["xp"], by_id["foundations"]["max_xp"]) == (100, 175)
+
+
+def test_a_course_without_a_star_bonus_awards_only_its_base():
+    from app.services import certification_service as cert_svc
+
+    with patch.object(cert_svc, "course_star_bonus_xp", return_value=0):
+        assert cert_svc.course_module_max_xp() == cert_svc.course_module_xp()
+
+
+def test_a_module_cannot_claim_less_than_its_base_xp():
+    from pydantic import ValidationError
+    from app.services.certification_versions.tool_results import ModuleRow
+
+    row = {"module_id": "one", "title": "One", "xp": 100, "completed": False, "stars": 0}
+    assert ModuleRow.model_validate({**row, "max_xp": 175}).max_xp == 175
+    with pytest.raises(ValidationError):
+        ModuleRow.model_validate({**row, "max_xp": 50})
+
+
+@pytest.mark.asyncio
 async def test_progress_fully_certified_has_no_next_module():
     modules = {}
     from app.services.certification_service import MODULE_ORDER
@@ -166,6 +198,8 @@ async def test_get_module_merges_exercise_and_progress():
 
     assert result["title"] == "Foundations"
     assert result["xp"] == 100
+    assert result["max_xp"] == 175
+    assert result["star_bonus_xp"] == 25
     assert result["completed"] is True
     assert result["stars"] == 2
     assert result["expected_fields"] == ["pi_name", "award_amount"]
@@ -436,6 +470,8 @@ async def test_complete_success_adds_title():
     assert result["title"] == "Foundations"
     assert result["xp_earned"] == 100
     assert result["level"] == "builder"
+    # What the card needs to explain the award.
+    assert (result["base_xp"], result["star_bonus_xp"]) == (100, 25)
 
 
 @pytest.mark.asyncio

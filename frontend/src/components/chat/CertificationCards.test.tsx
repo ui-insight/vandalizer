@@ -240,3 +240,34 @@ describe('CertCompletionCard', () => {
     expect(screen.getByText('Certification complete — the course requirements are complete.')).toBeInTheDocument()
   })
 })
+
+// Ticket: AI Literacy showed 50 XP and awarded 125; Foundations 100 and 150.
+describe('module XP shows what completing can award', () => {
+  it('lists an open module at its full range, a completed one at its base', () => {
+    render(<CertProgressCard content={{ ...PROGRESS, modules: [
+      { ...PROGRESS.modules[1], max_xp: 175 },
+      { ...PROGRESS.modules[2], max_xp: 175 },
+    ] }} />)
+    expect(screen.getByText('100–175 XP')).toBeInTheDocument()
+    expect(screen.getByText('100 XP')).toBeInTheDocument()
+  })
+
+  it('explains the range on the module card', () => {
+    render(<CertModuleCard content={{ module_id: 'ai_literacy', title: 'AI Literacy', xp: 50, max_xp: 125, star_bonus_xp: 25,
+      completed: false, stars: 0, overview: '', instructions: [], star_criteria: {} }} />)
+    expect(screen.getByText('50–125 XP')).toHaveAttribute('title', '50 XP for completing this module, plus 25 XP for each star you earn: up to 125 XP')
+  })
+
+  it('breaks a first completion into base XP and star bonus', () => {
+    render(<CertCompletionCard content={{ module_id: 'ai_literacy', title: 'AI Literacy', stars: 3, xp_earned: 125,
+      total_xp: 125, level: 'apprentice', certified: false, base_xp: 50, star_bonus_xp: 25 }} />)
+    expect(screen.getByText(/\+125 XP \(50 for completing \+ 75 for 3 stars\)/)).toBeInTheDocument()
+  })
+
+  it('adds no breakdown to a star upgrade it cannot explain', () => {
+    render(<CertCompletionCard content={{ module_id: 'foundations', title: 'Foundations', stars: 3, xp_earned: 25,
+      total_xp: 175, level: 'apprentice', certified: false, base_xp: 100, star_bonus_xp: 25 }} />)
+    expect(screen.getByText(/\+25 XP ·/)).toBeInTheDocument()
+    expect(screen.queryByText(/for completing/)).not.toBeInTheDocument()
+  })
+})

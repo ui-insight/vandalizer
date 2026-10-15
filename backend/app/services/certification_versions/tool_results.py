@@ -71,7 +71,15 @@ class ModuleRow(BaseModel):
     stars: Stars
     # Historical retained cards may predate the completion precondition.
     attempts: Count | None = None
+    # Base XP plus every star's bonus; absent on cards saved before it existed.
+    max_xp: Count | None = None
     saved_assessment: SavedAssessment | None = None
+
+    @model_validator(mode='after')
+    def reward_range(self):
+        if self.max_xp is not None and self.max_xp < self.xp:
+            raise ValueError('A module cannot award less than its base XP')
+        return self
 
 
 class ProgressionSummary(BaseModel):
@@ -129,6 +137,9 @@ class ModuleResult(Result):
     stars: Stars
     # Historical retained cards may predate the completion precondition.
     attempts: Count | None = None
+    # Base XP plus every star's bonus, and the per-star bonus, when known.
+    max_xp: Count | None = None
+    star_bonus_xp: Count | None = None
     overview: str
     instructions: list[Text]
     agent_guidance: list[Text] = Field(default_factory=list)
@@ -237,6 +248,9 @@ class CompletionResult(Result):
     credit_origin: Literal['transferred'] | None = None
     xp_carried: Count | None = None
     source_enrollment_id: Text | None = None
+    # What made up the award; absent on receipts saved before they were sent.
+    base_xp: Count | None = None
+    star_bonus_xp: Count | None = None
 
     @model_validator(mode='after')
     def reward(self):

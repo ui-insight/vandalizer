@@ -3,6 +3,7 @@ import { cn } from '../../lib/cn'
 import type { ModuleDefinition } from '../../types/certification'
 import { ICON_MAP } from './constants'
 import { hasOutcomeAssessment } from '../../lib/certificationAssessment'
+import { moduleXpExplanation, moduleXpLabel } from './moduleXp'
 
 function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; size?: number }) {
   return (
@@ -23,7 +24,7 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
   )
 }
 
-export function ModuleCard({ module, completed, stars, locked, active, onClick, previousModuleTitle, lockedReason }: {
+export function ModuleCard({ module, completed, stars, locked, active, onClick, previousModuleTitle, lockedReason, maxXp, starBonusXp }: {
   module: ModuleDefinition
   completed: boolean
   stars: number
@@ -32,6 +33,9 @@ export function ModuleCard({ module, completed, stars, locked, active, onClick, 
   onClick: () => void
   previousModuleTitle?: string
   lockedReason?: string
+  /** Base XP plus every star's bonus. Omitted when stars add no XP. */
+  maxXp?: number
+  starBonusXp?: number
 }) {
   const Icon = ICON_MAP[module.icon] || BookOpen
 
@@ -90,8 +94,9 @@ export function ModuleCard({ module, completed, stars, locked, active, onClick, 
               completed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600',
             )}
             style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+            title={completed ? undefined : moduleXpExplanation(module.xp, maxXp, starBonusXp)}
           >
-            {module.xp} XP
+            {completed ? `${module.xp} XP` : moduleXpLabel(module.xp, maxXp)}
           </span>
         </div>
       </div>
