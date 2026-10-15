@@ -106,7 +106,7 @@ async def live_session(repo, monkeypatch, tmp_path):
     async def say(prompt):
         deps = AgenticChatDeps(user=user, user_id=USER_ID, team_id=None, team_access=TeamAccessContext(),
                                organization_id=None, system_config_doc=system_config, model_name=LIVE_MODEL,
-                               turn_marker=len(history))
+                               turn_marker=len(history), user_message=prompt)
         result = await agent.run(prompt, deps=deps, message_history=history,
                                  instructions=llm_service.AGENTIC_CHAT_SYSTEM_PROMPT)
         history[:] = result.all_messages()

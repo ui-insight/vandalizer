@@ -86,3 +86,9 @@ class AgenticChatDeps:
     # Set once require_available_nodes has sent back a reply describing an
     # unavailable workflow node, so the retry happens at most once per turn.
     unavailable_node_retry_used: bool = False
+
+    # The user's own words this turn, without the reminder and document blocks
+    # chat_service wraps around them; and the once-only flag for
+    # approval_claims.require_learner_route.
+    user_message: str = ""
+    learner_route_retry_used: bool = False

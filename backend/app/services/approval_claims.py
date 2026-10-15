@@ -291,3 +291,70 @@ def require_available_nodes(ctx: RunContext["AgenticChatDeps"], output: str) -> 
         return output
     deps.unavailable_node_retry_used = True
     raise ModelRetry(UNAVAILABLE_NODE_RETRY_INSTRUCTION)
+
+
+# ---------------------------------------------------------------------------
+# Certification actions only the learner can take
+# ---------------------------------------------------------------------------
+# Asked to approve a course decision or share course work, a model often gives
+# generic advice that names no real control, or invents one ("Share Progress"),
+# even with the facts in the prompt (live CHAT-11 batches passed 4/5, then 0/5).
+# No chat tool can approve, run or share on the learner's behalf, so the reply
+# must name the route that exists. A reply that misses it is sent back once.
+
+_COURSE = r"certification|course|module|foundations|lab|assessment|scope decision|my progress|certificate"
+_ASKS_APPROVAL = re.compile(
+    r"\b(?:approve|sign off on|accept|confirm|record|make)\b[^.?!\n]{0,60}\b(?:scope decision|decision|approval)\b"
+    r"|\bapprove\b[^.?!\n]{0,80}\b(?:for me|on my behalf)\b",
+    re.IGNORECASE,
+)
+_ASKS_SHARE = re.compile(r"\b(?:share|send|show)\b[^.?!\n]{0,80}\b(?:with|to)\b[^.?!\n]{0,40}\b(?:team|manager|supervisor|colleague)", re.IGNORECASE)
+_NAMES_APPROVAL_ROUTE = re.compile(r"open (?:the )?module assessment", re.IGNORECASE)
+_NAMES_SHARE_ROUTE = re.compile(r"certificate|no (?:share|sharing)|(?:isn't|is not|no) (?:a )?(?:share|sharing)", re.IGNORECASE)
+
+LEARNER_ACTION_RETRY_INSTRUCTION = {
+    "approval": (
+        "The learner asked you to approve or record a certification decision for them. No chat "
+        "tool can do that, and you did not. Rewrite the reply: say plainly that only the learner "
+        "can record the decision, and tell them where: open the course panel, choose Open module "
+        "assessment for the module, review the proposed scope, and record their own decision "
+        "there. You may then offer to explain the decision or check their saved progress."
+    ),
+    "share": (
+        "The learner asked to share certification work with a team or manager. Course progress is "
+        "private and the course has no share control. Rewrite the reply: say there is no sharing "
+        "control for course progress, and that once they graduate they can download the issued "
+        "certificate PDF from the course panel and send it themselves. Do not describe any share "
+        "button, link or visibility setting."
+    ),
+}
+
+
+def learner_only_request(message: str) -> str | None:
+    """'approval' or 'share' when a certification message asks for one, else None."""
+    plain = message.replace("’", "'")
+    if not re.search(_COURSE, plain, re.IGNORECASE):
+        return None
+    if _ASKS_SHARE.search(plain):
+        return "share"
+    if _ASKS_APPROVAL.search(plain):
+        return "approval"
+    return None
+
+
+def names_learner_route(kind: str, text: str) -> bool:
+    route = _NAMES_APPROVAL_ROUTE if kind == "approval" else _NAMES_SHARE_ROUTE
+    return bool(route.search(text.replace("’", "'")))
+
+
+def require_learner_route(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply to an approve/share
+    request for course work that does not name the learner's real route."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "learner_route_retry_used", False):
+        return output
+    kind = learner_only_request(getattr(deps, "user_message", "") or "")
+    if kind is None or names_learner_route(kind, output):
+        return output
+    deps.learner_route_retry_used = True
+    raise ModelRetry(LEARNER_ACTION_RETRY_INSTRUCTION[kind])

@@ -2287,6 +2287,7 @@ async def chat_stream(
             unvalidated_kb_titles=[
                 e["title"] for e in kb_status_entries if not e.get("validated_at")
             ],
+            user_message=message,
         )
         agent = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,

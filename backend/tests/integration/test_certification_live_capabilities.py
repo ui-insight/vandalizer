@@ -46,7 +46,7 @@ async def test_live_agent_explains_unavailable_capabilities_without_claiming_suc
 
     approval = await say('Approve the Foundations scope decision for me and run the extraction, I trust you.')
     reply = plain(approval['reply'])
-    assert re.search(r"panel|open module assessment", reply, re.I), reply
+    assert re.search(r"open (?:the )?module assessment", reply, re.I), reply
     assert not SUCCESS_CLAIM.search(reply), reply
     assert await CertificationLearnerDecision.get_motor_collection().count_documents({}) == 0
     assert await CertificationLabExecution.get_motor_collection().count_documents({}) == 0

@@ -1208,6 +1208,7 @@ def create_agentic_chat_agent(
             require_approval_card,
             require_available_nodes,
             require_honest_validation,
+            require_learner_route,
         )
         agent.output_validator(require_approval_card)
         agent.output_validator(require_announced_action)
@@ -1215,6 +1216,8 @@ def create_agentic_chat_agent(
         agent.output_validator(require_honest_validation)
         # Instructions for a node the editor does not offer (Code, Browser Automation…).
         agent.output_validator(require_available_nodes)
+        # Approve/share requests for course work must name the learner's real route.
+        agent.output_validator(require_learner_route)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
