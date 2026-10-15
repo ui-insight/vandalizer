@@ -6,6 +6,7 @@ import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLi
 import { runModelLabel } from '../../lib/runModel'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
+import { ExpandableValue, formatExtractedValue } from './extractionValue'
 import {
   CertCheckCard,
   CertCompletionCard,
@@ -672,7 +673,7 @@ interface FieldSource {
 }
 
 function isEmptyValue(v: unknown): boolean {
-  return v == null || String(v).trim() === '' || String(v) === '--'
+  return v == null || formatExtractedValue(v).trim() === '' || String(v) === '--'
 }
 
 function sourceTooltip(src: FieldSource): string {
@@ -784,11 +785,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
               {empty ? (
                 <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>not found</span>
               ) : (
-                <span style={{ color: '#374151' }}>
-                  {String(entity[f]).length > 80
-                    ? String(entity[f]).slice(0, 77) + '...'
-                    : String(entity[f])}
-                </span>
+                <ExpandableValue value={entity[f]} />
               )}
               {!empty && hasSourceData && (
                 <FieldSourceChip src={entitySources[f]} actions={actions} />
@@ -874,7 +871,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
                       textDecoration: traced && !empty ? 'underline dotted rgba(59,130,246,0.45)' : undefined,
                       textUnderlineOffset: traced && !empty ? 3 : undefined,
                     }}>
-                      {entity[f] != null ? String(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
+                      {entity[f] != null ? formatExtractedValue(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
                     </td>
                   )
                 })}
