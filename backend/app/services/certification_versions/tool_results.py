@@ -38,6 +38,28 @@ class Result(BaseModel):
         return self
 
 
+class SavedOutcome(BaseModel):
+    model_config = ConfigDict(strict=True, extra='forbid')
+    outcome_id: Text
+    state: Literal['supported', 'revision_required', 'selection_required', 'assessment_pending', 'grading_unavailable']
+
+
+class SavedAssessment(BaseModel):
+    model_config = ConfigDict(strict=True, extra='forbid')
+    scenario_attempt_id: Text
+    status: Literal['requirements_supported', 'revision_required', 'selection_required', 'assessment_pending',
+                    'grading_unavailable', 'unavailable']
+    outcomes: list[SavedOutcome]
+    next_step: Text
+    credit_awarded: Literal[False]
+
+    @model_validator(mode='after')
+    def readable(self):
+        if (self.status == 'unavailable') != (not self.outcomes):
+            raise ValueError('Only an unreadable saved assessment omits its outcomes')
+        return self
+
+
 class ModuleRow(BaseModel):
     model_config = ConfigDict(strict=True, extra='allow')
     module_id: Text
@@ -47,6 +69,7 @@ class ModuleRow(BaseModel):
     stars: Stars
     # Historical retained cards may predate the completion precondition.
     attempts: Count | None = None
+    saved_assessment: SavedAssessment | None = None
 
 
 class ProgressionSummary(BaseModel):
@@ -118,6 +141,7 @@ class ModuleResult(Result):
     required_outcomes: list[RequiredOutcome] = Field(default_factory=list)
     selected_outcome_completion: bool = False
     scenario_case_count: Count | None = None
+    saved_assessment: SavedAssessment | None = None
 
     @model_validator(mode='after')
     def criteria(self):

@@ -5646,6 +5646,35 @@ async def update_plan(
 # ---------------------------------------------------------------------------
 
 
+_SAVED_NEXT_STEPS = {
+    'requirements_supported': ('Every outcome is supported, but no credit is recorded yet. The learner completes '
+                               'the module in the Certification panel: Check all module outcomes, choose this saved '
+                               'assessment, then Complete module with selected evidence.'),
+    'revision_required': ('The answers were graded when saved and at least one outcome needs revision. The learner '
+                          'reads the saved feedback in the panel and submits new answers of their own.'),
+    'selection_required': ('The scenario outcomes are graded. The module also needs a saved automatic assessment '
+                           'of practical work, chosen in Check all module outcomes before it can be completed.'),
+    'unavailable': 'The saved answers could not be read. The learner reopens the module in the Certification panel.',
+}
+
+
+async def _saved_scenario_summary(user_id: str, enrollment_id: str, module_id: str, attempt_id: str) -> dict:
+    """The learner's own saved scenario answers, read only: graded on save, never credit by themselves."""
+    from app.services.certification_versions.catalog import CourseCatalogError
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.module_readiness import ModuleReadiness
+    from app.services.certification_versions.review_delivery import SavedReviewUnavailable
+    # An unreadable receipt is reported, never allowed to block reading the course.
+    try:
+        preview = await ModuleReadiness().preview(user_id, enrollment_id, module_id, scenario_attempt_id=attempt_id)
+        status = preview['status']
+        outcomes = [{'outcome_id': item['outcome_id'], 'state': item['state']} for item in preview['outcomes']]
+    except (CourseCatalogError, EnrollmentConflict, SavedReviewUnavailable):
+        status, outcomes = 'unavailable', []
+    return {'scenario_attempt_id': attempt_id, 'status': status, 'outcomes': outcomes,
+            'next_step': _SAVED_NEXT_STEPS.get(status, _SAVED_NEXT_STEPS['selection_required']), 'credit_awarded': False}
+
+
 @course_operation(tool=True)
 @certification_result(ProgressResult)
 async def get_certification_progress(
@@ -5657,7 +5686,9 @@ async def get_certification_progress(
     next incomplete module. Call this when the user says "start certification",
     "continue certification", asks how far along they are, or asks about XP,
     levels, or badges. Progress is shared with the Certification panel for
-    the selected enrollment. Only its applicable assessed requirements earn
+    the selected enrollment. A module row's saved_assessment reports the
+    learner's saved scenario answers, graded when saved: relay its status
+    and next_step; nothing is pending and it is not credit. Only its applicable assessed requirements earn
     credit; reading, drafting and practice do not become completion by chat.
 
     Args:
@@ -5682,6 +5713,8 @@ async def get_certification_progress(
             "completed": completed,
             "stars": data.get("stars", 0),
             "attempts": data.get("attempts", 0),
+            **({"saved_assessment": await _saved_scenario_summary(context.deps.user_id, prog["enrollment_id"], mid, data["scenario_attempt_id"])}
+               if prog.get("enrollment_id") and data.get("scenario_attempt_id") else {}),
         })
     completed_count = sum(1 for m in modules if m["completed"])
     operation = cert_svc.current_operation()
@@ -5710,7 +5743,9 @@ async def get_certification_module(
     """Get one certification module's exercise: overview, instructions, criteria.
 
     Use the returned assessment_mode and required_outcomes, never a module
-    name, to choose its assessment path. Teach relevant lessons and respect
+    name, to choose its assessment path. When saved_assessment is present,
+    the learner's scenario answers are saved and graded: relay each
+    outcome's state and its next_step, never as credit. Teach relevant lessons and respect
     the learner's saved position. Selected-outcome courses require the
     learner's saved evidence and decisions in the Certification panel; chat
     can explain and help author work but cannot choose or submit those
@@ -5745,7 +5780,7 @@ async def get_certification_module(
     assessment_mode = "legacy_reflection" if assessment_keys else "legacy_practical"
     required_outcomes = []
     selected_completion = False
-    scenario_cases = None
+    scenario_cases = saved_assessment = None
     operation = cert_svc.current_operation()
     if operation and 'outcomes.json' in operation.package.manifest.artifacts:
         from app.services.certification_versions.outcomes import package_outcomes
@@ -5761,6 +5796,9 @@ async def get_certification_module(
             from app.services.certification_versions.scenario_submissions import module_bank
             # The real case count, so the agent does not infer one from the outcome list.
             scenario_cases = len(module_bank(operation.package, module_id).questions)
+            if data.get("scenario_attempt_id"):
+                saved_assessment = await _saved_scenario_summary(context.deps.user_id, operation.progress.enrollment_id,
+                                                                 module_id, data["scenario_attempt_id"])
     return {
         **cert_svc.course_identity(),
         "module_id": module_id,
@@ -5787,6 +5825,7 @@ async def get_certification_module(
         "required_outcomes": required_outcomes,
         "selected_outcome_completion": selected_completion,
         **({"scenario_case_count": scenario_cases} if scenario_cases is not None else {}),
+        **({"saved_assessment": saved_assessment} if saved_assessment is not None else {}),
         "assessment_keys": assessment_keys,
         "assessment_questions": assessment_questions,
     }
