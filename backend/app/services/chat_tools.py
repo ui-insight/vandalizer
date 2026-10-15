@@ -2738,7 +2738,10 @@ async def _execute_workflow(
         "session_id": session_id,
         "status": "running",
         "model": run_model,
-        "message": "Workflow started. Use get_workflow_status with the session_id to check progress.",
+        # "message" can be shown to the user as is; how to follow up is for
+        # the model only.
+        "message": "Workflow started.",
+        "next_step": "Use get_workflow_status with the session_id to check progress.",
     }
 
 
@@ -4081,10 +4084,13 @@ async def start_optimization(
         "run_uuid": run.uuid,
         "status": "queued",
         "item": title,
+        # Shown on the chat card as is, so no tool names: support ticket,
+        # users read "check progress with get_optimization_run".
         "message": (
-            f"Autovalidate started for '{title}'. It runs in the background — "
-            "check progress with get_optimization_run."
+            f"Autovalidate started for '{title}'. It runs in the background; "
+            "ask me to check on it any time."
         ),
+        "next_step": "Use get_optimization_run with run_uuid to check progress.",
     }
 
 
@@ -4515,7 +4521,7 @@ async def save_to_folder(
         key={"title": display_title, "folder": target_folder, "ext": ext},
         preview={
             "action": "save_to_folder",
-            "preview": f'Save "{display_title}" ({len(content):,} chars) to {folder_name}.',
+            "preview": f'Save "{display_title}" to {folder_name}.',
             "needs_confirmation": True,
             "destination_folder": target_folder,
         },
@@ -4581,9 +4587,10 @@ async def save_to_folder(
     return {
         "document_uuid": uid,
         "title": display_title,
-        "folder": target_folder,
+        # The folder by name: the root folder's id is "0", which chat read
+        # back to users as "the special UUID 0".
+        "folder": folder_name,
         "extension": ext,
-        "char_count": len(content),
         "sources": [{k: r[k] for k in ("item", "document", "page", "status")} for r in source_rows],
         "message": (
             f'Saved "{display_title}" to {folder_name}. It\'s in your Files tab now and '
@@ -6336,9 +6343,10 @@ async def submit_certification_assessment(
         **cert_svc.course_identity(),
         "stored": True,
         "module_id": module_id,
-        "message": (
-            "Answers saved. Run check_certification_module then "
-            "complete_certification_module to bank the XP."
+        "message": "Answers saved.",
+        "next_step": (
+            "Run check_certification_module, then complete_certification_module "
+            "to bank the XP."
         ),
     }
 

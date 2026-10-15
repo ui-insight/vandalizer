@@ -28,7 +28,8 @@
       "credit_basis": "legacy_rubric",
       "stored": true,
       "module_id": "ai_literacy",
-      "message": "Answers saved. Run check_certification_module then complete_certification_module to bank the XP."
+      "message": "Answers saved.",
+      "next_step": "Run check_certification_module, then complete_certification_module to bank the XP."
     }
   },
   {

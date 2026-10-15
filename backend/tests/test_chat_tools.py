@@ -808,7 +808,9 @@ class TestSaveToFolder:
             )
 
         assert result["title"] == "My Memo.md"
-        assert result["folder"] == "0"
+        # By name: the root's id "0" reached users as "the special UUID 0".
+        assert result["folder"] == "your root folder"
+        assert "char_count" not in result
         assert result["extension"] == "md"
         assert "document_uuid" in result
         mock_storage.write.assert_awaited_once()
