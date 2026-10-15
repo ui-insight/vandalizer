@@ -211,6 +211,9 @@ class CheckResult(Result):
     passed: bool
     stars: Stars
     checks: list[CheckRow] = Field(min_length=1)
+    # The counter a following completion is fenced against. Optional so cards
+    # saved before checks carried it stay readable.
+    expected_attempts: Count | None = None
 
     @model_validator(mode='after')
     def required_summary(self):

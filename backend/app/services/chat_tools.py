@@ -6263,6 +6263,7 @@ async def check_certification_module(
             hint=f"Valid module ids: {', '.join(cert_svc.course_module_order())}",
         )
     result = await cert_svc.validate_module(context.deps.user_id, module_id)
+    progress = await cert_svc.get_progress_dict(context.deps.user_id)
     return {
         **cert_svc.course_identity(),
         "module_id": module_id,
@@ -6270,6 +6271,11 @@ async def check_certification_module(
         "passed": result["passed"],
         "stars": result["stars"],
         "checks": result["checks"],
+        # The counter complete_certification_module is fenced against, read
+        # with the check the learner just reviewed. Without it here, chat had to
+        # carry `attempts` over from a progress read turns earlier; it didn't,
+        # and every completion failed with "Reload the app".
+        "expected_attempts": progress["modules"].get(module_id, {}).get("attempts", 0),
     }
 
 
@@ -6299,7 +6305,7 @@ async def complete_certification_module(
         context: The call context.
         module_id: The certification module to complete.
         enrollment_id: Enrollment returned by get_certification_progress; required for a versioned course.
-        expected_attempts: The attempts counter from freshly read progress or module details, required for a new submission. Never infer or increment it; refresh and review after a conflict. Recorded requests can replay without it.
+        expected_attempts: Required for a new submission: pass the expected_attempts value from the check_certification_module result for this module (or attempts from freshly read progress or module details). Never infer or increment it, and never ask the learner for it. After a conflict, run the check again and use its new value. Recorded requests can replay without it.
         request_id: Optional 32-character lowercase hexadecimal retry identity. Reuse it after an uncertain response; use a new identity for a new assessed submission.
     """
     from app.services import certification_service as cert_svc
@@ -6319,8 +6325,39 @@ async def complete_certification_module(
             # completion identity without asking the model to invent one.
             request_id = hashlib.sha256(json.dumps(['certification-completion', context.deps.user_id,
                 conversation_id, marker, call_id, module_id, enrollment_id], separators=(',', ':')).encode()).hexdigest()[:32]
-    result = await cert_svc.complete_module(context.deps.user_id, module_id, request_id=request_id,
-        expected_attempts=expected_attempts, require_attempt_counter=True)
+    from app.services.certification_versions.completion_preconditions import (
+        CompletionChanged, CompletionReviewRequired,
+    )
+    try:
+        result = await cert_svc.complete_module(context.deps.user_id, module_id, request_id=request_id,
+            expected_attempts=expected_attempts, require_attempt_counter=True)
+    except CompletionReviewRequired:
+        # The course's own message says to reload the app, which the learner
+        # can't act on and the model can't either: it retried six times with
+        # the same call. Say what is missing and where to get it. ``hint`` is
+        # shown to the learner; ``next_step`` is the model's instruction.
+        return {
+            "error": "Completion needs this module's latest check result.",
+            "hint": "The Assistant re-checks the module and then completes it. You don't need to do anything.",
+            "next_step": (
+                "Run check_certification_module for this module, then call "
+                "complete_certification_module again with expected_attempts set "
+                "to the expected_attempts value that check returned. Never ask "
+                "the learner for it."
+            ),
+            "module_id": module_id,
+        }
+    except CompletionChanged:
+        return {
+            "error": "This module's saved result changed after its last check.",
+            "hint": "The Assistant checks the module again before trying once more.",
+            "next_step": (
+                "Run check_certification_module again and use the "
+                "expected_attempts value it returns. If the module is already "
+                "completed, tell the learner it's done instead of completing it again."
+            ),
+            "module_id": module_id,
+        }
     if "error" in result:
         return {
             **cert_svc.course_identity(),

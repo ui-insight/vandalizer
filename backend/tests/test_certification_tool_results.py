@@ -49,7 +49,8 @@ async def test_malformed_progress_is_unconfirmed_not_zero_or_success(changes):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('value', [{'passed': 'false', 'stars': 1, 'checks': []}, {'passed': True, 'stars': 1, 'checks': {}}, {'passed': True, 'stars': 1, 'checks': [{'name': 'Source', 'passed': 'false', 'detail': 'Missing'}]}])
 async def test_invalid_check_never_becomes_passing_card(value):
-    with patch.object(service, 'validate_module', new=AsyncMock(return_value=value)) as grade:
+    with patch.object(service, 'validate_module', new=AsyncMock(return_value=value)) as grade, \
+            patch.object(service, 'get_progress_dict', new=AsyncMock(return_value=_progress())):
         saved = await tools.check_certification_module(_make_context(), 'foundations')
     grade.assert_awaited_once()
     assert saved['code'] == 'certification_response_invalid'
@@ -72,7 +73,8 @@ async def test_explicit_check_roles_preserve_advice_and_reject_contradictory_sum
         del value['checks'][0]['role']
     elif change == 'only_advice':
         value['checks'].pop(0)
-    with patch.object(service, 'validate_module', new=AsyncMock(return_value=value)):
+    with patch.object(service, 'validate_module', new=AsyncMock(return_value=value)), \
+            patch.object(service, 'get_progress_dict', new=AsyncMock(return_value=_progress())):
         saved = await tools.check_certification_module(_make_context(), 'extraction_engine')
     if change == 'valid':
         assert saved['passed'] is True and saved['checks'] == value['checks']
@@ -161,6 +163,18 @@ async def test_malformed_stored_attempt_counter_is_not_offered_for_completion(co
                        await tools.get_certification_module(_make_context(), 'foundations')):
             assert result['code'] == 'certification_response_invalid'
             assert 'attempts' not in result
+
+
+@pytest.mark.parametrize('counter', [True, -1, '1'])
+async def test_a_check_never_hands_over_a_malformed_counter(counter):
+    progress = _progress()
+    progress['modules']['foundations'] = {'attempts': counter}
+    passing = {'passed': True, 'stars': 1, 'checks': [{'name': 'Answers', 'passed': True, 'detail': ''}]}
+    with patch.object(service, 'validate_module', new=AsyncMock(return_value=passing)), \
+            patch.object(service, 'get_progress_dict', new=AsyncMock(return_value=progress)):
+        result = await tools.check_certification_module(_make_context(), 'foundations')
+    assert result['code'] == 'certification_response_invalid'
+    assert 'expected_attempts' not in result
 
 
 def test_historical_cards_without_attempt_counter_remain_readable():

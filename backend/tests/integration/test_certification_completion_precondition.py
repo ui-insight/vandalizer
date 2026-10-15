@@ -92,11 +92,15 @@ async def test_chat_reads_counter_and_fences_new_requests_but_replays_old_receip
     assert details['attempts'] == 0
     request_id = uuid4().hex
     blocked = await chat_tools.complete_certification_module(context, module, request_id=request_id, **identity)
-    assert 'review' in blocked['error']
+    assert "latest check result" in blocked['error']
+    assert 'check_certification_module' in blocked['next_step']
     for malformed in (False, -1, '0'):
         rejected = await chat_tools.complete_certification_module(context, module, request_id=request_id, expected_attempts=malformed, **identity)
         assert 'nonnegative' in rejected['error']
-    first = await chat_tools.complete_certification_module(context, module, request_id=request_id, expected_attempts=row['attempts'], **identity)
+    # The check hands over the counter the completion is fenced against.
+    check = await chat_tools.check_certification_module(context, module, **identity)
+    assert check['passed'] is True and check['expected_attempts'] == row['attempts'] == 0
+    first = await chat_tools.complete_certification_module(context, module, request_id=request_id, expected_attempts=check['expected_attempts'], **identity)
     assert first['xp_earned'] == 125
     assert await chat_tools.complete_certification_module(context, module, request_id=request_id, **identity) == first
     stale = await chat_tools.complete_certification_module(context, module, request_id=uuid4().hex, expected_attempts=0, **identity)

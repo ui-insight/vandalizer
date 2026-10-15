@@ -373,7 +373,10 @@ async def test_check_module_relays_validator_result():
     with patch(
         "app.services.certification_service.validate_module",
         new=AsyncMock(return_value=validation),
-    ) as validate:
+    ) as validate, patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value={"modules": {}}),
+    ):
         result = await check_certification_module(_make_context(), "foundations")
 
     validate.assert_awaited_once_with("user1", "foundations")
@@ -381,6 +384,24 @@ async def test_check_module_relays_validator_result():
     assert result["title"] == "Foundations"
     assert result["passed"] is False
     assert result["checks"][0]["name"] == "Extraction template exists"
+
+
+@pytest.mark.asyncio
+async def test_check_returns_the_counter_completion_needs():
+    """Ticket: every chat completion failed with "Reload the app" because the
+    model had to carry the attempts counter over from a read turns earlier.
+    The check the learner just reviewed now hands it over."""
+    validation = {"passed": True, "stars": 1, "checks": [{"name": "Answers", "passed": True, "detail": ""}]}
+    for stored, expected in (({}, 0), ({"foundations": {"attempts": 2}}, 2)):
+        with patch(
+            "app.services.certification_service.validate_module",
+            new=AsyncMock(return_value=validation),
+        ), patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value={"modules": stored}),
+        ):
+            result = await check_certification_module(_make_context(), "foundations")
+        assert result["expected_attempts"] == expected
 
 
 @pytest.mark.asyncio
@@ -431,6 +452,39 @@ async def test_complete_failure_returns_validation():
 
     assert result["error"] == "Validation did not pass"
     assert result["validation"]["passed"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_missing_counter_tells_the_model_what_to_do_not_the_learner_to_reload():
+    from app.services.certification_versions.completion_preconditions import CompletionReviewRequired
+
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(side_effect=CompletionReviewRequired()),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations")
+
+    assert "Reload" not in result["error"] and "Reload" not in result["hint"]
+    # The learner sees error + hint, so neither names a tool or the counter.
+    for shown in (result["error"], result["hint"]):
+        assert "certification_module" not in shown and "expected_attempts" not in shown
+    assert "check_certification_module" in result["next_step"]
+    assert "expected_attempts" in result["next_step"]
+
+
+@pytest.mark.asyncio
+async def test_a_changed_counter_says_to_check_again():
+    from app.services.certification_versions.completion_preconditions import CompletionChanged
+
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(side_effect=CompletionChanged()),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations", expected_attempts=0)
+
+    assert "changed" in result["error"]
+    assert "check_certification_module" in result["next_step"]
+    assert "already completed" in result["next_step"]
 
 
 # ---------------------------------------------------------------------------
