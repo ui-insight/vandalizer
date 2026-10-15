@@ -46,6 +46,7 @@ CASES = {
     'progression-policy.json': 'progression-policy.json',
     'course-structure.json': 'course-structure.json',
     'bridge-path.json': 'bridge-path.json',
+    'legacy-equivalence-review.json': 'legacy-equivalence-review.json',
 }
 
 

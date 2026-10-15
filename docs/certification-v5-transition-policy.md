@@ -108,6 +108,17 @@ A target package may author `credit-equivalence.json` for one exact source relea
 
 Eligibility does not apply credit, award XP, activate an enrollment or change an issued credential. Existing optional-upgrade consent still explicitly transfers no credit. A future application must have separate reviewable consent and a durable receipt, retain original evidence, account for rewards without duplication and survive retries/rollback. Do not reinterpret an older choice as permission to transfer credit. Automatic assessment remains the only normal grading route; no staff review queue is introduced.
 
+### Legacy-to-5.0 equivalence decision (October 15)
+
+Decision (conservative default; the user may override it): **no 5.0 outcome transfers from the current/legacy course.** The 5.0 draft package carries `legacy-equivalence-review.json`, bound to the exact `legacy-2026-10-02.1` manifest and the 5.0 outcome contract. It records one determination per required outcome (all 33), each `requires_new_assessment` with reason codes and a sentence the learner sees in the upgrade preview:
+
+- `no_outcome_level_source_evidence` (all 33): legacy records hold module completion, stars and XP, not evidence for an outcome.
+- `source_assessed_reflection_only` (AI Literacy, Thinking in Workflows, Workflow Design): those modules passed on submitted reflections, and every submission earned three stars.
+- `source_evidence_not_attempt_bound` (the other eight modules): the legacy check counted fields, nodes or runs in the workspace at grading time. It used no assigned input or pinned revision and kept no receipt.
+- `new_agent_supervision_competency` (24 outcomes): scope, approval, source-checking, recovery and release decisions that the legacy course never assessed. A matching module title does not establish them.
+
+Reason: an outcome is unchanged only when its assessment requirements match and original assessed evidence exists. The legacy course has no outcome contract, so `assessment_basis` is undefined and no `credit-equivalence.json` rule can bind to it. The review schema accepts only `requires_new_assessment`, so it can explain a refusal but never grant credit. Transfer stays possible only between outcome-based releases with an identical assessment basis. The review is presentation-only: editing its text does not change the target's assessment basis. To override the decision, author a new outcome-based release whose evidence supports an `EquivalencePolicy` rule. Do not edit the review to say otherwise.
+
 ## Data and rollout sequence
 
 1. Publish an immutable course manifest containing stable module/lesson/outcome IDs, ordered requirements, assets, XP rules and exact content/exercise/rubric revisions. Store the release digest and distinguish drafts, published releases, retired-for-new-enrollment releases and support for existing enrollments.

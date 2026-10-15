@@ -4,6 +4,7 @@ Rules are immutable target-package assets, not request parameters. A compatible
 rubric alone is insufficient: original, enrollment-bound assessed credit must
 also validate. Legacy participation remains earned in its original course.
 """
+import datetime
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -37,6 +38,50 @@ class EquivalencePolicy(ContractModel):
         return self
 
 
+ReviewReason = Literal['no_outcome_level_source_evidence', 'source_assessed_reflection_only',
+                       'source_evidence_not_attempt_bound', 'new_agent_supervision_competency']
+
+
+class OutcomeDetermination(ContractModel):
+    outcome_id: str
+    # Deliberately one value: a review explains why credit does not transfer.
+    # Transfer needs an EquivalenceRule bound to an unchanged assessment basis.
+    decision: Literal['requires_new_assessment']
+    reason_codes: tuple[ReviewReason, ...] = Field(min_length=1)
+    reason: str = Field(min_length=40)
+
+
+class EquivalenceReview(ContractModel):
+    """Authored per-outcome determination for one exact source release."""
+    schema_version: Literal[1] = 1
+    review_id: str = Field(min_length=1)
+    source_version: str
+    source_manifest_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    target_contract_id: str = Field(min_length=1)
+    decided_on: datetime.date
+    basis: str = Field(min_length=40)
+    determinations: tuple[OutcomeDetermination, ...] = Field(min_length=1)
+
+    @model_validator(mode='after')
+    def unique_outcomes(self):
+        if len({item.outcome_id for item in self.determinations}) != len(self.determinations):
+            raise ValueError('Each target outcome needs exactly one determination')
+        return self
+
+
+def equivalence_review(source, target, contract):
+    """The authored review for this exact source, or None; never grants credit."""
+    if 'legacy-equivalence-review.json' not in target.manifest.artifacts:
+        return None
+    review = EquivalenceReview.model_validate_json(target.read('legacy-equivalence-review.json'))
+    if review.source_version != source.manifest.release_id or review.source_manifest_sha256 != source.manifest_sha256:
+        return None
+    if (review.target_contract_id != contract.contract_id
+            or {item.outcome_id for item in review.determinations} != set(contract.required_outcomes())):
+        raise CourseCatalogError('The equivalence review must determine every target outcome exactly once')
+    return review
+
+
 def assessment_basis(package):
     """Conservative compatibility boundary; only presentation may differ.
 
@@ -55,7 +100,8 @@ The mapping itself is excluded to avoid a circular package digest.
             for key in ('lesson_ids', 'practice', 'teaching_status', 'assessment_status'):
                 outcome.pop(key)
     presentation = {'lessons.json', 'panel-modules.json', 'course-structure.json',
-                    'outcomes.json', 'credit-equivalence.json', 'bridge-path.json'}
+                    'outcomes.json', 'credit-equivalence.json', 'bridge-path.json',
+                    'legacy-equivalence-review.json'}
     manifest = package.manifest
     return encode({'outcomes': definition, 'rubric_id': manifest.rubric_id,
         'maximum_stars': manifest.maximum_stars, 'star_bonus_xp': manifest.star_bonus_xp,
@@ -86,6 +132,10 @@ def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
             if not set(rules) <= set(target_contract.required_outcomes()):
                 raise CourseCatalogError('The credit mapping names an unknown target outcome')
         # A rule for a different source release never grants this learner credit.
+    review = equivalence_review(source, target, target_contract)
+    determinations = {item.outcome_id: item for item in review.determinations} if review else {}
+    if set(determinations) & set(rules):
+        raise CourseCatalogError('An outcome cannot be both transferable and reviewed as requiring assessment')
     outcomes = []
     for module in target_contract.modules:
         saved = progress.modules.get(module.module_id, {})
@@ -98,14 +148,18 @@ def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
                     saved['outcome_credit'], expected_attempt_id=saved.get('completion_attempt_id'))
         for outcome in module.outcomes:
             rule = rules.get(outcome.id)
+            determination = determinations.get(outcome.id)
             eligible = rule is not None and snapshot is not None
             row = {'outcome_id': outcome.id, 'module_id': module.module_id,
                    'statement': outcome.statement,
                    'status': 'eligible_for_transfer' if eligible else 'requires_assessment',
                    'reason': rule.reason if eligible else (
                        'Original assessed evidence is required; prior XP or completion alone is insufficient.' if rule
+                       else determination.reason if determination
                        else 'No authored equivalence rule applies to this source course and outcome.'),
                    'rule_id': rule.rule_id if rule else None}
+            if determination:
+                row['reason_codes'] = list(determination.reason_codes)
             if eligible:
                 row['source_completion_attempt_id'] = saved['completion_attempt_id']
                 row['source_assessment_sha256'] = encode(snapshot)[1]
@@ -114,7 +168,8 @@ def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
         'source_enrollment_id': progress.enrollment_id,
         'source_version': source.manifest.release_id, 'source_manifest_sha256': source.manifest_sha256,
         'target_version': target.manifest.release_id, 'target_manifest_sha256': target.manifest_sha256,
-        'policy_id': policy.policy_id if rules else None, 'outcomes': outcomes,
+        'policy_id': policy.policy_id if rules else None, 'review_id': review.review_id if review else None,
+        'outcomes': outcomes,
         'eligible_outcome_count': sum(item['status'] == 'eligible_for_transfer' for item in outcomes),
         'required_outcome_count': len(outcomes), 'read_only': True, 'can_apply': False,
         'credit_transferred': False, 'xp_awarded': 0, 'staff_review_required': False,
