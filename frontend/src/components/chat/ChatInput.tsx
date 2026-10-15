@@ -364,7 +364,7 @@ export function ChatInput({
               type="button"
               onClick={onNewChat}
               title="Start a new conversation"
-              className="flex shrink-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
             >
               <SquarePen className="h-3 w-3 shrink-0" aria-hidden="true" />
               New chat

@@ -211,3 +211,30 @@ class TestProposeTestCaseUsesEditorSettings:
         kwargs = engine.extract.call_args.kwargs
         assert kwargs["model"] == "kimi-k3"
         assert kwargs["extraction_config_override"] == {"mode": "two_pass"}
+
+
+class TestUnscoredBadge:
+    """v5 retest ticket: an extraction never validated showed no badge, while
+    the user guide says anything unvalidated is labelled Unscored."""
+
+    @pytest.mark.asyncio
+    async def test_a_set_with_no_validation_run_is_unscored(self):
+        result, _ = await _run_chat(EDITOR_RUN)
+
+        assert result["quality"]["tier"] == "unscored"
+        assert result["quality"]["score"] is None
+
+
+class TestWorkflowUnscored:
+    @pytest.mark.asyncio
+    async def test_a_workflow_with_no_validation_run_is_unscored(self):
+        from app.services import chat_tools
+
+        chain = MagicMock()
+        chain.sort.return_value.first_or_none = AsyncMock(return_value=None)
+        with patch.object(chat_tools, "ValidationRun") as MockRun:
+            MockRun.find.return_value = chain
+            quality = await chat_tools._workflow_quality_sidecar("wf-1", MagicMock())
+
+        assert quality["tier"] == "unscored"
+        assert quality["score"] is None

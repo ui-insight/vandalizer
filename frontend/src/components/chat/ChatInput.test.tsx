@@ -130,3 +130,9 @@ it('offers New chat in the composer once the conversation has messages', () => {
   fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
   expect(newChat).toHaveBeenCalledOnce()
 })
+
+it('shows the hand cursor on New chat (v5 retest ticket)', () => {
+  // Tailwind v4 gives buttons the arrow cursor unless they ask for the hand.
+  render(<ChatInput onSend={vi.fn()} onNewChat={vi.fn()} hasMessages />)
+  expect(screen.getByRole('button', { name: 'New chat' })).toHaveClass('cursor-pointer')
+})

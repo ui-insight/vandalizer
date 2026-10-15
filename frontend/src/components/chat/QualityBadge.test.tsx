@@ -17,3 +17,12 @@ it('opens readable evidence details and returns focus on Escape without implying
   expect(screen.queryByRole('region', { name: 'Tool quality details' })).not.toBeInTheDocument()
   expect(button).toHaveFocus()
 })
+
+it('labels an extraction with no validation run Unscored (v5 retest ticket)', () => {
+  const quality = { score: null, tier: 'unscored', grade: null, last_validated_at: null, num_test_cases: 0, active_alerts: [] } as QualityMeta
+  render(<QualityBadge quality={quality} />)
+  const button = screen.getByRole('button', { name: 'Quality Unscored. Show details.' })
+  expect(button).toHaveTextContent('Unscored')
+  fireEvent.click(button)
+  expect(screen.getByRole('region', { name: 'Tool quality details' })).toHaveTextContent('No Score')
+})

@@ -193,6 +193,13 @@ function kbPassages(content: unknown): Array<Record<string, unknown>> {
   )
 }
 
+/** The approve button for a tool with no label of its own: "Approve run
+ * report", never "Approve approve …" for a tool whose name starts with the verb. */
+export function approveLabel(toolName: string): string {
+  const words = toolName.replaceAll('_', ' ').trim()
+  return /^approve\b/i.test(words) ? `A${words.slice(1)}` : `Approve ${words}`
+}
+
 function summarizeResult(toolName: string, content: unknown, quality: QualityMeta | null): ResultSummary {
   const empty: ResultSummary = { text: '', qualityHint: '' }
   if (content == null) return empty
@@ -289,12 +296,13 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     }
 
     case 'propose_test_case': {
-      const count = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
+      // Only a prepared session has fields. Anything else (a stored result
+      // without them, a plain message) read ": 0 fields ready to verify".
+      if (!Array.isArray(obj.fields)) break
+      const count = (obj.fields as unknown[]).length
       const title = obj.document_title ? `"${String(obj.document_title).slice(0, 40)}"` : ''
-      return {
-        text: `${title}: ${count} field${count !== 1 ? 's' : ''} ready to verify`,
-        qualityHint: '',
-      }
+      const ready = `${count} field${count !== 1 ? 's' : ''} ready to verify`
+      return { text: title ? `${title}: ${ready}` : ready, qualityHint: '' }
     }
 
     case 'run_validation': {
@@ -1243,7 +1251,7 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation' } as Record<string, string>)[name] ?? `Approve ${name.replaceAll('_', ' ')}`
+  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }

@@ -64,6 +64,23 @@ def _resolve_doc_uuids(
     return deduped
 
 
+def _unscored_quality() -> dict:
+    """Quality sidecar for an extraction or workflow with no validation score.
+
+    Without it chat showed no badge at all, while the user guide promises that
+    anything unvalidated is labelled Unscored. ``tier`` is set explicitly so the
+    badge renders without a score.
+    """
+    return {
+        "score": None,
+        "tier": "unscored",
+        "grade": None,
+        "last_validated_at": None,
+        "num_test_cases": 0,
+        "active_alerts": [],
+    }
+
+
 def _score_to_tier(score: float | None) -> str | None:
     """Map a numeric quality score to a tier label."""
     if score is None:
@@ -2058,6 +2075,8 @@ async def _execute_extraction(
                 for a in alerts
             ],
         }
+    else:
+        response["quality"] = _unscored_quality()
 
     return response
 
@@ -2756,7 +2775,7 @@ async def _workflow_quality_sidecar(workflow_id: str, user) -> Optional[dict]:
         ValidationRun.item_id == workflow_id,
     ).sort("-created_at").first_or_none()
     if not latest or latest.score is None:
-        return None
+        return _unscored_quality()
     alerts = await QualityAlert.find(
         QualityAlert.item_kind == "workflow",
         QualityAlert.item_id == workflow_id,
