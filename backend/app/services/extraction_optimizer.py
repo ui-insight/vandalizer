@@ -40,6 +40,8 @@ from app.services.optimization_common import (
     DEFAULT_JUDGE_NOISE_FLOOR,
     build_apply_preview,
     pick_winner_variance_aware,
+    tie_band,
+    tied_on_reported_scores,
 )
 from app.services.search_set_service import (
     effective_extraction_config,
@@ -710,6 +712,19 @@ async def run_optimization(
                     default_breakdown=list(default_result.get("field_breakdown") or []),
                     judge_variance=run_doc.judge_variance,
                 )
+
+        # The tie was decided on training scores; the headline is now the
+        # holdout score. Decide it again on the numbers the run reports.
+        if trial_results and run_doc.best_config is not None:
+            regated = tied_on_reported_scores(
+                tied=run_doc.tied_with_baseline,
+                optimized_score=run_doc.optimized_score,
+                baseline_score=run_doc.baseline_default_score,
+                band=tie_band(run_doc.judge_variance, n_items),
+            )
+            if regated and not run_doc.tied_with_baseline:
+                run_doc.winner_selection_reason = "tied_on_reported_score"
+            run_doc.tied_with_baseline = regated
 
         # Apply-on-finish: write best config to override — but ONLY when the
         # winner beat baseline by more than 2 × SE. Applying a config change

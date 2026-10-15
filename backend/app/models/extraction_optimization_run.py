@@ -104,6 +104,8 @@ class ExtractionOptimizationRun(Document):
     #   "closest_to_default"      — multiple non-default trials are tied; pick
     #                               the one structurally closest to default
     #   "no_judge_variance"       — could not measure σ; default noise floor used
+    #   "tied_on_reported_score"  — led on training cases, but the reported
+    #                               (holdout) score is within 2 × SE of baseline
     winner_selection_reason: Optional[str] = None
     # True when no trial beat baseline_default by >= 2 × SE. Suppresses
     # apply_on_finish so we don't write a config change that the data can't

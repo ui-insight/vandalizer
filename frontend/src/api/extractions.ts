@@ -686,8 +686,9 @@ export interface ExtractionOptimizationRun {
    *  Suppresses apply_on_finish — surface as "no significant improvement". */
   tied_with_baseline: boolean
   /** Reason tag from variance-aware winner selection. One of:
-   *  highest_score, default_in_cluster, closest_to_default,
-   *  tied_with_baseline_no_default_in_cluster, no_judge_variance. */
+   *  highest_score, default_in_cluster, closest_to_default, tied_with_baseline,
+   *  tied_on_reported_score (led on training cases, tied on the reported
+   *  holdout score), tied_with_baseline_no_default_in_cluster, no_judge_variance. */
   winner_selection_reason: string | null
   /** Candidate models excluded from the sweep because they share a family
    *  with the judge_model (self-preference guard). */

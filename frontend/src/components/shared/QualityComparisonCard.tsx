@@ -77,6 +77,11 @@ interface QualityComparisonCardProps {
    * measured on (e.g. held-out vs training queries). Keeps the bars honest
    * when different rows come from different slices. */
   measurementNote?: string
+  /** The run's own verdict (``tied_with_baseline``): whether its result is
+   * within noise of the current settings. When given, it decides the outcome
+   * banner, so the card says what the Apply gate and chat say. The card's own
+   * estimate below is only for callers without a run verdict. */
+  tiedWithBaseline?: boolean
 }
 
 export function QualityComparisonCard({
@@ -86,7 +91,7 @@ export function QualityComparisonCard({
   secondaryBaselineId,
   title = 'Optimization complete',
   insignificantThreshold = 5,
-  topSlot, bottomSlot, scoreFormulaHint, measurementNote,
+  topSlot, bottomSlot, scoreFormulaHint, measurementNote, tiedWithBaseline,
 }: QualityComparisonCardProps) {
   const [ciExpanded, setCiExpanded] = useState(false)
   // Legacy noise-floor band. σ × 1.96 from two judge-replay deltas: this is
@@ -109,11 +114,21 @@ export function QualityComparisonCard({
   // Preferred path: paired-bootstrap test. Significant when the CI excludes 0
   // AND the permutation p-value is below 0.05.
   // Fallback path: legacy 2σ noise floor (older runs).
-  const liftSignificant = liftCI
+  const ciSignificant = liftCI
     ? (liftCI.lower > 0 || liftCI.upper < 0) && liftCI.p_value < 0.05
-    : liftVsDefault != null && Math.abs(liftVsDefault / 100) > 2 * legacyCi
-  const liftIsNoise = liftVsDefault != null && !liftSignificant
-    && (liftCI != null || Math.abs(liftVsDefault) < insignificantThreshold)
+    : false
+  // The card once decided this itself, on a band about twice the optimizer's,
+  // and said "No significant change" beside an enabled Apply button while chat
+  // called the same result a gain. The run's verdict wins when there is one.
+  const liftSignificant = tiedWithBaseline != null
+    ? !tiedWithBaseline
+    : liftCI
+      ? ciSignificant
+      : liftVsDefault != null && Math.abs(liftVsDefault / 100) > 2 * legacyCi
+  const liftIsNoise = liftVsDefault != null && (tiedWithBaseline != null
+    ? tiedWithBaseline
+    : !liftSignificant && (liftCI != null || Math.abs(liftVsDefault) < insignificantThreshold))
+  const ciSpansZero = liftCI != null && liftCI.lower <= 0 && liftCI.upper >= 0
   // Below the paired-bootstrap reliability floor we can't call it either way —
   // the banner must say "not enough data", never "equivalent to default".
   const nTooSmall = liftCI != null && liftCI.n_queries < MIN_N_FOR_SIGNIFICANCE
@@ -143,7 +158,7 @@ export function QualityComparisonCard({
             title={`Paired bootstrap on ${liftCI.n_queries} queries, ${liftCI.n_iterations} resamples`}
             style={{
               marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)',
-              color: liftSignificant ? 'var(--workspace-success)' : 'var(--workspace-warning)',
+              color: ciSignificant ? 'var(--workspace-success)' : 'var(--workspace-warning)',
               fontFamily: 'inherit',
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
               textDecoration: 'underline dotted', textUnderlineOffset: 2,
@@ -177,7 +192,7 @@ export function QualityComparisonCard({
               The {(liftCI.confidence_level ? liftCI.confidence_level * 100 : 95).toFixed(0)}% interval
               for the per-query lift is [{fmtSignedPts(liftCI.lower * 100)}, {fmtSignedPts(liftCI.upper * 100)}].
               A two-sided permutation p-value gives <strong>p={liftCI.p_value < 0.001 ? '<0.001' : liftCI.p_value.toFixed(3)}</strong>{' '}
-              ({liftSignificant ? 'significant' : 'not significant'}).
+              ({ciSignificant ? 'significant' : 'not significant'}).
               {' '}n={liftCI.n_queries} paired queries.
               {statsCoverageGap && (
                 ' Bar heights are the blended quality score, which also includes components measured once per configuration — only the per-query answer-quality portion can be significance-tested.'
@@ -238,9 +253,9 @@ export function QualityComparisonCard({
               <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
                 {liftCI && nTooSmall
                   ? `Only n=${liftCI.n_queries} paired ${liftCI.n_queries === 1 ? 'query was' : 'queries were'} available for the statistical test — at least ${MIN_N_FOR_SIGNIFICANCE} are needed for a reliable call. The bars are real measurements, but we can't yet tell how much of the difference would repeat on new questions. Add more test queries and re-run for a trustworthy verdict.`
-                  : liftCI
+                  : liftCI && ciSpansZero
                     ? `The 95% CI on the per-query lift spans zero (${fmtSignedPts(liftCI.lower * 100)} to ${fmtSignedPts(liftCI.upper * 100)}, n=${liftCI.n_queries}, p=${liftCI.p_value < 0.001 ? '<0.001' : liftCI.p_value.toFixed(3)}). On answer quality, treat the optimized run as equivalent to default.`
-                    : `The ${liftVsDefault > 0 ? '+' : ''}${liftVsDefault.toFixed(0)}pts difference is inside the judge's measurement noise (±${(legacyCi * 100).toFixed(1)}pts) — treat the optimized run as equivalent to default.`}
+                    : `The ${liftVsDefault > 0 ? '+' : ''}${liftVsDefault.toFixed(0)}pts difference is inside the judge's measurement noise${legacyCi > 0 ? ` (±${(legacyCi * 100).toFixed(1)}pts)` : ''} — treat the optimized run as equivalent to default.`}
                 {liftCI && statsCoverageGap && judgeLiftPts != null && (
                   ` The test covers the per-query answer-quality scores (${fmtSignedPts(judgeLiftPts)} there); the rest of the bar difference comes from score components measured once per configuration, which can't be significance-tested.`
                 )}

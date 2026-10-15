@@ -429,6 +429,7 @@ function CompletedView({
         optimizedBaselineId="optimized"
         secondaryBaselineId="no-workflow"
         title="Optimization complete"
+        tiedWithBaseline={run.tied_with_baseline}
       />
 
       {run.step_breakdown.length > 0 && (

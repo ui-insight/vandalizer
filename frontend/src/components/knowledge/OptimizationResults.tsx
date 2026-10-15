@@ -113,6 +113,7 @@ export function OptimizationResults({
         baselines={baselines}
         variance={run.judge_variance ?? 0}
         liftCI={run.lift_ci ?? null}
+        tiedWithBaseline={run.tied_with_baseline}
         scoreFormulaHint={
           'Quality score = 40% LLM judge + 25% retrieval precision + 20% source health + 15% chunk coverage. '
           + 'Answer accuracy and AI-only results use a different metric.'

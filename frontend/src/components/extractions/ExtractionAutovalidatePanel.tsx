@@ -403,6 +403,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
            judge_variance for legacy runs that don't carry the SE field. */
         variance={displayedRun.judge_score_se ?? displayedRun.judge_variance ?? 0}
         secondaryBaselineId="no-tool"
+        tiedWithBaseline={displayedRun.tied_with_baseline}
       />
       {displayedRun.baseline_model && (
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: -4 }}>
@@ -1071,6 +1072,14 @@ function WinnerExplanation({ run }: { run: ExtractionOptimizationRun }) {
     body = bandPts != null
       ? `Your current settings are within ±${bandPts} pts (2σ) of the best trial, so the data can't justify changing them. Apply is disabled.`
       : 'Your current settings are statistically tied with the best trial. Apply is disabled.'
+  } else if (reason === 'tied_with_baseline') {
+    body = bandPts != null
+      ? `The best trial scored within ±${bandPts} pts (2σ) of your current settings, so the data can't justify changing them. Apply is disabled.`
+      : 'The best trial is statistically tied with your current settings. Apply is disabled.'
+  } else if (reason === 'tied_on_reported_score') {
+    body = bandPts != null
+      ? `The best trial led on the training cases, but re-scored on the held-out cases it came within ±${bandPts} pts (2σ) of your current settings. That lead didn't hold up, so Apply is disabled.`
+      : "The best trial's lead on the training cases didn't hold up on the held-out cases. Apply is disabled."
   } else if (reason === 'closest_to_default') {
     body = 'Multiple non-default configs tied with the leader; we picked the one that changes the fewest knobs from your current settings, for fewer surprises downstream.'
   } else if (reason === 'no_judge_variance') {
