@@ -831,41 +831,121 @@ async def search_knowledge_base(
     return enriched
 
 
+KB_GROUPS = ("mine", "team", "verified", "project")
+
+
+def _kb_entry(kb: KnowledgeBase, group: str, **extra) -> dict:
+    return {
+        "uuid": kb.uuid,
+        "title": kb.title,
+        "description": kb.description,
+        "status": kb.status,
+        "total_sources": kb.total_sources,
+        "total_chunks": kb.total_chunks,
+        "group": group,
+        **extra,
+    }
+
+
+def _kb_matches(kb: KnowledgeBase, search: Optional[str]) -> bool:
+    if not search:
+        return True
+    term = search.casefold()
+    return term in (kb.title or "").casefold() or term in (kb.description or "").casefold()
+
+
 async def list_knowledge_bases(
     context: RunContext[AgenticChatDeps],
-) -> list[dict]:
-    """List knowledge bases available to the user (personal, team-shared, and verified).
+    scope: str = "all",
+    search: Optional[str] = None,
+) -> dict:
+    """List the user's knowledge bases, grouped the way the Knowledge panel groups them.
+
+    Call this for ANY question about how many knowledge bases the user has or
+    which ones exist. The workspace summary is not a per-group count.
+
+    Groups:
+    - "mine": the Knowledge panel's Mine tab — KBs the user created plus ones
+      added to My Knowledge Bases from Explore.
+    - "team": the Team tab — KBs shared with the user's current team.
+    - "verified": verified organization KBs, browsed on the Explore tab.
+    - "project": each project's own KB. These live inside their project and
+      are not on the Knowledge panel.
+    There is no "everyone" group; verified KBs are the ones open to the whole
+    organization.
+
+    ``counts`` always holds every group's full total, even when ``scope``
+    narrows the listed items or a group's list is capped.
 
     Args:
         context: The call context.
+        scope: "all" (default), "mine", "team", "verified" or "project".
+        search: Optional text to filter knowledge bases by title or description.
     """
-    team_id = context.deps.team_id
+    from app.services import knowledge_service, organization_service, project_service
+
+    scope = (scope or "all").strip().lower()
+    if scope not in ("all", *KB_GROUPS):
+        return {"error": f'Unknown scope "{scope}". Use one of: all, {", ".join(KB_GROUPS)}.'}
+
+    user = context.deps.user
     user_id = context.deps.user_id
+    team_id = context.deps.team_id
+    # The same visibility rules as the Knowledge panel's list endpoint.
+    ancestry = await organization_service.get_user_org_ancestry(user)
 
-    # Personal + team shared + verified
-    filters = {
-        "$or": [
-            {"user_id": user_id},
-            {"verified": True},
-        ]
-    }
-    if team_id:
-        filters["$or"].append({"team_id": team_id, "shared_with_team": True})
+    groups: dict[str, list[dict]] = {}
+    counts: dict[str, int] = {}
+    for group in ("mine", "team", "verified"):
+        kbs, total = await knowledge_service.list_knowledge_bases(
+            user_id, team_id=team_id, user_org_ancestry=ancestry,
+            scope=group, search=search, limit=MAX_RESULTS,
+        )
+        groups[group] = [_kb_entry(kb, group) for kb in kbs]
+        counts[group] = total
 
-    kbs = await KnowledgeBase.find(filters).sort("-updated_at").limit(MAX_RESULTS).to_list()
-    return [
-        {
-            "uuid": kb.uuid,
-            "title": kb.title,
-            "description": kb.description,
-            "status": kb.status,
-            "total_sources": kb.total_sources,
-            "total_chunks": kb.total_chunks,
-            "verified": kb.verified,
-            "shared_with_team": kb.shared_with_team,
-        }
-        for kb in kbs
+    # Mine also holds KBs added from Explore (references), as the panel does.
+    refs = await knowledge_service.list_references(user_id, team_id=team_id)
+    sources = await asyncio.gather(*(
+        knowledge_service.resolve_reference(ref.uuid, user, user_org_ancestry=ancestry)
+        for ref in refs
+    ))
+    added = [kb for kb in sources if kb is not None and _kb_matches(kb, search)]
+    counts["mine"] += len(added)
+    room = max(0, MAX_RESULTS - len(groups["mine"]))
+    groups["mine"] += [_kb_entry(kb, "mine", added_from_explore=True) for kb in added[:room]]
+
+    projects = await project_service.list_projects(user)
+    project_titles = {p.kb_uuid: p.title for p in projects if p.kb_uuid}
+    project_kbs = await KnowledgeBase.find(
+        {"uuid": {"$in": list(project_titles)}}
+    ).sort("-created_at").to_list() if project_titles else []
+    project_kbs = [kb for kb in project_kbs if _kb_matches(kb, search)]
+    counts["project"] = len(project_kbs)
+    groups["project"] = [
+        _kb_entry(kb, "project", project=project_titles.get(kb.uuid))
+        for kb in project_kbs[:MAX_RESULTS]
     ]
+
+    selected = KB_GROUPS if scope == "all" else (scope,)
+    notes = [
+        "Report each group separately; never add the groups into one total. "
+        "A KB the user owns and shares with the team counts under both mine and team.",
+    ]
+    capped = [g for g in selected if counts[g] > len(groups[g])]
+    if capped:
+        notes.append(
+            "Only the newest %d of %s are listed; say how many more there are."
+            % (MAX_RESULTS, ", ".join(capped))
+        )
+    if not team_id:
+        notes.append("The user has no current team, so the team group is empty.")
+    return {
+        "scope": scope,
+        "counts": counts,
+        "knowledge_bases": [entry for g in selected for entry in groups[g]],
+        "note": " ".join(notes),
+    }
 
 
 async def list_extraction_sets(

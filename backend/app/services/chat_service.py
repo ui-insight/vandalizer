@@ -4172,6 +4172,8 @@ async def _build_workspace_inventory(
         workflows,
         knowledge_bases,
         recent_activity,
+        ss_count,
+        wf_count,
     ) = await asyncio.gather(
         SmartDocument.find(doc_filter).count(),
         SmartDocument.find(doc_filter)
@@ -4187,6 +4189,8 @@ async def _build_workspace_inventory(
         .sort("-last_updated_at")
         .limit(3)
         .to_list(),
+        SearchSet.find(ss_filter).count(),
+        Workflow.find(wf_filter).count(),
     )
 
     # Quick check: if the user has nothing, return empty
@@ -4242,9 +4246,9 @@ async def _build_workspace_inventory(
                 label += f" ({', '.join(hints)})"
             ss_parts.append(label)
         lines.append(
-            f"- {len(search_sets)} extraction set"
-            f"{'s' if len(search_sets) != 1 else ''}: "
-            + ", ".join(ss_parts)
+            f"- {ss_count} extraction set"
+            f"{'s' if ss_count != 1 else ''} (newest: "
+            + ", ".join(ss_parts) + ")"
         )
 
     # Workflows
@@ -4256,9 +4260,9 @@ async def _build_workspace_inventory(
                 label += f" ({wf.num_executions} run{'s' if wf.num_executions != 1 else ''})"
             wf_parts.append(label)
         lines.append(
-            f"- {len(workflows)} workflow"
-            f"{'s' if len(workflows) != 1 else ''}: "
-            + ", ".join(wf_parts)
+            f"- {wf_count} workflow"
+            f"{'s' if wf_count != 1 else ''} (newest: "
+            + ", ".join(wf_parts) + ")"
         )
 
     # Knowledge bases
@@ -4269,10 +4273,11 @@ async def _build_workspace_inventory(
             if kb.status:
                 label += f" ({kb.status})"
             kb_parts.append(label)
+        # No count: these filters don't match the Knowledge panel's Mine /
+        # Team / Explore groups, so any number here would contradict it.
         lines.append(
-            f"- {len(knowledge_bases)} knowledge base"
-            f"{'s' if len(knowledge_bases) != 1 else ''}: "
-            + ", ".join(kb_parts)
+            "- Knowledge bases (newest: " + ", ".join(kb_parts) + "). "
+            "For how many there are, or which ones, call list_knowledge_bases."
         )
 
     # Recent activity

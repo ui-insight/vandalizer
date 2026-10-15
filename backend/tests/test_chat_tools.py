@@ -290,28 +290,16 @@ class TestClosestTitles:
 
 
 class TestListKnowledgeBases:
+    # Group counts run against a real database in
+    # tests/integration/test_tier2_services.py::TestChatListKnowledgeBasesWithRealDB.
     @pytest.mark.asyncio
-    async def test_returns_accessible_kbs(self):
+    async def test_rejects_unknown_scope(self):
         from app.services.chat_tools import list_knowledge_bases
 
-        kb = MagicMock()
-        kb.uuid = "kb-1"
-        kb.title = "My KB"
-        kb.description = "Test"
-        kb.status = "ready"
-        kb.total_sources = 3
-        kb.total_chunks = 100
-        kb.verified = False
-        kb.shared_with_team = True
+        result = await list_knowledge_bases(_make_context(), scope="everyone")
 
-        ctx = _make_context()
-        with patch("app.services.chat_tools.KnowledgeBase") as MockKB:
-            MockKB.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[kb])
-            result = await list_knowledge_bases(ctx)
-
-        assert len(result) == 1
-        assert result[0]["uuid"] == "kb-1"
-        assert result[0]["total_chunks"] == 100
+        assert "Unknown scope" in result["error"]
+        assert "mine" in result["error"]
 
 
 # ---------------------------------------------------------------------------
