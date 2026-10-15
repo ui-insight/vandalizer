@@ -1223,18 +1223,47 @@ function VerificationLauncher({
 // Exported single-tool status line — used for interleaved segment rendering
 // ---------------------------------------------------------------------------
 
+/** Whether a tool result reports a failure: the test the status line uses. */
+export function toolResultFailed(name: string, content: unknown): boolean {
+  if (certificationPayloadIssue(name, content)) return true
+  const obj = (listErrorEntry(content) ?? content) as Record<string, unknown> | undefined
+  const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
+  return !canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error')
+}
+
+/** Failed calls the Assistant fixed itself: a later call to the same tool in
+ * the same reply succeeded. Support ticket: "Loading lesson · Failed" and
+ * "Building workflow failed – KB not found" stayed red, with a recovery
+ * button, after the retries a moment later worked. */
+export function recoveredCallIds(order: string[], results: Map<string, ToolResultInfo>): Set<string> {
+  const ok = (id: string) => {
+    const r = results.get(id)
+    return r ? !toolResultFailed(r.tool_name, r.content) : null
+  }
+  const recovered = new Set<string>()
+  order.forEach((id, i) => {
+    const name = results.get(id)?.tool_name
+    if (!name || ok(id) !== false) return
+    if (order.slice(i + 1).some(later => results.get(later)?.tool_name === name && ok(later) === true)) recovered.add(id)
+  })
+  return recovered
+}
+
 export function ToolStatusLine({
   call,
   result,
   isActive,
   onConfirm,
   approvalHistory,
+  recovered = false,
 }: {
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
   onConfirm?: (message: string) => boolean | void
   approvalHistory?: ApprovalRecord
+  /** This call failed, and a later call to the same tool succeeded. */
+  recovered?: boolean
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
@@ -1319,6 +1348,17 @@ export function ToolStatusLine({
         updated_at: null,
       })
     },
+  }
+
+  // A failure the Assistant already fixed needs nothing from the user: no red
+  // state, no error text, no recovery button.
+  if (recovered && isError) {
+    return (
+      <div className="agent-tool-result" data-tool-state="Retried">
+        <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · Retried</p>
+        <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-control)' }}>Didn&apos;t work the first time; the Assistant tried again below.</span>
+      </div>
+    )
   }
 
   return (
@@ -1490,6 +1530,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
     ...toolResults.map((r) => r.tool_call_id),
     ...toolCalls.map((c) => c.tool_call_id),
   ])
+  const recovered = recoveredCallIds([...allCallIds], resultMap)
 
   const toggle = (id: string) => {
     setExpandedIds((prev) => {
@@ -1514,7 +1555,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
           <div key={callId}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
               <div style={{ flex: 1 }}>
-                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} />
+                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} />
               </div>
               {expandable && (
                 <button

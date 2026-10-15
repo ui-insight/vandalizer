@@ -8,7 +8,7 @@ import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, toolResultToText } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -350,6 +350,15 @@ export function ChatMessage({
     return map
   }, [toolResults, message.tool_results, segments])
 
+  // Failed steps a later call to the same tool fixed, shown as retried.
+  const recoveredIds = useMemo(
+    () => recoveredCallIds(
+      (segments ?? []).flatMap(seg => (seg.kind === 'tool_call' ? [seg.call.tool_call_id] : [])),
+      resultMap,
+    ),
+    [segments, resultMap],
+  )
+
   // Active call IDs (no result yet)
   const activeCallIds = useMemo(() => {
     const ids = new Set<string>()
@@ -491,7 +500,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
-                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} />
+                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} />
                     </div>
                   )
                 }
