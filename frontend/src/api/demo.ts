@@ -2,6 +2,7 @@ import { apiFetch } from './client'
 import type {
   FeedbackInfo,
   TrialEndInfo,
+  InAppTopUpInfo,
   TrialExtensionResult,
   TrialUsage,
   DemoAdminStats,
@@ -52,6 +53,19 @@ export function requestTrialExtension(token: string, notes?: Record<string, unkn
 /** The signed-in user's trial token balance (`enabled: false` → render nothing). */
 export function getTrialUsage() {
   return apiFetch<TrialUsage>('/api/demo/trial-usage')
+}
+
+/** Whether the signed-in trial user can top up in the app, and what it asks. */
+export function getInAppTopUp() {
+  return apiFetch<InAppTopUpInfo>('/api/demo/top-up')
+}
+
+/** In-app top-up for the signed-in trial user: the same grant and feedback as the emailed link. */
+export function requestInAppTopUp(notes?: Record<string, unknown>) {
+  return apiFetch<TrialExtensionResult>('/api/demo/top-up', {
+    method: 'POST',
+    body: JSON.stringify({ notes: notes ?? null }),
+  })
 }
 
 /** Re-send the confirm-your-email link to the signed-in trial user. */

@@ -1928,7 +1928,7 @@ class TestBudgetHookPassesInFlightSpend:
         mock_engine.usage = MagicMock(tokens_in=700, tokens_out=200)
         mock_build.return_value = mock_engine
 
-        def fake_check_sync(user_id, *, extra_used=0):
+        def fake_check_sync(user_id, *, extra_used=0, feature=None):
             captured["user_id"] = user_id
             captured["extra_used"] = extra_used
 

@@ -518,6 +518,22 @@ def unchecked_hidden_text_titles(documents: list) -> list[str]:
     ]
 
 
+def _stream_error_event(exc: BaseException, user_message: str) -> dict:
+    """The error chunk a failed turn streams to the client.
+
+    An exhausted trial allowance carries a code, so the client can offer the
+    in-app top-up and then retry the same message — including an approval
+    ("Yes, go ahead") whose action is still armed, since a blocked turn never
+    ran it.
+    """
+    from app.exceptions import TrialBudgetExceededError
+
+    event = {"kind": "error", "content": user_message}
+    if isinstance(exc, TrialBudgetExceededError) and exc.code == "budget_exhausted":
+        event["code"] = "trial_budget_exhausted"
+    return event
+
+
 def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
     """Classify a chat stream error into (severity, user_message).
 
@@ -2332,7 +2348,9 @@ async def chat_stream(
     # finally flushes whatever was accrued, even on cancellation mid-stream.
     from app.services.metering import metered_async
     _meter = metered_async(
-        "chat",
+        # A certification chat meters under its own feature, which a trial
+        # account's token budget doesn't count; see _mark_certification_turn.
+        "certification_chat" if getattr(conversation, "is_certification", False) else "chat",
         user_id=user_id,
         team_id=getattr(conversation, "team_id", None),
         activity_id=activity_id,
@@ -2341,7 +2359,7 @@ async def chat_stream(
     try:
         # Entered inside the try so a trial-budget rejection at scope entry
         # surfaces through the stream's error path instead of aborting the SSE.
-        await _meter.__aenter__()
+        _meter_scope = await _meter.__aenter__()
         _meter_entered = True
         # A Stop that arrived after the previous turn already finished must
         # not label this one.
@@ -2755,7 +2773,7 @@ async def chat_stream(
             logger.warning("Chat stream error: %s", e)
         else:
             logger.error("Chat stream error: %s", e)
-        yield json.dumps({"kind": "error", "content": user_message}) + "\n"
+        yield json.dumps(_stream_error_event(e, user_message)) + "\n"
         try:
             await _save_failed_assistant_turn(
                 conversation,
@@ -2770,7 +2788,36 @@ async def chat_stream(
             logger.error("Failed to persist interrupted chat: %s", save_err)
     finally:
         if _meter_entered:
+            await _mark_certification_turn(conversation, _meter_scope, streamed_tool_calls)
             await _meter.__aexit__(None, None, None)
+
+
+def _is_certification_tool(tool_name: str) -> bool:
+    """Whether a chat tool is part of the certification course."""
+    return "certification" in (tool_name or "")
+
+
+async def _mark_certification_turn(conversation, scope, tool_calls: list[dict]) -> None:
+    """Meter a turn that ran a certification tool as certification, and mark its chat.
+
+    Certification runs through ordinary chat turns: there is no mode on the
+    request, so the first tool call is the first sign. That turn is re-tagged
+    before its tokens are written, and the chat is marked so every later turn
+    in it — lesson questions, lab steps — meters as certification from the
+    start. A trial learner ran out of tokens in Module 1 (support ticket);
+    see trial_budget.BUDGET_EXEMPT_FEATURES.
+    """
+    if scope.feature != "chat":
+        return
+    if not any(_is_certification_tool(c.get("tool_name", "")) for c in tool_calls):
+        return
+    scope.feature = "certification_chat"
+    if getattr(conversation, "is_certification", False):
+        return
+    try:
+        await conversation.set({"is_certification": True})
+    except Exception as e:  # metering context, never a reason to fail the turn
+        logger.warning("Could not mark conversation %s as certification: %s", getattr(conversation, "uuid", "?"), e)
 
 
 

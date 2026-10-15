@@ -5,6 +5,7 @@ import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { TrialVerifyBanner } from '../trial/TrialVerifyBanner'
+import { TrialUsageBanner } from '../trial/TrialUsageBanner'
 import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useBranding } from '../../contexts/BrandingContext'
@@ -130,6 +131,9 @@ export function Header({ onOpenActivity }: { onOpenActivity?: () => void } = {})
       {/* Renders only for a trial account that hasn't confirmed its email —
           otherwise the spend gate is silent until something fails mid-task. */}
       <TrialVerifyBanner />
+      {/* A trial account at 80% of its AI tokens or more: the warning and the
+          in-app top-up, which the chat's out-of-tokens notice also opens. */}
+      <TrialUsageBanner />
 
       <SupportChatPanel
         open={supportOpen}

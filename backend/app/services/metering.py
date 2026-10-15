@@ -185,7 +185,7 @@ def metered(
     if user_id:
         from app.services.trial_budget import check_sync
 
-        check_sync(user_id)
+        check_sync(user_id, feature=feature)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,
@@ -215,7 +215,7 @@ async def metered_async(
     if user_id:
         from app.services.trial_budget import check_async
 
-        await check_async(user_id)
+        await check_async(user_id, feature)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,

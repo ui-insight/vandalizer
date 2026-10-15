@@ -10,6 +10,7 @@ import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { conversationToCsv, conversationToText, exportMessageParts, exportRoleLabel } from './conversationExport'
+import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { RAInbox } from './RAInbox'
 import { HomeWorkQueue } from './HomeWorkQueue'
@@ -730,6 +731,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // Titles of everything selected this session, by ID, so an export can name
   // what each message was sent with after the selection has changed. It only
   // grows: an ID's title doesn't change by being deselected.
+  // The out-of-tokens notice's top-up: on success the blocked message is sent again.
+  const [topUpOpen, setTopUpOpen] = useState(false)
   const scopeNamesRef = useRef<Record<string, string>>({})
   useEffect(() => {
     Object.assign(scopeNamesRef.current, selectedDocNames, selectedFolderNames)
@@ -1305,6 +1308,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Builds a searchable index so chat can read the document a chunk at a time.
                 </span>
               </div>
+            ) : errorDetails?.code === 'trial_budget_exhausted' ? (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => setTopUpOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Top up and retry
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Adds tokens here, then sends your last message again. An approval you just gave goes through.
+                </span>
+              </div>
             ) : errorDetails?.suggestedAction === 'continue' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button
@@ -1328,6 +1343,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               </div>
             )}
             <CertificationChatRecovery messages={messages} toolCalls={activeToolCalls} toolResults={toolResults} />
+            <TrialTopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onToppedUp={retry} />
           </div>
         )}
 

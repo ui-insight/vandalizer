@@ -255,6 +255,10 @@ class ChatConversation(Document):
     user_id: str
     team_id: Optional[str] = None
     is_first_session: bool = False
+    # Set once a certification tool runs in this chat. From then on its turns
+    # are metered as "certification_chat", which a trial account's own token
+    # budget doesn't count (see trial_budget.BUDGET_EXEMPT_FEATURES).
+    is_certification: bool = False
     messages: list[PydanticObjectId] = []
     file_attachments: list[PydanticObjectId] = []
     url_attachments: list[PydanticObjectId] = []
