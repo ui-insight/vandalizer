@@ -26,6 +26,7 @@ vi.mock('../../contexts/CertificationPanelContext', () => ({
     consumeAssessmentDestination,
     loading: false,
     refresh: vi.fn().mockResolvedValue(undefined),
+    refreshAfterWrite: vi.fn().mockResolvedValue(undefined),
     validate,
     complete,
     provision,

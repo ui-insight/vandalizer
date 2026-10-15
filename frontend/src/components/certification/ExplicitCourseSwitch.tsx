@@ -30,6 +30,16 @@ export function ExplicitCourseSwitch({ request, sourceId, targetVersion, targetM
     setPhase('saved')
     setMessage(result.confirmation_pending ? 'Your course choice was saved and needs confirmation. Refresh your course to finish confirming it.'
       : 'Your course choice has a saved receipt. Refresh your course to load your current selection and continue learning.')
+    return result.confirmation_pending
+  }
+  // Panel, chat, home and rail all read the shared course state; load the new selection now
+  // instead of leaving them on the previous course until the learner asks.
+  async function refreshAfterSave(token: number, confirmationPending: boolean) {
+    try {
+      await onRefreshCourse()
+      if (token === generation.current) setMessage(confirmationPending ? 'Your course choice was saved. Confirm it in the course notice to finish.'
+        : 'Your course choice is saved, and your course now shows your current selection.')
+    } catch { /* Keep the saved-receipt message; Refresh my course retries the read. */ }
   }
   async function run(read: boolean) {
     const token = ++generation.current
@@ -43,14 +53,14 @@ export function ExplicitCourseSwitch({ request, sourceId, targetVersion, targetM
         if (result.read_only !== true || result.source_enrollment_id !== sourceId
           || Object.keys(original).length !== Object.keys(request).length
           || Object.entries(request).some(([key, value]) => original[key as keyof typeof original] !== value)) throw new Error('Original request changed')
-        if (result.state === 'applied' && result.receipt) verify({ ...result, receipt: result.receipt })
+        if (result.state === 'applied' && result.receipt) await refreshAfterSave(token, verify({ ...result, receipt: result.receipt }))
         else if (result.state === 'prepared' && result.receipt === null) {
           setPhase('prepared'); setMessage('Your original switch is prepared. You can retry that same choice, or refresh your course to check whether it needs confirmation or preparation recovery.')
         } else throw new Error('Unknown switch state')
       } else {
         const result = await (upgrade ? activateUpgrade(request) : selectSavedCourse(request))
         if (token !== generation.current) return
-        verify(result)
+        await refreshAfterSave(token, verify(result))
       }
     } catch (reason) {
       if (token !== generation.current) return

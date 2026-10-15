@@ -132,7 +132,7 @@ function keepCourseFocusVisible(event: React.FocusEvent<HTMLDivElement>) {
 }
 
 export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () => Promise<void> }) {
-  const { isOpen, mode, closePanel, setMode, progress, course, pendingCompletions, savedWritePendingRefresh, loading, validate, complete, provision, getExercise, submitAssessment, savePosition, refresh, assessmentDestination, consumeAssessmentDestination } = useCertificationPanel()
+  const { isOpen, mode, closePanel, setMode, progress, course, pendingCompletions, savedWritePendingRefresh, loading, validate, complete, provision, getExercise, submitAssessment, savePosition, refresh, refreshAfterWrite, assessmentDestination, consumeAssessmentDestination } = useCertificationPanel()
   const MODULES = course?.modules ?? LEGACY_MODULES
   const LEVEL_THRESHOLDS = course?.levels ?? LEGACY_LEVELS
   const TIERS = course?.tiers ?? LEGACY_TIERS
@@ -534,7 +534,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
             if (onOpenWorkspace) await onOpenWorkspace()
             closePanel()
           }}
-          onScenarioSaved={refresh}
+          onScenarioSaved={refreshAfterWrite}
           module={activeModuleDef}
           moduleProgress={progress?.modules[activeModuleDef.id] ? {
             completed: progress.modules[activeModuleDef.id].completed,
