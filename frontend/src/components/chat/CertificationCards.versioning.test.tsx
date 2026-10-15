@@ -67,8 +67,7 @@ it.each(['missing-course', 'mismatched-progress'])('keeps unavailable progress a
 
 it('preserves original completion identity and opens the selected course in chat', () => {
   render(<CertCompletionCard content={{ ...identity, enrollment_id: 'previous', title: 'Foundations', course_title: 'Original course', certified: false }} />)
-  expect(screen.getByText('Original course')).toBeInTheDocument()
-  expect(screen.getByText('Course version: original')).toBeInTheDocument()
+  expect(screen.getByText('Original course · original')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: "What's next?" })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Open current course' }))
   expect(state.inChat).toHaveBeenCalledOnce()

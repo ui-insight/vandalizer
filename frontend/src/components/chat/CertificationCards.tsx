@@ -440,8 +440,10 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
         fontSize: 'var(--workspace-font-meta)',
         color: '#374151',
       }}>
-        {typeof content.course_title === 'string' && <p className="mb-2 text-xs font-medium text-gray-700">{content.course_title}</p>}
-        {typeof content.course_version === 'string' && <p className="mb-2 text-xs text-gray-700">Course version: {content.course_version}</p>}
+        {typeof content.course_title === 'string'
+          ? <p className="mb-2 text-xs font-medium text-gray-700">{content.course_title}{typeof content.course_version === 'string' ? ` · ${content.course_version}` : ''}</p>
+          : typeof content.course_version === 'string' && <p className="mb-2 text-xs text-gray-700">Course version: {content.course_version}</p>}
+        {content.optional_update_available === true && <p className="mb-2 text-xs text-gray-700">A newer optional course is available to compare in the Certification panel. This course and your earned progress are unchanged.</p>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
           <Sparkles size={15} style={{ color: 'var(--cert-text-success)', flexShrink: 0 }} />
           <h3 style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)', color: '#166534' }}>
