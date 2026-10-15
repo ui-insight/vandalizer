@@ -515,3 +515,101 @@ def require_lessons_in_order(ctx: RunContext["AgenticChatDeps"], output: str) ->
     raise ModelRetry(LESSON_ORDER_RETRY_INSTRUCTION.format(
         module=module or "this module", lessons=", ".join(map(str, lessons)), first=lessons[0],
     ))
+
+
+# ---------------------------------------------------------------------------
+# A lesson card's content restated under the card.
+#
+# Support ticket: under the "From one workflow to many" card, chat's summary
+# said a project means "everything is indexed together and you can chat across
+# the whole set", where the lesson says a project "does not itself … make every
+# source ready for chat"; and that "a frequent, simple extraction may be worth a
+# workflow", where it says "a frequent question may still need only a small
+# extraction". The card already shows the lesson, and the prompt asks for one
+# framing sentence, but a paraphrase is where meaning gets reversed, and the
+# model wrote one anyway. A reply is sent back once when, right after a lesson
+# card, it restates the lesson: it runs past a framing sentence or two, and
+# several of its sentences each carry several of the lesson's own terms.
+# ---------------------------------------------------------------------------
+
+# A framing sentence and an invitation fit under this. Measured on 64 replies a
+# separate model wrote under 8 real lesson cards: framings ran to 36 words and
+# none was flagged at 30; 31 of 32 summaries were, the miss a one-sentence gist.
+_FRAMING_WORDS = 30
+# Sentences sharing this many of the lesson's terms are restating it.
+_RESTATING_TERMS = 3
+_RESTATING_SENTENCES = 2
+
+_LEARNER_ASKS_ABOUT = re.compile(
+    r"\?|\b(?:explain|summar|what does|what do|why|how does|how do|mean|clarify|in other words|tl;?dr)\w*",
+    re.IGNORECASE,
+)
+_TERM = re.compile(r"[a-z][a-z'-]{3,}")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_COMMON = frozenset(
+    """
+    about after also because before being between both could does each even every
+    from have here into just like make many more most much must need only other over
+    same should some such than that their them then there these they this those
+    through very want were what when where which while will with without would your
+    lesson lessons card read reading next ready practice module first second third
+    """.split()
+)
+
+
+def _terms(text: str) -> set[str]:
+    out = set()
+    for word in _TERM.findall((text or "").lower().replace("’", "'")):
+        word = word.strip("'-")
+        if len(word) >= 4 and word not in _COMMON:
+            out.add(word[:6])  # a crude stem: "projects"/"project", "indexed"/"indexing"
+    return out
+
+
+def restates_lesson(reply: str, lesson_text: str) -> bool:
+    """Whether *reply* restates *lesson_text* rather than framing it."""
+    if len((reply or "").split()) <= _FRAMING_WORDS:
+        return False
+    lesson = _terms(lesson_text)
+    restating = sum(
+        1 for sentence in _SENTENCE_SPLIT.split(reply)
+        if len(_terms(sentence) & lesson) >= _RESTATING_TERMS
+    )
+    return restating >= _RESTATING_SENTENCES
+
+
+def lesson_shown_this_turn(messages) -> str | None:
+    """The text of the latest lesson card returned since the learner's message."""
+    for part in reversed(_this_turn_tool_returns(messages)):
+        if getattr(part, "tool_name", None) != "get_certification_lesson":
+            continue
+        content = part.content
+        if isinstance(content, dict) and isinstance(content.get("content"), str):
+            return content["content"]
+    return None
+
+
+LESSON_RESTATED_RETRY_INSTRUCTION = (
+    "The lesson card already shows this lesson to the learner. Do not summarize or "
+    "restate it in your own words: a paraphrase can change what the lesson says. "
+    "Rewrite the reply as one or two sentences that introduce the card and invite the "
+    "learner to read it and try its practice. If you mention a point from the lesson, "
+    "quote the lesson's own words."
+)
+
+
+def require_lesson_not_restated(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply that restates the
+    lesson card it sits under, unless the learner asked about the lesson."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "lesson_restated_retry_used", False):
+        return output
+    lesson = lesson_shown_this_turn(ctx.messages)
+    if not lesson:
+        return output
+    if _LEARNER_ASKS_ABOUT.search(getattr(deps, "user_message", "") or ""):
+        return output
+    if not restates_lesson(output, lesson):
+        return output
+    deps.lesson_restated_retry_used = True
+    raise ModelRetry(LESSON_RESTATED_RETRY_INSTRUCTION)

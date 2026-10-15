@@ -96,3 +96,5 @@ class AgenticChatDeps:
     course_entry_retry_used: bool = False
     # Once-only flag for approval_claims.require_lessons_in_order.
     lesson_skip_retry_used: bool = False
+    # Once-only flag for approval_claims.require_lesson_not_restated.
+    lesson_restated_retry_used: bool = False

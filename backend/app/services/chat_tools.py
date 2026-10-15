@@ -6105,8 +6105,10 @@ async def get_certification_lesson(
 
     Each module's challenge assumes the user has been taught its lessons, so
     walk through them one at a time before the exercise or self-assessment.
-    The lesson content renders as a card the user reads directly — don't
-    repeat it verbatim. Knowledge checks render as interactive practice in the
+    The lesson content renders as a card the user reads directly. Add one
+    framing sentence; don't summarize or restate the lesson in your own words,
+    because a paraphrase can reverse what it says. When the learner asks about
+    it, quote the lesson's own words. Knowledge checks render as interactive practice in the
     card; invite the learner to try them and ask for help if needed. Do not
     duplicate the question or claim to have seen their local answer. Practice
     checks do not award module credit.

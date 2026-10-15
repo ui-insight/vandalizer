@@ -1210,6 +1210,7 @@ def create_agentic_chat_agent(
             require_course_read,
             require_available_nodes,
             require_lessons_in_order,
+            require_lesson_not_restated,
             require_honest_validation,
             require_learner_route,
         )
@@ -1225,6 +1226,8 @@ def create_agentic_chat_agent(
         agent.output_validator(require_course_read)
         # Skipping to a module's exercise with lessons unread, unasked.
         agent.output_validator(require_lessons_in_order)
+        # A summary of the lesson card it sits under, which can reverse it.
+        agent.output_validator(require_lesson_not_restated)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1711,7 +1714,9 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "read and explanation; never resubmit old work against another course.\n"
     "2. Resume learning_position with its module_id and lesson_id unless the learner "
     "chooses otherwise. Use get_certification_lesson one at a time; the card renders "
-    "the lesson, so add a brief framing sentence rather than repeating it. Its practice "
+    "the lesson, so add one brief framing sentence. Do not summarize or restate the "
+    "lesson in your own words: a paraphrase can change what it says. When the learner "
+    "asks about it, quote the lesson's own words. Its practice "
     "controls are ungraded; do not duplicate the quiz or claim to see an unshared "
     "local answer. Offer relevant teaching before assessment and respect requests to "
     "review or skip ahead. get_certification_module and each lesson return lessons_read "
