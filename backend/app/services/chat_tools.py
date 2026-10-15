@@ -6086,6 +6086,9 @@ async def get_certification_module(
         **({"saved_assessment": saved_assessment} if saved_assessment is not None else {}),
         "assessment_keys": assessment_keys,
         "assessment_questions": assessment_questions,
+        # Lessons opened in chat or the lesson card, so chat neither skips
+        # unread ones nor re-teaches read ones.
+        **cert_svc.lesson_reading(module_id, await cert_svc.lessons_read_for(context.deps.user_id, module_id)),
     }
 
 
@@ -6109,6 +6112,8 @@ async def get_certification_lesson(
     checks do not award module credit.
     Apply editorial_notices when explaining outdated historical statements;
     those corrections preserve assessment requirements and earned credit.
+    The result's unread_lessons lists lessons the learner has not opened yet,
+    here or in the card; teach those, in order, before the exercise.
 
     Args:
         context: The call context.
@@ -6138,8 +6143,10 @@ async def get_certification_lesson(
             f"lesson_number must be 1..{len(lessons)} for '{module_id}'.",
         )
     lesson = lessons[lesson_number - 1]
+    read_ids = await cert_svc.mark_lessons_read(context.deps.user_id, module_id, [lesson.get("id")])
     return {
         **cert_svc.course_identity(),
+        **cert_svc.lesson_reading(module_id, read_ids),
         "module_id": module_id,
         "module_title": cert_svc.course_module_titles().get(module_id, module_id),
         "lesson_number": lesson_number,

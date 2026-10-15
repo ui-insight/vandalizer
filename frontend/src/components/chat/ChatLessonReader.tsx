@@ -7,6 +7,7 @@ import { LessonExtras } from '../certification/LessonContent'
 import { EditorialCorrection } from '../certification/EditorialCorrection'
 import type { KnowledgeCheckData } from '../../types/certification'
 import { renderMarkdown } from './markdown'
+import { markLessonRead } from '../../api/certification'
 import { wrapCertificationTables } from '../../lib/certificationMarkdown'
 
 const button = 'min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50'
@@ -55,6 +56,8 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
     focusHeading.current = true
     setSelectedId(id)
     setStatus('idle')
+    // Recorded so chat knows this lesson was read and doesn't send it again.
+    markLessonRead(moduleId, id, enrollmentId).catch(() => {})
     // A return to the already displayed lesson still gives keyboard focus.
     if (id === selectedId) { focusHeading.current = false; heading.current?.focus() }
   }

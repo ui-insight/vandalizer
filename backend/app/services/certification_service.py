@@ -262,6 +262,52 @@ async def save_learning_position(user_id: str, module_id: str, lesson_id: str, e
     return await CourseDelivery.store_position(operation.progress, operation.package, module_id, lesson_id, expected_revision)
 
 
+async def mark_lessons_read(user_id: str, module_id: str, lesson_ids: list[str]) -> list[str]:
+    """Record lessons the learner opened, in chat or with the lesson card's
+    Next lesson, and return every lesson id read in the module.
+
+    Support ticket: lessons read in the card were invisible to chat, which
+    sent all six again; and with no record of what was read, chat skipped
+    from lesson 1 to the exercise. Navigation only: no credit, no gate. A
+    targeted $addToSet, so it is safe inside a read-only course operation and
+    never touches the position revision.
+    """
+    if module_id not in course_module_xp():
+        return []
+    known = {row.get("id") for row in (get_lessons(module_id) or {}).get("lessons", [])}
+    try:
+        prog = await get_progress(user_id)
+        read = list((prog.lessons_read or {}).get(module_id, []))
+        new = [i for i in lesson_ids if i in known and i not in read]
+        if new and prog.id is not None:
+            await CertificationProgress.get_motor_collection().update_one(
+                {"_id": prog.id}, {"$addToSet": {f"lessons_read.{module_id}": {"$each": new}}},
+            )
+            read += new
+            prog.lessons_read = {**(prog.lessons_read or {}), module_id: read}
+        return read
+    except Exception:
+        # Reading history is a hint for chat; it must never break a lesson.
+        log.warning("Could not record lessons read for %s/%s", user_id, module_id, exc_info=True)
+        return [i for i in lesson_ids if i in known]
+
+
+async def lessons_read_for(user_id: str, module_id: str) -> list[str]:
+    """Lesson ids read in *module_id*; empty when progress can't be read."""
+    return await mark_lessons_read(user_id, module_id, [])
+
+
+def lesson_reading(module_id: str, read_ids: list[str]) -> dict:
+    """Which of a module's lessons are read and unread, by 1-based number."""
+    lessons = (get_lessons(module_id) or {}).get("lessons", [])
+    read = set(read_ids)
+    numbers = [n for n, row in enumerate(lessons, 1) if row.get("id") in read]
+    return {
+        "lessons_read": numbers,
+        "unread_lessons": [n for n in range(1, len(lessons) + 1) if n not in numbers],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Activity tracking
 # ---------------------------------------------------------------------------

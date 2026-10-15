@@ -7,6 +7,8 @@ import corrections from '../certification/editorialCorrections.json'
 
 const state = vi.hoisted(() => ({ value: null as unknown, save: vi.fn(), refresh: vi.fn(), open: vi.fn() }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => state.value }))
+const markLessonRead = vi.hoisted(() => vi.fn())
+vi.mock('../../api/certification', async importOriginal => ({ ...(await importOriginal<object>()), markLessonRead }))
 const lessons = [
   { id: 'module.alpha', revision: 1, title: 'Same title', content: 'First immutable lesson.', objective: 'First objective.', variant: 'concept' },
   { id: 'module.beta', revision: 1, title: 'Same title', content: 'Second immutable lesson.', variant: 'concept' },
@@ -18,7 +20,7 @@ function context() {
   return { progress: { ...identity, modules: { module: { learning_position: { lesson_id: lessons[1].id } } } },
     course: { ...identity, modules: [{ id: 'module', lessons }] }, savePosition: state.save, refresh: state.refresh, openPanel: state.open }
 }
-beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); state.save.mockResolvedValue(undefined); state.value = context() })
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); state.save.mockResolvedValue(undefined); markLessonRead.mockResolvedValue({}); state.value = context() })
 
 it('corrects a preserved historical card without an active course, new payload metadata or a write', () => {
   state.value = null
@@ -169,4 +171,10 @@ it('honors a read-only card boundary even when lesson identity otherwise matches
   expect(screen.queryByRole('button', { name: 'Save my place' })).not.toBeInTheDocument()
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   expect(state.save).not.toHaveBeenCalled()
+})
+
+it('records a lesson opened with Next lesson as read, so chat does not send it again', () => {
+  render(<ChatLessonReader content={content} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  expect(markLessonRead).toHaveBeenCalledWith('module', lessons[1].id, 'enrollment-a')
 })

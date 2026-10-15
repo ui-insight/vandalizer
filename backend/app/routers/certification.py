@@ -44,6 +44,11 @@ class LessonPositionPayload(BaseModel):
     expected_revision: int = Field(ge=0, strict=True)
 
 
+class LessonReadPayload(BaseModel):
+    module_id: str
+    lesson_id: str
+
+
 class ScenarioSubmissionPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
@@ -150,6 +155,14 @@ async def download_preserved_certificate(credential_id: str, user: User = Depend
 @course_operation(write=True, http=True)
 async def save_lesson_position(payload: LessonPositionPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
     return await svc.save_learning_position(user.user_id, payload.module_id, payload.lesson_id, payload.expected_revision)
+
+
+@router.post('/lessons/read')
+@course_operation(http=True)
+async def mark_lesson_read(payload: LessonReadPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+    """A lesson opened with the chat lesson card's Next lesson, so chat knows."""
+    read = await svc.mark_lessons_read(user.user_id, payload.module_id, [payload.lesson_id])
+    return {"module_id": payload.module_id, **svc.lesson_reading(payload.module_id, read)}
 
 
 @router.get("/progress")

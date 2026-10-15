@@ -1209,6 +1209,7 @@ def create_agentic_chat_agent(
             require_approval_card,
             require_course_read,
             require_available_nodes,
+            require_lessons_in_order,
             require_honest_validation,
             require_learner_route,
         )
@@ -1222,6 +1223,8 @@ def create_agentic_chat_agent(
         agent.output_validator(require_learner_route)
         # A course-entry message must be answered from the learner's enrollment.
         agent.output_validator(require_course_read)
+        # Skipping to a module's exercise with lessons unread, unasked.
+        agent.output_validator(require_lessons_in_order)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1711,7 +1714,11 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "the lesson, so add a brief framing sentence rather than repeating it. Its practice "
     "controls are ungraded; do not duplicate the quiz or claim to see an unshared "
     "local answer. Offer relevant teaching before assessment and respect requests to "
-    "review or skip ahead. save_certification_position records a viewed lesson using "
+    "review or skip ahead. get_certification_module and each lesson return lessons_read "
+    "and unread_lessons, which include lessons the learner opened in the card: teach the "
+    "unread lessons in order, one at a time, before the exercise or reflection, and never "
+    "re-send lessons already read. Do not offer to skip lessons yourself; skip only when "
+    "the learner asks. save_certification_position records a viewed lesson using "
     "position_revision; it never answers a question or earns credit. Reconcile a "
     "position conflict before offering another save.\n"
     "3. When the learner asks for help with a named module's work, read "

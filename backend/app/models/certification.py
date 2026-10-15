@@ -15,6 +15,9 @@ class CertificationProgress(Document):
     lab_folder_id: Optional[str] = None
     learning_position: Optional[dict] = None
     position_revision: int = 0
+    # {module_id: [lesson_id, ...]} opened in chat or the lesson card.
+    # Navigation only, like learning_position: it never awards credit.
+    lessons_read: dict = {}
     pending_credential: Optional[dict] = None
     completion_receipt: Optional[dict] = None
     modules: dict = {}  # {module_id: {completed, stars, completed_at, attempts, xp_earned}}

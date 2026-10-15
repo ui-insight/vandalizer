@@ -432,3 +432,86 @@ def require_course_read(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
         return output
     deps.course_entry_retry_used = True
     raise ModelRetry(COURSE_ENTRY_RETRY_INSTRUCTION)
+
+
+# ---------------------------------------------------------------------------
+# Lessons before the exercise
+# ---------------------------------------------------------------------------
+# Support ticket: after Module 0's first lesson chat went straight to the
+# reflection questions, skipping lessons 2-9, and in Module 1 it offered "Jump
+# to the exercise". The course tools report unread_lessons (including lessons
+# read in the card); a reply that moves to the exercise while some are unread,
+# when the learner didn't ask to skip, is sent back once. Guidance, not a gate:
+# completion rules are unchanged.
+
+_ASSESSMENT = r"(?:exercise|reflection|reflective|assessment|self-assessment|challenge|lab|quiz)"
+_OFFERS_SKIP = re.compile(
+    rf"\b(?:jump|skip|go|move|head|proceed)\s+(?:straight\s+|right\s+|ahead\s+|directly\s+)?(?:on\s+)?to\s+(?:the\s+)?(?:\w+\s+)?{_ASSESSMENT}"
+    rf"|\b(?:skip|skipping)\s+(?:the\s+)?(?:remaining\s+|rest\s+of\s+the\s+|other\s+)?lessons?\b"
+    rf"|\b(?:let'?s|now|next)\b[^.?!\n]{{0,30}}\b(?:start|begin|do|try|tackle|answer)\b[^.?!\n]{{0,20}}\b{_ASSESSMENT}"
+    rf"|\b{_ASSESSMENT}\s+questions?\s*:",
+    re.IGNORECASE,
+)
+_LEARNER_ASKS_SKIP = re.compile(
+    rf"\b(?:skip|jump|straight to|go to|move on to|ready for|start|begin|do)\b[^.?!\n]{{0,30}}\b(?:{_ASSESSMENT}|lessons?)\b",
+    re.IGNORECASE,
+)
+_ASSESSMENT_TOOLS = {
+    "check_certification_module", "submit_certification_assessment",
+    "complete_certification_module", "provision_certification_lab",
+}
+
+
+def _this_turn_tool_returns(messages) -> list:
+    """Tool results since the user's latest message, in order."""
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart, UserPromptPart
+
+    returns: list = []
+    for message in messages or []:
+        if isinstance(message, ModelRequest):
+            if any(isinstance(p, UserPromptPart) for p in message.parts):
+                returns = []
+            returns += [p for p in message.parts if isinstance(p, ToolReturnPart)]
+    return returns
+
+
+def unread_lessons_this_turn(messages) -> tuple[str, list[int]] | None:
+    """The module and unread lesson numbers the latest course result reported."""
+    for part in reversed(_this_turn_tool_returns(messages)):
+        content = part.content
+        if isinstance(content, dict) and isinstance(content.get("unread_lessons"), list):
+            return str(content.get("module_id") or ""), list(content["unread_lessons"])
+    return None
+
+
+def skips_ahead(text: str) -> bool:
+    return bool(_OFFERS_SKIP.search((text or "").replace("’", "'")))
+
+
+LESSON_ORDER_RETRY_INSTRUCTION = (
+    "Module {module} still has unread lessons ({lessons}), and the learner did not ask to "
+    "skip them. Do not move to or offer the exercise, reflection or assessment yet. "
+    "Rewrite the reply: call get_certification_lesson for lesson {first} and add one "
+    "framing sentence. Lessons the learner already read in the card are not in this list; "
+    "do not send those again."
+)
+
+
+def require_lessons_in_order(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply that skips to a
+    module's exercise while lessons are unread and the learner didn't ask."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "lesson_skip_retry_used", False):
+        return output
+    unread = unread_lessons_this_turn(ctx.messages)
+    if not unread or not unread[1]:
+        return output
+    if _LEARNER_ASKS_SKIP.search((getattr(deps, "user_message", "") or "").replace("’", "'")):
+        return output
+    if not (skips_ahead(output) or _tools_called_this_turn(ctx.messages) & _ASSESSMENT_TOOLS):
+        return output
+    deps.lesson_skip_retry_used = True
+    module, lessons = unread
+    raise ModelRetry(LESSON_ORDER_RETRY_INSTRUCTION.format(
+        module=module or "this module", lessons=", ".join(map(str, lessons)), first=lessons[0],
+    ))

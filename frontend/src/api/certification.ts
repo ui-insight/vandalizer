@@ -105,6 +105,13 @@ export function savePosition(enrollmentId: string, moduleId: string, lessonId: s
   })
 }
 
+/** Tell chat a lesson was opened in the lesson card. Navigation only. */
+export function markLessonRead(moduleId: string, lessonId: string, enrollmentId?: string) {
+  return apiFetch<{ module_id: string; lessons_read: number[]; unread_lessons: number[] }>(enrolledPath('/api/certification/lessons/read', enrollmentId), {
+    method: 'POST', body: JSON.stringify({ module_id: moduleId, lesson_id: lessonId }),
+  })
+}
+
 export function validateModule(moduleId: string, enrollmentId?: string) {
   return apiFetch<ValidationResult>(enrolledPath(`/api/certification/modules/${moduleId}/validate`, enrollmentId), { method: 'POST' })
 }
