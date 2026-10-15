@@ -1193,7 +1193,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <ChatMessage
                     message={msg}
                     messageIndex={i}
-                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1))}
+                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming)}
                     conversationUuid={conversationUuid || undefined}
                     onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
                   />
