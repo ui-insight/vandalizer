@@ -8,7 +8,8 @@ from app.models.certification import CertificationEnrollment
 from app.models.certification_journey import CertificationJourneyEvent
 
 EVENTS = ('initial_progress_load_failed', 'progress_refresh_failed', 'position_save_failed',
-          'saved_lesson_displayed', 'bridge_assessment_requested')
+          'saved_lesson_displayed', 'saved_lesson_unavailable', 'bridge_assessment_requested',
+          'grading_question_opened')
 
 
 class JourneyEventRequest(BaseModel):
@@ -16,8 +17,12 @@ class JourneyEventRequest(BaseModel):
     event_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     enrollment_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     manifest_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+    # saved_lesson_unavailable: a saved place existed but its lesson could not be
+    # shown. grading_question_opened: the learner chose to question a graded
+    # result. Neither carries module, lesson, answer or message text.
     event: Literal['initial_progress_load_failed', 'progress_refresh_failed', 'position_save_failed',
-                   'saved_lesson_displayed', 'bridge_assessment_requested']
+                   'saved_lesson_displayed', 'saved_lesson_unavailable', 'bridge_assessment_requested',
+                   'grading_question_opened']
 
     @model_validator(mode='after')
     def require_identity(self):

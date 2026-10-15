@@ -20,6 +20,8 @@ it('sends only the allowed identity and event, with authentication and CSRF', ()
 it('drops success observations without identity while preserving unattributed load failures', () => {
   observeCertificationJourney('saved_lesson_displayed')
   observeCertificationJourney('bridge_assessment_requested', { enrollment_id: 'a'.repeat(32) })
+  observeCertificationJourney('grading_question_opened')
+  observeCertificationJourney('saved_lesson_unavailable', null)
   expect(fetchMock).not.toHaveBeenCalled()
   observeCertificationJourney('initial_progress_load_failed')
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ event_id: expect.any(String), event: 'initial_progress_load_failed' })

@@ -27,6 +27,15 @@ it('observes a displayed original saved lesson once, without counting subsequent
   expect(observeCertificationJourney).not.toHaveBeenCalled()
 })
 
+it('observes a saved place whose lesson is gone as one unavailable resume, without the lesson identity', () => {
+  const props = { lessons, moduleId: 'module', enrollmentId: 'a'.repeat(32), manifestSha256: 'b'.repeat(64), onSavePosition: vi.fn(), onGoToChallenge: vi.fn() }
+  const view = render(<LessonStepper {...props} savedLessonId="module.removed" />)
+  expect(screen.getByRole('heading', { name: 'First lesson' })).toBeInTheDocument()
+  expect(observeCertificationJourney).toHaveBeenCalledExactlyOnceWith('saved_lesson_unavailable', { enrollment_id: props.enrollmentId, manifest_sha256: props.manifestSha256 })
+  view.rerender(<LessonStepper {...props} savedLessonId="module.removed" lessons={[...lessons]} />)
+  expect(observeCertificationJourney).toHaveBeenCalledOnce()
+})
+
 it('preserves a lesson identity across reordering and isolates another enrollment', () => {
   localStorage.setItem('cert-lesson:learner:module', '1')
   const props = { lessons, moduleId: 'module', onGoToChallenge: vi.fn() }

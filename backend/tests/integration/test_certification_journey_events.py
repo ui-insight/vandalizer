@@ -57,6 +57,19 @@ async def test_initial_load_failure_does_not_create_a_course_and_legacy_identity
     assert all(row['course_version'] is None and row['manifest_sha256'] is None for row in rows)
 
 
+async def test_resume_failure_and_grading_question_need_an_owned_course_and_carry_no_text(repo):
+    enrollment = await repo.ensure_initial('learner')
+    for event in ('saved_lesson_unavailable', 'grading_question_opened'):
+        with pytest.raises(ValueError):
+            request(event=event)
+        assert await record('learner', request(enrollment, event)) == {'recorded': True, 'assessment_changed': False}
+        with pytest.raises(ValueError):
+            request(enrollment, event, message='PRIVATE grading complaint')
+    rows = await CertificationJourneyEvent.get_motor_collection().find({}, {'_id': 0, 'observed_at': 0, 'uuid': 0}).to_list(None)
+    assert {row['state'] for row in rows} == {'saved_lesson_unavailable', 'grading_question_opened'}
+    assert all(set(row) == {'user_id', 'enrollment_id', 'course_version', 'manifest_sha256', 'state'} for row in rows)
+
+
 async def test_aggregate_window_privacy_and_retention_are_explicit(repo):
     enrollment = await repo.ensure_initial('PRIVATE-LEARNER')
     for event in ('initial_progress_load_failed', 'progress_refresh_failed', 'position_save_failed', 'saved_lesson_displayed', 'bridge_assessment_requested'):

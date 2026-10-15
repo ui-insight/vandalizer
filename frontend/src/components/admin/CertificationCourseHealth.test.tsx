@@ -25,6 +25,28 @@ it('separates a bounded client observation window from saved states and missing 
   expect(screen.getByText(/Offline browsers and older app versions can miss events/)).toBeInTheDocument()
 })
 
+it('shows journey outcomes by course title, withholds small-sample rates and keeps hashes in support details', async () => {
+  const course = { course_version: 'course-v5', manifest_sha256: 'a'.repeat(64), course_title: 'Research Workflow Practitioner',
+    started: 8, active: 3, completed: 2, transferred: 1, inactive: 1, activity_unknown: 0, staff_grading_corrections: 1,
+    grading_questions_opened: 3, resumes_restored: 4, resumes_unavailable: 1, completion_rate: 2 / 7, inactive_share: null, resume_success_rate: 0.8 }
+  get.mockResolvedValue({ ...report, unavailable_metrics: ['dropout', 'grading_question_outcomes'], journey_success: {
+    inactive_after_days: 60, min_rate_denominator: 5, journey_window_days: 30, courses: [course],
+    bridge: { legacy_learners: 5, upgraded_learners: 2, uptake_rate: 0.4, targets: [{ course_version: 'course-v5', manifest_sha256: 'a'.repeat(64), course_title: 'Research Workflow Practitioner', learners: 2 }] } } })
+  render(<CertificationCourseHealth />); open()
+  const outcomes = await screen.findByRole('region', { name: 'Journey outcomes: Research Workflow Practitioner (version course-v5)' })
+  expect(outcomes).toHaveTextContent('Completed: 2 · 28.6%')
+  expect(outcomes).toHaveTextContent('1 transferred to another course and excluded')
+  expect(outcomes).toHaveTextContent('Inactive 60+ days: 1 of 3 active · rate withheld (too few records)')
+  expect(outcomes).toHaveTextContent('Resumed at saved place: 4 of 5 · 80%')
+  expect(outcomes).toHaveTextContent('Grading questions opened: 3')
+  expect(outcomes).toHaveTextContent('Staff grading corrections: 1')
+  expect(screen.getByRole('region', { name: 'Bridge uptake' })).toHaveTextContent('2 of 5 learners with a historical course record started a newer course (40%)')
+  expect(screen.getByText(/It is not dropout/)).toBeInTheDocument()
+  expect(screen.getByText(/Why learners stop \(dropout\), Whether a grading question was upheld/)).toBeInTheDocument()
+  expect(screen.getAllByRole('heading', { name: 'Research Workflow Practitioner (version course-v5)' }).length).toBeGreaterThan(1)
+  for (const hash of screen.getAllByText(/Package: a{64}/)) expect(hash.closest('details')).not.toBeNull()
+})
+
 it('loads only when opened and separates package identities and unknown history', async () => {
   render(<CertificationCourseHealth />)
   expect(get).not.toHaveBeenCalled()

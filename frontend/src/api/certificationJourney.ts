@@ -1,7 +1,7 @@
 import { getCsrfToken } from './client'
 
 export type JourneyEvent = 'initial_progress_load_failed' | 'progress_refresh_failed' | 'position_save_failed'
-  | 'saved_lesson_displayed' | 'bridge_assessment_requested'
+  | 'saved_lesson_displayed' | 'saved_lesson_unavailable' | 'bridge_assessment_requested' | 'grading_question_opened'
 type Identity = { enrollment_id?: string; manifest_sha256?: string }
 
 /** Best effort local operations telemetry. No answers, errors, titles or documents. */

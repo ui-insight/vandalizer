@@ -97,10 +97,14 @@ export function LessonStepper({
     const key = `${enrollmentId}:${moduleId}`
     if (observedRestoration.current?.key !== key) observedRestoration.current = { key, lessonId: savedLessonId, reported: false }
     const restored = observedRestoration.current
-    if (!usesServerPosition || !restored.lessonId || lessons[safeIndex]?.id !== restored.lessonId
-      || restored.reported || !manifestSha256) return
+    if (!usesServerPosition || !restored.lessonId || restored.reported || !manifestSha256 || !lessons.length) return
+    // A saved place whose lesson is no longer in this module is a failed resume;
+    // only the outcome is reported, never the lesson identity.
+    const unavailable = !lessons.some(lesson => lesson.id === restored.lessonId)
+    if (!unavailable && lessons[safeIndex]?.id !== restored.lessonId) return
     restored.reported = true
-    observeCertificationJourney('saved_lesson_displayed', { enrollment_id: enrollmentId, manifest_sha256: manifestSha256 })
+    observeCertificationJourney(unavailable ? 'saved_lesson_unavailable' : 'saved_lesson_displayed',
+      { enrollment_id: enrollmentId, manifest_sha256: manifestSha256 })
   }, [enrollmentId, moduleId, usesServerPosition, savedLessonId, lessons, safeIndex, manifestSha256])
 
   // Keep a stable ref to onStepChange so the scroll effect doesn't re-fire

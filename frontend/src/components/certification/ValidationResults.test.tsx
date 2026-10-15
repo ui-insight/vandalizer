@@ -1,6 +1,26 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { ValidationResults } from './ValidationResults'
+import { observeCertificationJourney } from '../../api/certificationJourney'
+vi.mock('../../api/certificationJourney', () => ({ observeCertificationJourney: vi.fn() }))
+
+it('names the course, uses its star scale and offers a recorded way to question a versioned result', () => {
+  const identity = { enrollment_id: 'a'.repeat(32), manifest_sha256: 'b'.repeat(64), course_title: 'Research Workflow Practitioner', course_version: 'course-5.0.0', maximum_stars: 1 }
+  render(<ValidationResults result={{ ...identity, passed: true, stars: 1, checks: [{ name: 'Run completed', passed: true, detail: '' }] }} onDismiss={vi.fn()} />)
+  expect(screen.getByText('Checked against Research Workflow Practitioner (version course-5.0.0)')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: '1 of 1 stars' })).toBeInTheDocument()
+  expect(screen.queryByText(/b{64}/)).not.toBeInTheDocument()
+  const link = screen.getByRole('link', { name: 'Question this result' })
+  expect(link).toHaveAttribute('href', '/support')
+  fireEvent.click(link)
+  expect(observeCertificationJourney).toHaveBeenCalledExactlyOnceWith('grading_question_opened', { enrollment_id: identity.enrollment_id, manifest_sha256: identity.manifest_sha256 })
+})
+
+it('does not offer a grading question path for the legacy course, which has no correction record', () => {
+  render(<ValidationResults result={{ passed: false, stars: 0, checks: [{ name: 'Run completed', passed: false, detail: '' }] }} onDismiss={vi.fn()} />)
+  expect(screen.queryByRole('link', { name: 'Question this result' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/Checked against/)).not.toBeInTheDocument()
+})
 
 it('labels optional advice without presenting it as an unmet requirement', () => {
   render(<ValidationResults result={{ passed: true, stars: 1, checks: [

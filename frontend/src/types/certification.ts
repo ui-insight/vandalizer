@@ -63,6 +63,7 @@ export interface CourseIdentity {
   modules_total?: number
   module_ids?: string[]
   maximum_xp?: number
+  maximum_stars?: number
 }
 
 export interface CredentialScope {
