@@ -30,7 +30,7 @@ def test_a_cut_document_is_named_with_how_much_of_it_was_sent():
 def test_the_model_is_told_the_middle_was_left_out_and_how_to_read_it():
     sheet = DocumentSegment(label="doc:matrix.xlsx", text="row value " * 2_000)
     text = _compact(documents=[sheet]).documents[0].text
-    assert "The middle of this document was left out" in text
+    assert "[Vandalizer note, not part of the file: the middle of this document was left out" in text
     assert "get_document_text" in text
 
 

@@ -755,13 +755,22 @@ def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
 
 # Where a file's middle was cut to fit, say so to the model and how to get it
 # back. A bare "[truncated]" left it answering as though it had read the file.
+#
+# The note sits inside the file's text, so it names its author. Unsigned, it
+# read as the file talking to the model: with a large Excel file attached,
+# chat told the user their spreadsheet "contains internal notes addressed to
+# an AI (e.g., 'Read the omitted part…')", obeying the rule that flags such
+# text in documents. The chat prompts describe this prefix (see
+# llm_service), so keep the two in step.
+CUT_NOTE_PREFIX = "[Vandalizer note, not part of the file: "
 _DOCUMENT_CUT_MARKER = (
-    "\n\n…[The middle of this document was left out to fit the model's memory. "
-    "Read the omitted part with get_document_text before answering about it.]…\n\n"
+    f"\n\n…{CUT_NOTE_PREFIX}the middle of this document was left out to fit the "
+    "model's memory. Read the omitted part with get_document_text before "
+    "answering about it.]…\n\n"
 )
 _FILE_CUT_MARKER = (
-    "\n\n…[The middle of this file was left out to fit the model's memory. "
-    "Say so if the answer may depend on it.]…\n\n"
+    f"\n\n…{CUT_NOTE_PREFIX}the middle of this file was left out to fit the "
+    "model's memory. Say so if the answer may depend on it.]…\n\n"
 )
 
 
