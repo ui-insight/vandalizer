@@ -32,6 +32,7 @@ export function CertificationLearnerSummary({ item, onClose }: { item: Certifica
       <p>{summary.explanation}</p>
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div><dt className="font-medium">Course version</dt><dd>{data.course_version || 'Historical version unknown'}</dd></div>
+        <div><dt className="font-medium">Course updates</dt><dd>{data.optional_update_available == null ? 'Not available for this record' : data.optional_update_available ? 'A newer optional course is offered; the learner stays on this course unless they choose to compare and switch' : 'No newer course is offered'}</dd></div>
         <div><dt className="font-medium">Course selection</dt><dd>{data.is_active == null ? 'Not recorded' : data.is_active ? 'Selected course' : 'Preserved course history'}</dd></div>
         <div><dt className="font-medium">Recorded progress</dt><dd>{data.modules_completed}/{data.modules_total} modules · {data.total_xp} XP</dd></div>
         <div><dt className="font-medium">Completion</dt><dd>{data.certified ? 'Recorded as certified' : 'Not recorded as certified'}</dd></div>

@@ -177,7 +177,7 @@ def render_certificate_pdf(
 
     c.setFillColor(muted)
     c.setFont("DejaVuSans", 12)
-    caption = (course_version or '') if outcome_based else course_title + (f' | {course_version}' if course_version else '') if course_title else ''
+    caption = (f'Course version {course_version}' if course_version else '') if outcome_based else course_title + (f' | {course_version}' if course_version else '') if course_title else ''
     if caption:
         label = Paragraph(escape(caption), ParagraphStyle('course', fontName=_font_for(caption), fontSize=11, leading=14, alignment=1, textColor=muted))
         _label_width, label_height = label.wrap(width - 2 * inch, 42)

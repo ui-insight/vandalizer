@@ -973,6 +973,8 @@ export interface CertificationProgressItem {
   course_title?: string | null
   enrollment_state?: string | null
   is_active?: boolean | null
+  /** A newer optional course is offered to this enrollment's course; null when unknown. */
+  optional_update_available?: boolean | null
   can_unlock?: boolean
   progression_policy_id?: string | null
   learning_order?: string | null

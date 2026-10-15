@@ -3686,6 +3686,7 @@ class CertificationProgressItem(BaseModel):
     course_title: Optional[str] = None
     enrollment_state: Optional[str] = None
     is_active: Optional[bool] = None
+    optional_update_available: Optional[bool] = None
     can_unlock: bool = True
     progression_policy_id: Optional[str] = None
     learning_order: Optional[str] = None

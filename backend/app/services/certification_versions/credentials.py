@@ -158,7 +158,10 @@ class CredentialRepository:
             outcomes=contract.required_outcomes() if contract else (),
             outcome_evidence_status=('All required competency outcomes supported by original selected assessment receipts'
                                      if contract else 'Stored module credit; new 5.0 supervision outcomes are not established'),
-            **({'credential_scope': scope_from_contract(package, contract)} if contract else {}),
+            # An outcome credential is named by its own course; the legacy
+            # course keeps the Vandal Workflow Architect title it awarded.
+            **({'credential_scope': scope_from_contract(package, contract),
+                'credential_title': package.manifest.title} if contract else {}),
         )
 
     async def persist(self, record: CredentialSnapshot) -> CredentialSnapshot:

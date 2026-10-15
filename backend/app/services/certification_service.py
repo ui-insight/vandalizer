@@ -138,8 +138,10 @@ def course_module_titles() -> dict[str, str]:
 
 
 def course_identity() -> dict:
+    from .certification_versions.course_updates import optional_update_available
     operation = current_operation()
     return ({**operation.package.summary(), 'enrollment_id': operation.progress.enrollment_id,
+             'optional_update_available': optional_update_available(operation.package),
              'maximum_stars': operation.package.manifest.maximum_stars,
              'credit_basis': 'required_outcomes' if 'outcomes.json' in operation.package.manifest.artifacts else 'legacy_rubric'}
             if operation else {})

@@ -55,6 +55,16 @@ it.each(earnedCards)('uses the recorded reward policy in $name cards', ({ Compon
   expect(screen.getByText(/Foundations/)).toBeInTheDocument()
 })
 
+it.each(earnedCards)('names the course and states an offered newer course in plain language in $name cards', ({ Component, content }) => {
+  const identity = { enrollment_id: 'e'.repeat(32), course_version: 'course-5.0.0', course_title: 'Research Workflow Practitioner', manifest_sha256: 'f'.repeat(64) }
+  const { rerender } = render(<Component content={{ ...content, ...identity, optional_update_available: true }} />)
+  expect(screen.getByText('Research Workflow Practitioner · course-5.0.0')).toBeInTheDocument()
+  expect(screen.getByText(/A newer optional course is available to compare/)).toBeInTheDocument()
+  expect(screen.queryByText(/f{64}/)).toBeNull()
+  rerender(<Component content={{ ...content, ...identity, optional_update_available: false }} />)
+  expect(screen.queryByText(/A newer optional course is available/)).toBeNull()
+})
+
 it('preserves historical star counts without inventing a missing versioned scale', () => {
   render(<CertCompletionCard content={{ ...earnedCards[3].content, enrollment_id: 'old-enrollment' }} />)
   expect(screen.getByRole('img', { name: '2 stars recorded' })).toBeInTheDocument()

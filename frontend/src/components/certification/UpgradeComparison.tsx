@@ -6,7 +6,9 @@ import type { UpgradeCourseOption, UpgradeOptions, UpgradePreview } from '../../
 
 const buttonStyle = 'min-h-11 min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-left text-sm font-medium text-gray-900 [overflow-wrap:anywhere] disabled:opacity-50 sm:px-3'
 
-export function UpgradeComparison({ enrollmentId, onRefreshCourse }: { enrollmentId: string; onRefreshCourse: () => Promise<void> }) {
+export function UpgradeComparison({ enrollmentId, onRefreshCourse, updateAvailable }: {
+  enrollmentId: string; onRefreshCourse: () => Promise<void>; updateAvailable?: boolean | null
+}) {
   const headingId = useId()
   const request = useRef(0)
   const openButton = useRef<HTMLButtonElement>(null)
@@ -74,7 +76,7 @@ export function UpgradeComparison({ enrollmentId, onRefreshCourse }: { enrollmen
   }
 
   return <section className="my-4 min-w-0 rounded-lg border border-gray-200 bg-white p-2 [overflow-wrap:anywhere] sm:p-4" aria-labelledby={headingId}>
-    <h3 id={headingId} className="text-sm font-semibold text-gray-900">Course versions are your choice</h3>
+    <h3 id={headingId} className="text-sm font-semibold text-gray-900">{updateAvailable ? 'A newer optional course is offered' : 'Course versions are your choice'}</h3>
     <p className="mt-1 text-sm text-gray-700">Keep learning in your current course. You can compare an offered version without changing your enrollment or earned work.</p>
     {!open ? <button ref={openButton} type="button" className={`${buttonStyle} mt-3`} onClick={() => { void loadOptions() }}>Compare course versions</button> : <div className="mt-3 space-y-4">
       <button type="button" className={buttonStyle} onClick={close}>Close course options</button>

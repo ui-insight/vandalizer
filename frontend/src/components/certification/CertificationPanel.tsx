@@ -22,6 +22,7 @@ import { LEVEL_CONFIG, LEVEL_THRESHOLDS as LEGACY_LEVELS, TIERS as LEGACY_TIERS 
 import { CertifiedBanner } from './CertifiedBanner'
 import { CredentialHistory } from './CredentialHistory'
 import { UpgradeComparison } from './UpgradeComparison'
+import { CourseUpdateNotice, courseLabel } from './CourseUpdateNotice'
 import { SavedCourseChoices } from './SavedCourseChoices'
 import { CourseLearningPolicy } from './CourseLearningPolicy'
 import { CourseBridgePath } from './CourseBridgePath'
@@ -591,7 +592,7 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
       {course && <CourseLearningPolicy course={course} />}
       <CourseHistory key={`course-history:${uid}`} />
       {progress?.enrollment_id && <CredentialHistory refreshKey={`${progress.enrollment_id}:${progress.certified}`} />}
-      {progress?.enrollment_id && <UpgradeComparison key={progress.enrollment_id} enrollmentId={progress.enrollment_id} onRefreshCourse={refreshCourseChoice} />}
+      {progress?.enrollment_id && <UpgradeComparison key={progress.enrollment_id} enrollmentId={progress.enrollment_id} onRefreshCourse={refreshCourseChoice} updateAvailable={course?.optional_update_available} />}
       {progress?.enrollment_id && <SavedCourseChoices key={`saved-choices:${progress.enrollment_id}`} enrollmentId={progress.enrollment_id} onRefreshCourse={refreshCourseChoice} />}
       {/* Compact hero */}
       {progress?.certified ? (
@@ -701,7 +702,10 @@ export function CertificationPanel({ onOpenWorkspace }: { onOpenWorkspace?: () =
 
         <CertificationRefreshNotice />
         <CourseSelectionNotice key={`selection:${uid}`} refreshKey={selectionRefresh} enrollmentId={progress?.enrollment_id} onRefreshCourse={refreshCourseChoice} />
-        {course && <p className="border-b border-gray-100 px-4 py-2 text-xs font-medium text-gray-700" aria-label="Your course">{course.course_title}</p>}
+        {course && <div className="border-b border-gray-100 px-4 py-2">
+          <p className="text-xs font-medium text-gray-700" aria-label="Your course">{courseLabel(course)}</p>
+          <CourseUpdateNotice available={course.optional_update_available} className="mt-1 text-xs text-gray-700" compareHint="Compare it under “Course progress and credential” when you are ready." />
+        </div>}
         <CompletionResumeNotice pending={pendingCompletions} modules={MODULES} course={course ?? progress} busy={completing || loading} onOpen={setActiveModule} onRetry={handleComplete} onRefresh={refresh} onHelp={closePanel} />
         {/* Panel body */}
         {panelContent}

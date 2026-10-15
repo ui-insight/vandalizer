@@ -285,6 +285,20 @@ it.each([3, 11])('uses the selected %i-module manifest for progress even with hi
   expect(screen.queryByText('Certification complete')).toBeNull()
 })
 
+it.each([true, false, null])('names the selected course and version and states update availability (%s) in plain language', available => {
+  const modules = MODULES.slice(0, 3)
+  const identity = { enrollment_id: 'course-3', course_version: 'course-5.0.0', manifest_sha256: 'c'.repeat(64) }
+  panelState.progress = { ...progressWith(1), ...identity }
+  panelState.course = { ...identity, versioned: true, course_title: 'Research Workflow Practitioner', modules_total: 3,
+    optional_update_available: available, maximum_xp: modules.reduce((sum, module) => sum + module.xp + 75, 0), modules,
+    prerequisites: Object.fromEntries(modules.map(module => [module.id, []])), levels: [{ name: 'Novice', xp: 0 }], tiers: [],
+  }
+  render(<CertificationPanel />)
+  expect(screen.getByLabelText('Your course')).toHaveTextContent('Research Workflow Practitioner · version course-5.0.0')
+  expect(screen.queryAllByText('A newer optional course is available.')).toHaveLength(available ? 1 : 0)
+  expect(screen.queryByText(/c{64}/)).toBeNull()
+})
+
 it('preserves the last checks while rechecking and after an unavailable response', async () => {
   panelState.progress = progressWith(0, false)
   const previous: ValidationResult = { passed: false, stars: 0, checks: [

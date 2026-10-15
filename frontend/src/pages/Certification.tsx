@@ -2,6 +2,8 @@ import { ValidationResults } from '../components/certification/ValidationResults
 import { CompletionResumeNotice } from '../components/certification/CompletionResumeNotice'
 import { CourseSelectionNotice } from '../components/certification/CourseSelectionNotice'
 import { CourseLearningPolicy } from '../components/certification/CourseLearningPolicy'
+import { CourseUpdateNotice, courseLabel } from '../components/certification/CourseUpdateNotice'
+import { UpgradeComparison } from '../components/certification/UpgradeComparison'
 import { ApiError } from '../api/client'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
@@ -355,13 +357,14 @@ export default function Certification() {
   return (
     <PageLayout>
       <div className="p-6 max-w-5xl mx-auto space-y-8">
-        {course && <p className="text-sm font-medium text-gray-700" aria-label="Your course">{course.course_title}</p>}
+        {course && <p className="text-sm font-medium text-gray-700" aria-label="Your course">{courseLabel(course)}</p>}
 
         <CourseSelectionNotice key={`selection:${uid}`} enrollmentId={progress?.enrollment_id} onRefreshCourse={refresh} />
         {course && <CourseLearningPolicy course={course} />}
         <CompletionResumeNotice pending={pendingCompletions} modules={MODULES} course={course ?? progress} busy={completing || loading} onOpen={setActiveModule} onRetry={handleComplete} onRefresh={refresh} />
         {/* Hero Section */}
         {progress?.enrollment_id && <CredentialHistory refreshKey={`${progress.enrollment_id}:${progress.certified}`} />}
+        {progress?.enrollment_id && <UpgradeComparison key={progress.enrollment_id} enrollmentId={progress.enrollment_id} onRefreshCourse={refresh} updateAvailable={course?.optional_update_available} />}
         {progress?.certified ? (
           <CertifiedBanner progress={progress} />
         ) : (
@@ -386,12 +389,15 @@ export default function Certification() {
             {/* Stats */}
             <div className="flex-1 w-full">
               <h1 className="text-2xl font-bold text-gray-900 mb-1">
-                Vandal Workflow Architect
+                {course?.course_title ?? 'Vandal Workflow Architect'}
               </h1>
+              {course?.course_version && <p className="text-xs text-gray-600 mb-1">Course version {course.course_version}</p>}
               <p className="text-sm text-gray-500 mb-2">
                 Complete all {MODULES.length} modules to earn your official certification
               </p>
-              <div
+              <CourseUpdateNotice available={course?.optional_update_available} className="mb-2 text-sm text-gray-700" compareHint="Use “Compare course versions” on this page when you are ready." />
+              {/* The VWA credential blurb belongs to the legacy course only. */}
+              {!course?.credential_scope && <div
                 className="flex items-center gap-2 px-3 py-2 mb-4 border border-yellow-200 bg-yellow-50/60"
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}
               >
@@ -399,7 +405,7 @@ export default function Certification() {
                 <p className="text-xs text-yellow-800">
                   <span className="font-bold">Vandal Workflow Architect (VWA)</span>: a University of Idaho credential recognizing your ability to design, build, and deploy AI-powered document workflows for research administration.
                 </p>
-              </div>
+              </div>}
 
               {/* XP bar */}
               <XPBar

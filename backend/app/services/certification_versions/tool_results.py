@@ -23,6 +23,8 @@ class Result(BaseModel):
     manifest_sha256: Text | None = None
     maximum_stars: Annotated[int, Field(ge=1, le=3)] | None = None
     credit_basis: Literal['required_outcomes', 'legacy_rubric'] | None = None
+    # A newer course is offered for comparison; the pinned course is unchanged.
+    optional_update_available: bool | None = None
 
     @model_validator(mode='after')
     def identity(self):

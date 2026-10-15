@@ -174,7 +174,7 @@ export function CertificationsTab() {
                           <div style={{ fontSize: 14, fontWeight: 500 }}>{p.name || 'Unknown'}</div>
                           <div style={{ fontSize: 12, color: '#6b7280' }}>{p.email || p.user_id}</div>
                           {p.course_title && <div style={{ fontSize: 12, color: '#374151', marginTop: 6 }}>{p.course_title}</div>}
-                          {p.course_version && <div style={{ fontSize: 12, color: '#4b5563' }}>{p.course_version} · {p.is_active ? 'Selected course' : 'Preserved history'} · {p.enrollment_state}</div>}
+                          {p.course_version && <div style={{ fontSize: 12, color: '#4b5563' }}>{p.course_version} · {p.is_active ? 'Selected course' : 'Preserved history'} · {p.enrollment_state}{p.optional_update_available ? ' · Newer optional course offered' : ''}</div>}
                           {p.reconciliation_error && <div role="status" style={{ fontSize: 12, color: '#991b1b', marginTop: 4 }}>{p.reconciliation_error}</div>}
                         </div>
                       </div>

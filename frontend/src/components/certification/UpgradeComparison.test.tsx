@@ -19,6 +19,14 @@ async function openComparison() {
   fireEvent.click(await screen.findByRole('button', { name: 'Compare V5 course' }))
 }
 
+it('says in plain language when a newer optional course is offered, still without loading it', () => {
+  const view = render(<UpgradeComparison enrollmentId="source" onRefreshCourse={vi.fn()} updateAvailable />)
+  expect(screen.getByRole('heading', { name: 'A newer optional course is offered' })).toBeInTheDocument()
+  expect(api.getUpgradeOptions).not.toHaveBeenCalled()
+  view.rerender(<UpgradeComparison enrollmentId="source" onRefreshCourse={vi.fn()} updateAvailable={null} />)
+  expect(screen.getByRole('heading', { name: 'Course versions are your choice' })).toBeInTheDocument()
+})
+
 it('loads only on request and shows preserved credit separately from unverified transfer', async () => {
   render(<UpgradeComparison enrollmentId="source" onRefreshCourse={vi.fn()} />)
   expect(api.getUpgradeOptions).not.toHaveBeenCalled()

@@ -79,6 +79,7 @@ function CardShell({ children, content, footer, readingOnly = false }: { childre
         }}
       >
         {typeof content.course_title === 'string' && <p className="mb-2 text-xs font-medium text-gray-700">{content.course_title}{typeof content.course_version === 'string' ? ` · ${content.course_version}` : ''}</p>}
+        {content.optional_update_available === true && <p className="mb-2 text-xs text-gray-700">A newer optional course is available to compare in the Certification panel. This course and your earned progress are unchanged.</p>}
         {stale && <div className="mb-3 text-sm text-gray-700" role="status">
           <p>This card is from an earlier or unavailable course selection. Refresh your progress to continue.</p>
           {certification && <button type="button" className="mt-1 underline" onClick={() => void certification.refresh()}>Refresh progress</button>}

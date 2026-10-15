@@ -27,6 +27,12 @@ it('shows original course, saved lesson and credit separately without assessment
   fireEvent.click(screen.getByRole('button', { name: 'Close status' }))
   expect(close).toHaveBeenCalledOnce()
 })
+it.each([[true, /A newer optional course is offered/], [false, /No newer course is offered/], [null, /Not available for this record/]] as const)(
+  'states course update status %s in plain language', async (available, text) => {
+    get.mockResolvedValue({ ...item, optional_update_available: available, support_summary: summary })
+    render(<CertificationLearnerSummary item={item} onClose={vi.fn()} />)
+    expect(await screen.findByText(text)).toBeInTheDocument()
+  })
 it('displays failed required outcomes and exact selected receipts', async () => {
   get.mockResolvedValue({ ...item, is_active: false, support_summary: { ...summary, pending_credential: true, older_completions_available: true,
     pending_completions: [{ attempt_id: 'p', module_id: 'ai', module_title: 'AI Literacy', state: 'evaluating', in_flight: true, next_step: 'Inspect the original request before retrying.' }],

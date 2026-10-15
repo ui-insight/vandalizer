@@ -64,6 +64,8 @@ export interface CourseIdentity {
   module_ids?: string[]
   maximum_xp?: number
   maximum_stars?: number
+  /** A newer course is offered for comparison; null when the catalog could not be read. */
+  optional_update_available?: boolean | null
 }
 
 export interface CredentialScope {
@@ -91,6 +93,7 @@ export interface CourseDefinition {
   manifest_sha256: string
   modules_total: number
   maximum_xp: number
+  optional_update_available?: boolean | null
   modules: ModuleDefinition[]
   prerequisites: Record<string, string[]>
   levels: { name: string; xp: number }[]

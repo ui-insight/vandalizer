@@ -290,6 +290,7 @@ async def test_full_course_requires_all_original_outcomes_and_graduates_once(rep
             assert hashlib.sha256((authored.folder / 'manifest.json').read_bytes()).hexdigest() == pinned_manifest
         earned = await credentials.for_enrollment(learner.user_id, learner.uuid)
         assert earned.schema_version == 2
+        assert earned.credential_title == earned.course_title != 'Vandal Workflow Architect'
         assert earned.credential_scope.model_dump(mode='json') == {key: value for key, value in course_scope.items() if key != 'state'}
         original_credential = earned.model_dump_json()
         if pending_credential:
@@ -319,8 +320,8 @@ async def test_full_course_requires_all_original_outcomes_and_graduates_once(rep
             text = document[0].get_text()
             normalized = ' '.join(text.split())
             assert original_name in normalized
-            assert earned.course_version in normalized and earned.course_title in normalized
-            assert 'completed all 11 modules' in normalized
+            assert f'Course version {earned.course_version}' in normalized and earned.course_title in normalized
+            assert 'has demonstrated the assessed outcomes of' in normalized and 'Vandal Workflow Architect' not in normalized
             assert earned.credential_id.upper() in normalized
             assert ' '.join(earned.credential_scope.promise.split()) in normalized
             assert all(document[0].rect.contains(fitz.Rect(word[:4])) for word in document[0].get_text('words'))

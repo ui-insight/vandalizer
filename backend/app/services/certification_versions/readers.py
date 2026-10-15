@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.models.certification import CertificationEnrollment, CertificationProgress
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .catalog import CourseCatalogError
+from .course_updates import optional_update_available
 
 
 async def has_earned_certification(user_id: str) -> bool:
@@ -61,6 +62,7 @@ async def support_metadata_many(progresses: list[CertificationProgress]) -> dict
     counts = Counter(progress.user_id for progress in progresses)
     packages = {}
     policies = {}
+    updates = {}
 
     def verified_enrollment(raw):
         enrollment = CertificationEnrollment.model_validate(raw)
@@ -69,6 +71,7 @@ async def support_metadata_many(progresses: list[CertificationProgress]) -> dict
             try:
                 packages[version] = repository.catalog.load(version)
                 policies[version] = package_progression_policy(packages[version])
+                updates[version] = optional_update_available(packages[version])
             except CourseCatalogError as exc:
                 packages[version] = exc
         package = packages[version]
@@ -115,6 +118,7 @@ async def support_metadata_many(progresses: list[CertificationProgress]) -> dict
                 'progress_id': progress_id, 'enrollment_id': enrollment.uuid,
                 'course_version': enrollment.course_version, 'course_title': package.manifest.title,
                 'enrollment_state': enrollment.state, 'is_active': selected,
+                'optional_update_available': updates.get(enrollment.course_version),
                 'module_ids': [module.id for module in package.manifest.modules],
                 'can_unlock': selected and enrollment.state in ('active', 'completed') and policy is None,
                 **({'progression_policy_id': policy.policy_id, 'learning_order': policy.learning_order,

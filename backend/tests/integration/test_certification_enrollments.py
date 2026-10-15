@@ -607,6 +607,7 @@ async def test_admin_metadata_and_unlock_target_one_selected_enrollment(repo, mo
     assert listed.total == 1
     assert listed.items[0].enrollment_id == source.uuid
     assert listed.items[0].modules_total == 11
+    assert metadata['optional_update_available'] is listed.items[0].optional_update_available is False
     from fastapi import HTTPException
     for identity in (None, 'stale-enrollment'):
         with pytest.raises(HTTPException) as error:
