@@ -1,12 +1,14 @@
 """Local release authoring. These operations never read or change learners."""
 from contextlib import contextmanager
+import datetime
 import fcntl
 import json
 import os
 from pathlib import Path
 import tempfile
 
-from .catalog import CourseCatalog, CourseCatalogError
+from .catalog import (CATALOG_ROOT, QA_STAGING_MARKER, QA_STAGING_WAIVABLE, CourseCatalog, CourseCatalogError,
+                      PublicationRecord, production_environment)
 from .grading import load_rubric
 
 
@@ -34,12 +36,28 @@ def write_registry(root: Path, registry: dict):
 
 
 def publish(catalog: CourseCatalog, release_id: str, *, expected_digest: str,
-            impact_report=None, source_catalog=None, inventory=None):
-    """Publish exactly a reviewed draft; do not choose any enrollment default."""
+            impact_report=None, source_catalog=None, inventory=None, qa_staging=None):
+    """Publish exactly a reviewed draft; do not choose any enrollment default.
+
+    ``qa_staging`` ({'reason', 'actor'}) publishes a marked QA package to a
+    separate staging catalog. Only the production-evidence findings named in
+    QA_STAGING_WAIVABLE are waived, and the registry records that the release
+    is not production-authorized; production processes refuse to serve it.
+    """
     with authoring_lock(catalog.root):
         package = catalog.load(release_id, preview=True)
         if package.entry.state != 'draft' or package.manifest_sha256 != expected_digest:
             raise CourseCatalogError('Publication requires the exact reviewed draft')
+        marked = QA_STAGING_MARKER in package.manifest.artifacts
+        if qa_staging is not None:
+            if production_environment():
+                raise CourseCatalogError('QA staging publication is refused in a production environment')
+            if catalog.root.resolve() == CATALOG_ROOT.resolve():
+                raise CourseCatalogError('QA staging releases belong in a separate staging catalog, never the application catalog')
+            if not marked:
+                raise CourseCatalogError('QA staging publication requires a package built with its QA staging marker')
+        elif marked:
+            raise CourseCatalogError('A QA staging package cannot be published for production')
         from .outcomes import package_outcomes
         outcomes = package_outcomes(package)
         if outcomes is not None and outcomes.state != 'release_candidate':
@@ -52,13 +70,28 @@ def publish(catalog: CourseCatalog, release_id: str, *, expected_digest: str,
         # Initial preservation of the frozen continuation baseline retains its
         # existing path. Authored courses and outcome-based courses additionally
         # need the exact impact review; readiness metadata alone is insufficient.
-        if outcomes is not None or package.manifest.historical_provenance != 'continuation-baseline':
+        record = {'mode': 'production', 'production_authorized': True,
+                  'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+        if outcomes is not None or package.manifest.historical_provenance != 'continuation-baseline' or qa_staging is not None:
             from .release_impact import require_publication_impact
-            require_publication_impact(catalog, release_id, report=impact_report,
-                                       source_catalog=source_catalog, inventory=inventory)
+            current = require_publication_impact(catalog, release_id, report=impact_report,
+                                                 source_catalog=source_catalog, inventory=inventory,
+                                                 waivable=QA_STAGING_WAIVABLE if qa_staging is not None else ())
+            record.update(impact_report_sha256=current['report_sha256'],
+                          source_release_id=current['source']['course_version'])
+            if qa_staging is not None:
+                record.update(mode='qa_staging', production_authorized=False,
+                              waived_findings=sorted(item['code'] for item in current['blocking_findings']),
+                              reason=str(qa_staging.get('reason') or '').strip(),
+                              actor=str(qa_staging.get('actor') or '').strip())
+        try:
+            PublicationRecord.model_validate(record)
+        except ValueError as exc:
+            raise CourseCatalogError('QA staging publication needs a reason of at least five characters and an actor') from exc
         registry = catalog.registry()
-        registry['releases'][release_id].update(state='published', supported_for_existing=True)
+        registry['releases'][release_id].update(state='published', supported_for_existing=True, publication=record)
         write_registry(catalog.root, registry)
+        return record
 
 
 def retire(catalog: CourseCatalog, release_id: str):

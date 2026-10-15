@@ -14,10 +14,50 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CATALOG_ROOT = Path(__file__).resolve().parents[3] / 'certification-data' / 'courses'
 RELEASE_ID = re.compile(r'^[a-z0-9][a-z0-9.-]{0,95}$')
+# A QA staging package carries synthetic readiness metadata so testers can
+# complete it. The marker travels inside the hashed package; the publication
+# record travels in the registry. Neither can serve production learners.
+QA_STAGING_MARKER = 'qa-staging.json'
+QA_STAGING_WAIVABLE = ('runtime_compatibility_evidence_required', 'rollout_evidence_required', 'qa_staging_package')
+
+
+def configured_root() -> Path:
+    """The application catalog, or an explicit separate catalog for a staging deployment."""
+    from app.config import Settings
+    configured = Settings().certification_catalog_root.strip()
+    return Path(configured).resolve() if configured else CATALOG_ROOT
+
+
+def production_environment() -> bool:
+    from app.config import Settings
+    return Settings().environment.strip().lower() == 'production'
 
 
 class CourseCatalogError(ValueError):
     pass
+
+
+class PublicationRecord(BaseModel):
+    """How a release left draft: the exact reviewed report and any QA-only waiver."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    mode: Literal['production', 'qa_staging']
+    production_authorized: bool
+    recorded_at: str
+    impact_report_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+    source_release_id: str | None = None
+    waived_findings: tuple[str, ...] = ()
+    reason: str = Field(default='', max_length=1000)
+    actor: str = Field(default='', max_length=200)
+
+    @model_validator(mode='after')
+    def validate_authorization(self):
+        if self.mode == 'qa_staging':
+            if (self.production_authorized or not self.impact_report_sha256 or len(self.reason.strip()) < 5
+                    or not self.actor.strip() or not set(self.waived_findings) <= set(QA_STAGING_WAIVABLE)):
+                raise ValueError('A QA staging publication needs its report, reason, actor and only QA waivers')
+        elif not self.production_authorized or self.waived_findings:
+            raise ValueError('A production publication cannot waive release findings')
+        return self
 
 
 class ReleaseEntry(BaseModel):
@@ -25,12 +65,19 @@ class ReleaseEntry(BaseModel):
     state: Literal['draft', 'published', 'retired']
     supported_for_existing: bool
     manifest_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    publication: PublicationRecord | None = None
 
     @model_validator(mode='after')
     def validate_support(self):
         if self.state == 'published' and not self.supported_for_existing:
             raise ValueError('A course accepting new learners must support their enrollment')
+        if self.state == 'draft' and self.publication is not None:
+            raise ValueError('A draft has no publication record')
         return self
+
+    @property
+    def qa_staging(self) -> bool:
+        return self.publication is not None and self.publication.mode == 'qa_staging'
 
 
 class CourseModule(BaseModel):
@@ -117,12 +164,13 @@ class CoursePackage:
             'module_ids': [module.id for module in manifest.modules],
             'maximum_xp': sum(m.base_xp + manifest.maximum_stars * manifest.star_bonus_xp for m in manifest.modules),
             'historical_provenance': manifest.historical_provenance,
+            **({'authorization': 'qa_staging_not_production'} if self.entry.qa_staging else {}),
         }
 
 
 class CourseCatalog:
-    def __init__(self, root: Path = CATALOG_ROOT):
-        self.root = root
+    def __init__(self, root: Path | None = None):
+        self.root = Path(root) if root is not None else configured_root()
 
     def registry(self) -> dict:
         try:
@@ -170,6 +218,8 @@ class CourseCatalog:
                 raise CourseCatalogError('This course is closed to new enrollments')
             if not new_enrollment and not entry.supported_for_existing:
                 raise CourseCatalogError('This course requires a supported continuation path')
+            if entry.qa_staging and production_environment():
+                raise CourseCatalogError('This course release is authorized for QA staging only and cannot serve production learners')
         try:
             directory = (self.root / release_id).resolve()
             if directory.parent != self.root.resolve():
@@ -180,6 +230,8 @@ class CourseCatalog:
             manifest = CourseManifest.model_validate_json(raw_manifest)
             if manifest.release_id != release_id:
                 raise ValueError('Release identity mismatch')
+            if QA_STAGING_MARKER in manifest.artifacts and entry.state != 'draft' and not entry.qa_staging:
+                raise ValueError('A QA staging package lacks its QA-only publication record')
             assets = []
             for name, expected in manifest.artifacts.items():
                 path = (directory / name).resolve()

@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # Staged rollout: enable only after enrollment rehearsal and all course
     # surfaces have passed version-aware QA. Publication alone never enables it.
     certification_versioning_enabled: bool = False
+    # Separate course catalog for a QA staging deployment. Empty means the
+    # repository catalog. Releases published in QA staging mode refuse to
+    # serve learners when environment is "production".
+    certification_catalog_root: str = ""
     # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
     # unset to derive it from environment + frontend_url (see
     # use_secure_cookies): Secure in production, EXCEPT when the deployment is

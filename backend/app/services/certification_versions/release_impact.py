@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 
 from app.services.certificate_pdf import render_certificate_pdf
 
-from .catalog import CourseCatalogError
+from .catalog import QA_STAGING_MARKER, CourseCatalogError
 from .grading import load_rubric
 from .outcomes import package_outcomes
-from .progression_policy import package_progression_policy
+from .progression_policy import package_progression_policy, public_progression_policy
 
 
 def digest(value):
@@ -127,6 +127,23 @@ def publication_impact(source, target, *, inventory=None):
     except (ValueError, OSError) as exc:
         credential_rendering = {'status': 'unavailable', 'reason': str(exc)}
         block('target_certificate_unrenderable', 'Repair the target certificate metadata or renderer before publication: ' + str(exc))
+    # Exercise the learner-facing course definition the panel and chat receive.
+    # A package can pass integrity checks yet carry a case or policy that the
+    # installed delivery code cannot present.
+    try:
+        from .bridge_path import public_bridge_path
+        from .credential_scope import public_credential_scope
+        from .delivery import public_modules
+        public_modules(target)
+        public_progression_policy(target)
+        public_credential_scope(target)
+        public_bridge_path(target)
+        delivery = {'status': 'course_definition_rendered'}
+    except (CourseCatalogError, ValueError, KeyError, TypeError) as exc:
+        delivery = {'status': 'unavailable', 'reason': str(exc) or type(exc).__name__}
+        block('target_delivery_unavailable', 'Repair the package or install delivery support so the learner course definition renders: ' + delivery['reason'])
+    if QA_STAGING_MARKER in target.manifest.artifacts:
+        block('qa_staging_package', 'This package carries synthetic QA readiness metadata. Publish it only to a separate QA staging catalog with --qa-staging; build a production candidate without the marker.')
     observed = cohort_summary(inventory) if inventory is not None else None
     if observed is None:
         block('cohort_inventory_missing', 'Attach the aggregate read-only inventory from the authorized deployment; synthetic cohorts do not establish actual rollout impact.')
@@ -171,6 +188,7 @@ def publication_impact(source, target, *, inventory=None):
         },
         'compatibility': {'asset_integrity': 'verified_by_catalog', 'target_rubric': runner,
                           'credential_rendering': credential_rendering,
+                          'learner_course_definition': delivery,
                           'live_models_and_tools': 'not_verified_by_this_report',
                           'changed_lab_assets': [name for name in changed_paths if name.startswith(('documents/', 'decisions/', 'proposals/', 'assessments/')) or '-cases/' in name or name == 'exercises.json']},
         'cohorts': observed,
@@ -212,7 +230,7 @@ def inspect_catalogs(source_catalog, source_id, target_catalog, target_id, *, in
     return report
 
 
-def require_publication_impact(catalog, release_id, *, report, source_catalog=None, inventory=None):
+def require_publication_impact(catalog, release_id, *, report, source_catalog=None, inventory=None, waivable=()):
     """Bind publication to a fresh comparison; report edits cannot clear gates.
 
     The current inspector cannot certify the deferred runtime/rollout evidence.
@@ -234,6 +252,24 @@ def require_publication_impact(catalog, release_id, *, report, source_catalog=No
     current = inspect_catalogs(source_catalog or catalog, source_id, catalog, release_id, inventory=inventory)
     if report['report_sha256'] != current['report_sha256']:
         raise CourseCatalogError('Publication impact changed; regenerate and review the exact current report')
-    if current['blocking_findings'] or not current['publication_ready']:
-        reasons = '; '.join(f"{item['code']}: {item['action']}" for item in current['blocking_findings'])
+    # QA staging may waive only the named production-evidence findings; every
+    # integrity, revision, rubric, delivery, certificate and cohort finding stays.
+    remaining = [item for item in current['blocking_findings'] if item['code'] not in waivable]
+    if remaining or (not waivable and not current['publication_ready']):
+        reasons = '; '.join(f"{item['code']}: {item['action']}" for item in remaining)
         raise CourseCatalogError('Publication blocked by impact review: ' + (reasons or 'release evidence is incomplete'))
+    return current
+
+
+def change_summary(report):
+    """Reviewer-facing names of exactly what a publication changes."""
+    return {
+        'source': report['source']['course_version'], 'target': report['target']['course_version'],
+        'target_manifest_sha256': report['target']['manifest_sha256'], 'report_sha256': report['report_sha256'],
+        **{f'{kind}_{change}': report[kind][change] for kind in ('modules', 'lessons', 'outcomes', 'artifacts')
+           for change in ('added', 'removed', 'changed')},
+        'lessons_changed_without_new_revision': report['lessons']['changed_without_new_revision'],
+        'outcomes_requiring_compatibility_review': report['outcomes_requiring_compatibility_review'],
+        'changed_lab_assets': report['compatibility']['changed_lab_assets'],
+        'blocking_findings': report['blocking_findings'],
+    }
