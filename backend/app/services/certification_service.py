@@ -532,7 +532,7 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
     elif not already_completed:
         xp_earned = course_module_xp()[module_id]
     # Bonus XP for star upgrades
-    if stars > old_stars:
+    if stars > old_stars and not transferred:  # Carried credit is not a second star reward.
         operation = current_operation()
         bonus = operation.package.manifest.star_bonus_xp if operation else 25
         xp_earned += (stars - old_stars) * bonus
