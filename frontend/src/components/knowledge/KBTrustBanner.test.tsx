@@ -10,6 +10,15 @@ describe('KBTrustBanner', () => {
     expect(screen.queryByText('+40 pts')).not.toBeInTheDocument()
     expect(screen.queryByText(/Average answer accuracy/)).not.toBeInTheDocument()
   })
+  it('says a run that found no improvement kept the settings, and asks for nothing', () => {
+    const { rerender } = render(<KBTrustBanner score={0.8} metric="composite_quality" configState="no_improvement" />)
+    expect(screen.getByText(/Composite quality: 80\/100 · No improvement found/)).toBeVisible()
+    expect(screen.getByText(/current settings were kept and there is nothing to apply/)).toBeVisible()
+    expect(screen.queryByText(/Proposed settings/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Review and apply/)).not.toBeInTheDocument()
+    rerender(<AITrustChip score={0.8} metric="composite_quality" configState="no_improvement" />)
+    expect(screen.getByText('Quality 80/100 · no improvement found')).toBeVisible()
+  })
   it('keeps measured answer-only and composite chips distinct from an untested KB', () => {
     const { rerender } = render(<AITrustChip score={0.7} />)
     expect(screen.getByText('Answer accuracy 70%')).toBeVisible()

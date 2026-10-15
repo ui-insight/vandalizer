@@ -41,7 +41,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
       >
         <Minus size={iconSize} style={{ flexShrink: 0 }} />
         {composite
-          ? `Quality ${Math.round(score * 100)}/100 · ${configState === 'applied' ? 'applied in run' : configState === 'reverted' ? 'application reverted' : configState === 'default' ? 'default tested' : 'proposed'}`
+          ? `Quality ${Math.round(score * 100)}/100 · ${configState === 'applied' ? 'applied in run' : configState === 'reverted' ? 'application reverted' : configState === 'default' ? 'default tested' : configState === 'no_improvement' ? 'no improvement found' : 'proposed'}`
           : `Answer accuracy ${Math.round(score * 100)}%`}
       </span>
     )

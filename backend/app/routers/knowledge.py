@@ -271,10 +271,13 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
         # accuracy. Subtracting them would invent a comparison between unlike
         # metrics. Also distinguish tested proposals from settings actually applied.
         score = r.optimized_score if r.optimized_score is not None else r.baseline_default_score
+        # A run tied with the current settings has nothing to propose: apply
+        # was suppressed, so "review and apply" would point at a no-op.
         config_state = (
             "default" if r.optimized_score is None else
             "reverted" if getattr(r, "reverted_at", None) else
-            "applied" if getattr(r, "applied_at", None) else "proposed"
+            "applied" if getattr(r, "applied_at", None) else
+            "no_improvement" if getattr(r, "tied_with_baseline", False) else "proposed"
         )
         out[r.kb_uuid] = _TrustSummary(
             score=score, baseline=None, lift=None, at=ts,

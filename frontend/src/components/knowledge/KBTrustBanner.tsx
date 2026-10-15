@@ -99,11 +99,12 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
         ) : composite ? (
           <>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
-              Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : 'Proposed settings'}
+              Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : configState === 'no_improvement' ? 'No improvement found' : 'Proposed settings'}
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
               {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
+              {configState === 'no_improvement' && ' No tested settings measurably beat the current ones, so the current settings were kept and there is nothing to apply.'}
               {configState === 'reverted' && ' This score describes the tested settings, not the restored settings.'}
               {relTime && <span> · Last tested {relTime}</span>}
             </div>

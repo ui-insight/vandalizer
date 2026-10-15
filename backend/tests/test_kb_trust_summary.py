@@ -69,3 +69,10 @@ async def test_empty_list_does_not_query_runs():
     with patch('app.routers.knowledge.ValidationRun.find') as find:
         assert await _latest_runs_by_kb([]) == {}
     find.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_run_tied_with_the_current_settings_proposes_nothing():
+    result = await summarize(optimized=[optimization(tied_with_baseline=True)])
+    assert result.config_state == 'no_improvement'
+    assert result.score == 0.8
