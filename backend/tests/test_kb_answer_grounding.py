@@ -1,6 +1,8 @@
 """Figures in a KB answer must come from the snippets the model was shown."""
 
-from app.services.kb_answer_grounding import unsupported_figures
+import json
+
+from app.services.kb_answer_grounding import tool_output_as_source, unsupported_figures
 
 # The § 200.501 text the 2 CFR 200 KB actually holds (2024 revision).
 SNIPPETS = (
@@ -67,3 +69,41 @@ def test_no_snippets_means_every_figure_is_unsupported():
 
 def test_empty_answer():
     assert unsupported_figures("", SNIPPETS) == []
+
+
+# Support ticket: chat repeated what its validation and optimization tools
+# returned and flagged every number as possibly from general knowledge.
+VALIDATION_RESULT = json.dumps({
+    "extraction_set": "Award terms",
+    "num_runs": 3,
+    "accuracy": 0.8234,
+    "consistency": 0.92,
+    "score": 85.1,
+    "challenging_fields": [{"field": "PI", "accuracy": 0.77, "consistency": 0.96}],
+})
+
+
+def test_validation_scores_on_a_0_to_1_scale_support_their_percents():
+    answer = (
+        "Accuracy came in at 82% with 92% consistency (score 85.1%). "
+        "PI is the weakest field: 77% accurate, 96% consistent."
+    )
+    assert unsupported_figures(answer, tool_output_as_source(VALIDATION_RESULT)) == []
+
+
+def test_optimizer_score_percent_and_cost_are_supported():
+    result = json.dumps({"score_percent": 91, "estimated_cost_usd": 1.37, "tokens_used": 412000})
+    answer = "The best config scored 91% and cost about $1 ($1.37)."
+    assert unsupported_figures(answer, tool_output_as_source(result)) == []
+
+
+def test_figures_the_tool_did_not_return_are_still_flagged():
+    answer = "Accuracy was 88%, it ran 3 times, and it cost $412,000."
+    # num_runs and tokens_used are not percents or dollars, and 0.8234 is
+    # not 88%.
+    result = json.dumps({"accuracy": 0.8234, "num_runs": 3, "tokens_used": 412})
+    assert unsupported_figures(answer, tool_output_as_source(result)) == ["88%", "$412,000"]
+
+
+def test_a_plain_text_tool_result_still_reads_bare_amounts_as_dollars():
+    assert unsupported_figures("Budget: $1,250,000.", tool_output_as_source("budget 1250000")) == []

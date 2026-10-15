@@ -3708,6 +3708,18 @@ async def run_validation(
 # is the "typically $1–$5" tier the autovalidate marketing copy promises.
 DEFAULT_OPTIMIZATION_TOKEN_BUDGET = 500_000
 
+
+def _optimization_cost_range(token_budget: int) -> str:
+    """The "$1–$5 per 500k tokens" estimate, scaled to *token_budget*.
+
+    Stated in the tool's result rather than only its docstring, so a reply
+    that quotes it repeats something the tool returned (the figure check
+    flags dollar amounts no source or tool output states).
+    """
+    scale = token_budget / DEFAULT_OPTIMIZATION_TOKEN_BUDGET
+    low, high = (f"${n * scale:,.2f}".removesuffix(".00") for n in (1, 5))
+    return f"roughly {low}–{high} depending on model"
+
 _OPTIMIZE_KIND_ALIASES = {
     "kb": "knowledge_base",
     "knowledge_base": "knowledge_base",
@@ -3875,7 +3887,7 @@ async def start_optimization(
         context: The call context.
         item_kind: One of 'knowledge_base', 'search_set', or 'workflow' (aliases 'kb' / 'extraction' accepted).
         item_uuid: UUID of the item to optimize (workflow id for workflows).
-        token_budget: Max LLM tokens the run may spend. Default 500k (roughly $1–$5 depending on model).
+        token_budget: Max LLM tokens the run may spend. Default 500k. The preview carries the cost estimate.
         confirmed: Must be true to actually start. If false, returns a preview for user confirmation.
     """
     from app.services.optimization_actions import (
@@ -3906,7 +3918,8 @@ async def start_optimization(
             "action": "start_optimization",
             "preview": (
                 f"Run autovalidate on \"{title}\" with a budget of "
-                f"{token_budget:,} tokens (typically takes {duration}). "
+                f"{token_budget:,} tokens (typically takes {duration}; "
+                f"{_optimization_cost_range(token_budget)}). "
                 "Nothing changes until the winning config is applied."
             ),
             "needs_confirmation": True,

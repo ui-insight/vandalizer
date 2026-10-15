@@ -44,7 +44,7 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
-from app.services.kb_answer_grounding import bare_amounts_as_money, unsupported_figures
+from app.services.kb_answer_grounding import tool_output_as_source, unsupported_figures
 from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
     RoutingDecision,
@@ -2577,7 +2577,7 @@ async def chat_stream(
                         [s.text for s in (*doc_segments, *attachment_segments)]
                         + [getattr(d, "raw_text", None) or "" for d in documents or []]
                         + [message]
-                        + [bare_amounts_as_money(t) for t in tool_outputs]
+                        + [tool_output_as_source(t) for t in tool_outputs]
                     ))
                     if active_kbs or documents or tool_outputs else []
                 )

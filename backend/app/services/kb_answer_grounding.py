@@ -20,6 +20,7 @@ dates, counts and list numbering are left alone: they are either copied from
 the question or too common to check without drowning the real signal.
 """
 
+import json
 import re
 
 _SCALES = {
@@ -78,6 +79,70 @@ def bare_amounts_as_money(text: str) -> str:
     tool returned in any form still is.
     """
     return _BARE_AMOUNT_RE.sub(lambda m: "$" + m.group(1) + (m.group(2) or ""), text or "")
+
+
+# Field names whose numbers a reply reports as a percentage or in dollars.
+# Matched against the underscore-separated words of a JSON key, so
+# "aggregate_accuracy", "score_percent" and "estimated_cost_usd" all count
+# while "tokens_used" and "num_runs" do not.
+_PERCENT_KEY_WORDS = frozenset({
+    "score", "accuracy", "consistency", "percent", "pct", "rate",
+    "confidence", "precision", "recall", "f1", "coverage",
+})
+_MONEY_KEY_WORDS = frozenset({"cost", "usd", "price", "dollars", "spend"})
+
+
+def _key_words(key: str) -> set[str]:
+    return set(re.split(r"[^a-z0-9]+", key.lower()))
+
+
+def _number_forms(value: float, unit: str) -> list[str]:
+    """*value* as a reply would quote it: whole, one and two decimals."""
+    return [
+        f"${round(value, d):,.{d}f}" if unit == "$" else f"{round(value, d):.{d}f}%"
+        for d in (0, 1, 2)
+    ]
+
+
+def _keyed_figures(node, key: str = "") -> list[str]:
+    """Percent and dollar forms of the numbers under score- and cost-like keys."""
+    if isinstance(node, dict):
+        return [f for k, v in node.items() for f in _keyed_figures(v, str(k))]
+    if isinstance(node, list):
+        return [f for item in node for f in _keyed_figures(item, key)]
+    if isinstance(node, bool) or not isinstance(node, (int, float)):
+        return []
+    words = _key_words(key)
+    if words & _PERCENT_KEY_WORDS:
+        forms = _number_forms(node, "%")
+        # Validation and optimizer scores are stored on a 0..1 scale and
+        # reported as percents: 0.82 is "82%".
+        if 0 <= node <= 1:
+            forms += _number_forms(node * 100, "%")
+        return forms
+    if words & _MONEY_KEY_WORDS:
+        return _number_forms(node, "$")
+    return []
+
+
+def tool_output_as_source(text: str) -> str:
+    """A tool result, as the text a reply's figures are checked against.
+
+    Bare amounts read as dollars (see ``bare_amounts_as_money``). A JSON
+    result also gets each score- or cost-like field written the way a reply
+    states it: ``"accuracy": 0.82`` supports "82%", ``"score_percent": 91``
+    supports "91%", and ``"estimated_cost_usd": 1.37`` supports "$1.37" and
+    "$1". Support ticket: chat repeated a validation run's accuracy and
+    consistency and an optimizer's score straight from the tool result, and
+    every one was flagged as possibly recalled.
+    """
+    text = text or ""
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = None
+    extra = _keyed_figures(parsed) if isinstance(parsed, (dict, list)) else []
+    return "\n".join([bare_amounts_as_money(text), *extra])
 
 
 def _percent_values(text: str) -> dict[float, str]:
