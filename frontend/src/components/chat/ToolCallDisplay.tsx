@@ -506,6 +506,32 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
   return { text: '', qualityHint }
 }
 
+/**
+ * A tool call as a conversation export shows it: the line the chat shows,
+ * never the raw result. Exports used ``toolResultToText``, which falls back
+ * to JSON for most tools, so a 3-message certification chat printed as 4
+ * pages of `"module_id": "ai_literacy"` under the heading
+ * get_certification_progress (support ticket). Extraction results keep their
+ * values, as readable "Field: value" lines, because they are the answer.
+ */
+export function toolResultExportText(toolName: string, content: unknown): string {
+  const label = TOOL_META[toolName]?.label ?? 'Looked up workspace data'
+  const { text } = summarizeResult(toolName, content, null)
+  const lines = [text ? `${label} · ${text}` : label]
+  const obj = (content ?? {}) as Record<string, unknown>
+  if (toolName === 'run_extraction' && !obj.error && Array.isArray(obj.entities)) {
+    const entities = obj.entities as Array<Record<string, unknown>>
+    const fields = Array.isArray(obj.fields) ? (obj.fields as string[]) : Object.keys(entities[0] ?? {})
+    entities.forEach((entity, i) => {
+      if (entities.length > 1) lines.push(`Result ${i + 1}:`)
+      for (const f of fields) {
+        lines.push(`${f}: ${isEmptyValue(entity[f]) ? 'not found' : formatExtractedValue(entity[f])}`)
+      }
+    })
+  }
+  return lines.join('\n')
+}
+
 function formatQualityHint(quality: QualityMeta | null): string {
   if (!quality) return ''
   const parts: string[] = []

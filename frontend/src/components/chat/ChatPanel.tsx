@@ -1,7 +1,6 @@
 import DOMPurify from 'dompurify'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { marked } from 'marked'
-import { conversationEvidence } from './conversationEvidence'
 import { approvalHistoryFor } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
@@ -10,7 +9,7 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
-import { toolResultToText } from './ToolCallDisplay'
+import { conversationToCsv, conversationToText, exportMessageParts, exportRoleLabel } from './conversationExport'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { RAInbox } from './RAInbox'
 import { HomeWorkQueue } from './HomeWorkQueue'
@@ -728,95 +727,36 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
+  // Titles of everything selected this session, by ID, so an export can name
+  // what each message was sent with after the selection has changed. It only
+  // grows: an ID's title doesn't change by being deselected.
+  const scopeNamesRef = useRef<Record<string, string>>({})
+  useEffect(() => {
+    Object.assign(scopeNamesRef.current, selectedDocNames, selectedFolderNames)
+    for (const kb of activeKBs) if (kb.title) scopeNamesRef.current[kb.uuid] = kb.title
+    if (activeProjectUuid && activeProjectTitle) scopeNamesRef.current[activeProjectUuid] = activeProjectTitle
+  }, [selectedDocNames, selectedFolderNames, activeKBs, activeProjectUuid, activeProjectTitle])
+
   const handleExport = (format: string) => {
-    /** Serialize a single message including any tool results from its segments. */
-    const messageToText = (m: typeof messages[number]): string => {
-      const role = m.role === 'user' ? 'User' : 'Assistant'
-      const segs = m.segments
-      if (segs && segs.length > 0) {
-        const parts: string[] = []
-        for (const seg of segs) {
-          if (seg.kind === 'text') {
-            const cleaned = seg.content.trim()
-            if (cleaned) parts.push(cleaned)
-          } else if (seg.kind === 'tool_result') {
-            const body = toolResultToText(seg.result.tool_name, seg.result.content)
-            if (body) parts.push(`[${seg.result.tool_name}]\n${body}`)
-          }
-        }
-        parts.push(conversationEvidence(m))
-        return `${role}:\n${parts.join('\n\n')}`
-      }
-      // Fallback: content + tool results
-      const parts = [m.content]
-      if (m.tool_results) {
-        for (const r of m.tool_results) {
-          const body = toolResultToText(r.tool_name, r.content)
-          if (body) parts.push(`[${r.tool_name}]\n${body}`)
-        }
-      }
-      parts.push(conversationEvidence(m))
-      return `${role}:\n${parts.join('\n\n')}`
-    }
-
-    const fullText = messages.map(messageToText).join('\n\n---\n\n')
-
+    const names = scopeNamesRef.current
     if (format === 'text') {
-      const blob = new Blob([fullText], { type: 'text/plain' })
+      const blob = new Blob([conversationToText(messages, names)], { type: 'text/plain' })
       downloadBlob(blob, 'conversation.txt')
     } else if (format === 'csv') {
-      const csvEscape = (s: string) => `"${s.replace(/"/g, '""')}"`
-      const rows = [['Role', 'Content']]
-      messages.forEach(m => {
-        const segs = m.segments
-        let content = m.content
-        if (segs && segs.length > 0) {
-          const parts: string[] = []
-          for (const seg of segs) {
-            if (seg.kind === 'text') {
-              const cleaned = seg.content.trim()
-              if (cleaned) parts.push(cleaned)
-            } else if (seg.kind === 'tool_result') {
-              const body = toolResultToText(seg.result.tool_name, seg.result.content)
-              if (body) parts.push(`[${seg.result.tool_name}] ${body}`)
-            }
-          }
-          content = parts.join('\n')
-        } else if (m.tool_results) {
-          const extras = m.tool_results
-            .map(r => toolResultToText(r.tool_name, r.content))
-            .filter(Boolean)
-          if (extras.length) content += '\n' + extras.join('\n')
-        }
-        rows.push([m.role, [content, conversationEvidence(m)].filter(Boolean).join('\n\n')])
-      })
-      const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n')
-      const blob = new Blob([csv], { type: 'text/csv' })
+      const blob = new Blob([conversationToCsv(messages, names)], { type: 'text/csv' })
       downloadBlob(blob, 'conversation.csv')
     } else if (format === 'pdf') {
       const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
       const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
       table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px;text-align:left;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere}h1,h2,h3{break-after:avoid}.evidence{margin-top:12px;border-top:1px solid #ccc;padding-top:8px;font-size:12px;overflow-wrap:anywhere}.msg{overflow-wrap:anywhere;margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
       .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}
-      .tool-data{background:#f0f4f8;padding:8px 12px;border-radius:4px;font-size:12px;margin:8px 0;white-space:pre-wrap;font-family:monospace}</style></head>
+      .tool-data{color:#4b5563;font-size:12px;margin:8px 0;overflow-wrap:anywhere}</style></head>
       <body>${messages.map(m => {
+        const { tools, evidence } = exportMessageParts(m, names)
         const parts = [DOMPurify.sanitize(marked.parse(m.content, { async: false }))]
-        const segs = m.segments
-        if (segs) {
-          for (const seg of segs) {
-            if (seg.kind === 'tool_result') {
-              const body = toolResultToText(seg.result.tool_name, seg.result.content)
-              if (body) parts.push(`<div class="tool-data"><strong>${escHtml(seg.result.tool_name)}</strong><br>${escHtml(body)}</div>`)
-            }
-          }
-        } else if (m.tool_results) {
-          for (const r of m.tool_results) {
-            const body = toolResultToText(r.tool_name, r.content)
-            if (body) parts.push(`<div class="tool-data"><strong>${escHtml(r.tool_name)}</strong><br>${escHtml(body)}</div>`)
-          }
-        }
-        parts.push(`<div class="evidence">${escHtml(conversationEvidence(m))}</div>`)
-        return `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${parts.join('')}</div></div>`
+        for (const line of tools) parts.push(`<div class="tool-data">${escHtml(line)}</div>`)
+        if (evidence) parts.push(`<div class="evidence">${escHtml(evidence)}</div>`)
+        return `<div class="msg ${m.role}"><div class="role">${exportRoleLabel(m)}</div><div>${parts.join('')}</div></div>`
       }).join('')}</body></html>`
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close(); win.print() }
