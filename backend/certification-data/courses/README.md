@@ -54,6 +54,15 @@ After any schema-2 issuance, rolling back to a schema-1-only reader is unsafe. D
 
 An enrollment owns a course version, manifest digest, progress reference and provenance. A separate unique selection records the learner's active choice. Restartable initialization uses deterministic IDs and insert-only writes; legacy credit, dates, reflections and lab references remain in the original record. Duplicates, missing records and mismatched ownership fail closed for reconciliation.
 
+To backfill explicit legacy enrollments in bulk, first run a read-only dry run and review it. Then apply that exact plan:
+
+```bash
+CERTIFICATION_BACKFILL_MONGO_URL=... backend/.venv/bin/python scripts/backfill_certification_enrollments.py --database DB
+CERTIFICATION_BACKFILL_MONGO_URL=... backend/.venv/bin/python scripts/backfill_certification_enrollments.py --database DB --apply --expected-plan-sha256 REVIEWED
+```
+
+Apply uses the same `ensure_initial` path and never writes legacy progress. It exits 3 unless the before/after reconciliation matches per user and in record counts. After an interruption, run a new dry run and apply that plan. See the transition policy for the provenance and reward rules.
+
 Writes are serialized per active enrollment. Their durable marker records the operation, enrollment, course and rubric. Switching while work is in flight or submitting through a stale enrollment is rejected. A failed worker cleanup leaves the marker in place. It must be reconciled before a transition; no automatic timeout assumes that external work stopped.
 
 Course delivery resolves teaching by the enrollment's verified package. Saved positions use lesson identity and revision with stale-session conflict detection. Chat and panel share the cursor; navigation writes do not award credit. The staged delivery and grading tests exercise actual MongoDB persistence, not a mocked progress store.

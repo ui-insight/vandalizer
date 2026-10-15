@@ -125,6 +125,29 @@ Reason: an outcome is unchanged only when its assessment requirements match and 
 
 Decision (conservative default): graduates get no separate shorter credential. Through the optional upgrade they take this assessment-first path through the same 33 required outcomes and their automatic assessments. The upgrade comparison and preview now include the bridge, so a graduate can see it before choosing. Legacy credit transfers nothing (see the equivalence decision above). Duration stays unstated until a pilot measures it; do not publish a number from estimates.
 
+### Legacy provenance and enrollment backfill (October 15)
+
+Historical version (decision, conservative): a course version counts as known only when a versioned enrollment pins a manifest that matches the catalog. No legacy progress field establishes one. Dates, XP, module titles, completion, certification and stray version strings are not version evidence. Every unversioned record becomes `legacy_version_unknown`, reported as `legacy_unversioned`, and is never relabeled as 4.0 or 5.0 competence. A legacy record carrying a `course_version` value without an enrollment is held as `unverified_version_hint` for explicit reconciliation. It is neither trusted nor silently cleared.
+
+Backfill (`scripts/backfill_certification_enrollments.py`, `legacy_backfill.py`):
+
+- The default is a read-only dry run that reads twice and refuses if the records change between reads.
+- The dry run reports per-user module credit, stars, XP, completion dates, certification date, reflections, lab folder/documents and saved place. It uses pseudonymous user keys and never shows account IDs or answer text. It also reports aggregate totals and record counts.
+- `--apply` requires the reviewed `plan_sha256`. It backfills only `ready` and `resume` users, through the existing restartable `ensure_initial`, and never writes the legacy progress record.
+- Afterwards it recomputes the plan and requires identical per-user summaries (including a digest of each legacy record), unchanged totals and exactly the expected new enrollment/selection counts.
+- After an interruption, a new dry run shows `resume` users. Applying that new plan completes them without duplicates.
+- Duplicates, version hints, conflicting bindings and in-flight writes are classed `needs_reconciliation` and are never backfilled automatically.
+- Credential preservation for certified legacy learners stays the separate `preserve_legacy` step.
+- The operator runs it against production only with explicit authorization, starting with a dry run under a read-only credential. A supported `legacy_continuation` course must be configured before any apply.
+
+### Reward accounting (October 15)
+
+`reward_ledger.py` defines how totals are explained. Base XP is earned once, in the enrollment whose assessment first earned the module. A transferred module adds `xp_carried` to the target course's progress, with zero earned XP and no star bonus for the carried threshold. Lifetime earned XP counts carried XP once, where it was earned.
+
+Legacy stars and their 25-XP bonuses stay in the legacy course. The 5.0 course has one completion threshold and no star bonus, so legacy stars never become 5.0 stars or XP. Modules assessed in the bridge or upgraded course earn that course's base XP once. Later reassessment earns only genuinely new star bonus. Each credential belongs to one enrollment; transfer issues at most one new credential for the target, and the original is never reissued.
+
+Recorded totals the rule cannot explain (for example, legacy admin edits) appear as `unexplained_xp` and are never rewritten. Decision (conservative): carried XP stays visible in the selected course's total, matching the existing "carried XP, no new base reward" consent, rather than being hidden.
+
 ## Data and rollout sequence
 
 1. Publish an immutable course manifest containing stable module/lesson/outcome IDs, ordered requirements, assets, XP rules and exact content/exercise/rubric revisions. Store the release digest and distinguish drafts, published releases, retired-for-new-enrollment releases and support for existing enrollments.
