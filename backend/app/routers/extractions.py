@@ -1038,6 +1038,7 @@ async def run_recorded_extraction(
     extraction_config_override: Optional[dict] = None,
     combined_context: bool = False,
     tags: Optional[list[str]] = None,
+    source_conversation_id: Optional[str] = None,
 ) -> dict:
     """Run an extraction set and record it as a run in History.
 
@@ -1058,6 +1059,8 @@ async def run_recorded_extraction(
         team_id=team_id,
         search_set_uuid=ss.uuid,
         tags=tags,
+        document_uuids=document_uuids,
+        source_conversation_id=source_conversation_id,
     )
     assert activity.id is not None
 
@@ -1372,6 +1375,7 @@ async def run_extraction_integrated(
         title=ss.title,
         user_id=user.user_id,
         search_set_uuid=search_set_uuid,
+        document_uuids=all_doc_uuids,
     )
     assert activity.id is not None
 

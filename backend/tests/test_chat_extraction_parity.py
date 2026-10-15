@@ -59,6 +59,8 @@ async def _run_chat(run_result):
     from app.services.chat_tools import run_extraction
 
     ctx = _make_context(model_name="kimi-k3")
+    # The run is recorded against the chat it ran in, so History can nest it.
+    ctx.deps.conversation.uuid = "conv-1"
     recorded = AsyncMock(return_value=run_result)
     with (
         patch("app.services.chat_tools.SearchSet") as MockSS,
@@ -86,6 +88,7 @@ class TestChatRunsTheEditorRun:
         assert kwargs == {
             "user_id": "user1", "team_id": "team1",
             "model": "kimi-k3", "tags": ["chat"],
+            "source_conversation_id": "conv-1",
         }
         assert result["activity_id"] == "activity-1"
 

@@ -100,6 +100,10 @@ export interface ActivityEvent {
   status: 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
   title: string | null
   conversation_id: string | null
+  /** Runs only: the chat that started this run, when a chat tool did. */
+  source_conversation_id?: string | null
+  /** Runs only: titles of the first documents the run read. */
+  document_titles?: string[]
   search_set_uuid: string | null
   workflow_id: string | null
   workflow_session_id: string | null

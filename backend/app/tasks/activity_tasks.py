@@ -194,6 +194,14 @@ def generate_activity_description_task(
             logger.warning("Activity %s not found", activity_id)
             return
 
+        # Only a chat gets a generated title. A run keeps its extraction set's
+        # or workflow's name: the activity list shows the run's documents and
+        # time beside it, and a generated title ("Workflow Processing Subaward
+        # Agreement Document") replaced the one name that says what ran.
+        if activity_type != "conversation":
+            _mark_done()
+            return
+
         # Get first 2 documents for context
         document_text = ""
         for doc_uuid in document_uuids[:2]:

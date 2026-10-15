@@ -1147,6 +1147,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
         steps_total=num_steps,
+        document_uuids=document_uuids,
     )
 
     try:

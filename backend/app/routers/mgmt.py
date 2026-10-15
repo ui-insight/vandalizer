@@ -1134,6 +1134,7 @@ async def run_workflow_endpoint(
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
         steps_total=num_steps,
+        document_uuids=body.document_uuids,
     )
 
     try:
@@ -1188,6 +1189,7 @@ async def run_extraction(
         user_id=user.user_id,
         team_id=str(user.current_team) if user.current_team else None,
         search_set_uuid=body.search_set_uuid,
+        document_uuids=body.document_uuids,
     )
     try:
         # Same disclosure the in-app run makes — see the note there. A caller

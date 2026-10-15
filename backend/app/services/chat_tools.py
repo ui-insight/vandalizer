@@ -1902,6 +1902,7 @@ async def _execute_extraction(
                 # set's own pinned model, if any, still wins inside the engine.
                 model=context.deps.model_name or None,
                 tags=["chat"],
+                source_conversation_id=_source_conversation_id(context),
             ),
             timeout=120,
         )
@@ -2642,6 +2643,15 @@ async def run_workflow(
     return await _execute_workflow(context, wf, run_docs, model=requested_model)
 
 
+def _source_conversation_id(context: RunContext[AgenticChatDeps]) -> Optional[str]:
+    """The chat this tool call runs in, recorded on the runs it starts.
+
+    The activity list nests a run under the chat that started it.
+    """
+    conversation = context.deps.conversation
+    return getattr(conversation, "uuid", None) if conversation is not None else None
+
+
 async def _execute_workflow(
     context: RunContext[AgenticChatDeps],
     wf,
@@ -2669,16 +2679,19 @@ async def _execute_workflow(
     activity_id = None
     try:
         from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
+        from app.services.activity_service import document_titles_for
         now = datetime.datetime.now(datetime.timezone.utc)
         ev = ActivityEvent(
             type=ActivityType.WORKFLOW_RUN.value,
-            title=f"Workflow: {wf.name or workflow_id}",
+            title=wf.name or workflow_id,
             status=ActivityStatus.RUNNING.value,
             user_id=user_id,
             team_id=team_id,
             started_at=now,
             last_updated_at=now,
             documents_touched=len(document_uuids),
+            document_titles=await document_titles_for(document_uuids[:10]),
+            source_conversation_id=_source_conversation_id(context),
             tags=["chat"],
         )
         await ev.insert()

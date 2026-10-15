@@ -1490,6 +1490,18 @@ html {
 .activity-entry__rename:hover, .activity-entry__rename:focus-visible { color: #202124; background: #e8edf3; }
 .activity-entry__rename-form { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 8px; color: #202124; }
 .activity-entry__rename-input { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid #3b82f6; border-radius: 4px; font: inherit; font-size: 12px; color: #202124; background: #fff; outline: none; }
+.activity-entry__toggle { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 20px; min-height: 40px; margin-right: -4px; padding: 0; border: 0; border-radius: 6px; color: #59616b; background: transparent; cursor: pointer; }
+.activity-entry__toggle:hover, .activity-entry__toggle:focus-visible { color: #202124; background: #e8edf3; }
+.activity-runs { margin: -2px 0 4px 14px; padding-left: 6px; border-left: 1px solid #d8d8d8; }
+.activity-entry--nested { margin-bottom: 0; }
+.activity-entry__open--nested { min-height: 32px; padding: 6px 8px; }
+.activity-entry__error { margin: -2px 0 6px 32px; font-size: 12px; color: #59616b; }
+.activity-entry__error--nested { margin-left: 32px; }
+.activity-entry__error-toggle { padding: 0; border: 0; background: transparent; color: #0050d7; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.activity-entry__error-text { margin: 4px 0 0; padding: 6px 8px; border-radius: 4px; background: #fff0ee; color: #5f1d17; white-space: pre-wrap; overflow-wrap: anywhere; }
+.activity-section { display: flex; align-items: center; gap: 6px; width: 100%; margin: 8px 0 2px; padding: 4px 8px; border: 0; border-top: 1px solid #ddd; background: transparent; color: #444; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+.activity-section:hover, .activity-section:focus-visible { color: #111; background: #e8edf3; }
+.activity-count { border-radius: 999px; padding: 0 6px; background: #e5e7eb; color: #333; font-size: 11px; font-weight: 600; }
 
 @container (max-width: 350px) {
   .workflow-editor__header { padding: 12px !important; }

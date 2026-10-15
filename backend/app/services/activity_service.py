@@ -12,6 +12,29 @@ from app.models.chat import ChatConversation, ChatMessage, FileAttachment, UrlAt
 logger = logging.getLogger(__name__)
 
 
+# How many document titles a run records. The list shows the first and a count.
+RUN_DOCUMENT_TITLES_MAX = 10
+
+
+async def document_titles_for(document_uuids: Optional[list[str]]) -> list[str]:
+    """Titles of the first documents a run reads, in the order given.
+
+    A document that no longer exists is left out rather than failing the run.
+    """
+    uuids = list(dict.fromkeys(document_uuids or []))[:RUN_DOCUMENT_TITLES_MAX]
+    if not uuids:
+        return []
+    from app.models.document import SmartDocument
+
+    try:
+        docs = await SmartDocument.find({"uuid": {"$in": uuids}}).to_list()
+    except Exception:
+        logger.exception("Could not look up document titles for a run")
+        return []
+    by_uuid = {d.uuid: (d.title or d.uuid) for d in docs}
+    return [by_uuid[u] for u in uuids if u in by_uuid]
+
+
 async def activity_start(
     *,
     type: ActivityType,
@@ -24,6 +47,8 @@ async def activity_start(
     workflow_result: Optional[PydanticObjectId] = None,
     steps_total: int = 0,
     tags: Optional[list[str]] = None,
+    document_uuids: Optional[list[str]] = None,
+    source_conversation_id: Optional[str] = None,
 ) -> ActivityEvent:
     now = datetime.now(timezone.utc)
     ev = ActivityEvent(
@@ -38,6 +63,8 @@ async def activity_start(
         workflow_result=workflow_result,
         steps_total=steps_total,
         tags=tags or [],
+        document_titles=await document_titles_for(document_uuids),
+        source_conversation_id=source_conversation_id,
         started_at=now,
         last_updated_at=now,
     )
