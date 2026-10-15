@@ -29,10 +29,25 @@ _CERT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "certification-
 _EXERCISES: dict = {}
 
 
+def _require_unversioned_reader() -> None:
+    """Process-cached files serve only the unversioned course.
+
+    With versioning enabled, a read bound to no course operation could hand a
+    versioned learner the legacy lessons or exercises. Refuse it instead of
+    mixing course versions inside one attempt.
+    """
+    from app.services.certification_versions import runtime
+    from app.services.certification_versions.catalog import CourseCatalogError
+    from app.services.certification_versions.legacy_writes import legacy_operation
+    if legacy_operation.get() is None and runtime.versioning_enabled():
+        raise CourseCatalogError('Course content must be read through the learner\'s pinned course; this read is not bound to an enrollment')
+
+
 def _load_exercises() -> dict:
     operation = current_operation()
     if operation:
         return operation.package.json('exercises.json')
+    _require_unversioned_reader()
     global _EXERCISES
     if _EXERCISES:
         return _EXERCISES
@@ -64,6 +79,7 @@ def _load_lessons() -> dict:
     operation = current_operation()
     if operation:
         return operation.package.json('lessons.json')
+    _require_unversioned_reader()
     global _LESSONS
     if _LESSONS:
         return _LESSONS

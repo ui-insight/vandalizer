@@ -3794,13 +3794,13 @@ async def get_certification_progress_detail(
     """Get a single user's full certification progress including per-module state."""
     await _require_admin(user)
 
-    from app.services.certification_versions.readers import support_metadata, existing_active_progress
+    from app.services.certification_versions.readers import course_incident, support_metadata, existing_active_progress
     from app.services.certification_versions.enrollments import EnrollmentRepository, EnrollmentConflict
     from app.services.certification_versions.catalog import CourseCatalogError
     try:
         p = await EnrollmentRepository().read_progress(user_id, enrollment_id) if enrollment_id else await existing_active_progress(user_id)
     except (EnrollmentConflict, CourseCatalogError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail=await course_incident(user_id, enrollment_id, exc)) from exc
     if not p:
         raise HTTPException(status_code=404, detail="No certification progress for this user")
 

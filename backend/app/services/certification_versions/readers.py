@@ -129,7 +129,37 @@ async def support_metadata_many(progresses: list[CertificationProgress]) -> dict
                 'progress_id': progress_id, 'course_title': 'Course needs reconciliation',
                 'module_ids': [], 'can_unlock': False, 'reconciliation_error': str(exc),
             }
+            version = (bindings[0].get('course_version') if isinstance(exc, CourseCatalogError)
+                       and len(bindings) == 1 else None)
+            if isinstance(version, str):
+                # Name the active-course incident for support without reading learner content.
+                from .release_coherence import diagnose_release
+                diagnosis = diagnose_release(repository.catalog, version)
+                if diagnosis['status'] != 'available':
+                    result[progress_id].update(course_version=version, reconciliation_error=' '.join(
+                        (f"{exc}.", diagnosis['explanation'], diagnosis.get('detail', ''),
+                         diagnosis['next_step'], diagnosis['learner_work'])).replace('  ', ' '))
     return result
+
+
+async def course_incident(user_id: str, enrollment_id: str | None, error: Exception) -> str:
+    """Explain an unreadable enrolled course to support from its stored identity only."""
+    from .release_coherence import diagnose_release
+    repository = EnrollmentRepository()
+    if not isinstance(error, CourseCatalogError):
+        return str(error)
+    if enrollment_id is None:
+        selection = await repository.selections.find_one({'user_id': user_id})
+        enrollment_id = selection.get('active_enrollment_id') if selection else None
+    raw = await repository.enrollments.find_one({'uuid': enrollment_id, 'user_id': user_id}) if enrollment_id else None
+    version = raw.get('course_version') if raw else None
+    if not isinstance(version, str):
+        return str(error)
+    diagnosis = diagnose_release(repository.catalog, version)
+    if diagnosis['status'] == 'available':
+        return str(error)
+    return ' '.join((f'{error}. Course {version}: {diagnosis["explanation"]}', diagnosis.get('detail', ''),
+                     diagnosis['next_step'], diagnosis['learner_work'])).replace('  ', ' ')
 
 
 async def support_metadata(progress: CertificationProgress) -> dict:

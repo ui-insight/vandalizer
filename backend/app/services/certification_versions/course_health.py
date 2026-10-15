@@ -258,4 +258,25 @@ async def course_health():
         # Inactivity is measured; why someone stopped is not. A grading question
         # opened from a result is counted, but whether support upheld it is not linked.
         'unavailable_metrics': ['dropout', 'grading_question_outcomes'],
+        **release_status(rows),
     }
+
+
+def release_status(rows):
+    """This worker's release fingerprint and any enrolled course it cannot serve.
+
+    Each refresh may reach a different worker; differing fingerprints mean the
+    deployment is serving mixed releases. Diagnoses read packages, not learners.
+    """
+    from .catalog import CourseCatalog, CourseCatalogError
+    from .release_coherence import deployment_identity, diagnose_release
+    catalog = CourseCatalog()
+    try:
+        identity = deployment_identity(catalog)
+    except (CourseCatalogError, OSError):
+        identity = {'status': 'unavailable', 'explanation': 'This worker cannot read a valid course registry.'}
+    versions = sorted({row['course_version'] for row in rows
+                       if row['source'] == 'enrollments' and row['course_version']})
+    incidents = [diagnosis for diagnosis in (diagnose_release(catalog, version) for version in versions)
+                 if diagnosis['status'] != 'available']
+    return {'release_identity': identity, 'release_incidents': incidents}
