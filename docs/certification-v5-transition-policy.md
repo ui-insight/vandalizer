@@ -119,6 +119,12 @@ Decision (conservative default; the user may override it): **no 5.0 outcome tran
 
 Reason: an outcome is unchanged only when its assessment requirements match and original assessed evidence exists. The legacy course has no outcome contract, so `assessment_basis` is undefined and no `credit-equivalence.json` rule can bind to it. The review schema accepts only `requires_new_assessment`, so it can explain a refusal but never grant credit. Transfer stays possible only between outcome-based releases with an identical assessment basis. The review is presentation-only: editing its text does not change the target's assessment basis. To override the decision, author a new outcome-based release whose evidence supports an `EquivalencePolicy` rule. Do not edit the review to say otherwise.
 
+### Bridge contract (October 15)
+
+`bridge-path.json` is validated as an ordered contract: `scope` (scope and approval decisions), `verify` (source verification and quality limits), `recover_deliver` (recovery and delivery), then `capstone`. The final stage must hold exactly one module, and that module must assess the named `capstone_outcome_id` (`governance.capstone_supervision`). Reordered, missing or unknown stages, and a capstone that is not last, fail closed. `duration_minutes` must be `null`, and delivery reports `duration_status: unmeasured_until_pilot`.
+
+Decision (conservative default): graduates get no separate shorter credential. Through the optional upgrade they take this assessment-first path through the same 33 required outcomes and their automatic assessments. The upgrade comparison and preview now include the bridge, so a graduate can see it before choosing. Legacy credit transfers nothing (see the equivalence decision above). Duration stays unstated until a pilot measures it; do not publish a number from estimates.
+
 ## Data and rollout sequence
 
 1. Publish an immutable course manifest containing stable module/lesson/outcome IDs, ordered requirements, assets, XP rules and exact content/exercise/rubric revisions. Store the release digest and distinguish drafts, published releases, retired-for-new-enrollment releases and support for existing enrollments.

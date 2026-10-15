@@ -5,6 +5,7 @@
   "description": "Use this assessment-first path to demonstrate what you know. Open the relevant lessons when you need an explanation or when feedback identifies something to practise.",
   "credential_policy": "same_course_same_required_outcomes",
   "duration_minutes": null,
+  "capstone_outcome_id": "governance.capstone_supervision",
   "stages": [
     {
       "id": "scope",

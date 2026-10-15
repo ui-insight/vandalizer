@@ -90,6 +90,7 @@ class UpgradeComparison:
                 'required_outcome_count': preview['target']['required_outcome_count'],
                 'transferred_outcome_count': preview['target']['transferred_outcome_count'],
                 'modules': preview['target']['modules'],
+                'bridge_path': preview['target']['bridge_path'],
             },
             'preservation_plan': preview['preservation_plan'],
             'equivalence_plan': preview['equivalence_plan'],

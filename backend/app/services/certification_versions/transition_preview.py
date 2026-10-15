@@ -14,6 +14,7 @@ from .credentials import CredentialRepository
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .outcomes import package_outcomes
 from .credit_equivalence import equivalence_plan
+from .bridge_path import public_bridge_path
 
 
 EXECUTION_SUMMARY_FIELDS = {'uuid': 1, 'module_id': 1, 'input_snapshot_id': 1, 'state': 1,
@@ -188,7 +189,9 @@ class TransitionPreview:
             },
             'target': {**target.summary(), 'state': target.entry.state, 'rubric_id': contract.rubric_id,
                        'contract_id': contract.contract_id, 'required_outcome_count': len(contract.required_outcomes()),
-                       'transferred_outcome_count': 0, 'modules': modules},
+                       'transferred_outcome_count': 0, 'modules': modules,
+                       # The optional assessment-first path a graduate may take; same outcomes, no duration claim.
+                       'bridge_path': public_bridge_path(target)},
             'pending_assessments': [{'attempt_id': attempt['uuid'], 'module_id': attempt['module_id'], 'state': attempt['state']} for attempt in attempts],
             'saved_completion_history': [{'attempt_id': item['uuid'], 'module_id': item['module_id'], 'state': item['state']}
                 for item in completion_history if item['state'] not in ('evaluating', 'graded')],
