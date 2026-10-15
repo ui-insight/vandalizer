@@ -1317,7 +1317,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Top up and retry
                 </button>
                 <span className="text-xs text-red-600/80">
-                  Adds tokens here, then sends your last message again. An approval you just gave goes through.
+                  Your last message wasn't carried out. Top up here and it's sent again, including an approval or button you just clicked.
                 </span>
               </div>
             ) : errorDetails?.suggestedAction === 'continue' ? (
