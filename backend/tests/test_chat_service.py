@@ -306,6 +306,53 @@ class TestCitationPersistence:
         _, kwargs = conversation.add_message.await_args
         assert kwargs["unsupported_figures"] == ["$750,000"]
 
+    def test_chat_message_to_dict_carries_unsupported_citations(self):
+        from app.models.chat import ChatMessage, ChatRole
+
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer",
+            unsupported_citations=["2 CFR 200.332"],
+        )
+        assert msg.to_dict()["unsupported_citations"] == ["2 CFR 200.332"]
+        bare = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer", unsupported_citations=None,
+        )
+        assert "unsupported_citations" not in bare.to_dict()
+
+    @pytest.mark.asyncio
+    async def test_finalize_passes_unsupported_citations_to_add_message(self):
+        from unittest.mock import AsyncMock
+
+        from app.services.chat_service import _finalize
+
+        conversation = MagicMock()
+        conversation.add_message = AsyncMock()
+        await _finalize(
+            conversation, "answer", [], None, None, "user-1",
+            unsupported_citations=["2 CFR 200.332"],
+        )
+        _, kwargs = conversation.add_message.await_args
+        assert kwargs["unsupported_citations"] == ["2 CFR 200.332"]
+
+    def test_cited_source_texts_splits_kb_snippets_by_source(self):
+        from app.services.chat_service import _cited_source_texts
+        from app.services.context_budget import DocumentSegment
+
+        kb = DocumentSegment(label="kb", text=(
+            "\n\n## Retrieved Knowledge Base Snippets\n_preamble_\n"
+            "\n**Source: 2 CFR 200.332 (p. 1)**\neCFR page title only\n"
+            "\n**Source: Subpart F (p. 4)**\nsingle audit text\n"
+            "\n**Source: 2 CFR 200.332 (p. 1)**\nmore title chrome\n"
+        ))
+        doc = DocumentSegment(label="doc:award.pdf", text="## Document: award.pdf\nbody")
+        texts = _cited_source_texts([kb, doc, DocumentSegment(label="onboarding", text="x")])
+
+        assert set(texts) == {"2 CFR 200.332 (p. 1)", "Subpart F (p. 4)", "award.pdf"}
+        assert "eCFR page title only" in texts["2 CFR 200.332 (p. 1)"]
+        assert "more title chrome" in texts["2 CFR 200.332 (p. 1)"]
+        assert "single audit" not in texts["2 CFR 200.332 (p. 1)"]
+        assert "body" in texts["award.pdf"]
+
     @pytest.mark.asyncio
     async def test_finalize_passes_citations_to_add_message(self):
         from unittest.mock import AsyncMock

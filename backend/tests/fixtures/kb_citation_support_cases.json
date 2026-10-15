@@ -1,0 +1,646 @@
+[
+ {
+  "id": "g_308_prior_approval",
+  "kind": "grounded",
+  "question": "What changes need prior written approval under the budget revision rule?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(f) Revisions Requiring Prior Approval. A recipient or subrecipient must request prior written approval from the Federal agency or pass-through entity for the following program and budget-related reasons:\n(1) Change in the scope or the objective of the project or program (even if there is no associated budget revision requiring prior written approval).\n(2) Change in key personnel (including employees and contractors) that are identified by name or position in the Federal award.\n(3) The disengagement from a project for more than three months, or a 25 percent reduction in time and effort devoted to the Federal award over the course of the period of performance, by the approved project director or principal investigator.\n(4) The inclusion, unless waived by the Federal agency, of costs that require prior approval in accordance with subpart E as applicable.\n(5) The transfer of funds budgeted for participant support costs to other budget categories."
+   }
+  ],
+  "answer": "Prior written approval from the Federal agency or pass-through entity is needed for:\n- A change in the project's scope or objective, even with no budget impact\n- A change in key personnel named in the award (employees or contractors)\n- The PI/project director being disengaged for more than three months, or cutting time and effort by 25 percent\n- Including costs that need prior approval under subpart E, unless the agency waives that\n- Moving participant support funds into other budget categories\n\n[Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "g_308_nce",
+  "kind": "grounded",
+  "question": "When do I have to ask for a no-cost extension?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(10) A no-cost extension (meaning, an extension of time that does not require the obligation of additional Federal funds) of the period of performance, other than any one-time extension authorized by the Federal agency in accordance with paragraph (g)(2). All requests for no-cost extensions should be submitted at least 10 calendar days before the conclusion of the period of performance. The Federal agency may approve multiple no-cost extensions under a Federal award if not prohibited by Federal statute or regulation."
+   }
+  ],
+  "answer": "Submit no-cost extension requests at least 10 calendar days before the period of performance ends. The agency can approve more than one unless a statute or regulation forbids it. [Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "g_308_review",
+  "kind": "grounded",
+  "question": "How fast does the sponsor have to respond to a budget revision request?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(d) Federal agency or pass-through entity review. The Federal agency or pass-through entity must review the request for budget or program plan revision and should notify the recipient or subrecipient whether the revisions have been approved within 30 days of receipt of the request. The Federal agency or pass-through entity must inform the recipient or subrecipient in writing when a decision can be expected if more than 30 days is required for a review.\n(e) Limitation on other prior approval requirements. Unless specified in this guidance, the Federal agency must not impose additional prior approval requirements without OMB approval. See also §§ 200.102 and 200.407."
+   }
+  ],
+  "answer": "- The agency or pass-through entity should tell you within 30 days of receiving the request whether it is approved.\n- If the review will take longer, they must notify you in writing of when to expect a decision.\n- Agencies also can't add new prior-approval requirements without OMB sign-off.\n\n[Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "g_308_preaward",
+  "kind": "grounded",
+  "question": "How far back can we charge pre-award costs?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(g) Waiver of certain prior approvals. Except for the requirements listed in paragraphs (f)(1) through (10), the Federal agency is authorized to waive other cost-related and administrative prior written approval requirements contained in subparts D and E. Such waivers may include authorizing recipients to do one or more of the following:\n(1) Pre-award costs. Incur project costs 90 calendar days before the Federal award date. Expenses incurred more than 90 calendar days before the Federal award date require prior approval of the Federal agency. All costs incurred before the Federal award date are at the recipient's own risk (for example, the Federal agency is not required to reimburse such costs if the recipient does not receive the Federal award or if the Federal award is less than anticipated and inadequate to cover such costs). Pre-award costs must be charged to the initial budget period of the Federal award unless otherwise specified by the Federal agency. See also § 200.458."
+   }
+  ],
+  "answer": "Where the agency has waived the prior-approval requirement, you can start spending up to 90 calendar days before the award date. Anything earlier needs agency approval.\n- Spending before the award is at your own risk; the agency need not reimburse it if the award never comes or is smaller than expected.\n- Charge these costs to the first budget period unless the agency says otherwise.\n\n[Source: 2 CFR 200.308 (p. 4)]"
+ },
+ {
+  "id": "g_329_due",
+  "kind": "grounded",
+  "question": "When are performance reports due?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.329 — Monitoring and reporting program performance",
+    "text": "(c) Submitting performance reports. (1) The recipient or subrecipient must submit performance reports as required by the Federal award. Intervals must be no less frequent than annually nor more frequent than quarterly except if specific conditions are applied (See § 200.208). Reports submitted annually by the recipient or subrecipient must be due no later than 90 calendar days after the reporting period. Reports submitted quarterly or semiannually must be due no later than 30 calendar days after the reporting period. Alternatively, the Federal agency or pass-through entity may require annual reports before the anniversary dates of multiple-year Federal awards. The final performance report submitted by the recipient must be due no later than 120 calendar days after the period of performance. A subrecipient must submit a final performance report to a pass-through entity no later than 90 calendar days after the conclusion of the period of performance. See also § 200.344. The Federal agency or pass-through entity may extend the due date for any performance report with justification from the recipient or subrecipient."
+   }
+  ],
+  "answer": "Due dates depend on how often you report:\n- **Annual reports:** within 90 calendar days of the period's end\n- **Quarterly or semiannual reports:** within 30 calendar days\n- **Final report (recipient):** within 120 calendar days after the period of performance\n- **Final report (subrecipient to pass-through):** within 90 days\n\nThe agency or pass-through entity may extend a due date if you give justification. [Source: 2 CFR 200.329 — Monitoring and reporting program performance]"
+ },
+ {
+  "id": "g_329_significant",
+  "kind": "grounded",
+  "question": "Do we have to tell the sponsor about problems between report dates?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.329 — Monitoring and reporting program performance",
+    "text": "(e) Significant developments. When a significant development that could impact the Federal award occurs between performance reporting due dates, the recipient or subrecipient must notify the Federal agency or pass-through entity. Significant developments include events that enable meeting milestones and objectives sooner or at less cost than anticipated or that produce different beneficial results than originally planned. Significant developments also include problems, delays, or adverse conditions which will impact the recipient's or subrecipient's ability to meet milestones or the objectives of the Federal award. When significant developments occur that negatively impact the Federal Award, the recipient or subrecipient must include information on their plan for corrective action and any assistance needed to resolve the situation."
+   }
+  ],
+  "answer": "Yes. Between reporting dates you must notify the agency or pass-through entity of significant developments, whether good news (milestones met sooner or cheaper) or bad (delays, problems, adverse conditions). For negative developments, include a corrective action plan and say what help you need. [Source: 2 CFR 200.329 — Monitoring and reporting program performance]"
+ },
+ {
+  "id": "g_331_sub_vs_con",
+  "kind": "grounded",
+  "question": "How do I tell a subrecipient from a contractor?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "(a) Subrecipients. A subaward is for the purpose of carrying out a portion of the Federal award and creates a Federal financial assistance relationship with a subrecipient. See the definition of Subaward in § 200.1. Characteristics that support the classification of the entity as a subrecipient include, but are not limited to, when the entity:\n(1) Determines who is eligible to receive what Federal assistance;\n(2) Has its performance measured in relation to whether the objectives of a Federal program were met;\n(3) Has responsibility for programmatic decision-making;\n(4) Is responsible for adherence to applicable Federal program requirements specified in the Federal award; and\n(5) Implements a program for a public purpose specified in authorizing statute, as opposed to providing goods or services for the benefit of the pass-through entity."
+   },
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "(b) Contractors. A contract is for the purpose of obtaining goods and services for the recipient's or subrecipient's use and creates a procurement relationship with a contractor. See the definition of contract in § 200.1. Characteristics that support a procurement relationship between the recipient or subrecipient and a contractor include, but are not limited to, when the contractor:\n(1) Provides the goods and services within normal business operations;\n(2) Provides similar goods or services to many different purchasers;\n(3) Normally operates in a competitive environment;\n(4) Provides goods or services that are ancillary to the implementation of a Federal program; and\n(5) Is not subject to compliance requirements of a Federal program as a result of the agreement. However, similar requirements may apply for other reasons."
+   }
+  ],
+  "answer": "A subaward carries out part of the Federal award; a contract buys goods or services for your own use.\n\n**Looks like a subrecipient** when the entity:\n- decides who is eligible for assistance\n- is measured on whether program objectives were met\n- makes programmatic decisions\n- must follow Federal program requirements\n- runs a program for a public purpose\n\n**Looks like a contractor** when it sells within normal business operations, serves many buyers, competes in a market, provides ancillary goods or services, and isn't bound by program compliance requirements.\n\n[Source: 2 CFR 200.331 — Subrecipient and contractor determinations]"
+ },
+ {
+  "id": "g_331_substance",
+  "kind": "grounded",
+  "question": "Who decides whether an agreement is a subaward or a contract, and on what basis?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "An entity may concurrently receive Federal awards as a recipient, a subrecipient, and a contractor. The pass-through entity is responsible for making case-by-case determinations to determine whether the entity receiving Federal funds is a subrecipient or a contractor. The Federal agency may require the pass-through entity to comply with additional guidance to make these determinations, provided such guidance does not conflict with this section. The Federal agency does not have a direct legal relationship with subrecipients or contractors of any tier; however, the Federal agency is responsible for monitoring the pass-through entity's oversight of first-tier subrecipients. All of the characteristics listed below may not be present in all cases, and some characteristics from both categories may be present at the same time. No single factor or any combination of factors is necessarily determinative. The pass-through entity must use judgment in classifying each agreement as a subaward or a procurement contract. In making this determination, the substance of the relationship is more important than the form of the agreement."
+   }
+  ],
+  "answer": "The pass-through entity makes the call case by case, using judgment. No single characteristic decides it, and the real substance of the relationship counts for more than what the agreement is called. The Federal agency can add guidance but has no direct legal relationship with subrecipients or contractors. [Source: 2 CFR 200.331 — Subrecipient and contractor determinations]"
+ },
+ {
+  "id": "g_332_subaward_info",
+  "kind": "grounded",
+  "question": "What must a subaward document include?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(1) Federal award identification.\n(i) Subrecipient's name (must match the name associated with its unique entity identifier);\n(ii) Subrecipient's unique entity identifier;\n(iii) Federal Award Identification Number (FAIN);\n(iv) Federal Award Date;\n(v) Subaward Period of Performance Start and End Date;\n(vi) Subaward Budget Period Start and End Date;\n(vii) Amount of Federal Funds Obligated in the subaward;\n(viii) Total Amount of Federal Funds Obligated to the subrecipient by the pass-through entity, including the current financial obligation;\n(ix) Total Amount of the Federal Award committed to the subrecipient by the pass-through entity;\n(x) Federal award project description, as required by the Federal Funding Accountability and Transparency Act (FFATA);\n(xi) Name of the Federal agency, pass-through entity, and contact information for awarding official of the pass-through entity;\n(xii) Assistance Listings title and number; the pass-through entity must identify the dollar amount made available under each Federal award and the Assistance Listings Number at the time of disbursement;\n(xiii) Identification of whether the Federal award is for research and development; and\n(xiv) Indirect cost rate for the Federal award (including if the de minimis rate is used in accordance with § 200.414)."
+   }
+  ],
+  "answer": "A subaward must be clearly labeled as one, with the best available information on:\n- Subrecipient name and unique entity identifier [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- FAIN, Federal award date, and the subaward period of performance and budget period [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- Federal funds obligated now, in total to the subrecipient, and the amount committed [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- FFATA project description and awarding official contact details [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- Assistance Listing, R&D flag, and the indirect cost rate [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n\nAny missing items must be supplied once known."
+ },
+ {
+  "id": "g_332_risk_audit",
+  "kind": "grounded",
+  "question": "How does a pass-through decide how closely to monitor, and does the subrecipient's audit status matter?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(c) Evaluate each subrecipient's fraud risk and risk of noncompliance with a subaward to determine the appropriate subrecipient monitoring described in paragraph (f) of this section. When evaluating a subrecipient's risk, a pass-through entity should consider the following:\n(1) The subrecipient's prior experience with the same or similar subawards;\n(2) The results of previous audits. This includes considering whether or not the subrecipient receives a Single Audit in accordance with subpart F and the extent to which the same or similar subawards have been audited as a major program;\n(3) Whether the subrecipient has new personnel or new or substantially changed systems; and\n(4) The extent and results of any Federal agency monitoring (for example, if the subrecipient also receives Federal awards directly from the Federal agency)."
+   },
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(a) Audit required. A non-Federal entity that expends $1,000,000 or more during the non-Federal entity's fiscal year in Federal awards must have a single or program-specific audit conducted for that year in accordance with the provisions of this part.\n(b) Single audit. A non-Federal entity that expends $1,000,000 or more in Federal awards during the non-Federal entity's fiscal year must have a single audit conducted in accordance with § 200.514 except when it elects to have a program-specific audit conducted in accordance with paragraph (c) or (d) of this section.\n(c) Program-specific audit election (in general). A non-Federal entity may elect to have a program-specific audit conducted in accordance with § 200.507 if the following conditions are met:\n(1) The non-Federal entity expends Federal awards under only one Federal program (excluding research and development); and\n(2) The Federal program's statutes or regulations, or terms and conditions of the Federal award, do not require a financial statement audit of the non-Federal entity."
+   }
+  ],
+  "answer": "The pass-through assesses fraud and noncompliance risk first, then sets monitoring to match. Factors include prior experience with similar subawards, past audit results, new staff or systems, and any Federal monitoring. [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n\nAudit status is part of that picture: whether the subrecipient gets a Single Audit, which applies at $1,000,000 or more in Federal expenditures. [Source: 2 CFR 200.501 — Audit requirements] [Source: 2 CFR 200.332 — Requirements for pass-through entities]"
+ },
+ {
+  "id": "g_332_monitor",
+  "kind": "grounded",
+  "question": "What are the pass-through's monitoring duties?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(e) Monitor the activities of a subrecipient as necessary to ensure that the subrecipient complies with Federal statutes, regulations, and the terms and conditions of the subaward. The pass-through entity is responsible for monitoring the overall performance of a subrecipient to ensure that the goals and objectives of the subaward are achieved. In monitoring a subrecipient, a pass-through entity must:\n(1) Review financial and performance reports.\n(2) Ensure that the subrecipient takes corrective action on all significant developments that negatively affect the subaward. Significant developments include Single Audit findings related to the subaward, other audit findings, site visits, and written notifications from a subrecipient of adverse conditions which will impact their ability to meet the milestones or the objectives of a subaward. When significant developments negatively impact the subaward, a subrecipient must provide the pass-through entity with information on their plan for corrective action and any assistance needed to resolve the situation."
+   }
+  ],
+  "answer": "- Check up on the subrecipient enough to be confident it follows laws, regulations and subaward terms, and that goals are being met.\n- Go over its financial and performance reports.\n- Make sure it fixes significant problems (audit findings, site visit results, written notice of adverse conditions) and gets a corrective action plan from it.\n\n[Source: 2 CFR 200.332 — Requirements for pass-through entities]\n\n_Beyond the retrieved sources:_ many institutions also keep a monitoring checklist per subaward and document each review in the subaward file."
+ },
+ {
+  "id": "g_332_indirect",
+  "kind": "grounded",
+  "question": "Which indirect rate should a lower-tier awardee use?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(4) Indirect cost rate:\n(i) An approved indirect cost rate negotiated between the subrecipient and the Federal Government. If no approved rate exists, a pass-through entity must determine the appropriate rate in collaboration with the subrecipient. The indirect cost rate may be either:\n(A) An indirect cost rate negotiated between the pass-through entity and the subrecipient. These rates may be based on a prior negotiated rate between a different pass-through entity and the subrecipient, in which case the pass-through entity is not required to collect information justifying the rate but may elect to do so; or\n(B) The de minimis indirect cost rate.\n(ii) The pass-through entity must not require the use of the de minimis indirect cost rate if the subrecipient has an approved indirect cost rate negotiated with the Federal Government. Subrecipients may elect to use the cost allocation method to account for indirect costs in accordance with § 200.405(d)."
+   },
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(f) De minimis rate. Recipients and subrecipients that do not have a current Federal negotiated indirect cost rate (including provisional rate) may elect to charge a de minimis rate of up to 15 percent of modified total direct costs (MTDC). The recipient or subrecipient is authorized to determine the appropriate rate up to this limit. Federal agencies and pass-through entities may not require recipients and subrecipients to use a de minimis rate lower than the negotiated indirect cost rate or the rate elected pursuant to this subsection unless required by Federal statute or regulation. The de minimis rate must not be applied to cost reimbursement contracts issued directly by the Federal Government in accordance with the FAR. Recipients and subrecipients are not required to use the de minimis rate. When applying the de minimis rate, costs must be consistently charged as either direct or indirect costs and may not be double charged or inconsistently charged as both. The de minimis rate does not require documentation to justify its use and may be used indefinitely. Once elected, the recipient or subrecipient must use the de minimis rate for all Federal awards until the recipient or subrecipient chooses to receive a negotiated rate."
+   }
+  ],
+  "answer": "- If the subrecipient has a federally negotiated rate, that is the starting point, and the pass-through can't force the de minimis rate on it. [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- With no approved rate, the two parties settle on one together: a rate negotiated between them (possibly borrowed from another pass-through's negotiation) or the de minimis rate. [Source: 2 CFR 200.332 — Requirements for pass-through entities]\n- De minimis is up to 15 percent of modified total direct costs and needs no justification. [Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "g_344_reports",
+  "kind": "grounded",
+  "question": "What is the deadline for closeout reports?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(b) A recipient must submit all reports (financial, performance, and other reports required by the Federal award) no later than 120 calendar days after the conclusion of the period of performance. A subrecipient must submit all reports (financial, performance, and other reports required by a subaward) to the pass-through entity no later than 90 calendar days after the conclusion of the period of performance of the subaward (or an earlier date as agreed upon by the pass-through entity and subrecipient). When justified, the Federal agency or pass-through entity may approve extensions for the recipient or subrecipient. When the recipient does not have a final indirect cost rate covering the period of performance, a final financial report must still be submitted to fulfill the requirements of this section. The recipient must submit a revised final financial report when all applicable indirect cost rates have been finalized."
+   }
+  ],
+  "answer": "Recipients have 120 calendar days after the period of performance ends to submit all financial, performance and other required reports; subrecipients owe theirs to the pass-through within 90 days (or sooner if agreed). Extensions are possible when justified. If the final indirect rate isn't set yet, submit the final financial report anyway and send a revised one once rates are final. [Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "g_344_liquidate",
+  "kind": "grounded",
+  "question": "What do we owe at closeout besides reports?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(c) The recipient must liquidate all financial obligations incurred under the Federal award no later than 120 calendar days after the conclusion of the period of performance. A subrecipient must liquidate all financial obligations incurred under a subaward no later than 90 calendar days after the conclusion of the period of performance of the subaward (or an earlier date as agreed upon by the pass-through entity and subrecipient). When justified, the Federal agency or pass-through entity may approve extensions for the recipient or subrecipient.\n(d) The Federal agency or pass-through entity must not delay payments to the recipient or subrecipient for costs meeting the requirements of subpart E of this part.\n(e) The recipient or subrecipient must promptly refund any unobligated funds that the Federal agency or pass-through entity paid and that are not authorized to be retained. See OMB Circular A-129 and § 200.346."
+   }
+  ],
+  "answer": "- **Liquidate obligations** within 120 days of the end of the period of performance (90 days for subrecipients, or earlier by agreement).\n- **Refund promptly** any unobligated funds you weren't authorized to keep.\n- The agency can't hold up payment for allowable costs.\n\n[Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "g_344_agency_side",
+  "kind": "grounded",
+  "question": "What happens if a recipient doesn't submit final reports, and how quickly should the agency close out?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(h) The Federal agency must make every effort to complete all closeout actions no later than one year after the end of the period of performance. If the indirect cost rate has not been finalized and would delay closeout, the Federal agency is authorized to mutually agree with the recipient to close an award using the current or most recently negotiated rate. However, the recipient is not required to agree to a final rate for a Federal award for the purpose of prompt closeout.\n(i) If the recipient does not comply with the requirements of this section, including submitting all final reports, the Federal agency must report the recipient's material failure to comply with the terms and conditions of the Federal award in SAM.gov. A Federal agency must use the Contractor Performance Assessment Reporting System (CPARS) to enter or amend information in SAM.gov. Federal agencies may also pursue other enforcement actions as appropriate. See § 200.339."
+   }
+  ],
+  "answer": "- The agency should make every effort to finish closeout within one year after the period of performance ends.\n- If an unfinished indirect rate would hold things up, the agency may agree with the recipient to close using the current or latest negotiated rate, though the recipient needn't agree.\n- Failing to comply, including not submitting final reports, gets reported in SAM.gov (via CPARS), and other enforcement may follow.\n\n[Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "g_501_threshold",
+  "kind": "grounded",
+  "question": "At what spending level is a single audit required?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(a) Audit required. A non-Federal entity that expends $1,000,000 or more during the non-Federal entity's fiscal year in Federal awards must have a single or program-specific audit conducted for that year in accordance with the provisions of this part.\n(b) Single audit. A non-Federal entity that expends $1,000,000 or more in Federal awards during the non-Federal entity's fiscal year must have a single audit conducted in accordance with § 200.514 except when it elects to have a program-specific audit conducted in accordance with paragraph (c) or (d) of this section.\n(c) Program-specific audit election (in general). A non-Federal entity may elect to have a program-specific audit conducted in accordance with § 200.507 if the following conditions are met:\n(1) The non-Federal entity expends Federal awards under only one Federal program (excluding research and development); and\n(2) The Federal program's statutes or regulations, or terms and conditions of the Federal award, do not require a financial statement audit of the non-Federal entity."
+   }
+  ],
+  "answer": "A single audit (or a program-specific audit, where eligible) is required when a non-Federal entity spends $1,000,000 or more in Federal awards in its fiscal year. [Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "g_501_program_specific",
+  "kind": "grounded",
+  "question": "When can an entity choose a program-specific audit?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(c) Program-specific audit election (in general). A non-Federal entity may elect to have a program-specific audit conducted in accordance with § 200.507 if the following conditions are met:\n(1) The non-Federal entity expends Federal awards under only one Federal program (excluding research and development); and\n(2) The Federal program's statutes or regulations, or terms and conditions of the Federal award, do not require a financial statement audit of the non-Federal entity.\n(d) Program-specific audit election for research and development. A non-Federal entity may elect to have a program-specific audit for research and development conducted in accordance with § 200.507, but only if all of the following conditions are met:\n(1) The non-Federal entity expends Federal awards only from the same Federal agency, or the same Federal agency and the same pass-through entity; and\n(2) The Federal agency, or pass-through entity in the case of a subrecipient, approves a program-specific audit in advance."
+   }
+  ],
+  "answer": "**General case:** the entity spends under only one Federal program (R&D excluded) and the program doesn't require a financial statement audit.\n\n**Research and development:** both must be true:\n- awards come only from one Federal agency (or one agency plus the same pass-through), and\n- the agency, or the pass-through for a subrecipient, approves it in advance.\n\n[Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "g_501_contractors",
+  "kind": "grounded",
+  "question": "Are payments to contractors part of the audit?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(g) Subrecipients and contractors. An auditee may simultaneously be a recipient, a subrecipient, and a contractor. Unless a program is exempt by Federal statute, Federal awards expended as a recipient or a subrecipient are subject to audit under this part. Payments received for goods or services provided as a contractor under a Federal award (see § 200.331) are not subject to audit under this part.\n(h) Compliance responsibility for contractors. In most cases, the auditee's compliance responsibility for contractors is to ensure that the procurement, receipt, and payment for goods and services comply with Federal statutes, regulations, and the terms and conditions of a Federal award. Federal award compliance requirements normally do not flow down to contractors. However, for procurement transactions in which the contractor is made responsible for meeting program requirements, the auditee must ensure those requirements are met, including by clearly stating the contractor's responsibilities within the contract and reviewing the contractor's records to determine compliance. Also, when these procurement transactions relate to a major program, the scope of the audit must include a determination of whether these transactions comply with Federal statutes, regulations, and the terms and conditions of a Federal award. See also § 200.318(b)."
+   }
+  ],
+  "answer": "Payments for goods or services you receive from a contractor aren't audited as Federal awards under this part, though awards you spend as a recipient or subrecipient are. Your compliance duty for contractors is mostly making sure buying, receiving and paying comply. Requirements normally don't flow down, unless the contractor is made responsible for program requirements. Then you must spell that out in the contract and check its records. [Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "g_501_forprofit",
+  "kind": "grounded",
+  "question": "Do the audit rules apply to a for-profit subrecipient?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(i) For-profit subrecipient. This subpart does not apply to for-profit organizations. As necessary, the pass-through entity is responsible for establishing requirements to ensure compliance by for-profit subrecipients. The subaward with a for-profit subrecipient must describe applicable compliance requirements and the for-profit subrecipient's compliance responsibility. Methods to ensure compliance for Federal awards made to for-profit subrecipients may include pre-award audits, monitoring throughout the performance of the subaward, and post-award audits (see § 200.332)."
+   }
+  ],
+  "answer": "No, the subpart doesn't cover for-profit organizations. The pass-through sets its own compliance requirements, which the subaward must describe. Options include pre-award audits, monitoring during the subaward, and post-award audits. [Source: 2 CFR 200.501 — Audit requirements]\n\n_Beyond the retrieved sources:_ pass-throughs often cover this in their subaward template with a reporting or audit-rights clause."
+ },
+ {
+  "id": "g_414_demin",
+  "kind": "grounded",
+  "question": "Explain the de minimis indirect rate.",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(f) De minimis rate. Recipients and subrecipients that do not have a current Federal negotiated indirect cost rate (including provisional rate) may elect to charge a de minimis rate of up to 15 percent of modified total direct costs (MTDC). The recipient or subrecipient is authorized to determine the appropriate rate up to this limit. Federal agencies and pass-through entities may not require recipients and subrecipients to use a de minimis rate lower than the negotiated indirect cost rate or the rate elected pursuant to this subsection unless required by Federal statute or regulation. The de minimis rate must not be applied to cost reimbursement contracts issued directly by the Federal Government in accordance with the FAR. Recipients and subrecipients are not required to use the de minimis rate. When applying the de minimis rate, costs must be consistently charged as either direct or indirect costs and may not be double charged or inconsistently charged as both. The de minimis rate does not require documentation to justify its use and may be used indefinitely. Once elected, the recipient or subrecipient must use the de minimis rate for all Federal awards until the recipient or subrecipient chooses to receive a negotiated rate."
+   }
+  ],
+  "answer": "- Available if you have no current negotiated rate (provisional counts)\n- Up to 15% of modified total direct costs; you choose the rate within that cap\n- Optional, needs no justification, and can be used indefinitely\n- Once elected, it applies to all Federal awards until you opt for a negotiated rate\n- Costs must be treated consistently as direct or indirect, never both\n\n[Source: 2 CFR 200.414 (p. 7)]"
+ },
+ {
+  "id": "g_414_extension",
+  "kind": "grounded",
+  "question": "Can we extend our negotiated rate agreement?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(g) One-time extension of indirect rates. A recipient or subrecipient with a current Federal negotiated indirect cost rate may apply for a one-time extension of that agreement for up to four years. This extension will be subject to review and approval by the cognizant agency for indirect costs. If this extension is granted, the recipient or subrecipient may not request a rate review until the extension period ends. The recipient or subrecipient must re-apply to negotiate a new rate when the extension ends. After a new rate has been negotiated, the recipient or subrecipient may again apply for a one-time extension of the new rate in accordance with this paragraph."
+   }
+  ],
+  "answer": "Yes, once, for up to four years, subject to review and approval by the cognizant agency. While extended, you can't request a rate review. When it ends you must re-apply for a new rate, after which another one-time extension is possible. [Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "g_414_fa",
+  "kind": "grounded",
+  "question": "How are indirect costs classified for universities?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(a) Facilities and administration classification. For major Institutions of Higher Education (IHE) and major nonprofit organizations, indirect costs must be classified within two broad categories: “Facilities” and “Administration.” “Facilities” is defined as depreciation on buildings, equipment and capital improvements, interest on debt associated with certain buildings, equipment and capital improvements, and operations and maintenance expenses. “Administration” is defined as general administration and general expenses such as the director's office, accounting, personnel, and all other types of expenditures not listed specifically under one of the subcategories of “Facilities” (including cross allocations from other pools, where applicable). For nonprofit organizations, library expenses are included in the “Administration” category; for IHEs, they are included in the “Facilities” category. Major IHEs are defined as those required to use the Standard Format for Submission as noted in Appendix III. Major nonprofit organizations are those which receive more than $10 million in direct Federal funding."
+   }
+  ],
+  "answer": "Major IHEs split indirect costs into two categories:\n- **Facilities:** depreciation, interest on debt tied to buildings and equipment, and operations and maintenance. Library expenses sit here for IHEs.\n- **Administration:** general administration and expenses (director's office, accounting, personnel), plus anything not listed under Facilities.\n\nA major IHE is one required to use the Standard Format for Submission in Appendix III. [Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "g_414_accept",
+  "kind": "grounded",
+  "question": "Can an agency use a different rate than our negotiated rate?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(1) Negotiated indirect cost rates must be accepted by all Federal agencies. A Federal agency may use a rate different from the negotiated rate for either a class of Federal awards or a single Federal award only when required by Federal statute or regulation, or when approved by the awarding Federal agency in accordance with paragraph (c)(3) of this section.\n(2) The Federal agency must notify OMB of any approved deviations. The recipient or subrecipient may notify OMB of any disputes with Federal agencies regarding the application of a federally negotiated indirect cost rate.\n(3) The Federal agency must implement, and make publicly available, the policies, procedures and general decision-making criteria that their programs will follow to seek and justify deviations from negotiated rates.\n(4) The Federal agency must include, in the notice of funding opportunity, the policies relating to indirect cost rate reimbursement or cost share as approved under paragraph (e). As appropriate, the Federal agency should incorporate discussion of these policies into its outreach activities with applicants before posting a notice of funding opportunity. See § 200.204.\n(d) Pass-through entities. Pass-through entities are subject to the requirements in § 200.332(b)(4) and must accept all federally negotiated indirect costs rates for subrecipients."
+   }
+  ],
+  "answer": "Generally no. All agencies must accept negotiated rates. A deviation is allowed only when:\n- a statute or regulation requires it, or\n- the awarding agency approves it under the paragraph (c)(3) process.\n\nThe agency must notify OMB of approved deviations and publish its criteria, and it must state its indirect cost policies in the notice of funding opportunity. Pass-throughs must accept federally negotiated rates for subrecipients as well. [Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "g_final_perf_report",
+  "kind": "grounded",
+  "question": "When is a subrecipient's final performance report due?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.329 — Monitoring and reporting program performance",
+    "text": "(c) Submitting performance reports. (1) The recipient or subrecipient must submit performance reports as required by the Federal award. Intervals must be no less frequent than annually nor more frequent than quarterly except if specific conditions are applied (See § 200.208). Reports submitted annually by the recipient or subrecipient must be due no later than 90 calendar days after the reporting period. Reports submitted quarterly or semiannually must be due no later than 30 calendar days after the reporting period. Alternatively, the Federal agency or pass-through entity may require annual reports before the anniversary dates of multiple-year Federal awards. The final performance report submitted by the recipient must be due no later than 120 calendar days after the period of performance. A subrecipient must submit a final performance report to a pass-through entity no later than 90 calendar days after the conclusion of the period of performance. See also § 200.344. The Federal agency or pass-through entity may extend the due date for any performance report with justification from the recipient or subrecipient."
+   },
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(b) A recipient must submit all reports (financial, performance, and other reports required by the Federal award) no later than 120 calendar days after the conclusion of the period of performance. A subrecipient must submit all reports (financial, performance, and other reports required by a subaward) to the pass-through entity no later than 90 calendar days after the conclusion of the period of performance of the subaward (or an earlier date as agreed upon by the pass-through entity and subrecipient). When justified, the Federal agency or pass-through entity may approve extensions for the recipient or subrecipient. When the recipient does not have a final indirect cost rate covering the period of performance, a final financial report must still be submitted to fulfill the requirements of this section. The recipient must submit a revised final financial report when all applicable indirect cost rates have been finalized."
+   }
+  ],
+  "answer": "Ninety calendar days after the subaward's period of performance ends, delivered to the pass-through entity. [Source: 2 CFR 200.329 — Monitoring and reporting program performance] [Source: 2 CFR 200.344 — Closeout] The pass-through may agree to an earlier date, or approve an extension."
+ },
+ {
+  "id": "g_308_keypers",
+  "kind": "grounded",
+  "question": "Do I need approval if my PI cuts back effort on a grant?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(f) Revisions Requiring Prior Approval. A recipient or subrecipient must request prior written approval from the Federal agency or pass-through entity for the following program and budget-related reasons:\n(1) Change in the scope or the objective of the project or program (even if there is no associated budget revision requiring prior written approval).\n(2) Change in key personnel (including employees and contractors) that are identified by name or position in the Federal award.\n(3) The disengagement from a project for more than three months, or a 25 percent reduction in time and effort devoted to the Federal award over the course of the period of performance, by the approved project director or principal investigator.\n(4) The inclusion, unless waived by the Federal agency, of costs that require prior approval in accordance with subpart E as applicable."
+   }
+  ],
+  "answer": "It can. A cut of 25 percent or more in the PI's or project director's time and effort over the period of performance needs prior written approval, as does being disengaged for more than three months. Replacing key personnel named in the award does too. [Source: 2 CFR 200.308 — Revision of budget and program plans]\n\n_Beyond the retrieved sources:_ check your award's terms, since some sponsors set tighter thresholds."
+ },
+ {
+  "id": "g_331_audit_link",
+  "kind": "grounded",
+  "question": "If an entity is a contractor, does its payment count for single audit purposes?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "An entity may concurrently receive Federal awards as a recipient, a subrecipient, and a contractor. The pass-through entity is responsible for making case-by-case determinations to determine whether the entity receiving Federal funds is a subrecipient or a contractor. The Federal agency may require the pass-through entity to comply with additional guidance to make these determinations, provided such guidance does not conflict with this section. The Federal agency does not have a direct legal relationship with subrecipients or contractors of any tier; however, the Federal agency is responsible for monitoring the pass-through entity's oversight of first-tier subrecipients. All of the characteristics listed below may not be present in all cases, and some characteristics from both categories may be present at the same time. No single factor or any combination of factors is necessarily determinative. The pass-through entity must use judgment in classifying each agreement as a subaward or a procurement contract. In making this determination, the substance of the relationship is more important than the form of the agreement."
+   },
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(g) Subrecipients and contractors. An auditee may simultaneously be a recipient, a subrecipient, and a contractor. Unless a program is exempt by Federal statute, Federal awards expended as a recipient or a subrecipient are subject to audit under this part. Payments received for goods or services provided as a contractor under a Federal award (see § 200.331) are not subject to audit under this part.\n(h) Compliance responsibility for contractors. In most cases, the auditee's compliance responsibility for contractors is to ensure that the procurement, receipt, and payment for goods and services comply with Federal statutes, regulations, and the terms and conditions of a Federal award. Federal award compliance requirements normally do not flow down to contractors. However, for procurement transactions in which the contractor is made responsible for meeting program requirements, the auditee must ensure those requirements are met, including by clearly stating the contractor's responsibilities within the contract and reviewing the contractor's records to determine compliance. Also, when these procurement transactions relate to a major program, the scope of the audit must include a determination of whether these transactions comply with Federal statutes, regulations, and the terms and conditions of a Federal award. See also § 200.318(b)."
+   }
+  ],
+  "answer": "No. Money paid for goods or services as a contractor isn't subject to audit under this part. Whether the entity is a contractor is the pass-through's case-by-case judgment. [Source: 2 CFR 200.501 — Audit requirements] [Source: 2 CFR 200.331 — Subrecipient and contractor determinations]"
+ },
+ {
+  "id": "g_332_access",
+  "kind": "grounded",
+  "question": "What access rights must a subaward give the pass-through?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(4) Indirect cost rate:\n(i) An approved indirect cost rate negotiated between the subrecipient and the Federal Government. If no approved rate exists, a pass-through entity must determine the appropriate rate in collaboration with the subrecipient. The indirect cost rate may be either:\n(A) An indirect cost rate negotiated between the pass-through entity and the subrecipient. These rates may be based on a prior negotiated rate between a different pass-through entity and the subrecipient, in which case the pass-through entity is not required to collect information justifying the rate but may elect to do so; or\n(B) The de minimis indirect cost rate.\n(ii) The pass-through entity must not require the use of the de minimis indirect cost rate if the subrecipient has an approved indirect cost rate negotiated with the Federal Government. Subrecipients may elect to use the cost allocation method to account for indirect costs in accordance with § 200.405(d).\n(5) A requirement that the subrecipient permit the pass-through entity and auditors to access the subrecipient's records and financial statements for the pass-through entity to fulfill its monitoring requirements; and\n(6) Appropriate terms and conditions concerning the closeout of the subaward."
+   }
+  ],
+  "answer": "The subaward must require the subrecipient to let the pass-through and auditors see its records and financial statements, so monitoring can happen. It also needs closeout terms and conditions. [Source: 2 CFR 200.332 — Requirements for pass-through entities]"
+ },
+ {
+  "id": "g_308_format",
+  "kind": "grounded",
+  "question": "What format should a budget revision request take?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(a) Approved budget in general. The approved budget for the Federal award summarizes the financial aspects of the project or program as approved during the Federal award process. It may include the Federal share and non-Federal share or only the Federal share, as determined by the Federal agency or pass-through entity.\n(b) Deviations from approved budget. The recipient or subrecipient must report deviations from the approved budget, project or program scope, or objective(s) in accordance with § 200.329. The recipient or subrecipient must request prior approvals from the Federal agency or pass-through entity for budget and program plan revisions in accordance with this section.\n(c) Requesting approval for budget revisions. When requesting approval for budget revisions, the recipient or subrecipient must use the same format for budget information that was used in their application, except if the Federal agency has approved an alternative format. Alternative formats may include the use of electronic systems, email, or other agency-approved mechanisms that document the request."
+   }
+  ],
+  "answer": "Use the same budget format as the application unless the agency approved another, such as an electronic system or email that documents the request. Deviations from the approved budget, scope or objectives must also be reported under § 200.329. [Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "s_332",
+  "kind": "stub",
+  "question": "What does a pass-through have to do before and after issuing a subaward?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "eCFR :: 2 CFR 200.332 -- Requirements for pass-through entities. An official website of the United States government. Here's how you know ... Enhanced Content ... Displaying title 2, up to date as of 10/10/2026 ... Timeline ... Published Edition ..."
+   }
+  ],
+  "answer": "- Check SAM.gov to confirm the subrecipient isn't excluded.\n- Put required data in the subaward: FAIN, award dates, amounts, Assistance Listing, indirect rate.\n- Assess fraud and noncompliance risk (prior experience, audits, new staff or systems).\n- Monitor: review reports, require corrective action, and issue management decisions on audit findings.\n- Include closeout terms and records-access rights.\n\n[Source: 2 CFR 200.332 — Requirements for pass-through entities]"
+ },
+ {
+  "id": "s_501",
+  "kind": "stub",
+  "question": "When does a university need a single audit?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "Electronic Code of Federal Regulations. Home | Browse | Search | Recent Changes. Title 2 > Subtitle A > Chapter II > Part 200 > Subpart F > § 200.501. Skip to content. Hide Navigation. This site is a work in progress."
+   }
+  ],
+  "answer": "A Single Audit is required for any fiscal year in which the entity expends $1,000,000 or more in Federal awards. Below that, the entity is exempt, though records must still be available to the agency, pass-through and GAO. It may elect a program-specific audit if it runs only one Federal program, or for R&D when all funding comes from one agency with advance approval.\n\n[Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "s_344",
+  "kind": "stub",
+  "question": "What are the closeout deadlines?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "§ 200.344 Closeout. | Previous Section | Next Section | Print | Download PDF | Share | Back to top. Table of contents. This content is from the eCFR and is authoritative only to the extent provided."
+   }
+  ],
+  "answer": "- Recipients submit all final reports within 120 calendar days after the period of performance.\n- Subrecipients report to the pass-through within 90 days.\n- Obligations must be liquidated on the same timelines.\n- Unobligated funds are refunded promptly.\n- The agency aims to finish closeout within one year.\n\n[Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "s_414",
+  "kind": "stub",
+  "question": "What is the maximum de minimis indirect rate?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "eCFR :: 2 CFR 200.414 -- Indirect costs. Skip to main content. An official website of the United States government. Enhanced Content - Table of Contents. Displaying title 2, up to date as of 10/10/2026. Understanding the eCFR. Reader Aids."
+   }
+  ],
+  "answer": "The de minimis rate is up to 15 percent of modified total direct costs. It's available to anyone without a current negotiated rate, needs no documentation, and can be used indefinitely. [Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "s_329",
+  "kind": "stub",
+  "question": "How often can an agency require performance reports?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.329 — Monitoring and reporting program performance",
+    "text": "2 CFR 200.329 - Monitoring and reporting program performance. | Electronic Code of Federal Regulations (e-CFR) | Cornell Law School. Loading... Please enable JavaScript to view this content."
+   }
+  ],
+  "answer": "Not more often than quarterly (unless specific conditions apply) and no less often than annually. Annual reports are due 90 days after the period ends; quarterly or semiannual reports 30 days after. The final report is due within 120 days, or 90 days for subrecipients. [Source: 2 CFR 200.329 — Monitoring and reporting program performance]"
+ },
+ {
+  "id": "s_308",
+  "kind": "stub",
+  "question": "Do I need approval to move money into equipment?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "eCFR :: 2 CFR 200.308 -- Revision of budget and program plans. An official website of the United States government. Here's how you know. The .gov means it's official. Federal government websites often end in .gov or .mil. Displaying title 2 ... Timeline ... Published Edition"
+   }
+  ],
+  "answer": "Not necessarily. Prior approval is required for changes in scope, key personnel changes, transfers of participant support costs, changes in cost sharing, and no-cost extensions. Moving money between ordinary direct cost categories generally doesn't need approval unless the award terms say so. Equipment purchases that weren't in the approved budget may need approval depending on the agency.\n\n[Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "s_331",
+  "kind": "stub",
+  "question": "How do I classify a vendor as subrecipient or contractor?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "Subrecipient and contractor determinations :: eCFR. Menu. Search. Browse. Recent Changes. Site Feedback. Developer Resources. Javascript is required."
+   }
+  ],
+  "answer": "The pass-through decides case by case, weighing substance over form.\n- **Subrecipient:** makes programmatic decisions, is held to program objectives, determines eligibility, and carries out a public purpose.\n- **Contractor:** provides goods and services in the normal course of business to many buyers in a competitive market.\n\n[Source: 2 CFR 200.331 — Subrecipient and contractor determinations]"
+ },
+ {
+  "id": "s_333",
+  "kind": "stub",
+  "question": "What are the rules for fixed amount subawards?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.333 — Fixed amount subawards",
+    "text": "eCFR :: Title 2 :: Part 200 :: Subpart D :: § 200.333. Enhanced Content. Displaying title 2, up to date as of 10/10/2026. Print/PDF. Subscribe."
+   }
+  ],
+  "answer": "- Needs prior written approval from the Federal agency.\n- Capped at $500,000 per subaward.\n- Must meet § 200.201.\n- Payment is tied to milestones or deliverables rather than actual costs, so no detailed accounting of expenditures is needed.\n\n[Source: 2 CFR 200.333 — Fixed amount subawards]"
+ },
+ {
+  "id": "s_axis",
+  "kind": "stub",
+  "question": "What is covered in the post-award subpart, and what are record retention rules?",
+  "snippets": [
+   {
+    "source": "Subpart D—Post Federal Award Requirements (p. 12)",
+    "text": "Subpart D—Post Federal Award Requirements. Contents. Page 12. www.ecfr.gov. Last amended 8/1/2024. Printed 10/10/2026."
+   }
+  ],
+  "answer": "Subpart D covers award administration after issuance: financial management, property standards, procurement, subrecipient monitoring, reporting, and closeout. Records generally must be kept for three years from the date of the final financial report, with longer retention if there is litigation, audit, or a claim.\n\n[Source: Subpart D—Post Federal Award Requirements (p. 12)]"
+ },
+ {
+  "id": "s_cpars",
+  "kind": "stub",
+  "question": "What happens if a recipient never submits its final reports?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "eCFR :: 2 CFR 200.344. This page requires JavaScript. Please enable JavaScript to continue. Skip to main content. An official website of the United States government."
+   }
+  ],
+  "answer": "The agency must close out using the information available, report the recipient's material failure to comply in SAM.gov (through CPARS), and may take other enforcement actions such as disallowing costs or suspension. This record can affect future award eligibility.\n\n[Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "s_audit_cost",
+  "kind": "stub",
+  "question": "Are audit costs allowable on federal awards?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "Subpart F—Audit Requirements. Skip navigation. Home. About. Search the eCFR. Select a section: 200.500 200.501 200.502 200.503. Related content. Page 1 of 1."
+   }
+  ],
+  "answer": "Yes, the reasonable cost of the required audit is allowable and may be charged to Federal awards, usually as an indirect cost or allocated proportionately to the awards. Costs of an audit not required by Part 200, or of audits where the entity failed to submit one, are generally unallowable.\n\n[Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "s_pubs",
+  "kind": "stub",
+  "question": "Which cost categories are in an IHE's facilities pool?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "2 CFR § 200.414 - Indirect costs. | Legal Information Institute. Skip to main content. Support us! Search LII. Get the law. Lawyers. Log in. Cite this. Toggle Navigation."
+   }
+  ],
+  "answer": "Facilities covers depreciation on buildings, equipment and capital improvements, interest on related debt, and operations and maintenance. For IHEs, library costs go here; for nonprofits, library costs fall under Administration.\n\n[Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "w_308_cs",
+  "kind": "wrong_source",
+  "question": "Can we exceed the cost sharing in our budget?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(f) Revisions Requiring Prior Approval. A recipient or subrecipient must request prior written approval from the Federal agency or pass-through entity for the following program and budget-related reasons:\n(1) Change in the scope or the objective of the project or program (even if there is no associated budget revision requiring prior written approval).\n(2) Change in key personnel (including employees and contractors) that are identified by name or position in the Federal award.\n(3) The disengagement from a project for more than three months, or a 25 percent reduction in time and effort devoted to the Federal award over the course of the period of performance, by the approved project director or principal investigator.\n(4) The inclusion, unless waived by the Federal agency, of costs that require prior approval in accordance with subpart E as applicable.\n(5) The transfer of funds budgeted for participant support costs to other budget categories."
+   }
+  ],
+  "answer": "Changes in the approved cost-sharing amount need prior approval. Voluntary committed cost sharing must be documented in the university's records, be verifiable, not be counted toward another award, and be necessary and reasonable. Any shortfall can lead the agency to reduce the award.\n\n[Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "w_329_rppr",
+  "kind": "wrong_source",
+  "question": "What goes into a Research Performance Progress Report?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.329 — Monitoring and reporting program performance",
+    "text": "(c) Submitting performance reports. (1) The recipient or subrecipient must submit performance reports as required by the Federal award. Intervals must be no less frequent than annually nor more frequent than quarterly except if specific conditions are applied (See § 200.208). Reports submitted annually by the recipient or subrecipient must be due no later than 90 calendar days after the reporting period. Reports submitted quarterly or semiannually must be due no later than 30 calendar days after the reporting period. Alternatively, the Federal agency or pass-through entity may require annual reports before the anniversary dates of multiple-year Federal awards. The final performance report submitted by the recipient must be due no later than 120 calendar days after the period of performance. A subrecipient must submit a final performance report to a pass-through entity no later than 90 calendar days after the conclusion of the period of performance. See also § 200.344. The Federal agency or pass-through entity may extend the due date for any performance report with justification from the recipient or subrecipient."
+   }
+  ],
+  "answer": "The RPPR covers accomplishments, products (publications, datasets, inventions), participants and organizations, impact, and changes in approach or problems. Sections can be left blank if nothing has changed.\n- Submitted through Research.gov or eRA Commons\n- Must be certified by the authorized organizational representative\n\n[Source: 2 CFR 200.329 — Monitoring and reporting program performance]"
+ },
+ {
+  "id": "w_331_procure",
+  "kind": "wrong_source",
+  "question": "What procurement method do I use for a contractor?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.331 — Subrecipient and contractor determinations",
+    "text": "(b) Contractors. A contract is for the purpose of obtaining goods and services for the recipient's or subrecipient's use and creates a procurement relationship with a contractor. See the definition of contract in § 200.1. Characteristics that support a procurement relationship between the recipient or subrecipient and a contractor include, but are not limited to, when the contractor:\n(1) Provides the goods and services within normal business operations;\n(2) Provides similar goods or services to many different purchasers;\n(3) Normally operates in a competitive environment;\n(4) Provides goods or services that are ancillary to the implementation of a Federal program; and\n(5) Is not subject to compliance requirements of a Federal program as a result of the agreement. However, similar requirements may apply for other reasons."
+   }
+  ],
+  "answer": "Purchases above the simplified acquisition threshold of $250,000 generally need competitive proposals or sealed bids. Micro-purchases under $10,000 can be made without competition if the price is reasonable.\n- Document the procurement history and cost or price analysis\n- Check SAM.gov to confirm the vendor isn't debarred\n\n[Source: 2 CFR 200.331 — Subrecipient and contractor determinations]"
+ },
+ {
+  "id": "w_332_mon",
+  "kind": "wrong_source",
+  "question": "How often must a pass-through conduct on-site monitoring visits?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(e) Monitor the activities of a subrecipient as necessary to ensure that the subrecipient complies with Federal statutes, regulations, and the terms and conditions of the subaward. The pass-through entity is responsible for monitoring the overall performance of a subrecipient to ensure that the goals and objectives of the subaward are achieved. In monitoring a subrecipient, a pass-through entity must:\n(1) Review financial and performance reports.\n(2) Ensure that the subrecipient takes corrective action on all significant developments that negatively affect the subaward. Significant developments include Single Audit findings related to the subaward, other audit findings, site visits, and written notifications from a subrecipient of adverse conditions which will impact their ability to meet the milestones or the objectives of a subaward. When significant developments negatively impact the subaward, a subrecipient must provide the pass-through entity with information on their plan for corrective action and any assistance needed to resolve the situation."
+   }
+  ],
+  "answer": "Pass-throughs must visit each subrecipient on site at least annually, and perform desk reviews every quarter. Fixed-price subrecipients can be visited every two years. The pass-through must then issue a written report within 30 days.\n\n[Source: 2 CFR 200.332 — Requirements for pass-through entities]"
+ },
+ {
+  "id": "w_344_records",
+  "kind": "wrong_source",
+  "question": "How long must we keep records after closeout?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(c) The recipient must liquidate all financial obligations incurred under the Federal award no later than 120 calendar days after the conclusion of the period of performance. A subrecipient must liquidate all financial obligations incurred under a subaward no later than 90 calendar days after the conclusion of the period of performance of the subaward (or an earlier date as agreed upon by the pass-through entity and subrecipient). When justified, the Federal agency or pass-through entity may approve extensions for the recipient or subrecipient.\n(d) The Federal agency or pass-through entity must not delay payments to the recipient or subrecipient for costs meeting the requirements of subpart E of this part."
+   }
+  ],
+  "answer": "Keep financial records, supporting documents and statistical records for three years from the date the final financial report is submitted. The clock restarts if there's litigation or an audit. For property, retention runs three years after final disposition.\n\n[Source: 2 CFR 200.344 — Closeout]"
+ },
+ {
+  "id": "w_501_costs",
+  "kind": "wrong_source",
+  "question": "Who pays for the single audit?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(a) Audit required. A non-Federal entity that expends $1,000,000 or more during the non-Federal entity's fiscal year in Federal awards must have a single or program-specific audit conducted for that year in accordance with the provisions of this part.\n(b) Single audit. A non-Federal entity that expends $1,000,000 or more in Federal awards during the non-Federal entity's fiscal year must have a single audit conducted in accordance with § 200.514 except when it elects to have a program-specific audit conducted in accordance with paragraph (c) or (d) of this section.\n(c) Program-specific audit election (in general). A non-Federal entity may elect to have a program-specific audit conducted in accordance with § 200.507 if the following conditions are met:\n(1) The non-Federal entity expends Federal awards under only one Federal program (excluding research and development); and\n(2) The Federal program's statutes or regulations, or terms and conditions of the Federal award, do not require a financial statement audit of the non-Federal entity."
+   }
+  ],
+  "answer": "The auditee pays for the audit, and the cost can be charged to Federal awards as an allowable cost, typically as an indirect cost. The auditor must be procured under the independence rules and cannot also prepare the financial statements. Reports go to the Federal Audit Clearinghouse within nine months.\n\n[Source: 2 CFR 200.501 — Audit requirements]"
+ },
+ {
+  "id": "w_414_mtdc",
+  "kind": "wrong_source",
+  "question": "What is excluded from MTDC?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(f) De minimis rate. Recipients and subrecipients that do not have a current Federal negotiated indirect cost rate (including provisional rate) may elect to charge a de minimis rate of up to 15 percent of modified total direct costs (MTDC). The recipient or subrecipient is authorized to determine the appropriate rate up to this limit. Federal agencies and pass-through entities may not require recipients and subrecipients to use a de minimis rate lower than the negotiated indirect cost rate or the rate elected pursuant to this subsection unless required by Federal statute or regulation. The de minimis rate must not be applied to cost reimbursement contracts issued directly by the Federal Government in accordance with the FAR. Recipients and subrecipients are not required to use the de minimis rate. When applying the de minimis rate, costs must be consistently charged as either direct or indirect costs and may not be double charged or inconsistently charged as both. The de minimis rate does not require documentation to justify its use and may be used indefinitely. Once elected, the recipient or subrecipient must use the de minimis rate for all Federal awards until the recipient or subrecipient chooses to receive a negotiated rate."
+   }
+  ],
+  "answer": "MTDC leaves out equipment over $10,000 per unit, capital expenditures, patient care, rental costs, tuition remission, scholarships and fellowships, participant support costs, and the portion of each subaward above $50,000. The first $50,000 of each subaward is included.\n\n[Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "w_414_cola",
+  "kind": "wrong_source",
+  "question": "What is the cognizant agency for indirect costs for a university?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.414 — Indirect costs",
+    "text": "(1) Negotiated indirect cost rates must be accepted by all Federal agencies. A Federal agency may use a rate different from the negotiated rate for either a class of Federal awards or a single Federal award only when required by Federal statute or regulation, or when approved by the awarding Federal agency in accordance with paragraph (c)(3) of this section.\n(2) The Federal agency must notify OMB of any approved deviations. The recipient or subrecipient may notify OMB of any disputes with Federal agencies regarding the application of a federally negotiated indirect cost rate.\n(3) The Federal agency must implement, and make publicly available, the policies, procedures and general decision-making criteria that their programs will follow to seek and justify deviations from negotiated rates.\n(4) The Federal agency must include, in the notice of funding opportunity, the policies relating to indirect cost rate reimbursement or cost share as approved under paragraph (e). As appropriate, the Federal agency should incorporate discussion of these policies into its outreach activities with applicants before posting a notice of funding opportunity. See § 200.204.\n(d) Pass-through entities. Pass-through entities are subject to the requirements in § 200.332(b)(4) and must accept all federally negotiated indirect costs rates for subrecipients."
+   }
+  ],
+  "answer": "For most universities, the cognizant agency is HHS or the Office of Naval Research, determined by which has the largest share of direct Federal funding. The cognizant agency negotiates the F&A rate, usually for a period of three to four years, and a new proposal is due six months before the current rate expires.\n\n[Source: 2 CFR 200.414 — Indirect costs]"
+ },
+ {
+  "id": "w_308_travel",
+  "kind": "wrong_source",
+  "question": "Is foreign travel prior approval required?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.308 — Revision of budget and program plans",
+    "text": "(g) Waiver of certain prior approvals. Except for the requirements listed in paragraphs (f)(1) through (10), the Federal agency is authorized to waive other cost-related and administrative prior written approval requirements contained in subparts D and E. Such waivers may include authorizing recipients to do one or more of the following:\n(1) Pre-award costs. Incur project costs 90 calendar days before the Federal award date. Expenses incurred more than 90 calendar days before the Federal award date require prior approval of the Federal agency. All costs incurred before the Federal award date are at the recipient's own risk (for example, the Federal agency is not required to reimburse such costs if the recipient does not receive the Federal award or if the Federal award is less than anticipated and inadequate to cover such costs). Pre-award costs must be charged to the initial budget period of the Federal award unless otherwise specified by the Federal agency. See also § 200.458."
+   }
+  ],
+  "answer": "Foreign travel generally requires prior approval from the agency, and travel by U.S. flag air carriers is required where available under the Fly America Act. Travel costs must follow the institution's written policy.\n\n[Source: 2 CFR 200.308 — Revision of budget and program plans]"
+ },
+ {
+  "id": "w_nosrc_1",
+  "kind": "wrong_source",
+  "question": "What does the uniform guidance say about subrecipient monitoring?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.332 — Requirements for pass-through entities",
+    "text": "(e) Monitor the activities of a subrecipient as necessary to ensure that the subrecipient complies with Federal statutes, regulations, and the terms and conditions of the subaward. The pass-through entity is responsible for monitoring the overall performance of a subrecipient to ensure that the goals and objectives of the subaward are achieved. In monitoring a subrecipient, a pass-through entity must:\n(1) Review financial and performance reports.\n(2) Ensure that the subrecipient takes corrective action on all significant developments that negatively affect the subaward. Significant developments include Single Audit findings related to the subaward, other audit findings, site visits, and written notifications from a subrecipient of adverse conditions which will impact their ability to meet the milestones or the objectives of a subaward. When significant developments negatively impact the subaward, a subrecipient must provide the pass-through entity with information on their plan for corrective action and any assistance needed to resolve the situation."
+   }
+  ],
+  "answer": "- Review financial and performance reports\n- Follow up on corrective action for significant developments\n- Issue management decisions on audit findings\n\n[Source: 2 CFR 200.330 — Subrecipient monitoring and management]"
+ },
+ {
+  "id": "w_nosrc_2",
+  "kind": "wrong_source",
+  "question": "What's the audit threshold?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.501 — Audit requirements",
+    "text": "(a) Audit required. A non-Federal entity that expends $1,000,000 or more during the non-Federal entity's fiscal year in Federal awards must have a single or program-specific audit conducted for that year in accordance with the provisions of this part.\n(b) Single audit. A non-Federal entity that expends $1,000,000 or more in Federal awards during the non-Federal entity's fiscal year must have a single audit conducted in accordance with § 200.514 except when it elects to have a program-specific audit conducted in accordance with paragraph (c) or (d) of this section.\n(c) Program-specific audit election (in general). A non-Federal entity may elect to have a program-specific audit conducted in accordance with § 200.507 if the following conditions are met:\n(1) The non-Federal entity expends Federal awards under only one Federal program (excluding research and development); and\n(2) The Federal program's statutes or regulations, or terms and conditions of the Federal award, do not require a financial statement audit of the non-Federal entity."
+   }
+  ],
+  "answer": "A single audit is required once you expend $1,000,000 or more of Federal awards in a fiscal year. [Source: OMB Compliance Supplement 2026 (p. 3)]"
+ },
+ {
+  "id": "w_nosrc_3",
+  "kind": "wrong_source",
+  "question": "How is closeout timing handled?",
+  "snippets": [
+   {
+    "source": "2 CFR 200.344 — Closeout",
+    "text": "(b) A recipient must submit all reports (financial, performance, and other reports required by the Federal award) no later than 120 calendar days after the conclusion of the period of performance. A subrecipient must submit all reports (financial, performance, and other reports required by a subaward) to the pass-through entity no later than 90 calendar days after the conclusion of the period of performance of the subaward (or an earlier date as agreed upon by the pass-through entity and subrecipient). When justified, the Federal agency or pass-through entity may approve extensions for the recipient or subrecipient. When the recipient does not have a final indirect cost rate covering the period of performance, a final financial report must still be submitted to fulfill the requirements of this section. The recipient must submit a revised final financial report when all applicable indirect cost rates have been finalized."
+   }
+  ],
+  "answer": "Reports and liquidation of obligations are due 120 days after the period of performance for recipients, and 90 days for subrecipients. [Source: Subpart D—Post Federal Award Requirements (p. 41)]"
+ }
+]

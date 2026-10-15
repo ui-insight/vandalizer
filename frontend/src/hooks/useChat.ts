@@ -42,6 +42,7 @@ export function useChat() {
   const thinkingDurationRef = useRef<number | null>(null)
   const citationsRef = useRef<Citation[]>([])
   const unsupportedFiguresRef = useRef<string[]>([])
+  const unsupportedCitationsRef = useRef<string[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, projectUuid?: string) => {
@@ -58,6 +59,7 @@ export function useChat() {
       thinkingDurationRef.current = null
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      unsupportedCitationsRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -98,6 +100,7 @@ export function useChat() {
               }
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,
@@ -146,6 +149,9 @@ export function useChat() {
           }
           if (unsupportedFiguresRef.current.length) {
             assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+          }
+          if (unsupportedCitationsRef.current.length) {
+            assistantMsg.unsupported_citations = unsupportedCitationsRef.current
           }
           setMessages((prev) => [...prev, assistantMsg])
         }

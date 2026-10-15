@@ -32,7 +32,7 @@ from app.services.context_budget import (
     plan_and_compact_context,
     token_safety_margin,
 )
-from app.services.kb_answer_grounding import unsupported_figures
+from app.services.kb_answer_grounding import unsupported_citations, unsupported_figures
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -1147,6 +1147,16 @@ async def chat_stream(
                     ))
                     if active_kbs else []
                 )
+                # And a source it cites must contain what the answer credits
+                # to it — not just a title the model then answered around.
+                miscited = (
+                    unsupported_citations(
+                        assistant_message,
+                        _cited_source_texts([*doc_segments, *attachment_segments]),
+                        message,
+                    )
+                    if active_kbs else []
+                )
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -1154,12 +1164,14 @@ async def chat_stream(
                     thinking_duration=thinking_duration,
                     citations=kb_sources or None,
                     unsupported_figures=unsupported or None,
+                    unsupported_citations=miscited or None,
                 )
-                if unsupported:
+                if unsupported or miscited:
                     yield json.dumps({
                         "kind": "grounding_warning",
                         "content": "",
                         "unsupported_figures": unsupported,
+                        "unsupported_citations": miscited,
                     }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
@@ -2145,6 +2157,32 @@ async def _render_kb_segment(
     return DocumentSegment(label="kb", text=kb_text), kb_sources
 
 
+_KB_SOURCE_HEADING_RE = re.compile(r"^\*\*Source: (.+?)\*\*$", re.MULTILINE)
+
+
+def _cited_source_texts(segments: list[DocumentSegment]) -> dict[str, str]:
+    """What each citable source put in front of the model, keyed by its name.
+
+    A KB segment holds many snippets, each under the ``**Source: <label>**``
+    heading the model is told to cite, so it is split back apart on those
+    headings and a source's snippets are joined. A document, file or web page
+    is one segment, named by what follows its label prefix.
+    """
+    out: dict[str, str] = {}
+    for seg in segments:
+        if seg.label == "kb":
+            heads = list(_KB_SOURCE_HEADING_RE.finditer(seg.text))
+            for i, h in enumerate(heads):
+                end = heads[i + 1].start() if i + 1 < len(heads) else len(seg.text)
+                name = h.group(1).strip()
+                out[name] = out.get(name, "") + "\n" + seg.text[h.end():end]
+        elif ":" in seg.label:
+            kind, name = seg.label.split(":", 1)
+            if kind in ("doc", "file", "web") and name:
+                out[name] = out.get(name, "") + "\n" + seg.text
+    return out
+
+
 def _build_interrupted_body(full_response: list[str], reason: str) -> str:
     """Compose an assistant-turn body from any partial stream content + a reason."""
     partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
@@ -2200,6 +2238,7 @@ async def _finalize(
     thinking_duration: Optional[float] = None,
     citations: Optional[list[dict]] = None,
     unsupported_figures: Optional[list[str]] = None,
+    unsupported_citations: Optional[list[str]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -2209,6 +2248,7 @@ async def _finalize(
         thinking_duration=thinking_duration,
         citations=citations,
         unsupported_figures=unsupported_figures,
+        unsupported_citations=unsupported_citations,
     )
 
     if activity_id:
