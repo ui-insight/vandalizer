@@ -240,9 +240,15 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Found ${content.length} documents: ${title}`, qualityHint }
     }
 
-    case 'list_extraction_sets':
-    case 'list_workflows':
     case 'list_knowledge_bases': {
+      const counts = kbGroupCounts(content)
+      if (!counts) break
+      const parts = KB_GROUPS.filter(([key]) => counts[key] > 0).map(([key, label]) => `${counts[key]} ${label}`)
+      return { text: parts.length ? parts.join(' · ') : 'No knowledge bases found', qualityHint }
+    }
+
+    case 'list_extraction_sets':
+    case 'list_workflows': {
       if (!Array.isArray(content)) break
       const type = toolName === 'list_extraction_sets' ? 'template' :
         toolName === 'list_workflows' ? 'workflow' : 'knowledge base'
@@ -589,6 +595,14 @@ export function toolResultToText(toolName: string, content: unknown): string {
     return (content as Array<Record<string, unknown>>)
       .map(c => `[${c.source_name || 'Source'}]\n${c.content || ''}`)
       .join('\n\n')
+  }
+
+  if (toolName === 'list_knowledge_bases' && kbGroupCounts(content)) {
+    const counts = kbGroupCounts(content)!
+    const entries = kbEntries(content)
+    return KB_GROUPS.filter(([key]) => counts[key] > 0).map(([key, label]) =>
+      [`${label[0].toUpperCase() + label.slice(1)} (${counts[key]})`, ...entries.filter(e => e.group === key).map(e => String(e.title || e.uuid))].join('\n'),
+    ).join('\n\n')
   }
 
   // Lists: pull title/name
@@ -1593,8 +1607,25 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
 // Expandable details for list-type results
 // ---------------------------------------------------------------------------
 
+/** The chat tool's groups, labelled as the Knowledge panel labels them. */
+const KB_GROUPS = [['mine', 'mine'], ['team', 'team'], ['verified', 'verified'], ['project', 'in projects']] as const
+type KBGroup = typeof KB_GROUPS[number][0]
+
+function kbGroupCounts(content: unknown): Record<KBGroup, number> | null {
+  const counts = (content as { counts?: unknown } | null)?.counts
+  if (!counts || typeof counts !== 'object') return null
+  const value = counts as Record<string, unknown>
+  return Object.fromEntries(KB_GROUPS.map(([key]) => [key, typeof value[key] === 'number' ? value[key] : 0])) as Record<KBGroup, number>
+}
+
+function kbEntries(content: unknown): Array<Record<string, unknown>> {
+  const items = (content as { knowledge_bases?: unknown } | null)?.knowledge_bases
+  return Array.isArray(items) ? items as Array<Record<string, unknown>> : []
+}
+
 function hasExpandableContent(toolName: string, content: unknown): boolean {
   if (toolName === 'run_extraction') return false
+  if (toolName === 'list_knowledge_bases') return kbEntries(content).length > 0
   if (toolName === 'search_knowledge_base') return false
   if (Array.isArray(content) && content.length > 0) return true
   if (toolName === 'list_documents') {
@@ -1608,7 +1639,7 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
   const obj = content as Record<string, unknown>
 
   if (
-    ['search_documents', 'list_extraction_sets', 'list_workflows', 'list_knowledge_bases', 'search_library'].includes(toolName) &&
+    ['search_documents', 'list_extraction_sets', 'list_workflows', 'search_library'].includes(toolName) &&
     Array.isArray(content)
   ) {
     if (content.length === 0) return null
@@ -1630,6 +1661,36 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
         {content.length > 10 && (
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 'var(--workspace-space-12)' }}>+{content.length - 10} more</div>
         )}
+      </div>
+    )
+  }
+
+  if (toolName === 'list_knowledge_bases') {
+    const entries = kbEntries(content)
+    const counts = kbGroupCounts(content)
+    if (!entries.length || !counts) return null
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+        {KB_GROUPS.map(([key, label]) => {
+          const rows = entries.filter(e => e.group === key)
+          if (!rows.length) return null
+          return (
+            <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', fontWeight: 600 }}>{label[0].toUpperCase() + label.slice(1)} ({counts[key]})</div>
+              {rows.map((row, i) => (
+                <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+                  <span style={{ color: '#d1d5db' }}>&middot;</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {String(row.title || row.uuid || 'Untitled')}{typeof row.project === 'string' ? ` — ${row.project}` : ''}
+                  </span>
+                </div>
+              ))}
+              {counts[key] > rows.length && (
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 'var(--workspace-space-12)' }}>+{counts[key] - rows.length} more</div>
+              )}
+            </div>
+          )
+        })}
       </div>
     )
   }

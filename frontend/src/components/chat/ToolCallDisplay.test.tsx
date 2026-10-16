@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ToolCallDisplay, ToolStatusLine, WorkflowProgress } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, WorkflowProgress, toolResultToText } from './ToolCallDisplay'
 import { getWorkflowStatus } from '../../api/workflows'
 import type { WorkflowStatus } from '../../types/workflow'
 
@@ -104,6 +104,32 @@ it('renders a historical approval as a nonactionable record even when a callback
   expect(screen.queryByRole('button', { name: 'Create workflow' })).toBeNull()
   expect(screen.queryByText('Your approval is needed')).toBeNull()
   expect(confirm).not.toHaveBeenCalled()
+})
+
+describe('knowledge base listing', () => {
+  const kbCall = { tool_name: 'list_knowledge_bases', tool_call_id: 'kb-1', args: {} }
+  const content = {
+    scope: 'all',
+    counts: { mine: 2, team: 1, verified: 25, project: 1 },
+    knowledge_bases: [
+      { uuid: 'a', title: 'My Policies', group: 'mine' },
+      { uuid: 'b', title: 'Award Terms', group: 'mine' },
+      { uuid: 'c', title: 'Team Handbook', group: 'team' },
+      { uuid: 'd', title: '2 CFR 200', group: 'verified' },
+      { uuid: 'e', title: 'Project KB', group: 'project', project: 'Grant X' },
+    ],
+  }
+
+  it('summarizes each group from the full counts, not the listed rows', () => {
+    render(<ToolStatusLine call={kbCall} result={{ tool_name: 'list_knowledge_bases', tool_call_id: 'kb-1', content, quality: null }} />)
+    expect(screen.getByText('2 mine · 1 team · 25 verified · 1 in projects')).toBeInTheDocument()
+  })
+
+  it('copies the groups separately', () => {
+    expect(toolResultToText('list_knowledge_bases', content)).toBe(
+      'Mine (2)\nMy Policies\nAward Terms\n\nTeam (1)\nTeam Handbook\n\nVerified (25)\n2 CFR 200\n\nIn projects (1)\nProject KB',
+    )
+  })
 })
 
 it.each([
