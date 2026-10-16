@@ -28,8 +28,8 @@ describe('VerificationSubmitModal', () => {
 
   it('opens on "what do you want?" and hides the team card when the caller cannot share to a team', () => {
     open()
-    expect(screen.getByText('Share with everyone — it works for me')).toBeTruthy()
-    expect(screen.getByText('Get a second pair of eyes')).toBeTruthy()
+    expect(screen.getByText(/I've already validated it/)).toBeTruthy()
+    expect(screen.getByText(/I haven't validated it yet/)).toBeTruthy()
     expect(screen.queryByText('Share with a team')).toBeNull()
   })
 
@@ -42,21 +42,21 @@ describe('VerificationSubmitModal', () => {
     expect(submitForVerification).not.toHaveBeenCalled()
   })
 
-  it('"Get a second pair of eyes" is the needs-help path: skip_validation true, and the button says so', async () => {
+  it('"I haven\'t validated it yet" is the needs-help path: skip_validation true, and the button says so', async () => {
     const { onSubmitted } = open()
-    fireEvent.click(screen.getByText('Get a second pair of eyes'))
+    fireEvent.click(screen.getByText(/I haven't validated it yet/))
     // Basics -> Details -> Review
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Next'))
-    expect(screen.getByText(/an examiner will look it over and run a validation/)).toBeTruthy()
+    expect(screen.getByText(/an examiner will run a validation/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Ask for a look/ }))
     await waitFor(() => expect(onSubmitted).toHaveBeenCalled())
     expect(vi.mocked(submitForVerification).mock.calls[0][0]).toMatchObject({ item_id: 'wf-1', skip_validation: true })
   })
 
-  it('"Share with everyone" submits with skip_validation false', async () => {
+  it('"I\'ve already validated it" submits with skip_validation false', async () => {
     const { onSubmitted } = open()
-    fireEvent.click(screen.getByText('Share with everyone — it works for me'))
+    fireEvent.click(screen.getByText(/I've already validated it/))
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByRole('button', { name: /^Share with everyone$/ }))
@@ -67,7 +67,7 @@ describe('VerificationSubmitModal', () => {
   describe('closing after typing', () => {
     function typeDescription() {
       const result = open()
-      fireEvent.click(screen.getByText('Share with everyone — it works for me'))
+      fireEvent.click(screen.getByText(/I've already validated it/))
       fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Checks F&A rates' } })
       return result
     }
@@ -106,5 +106,26 @@ describe('VerificationSubmitModal', () => {
       fireEvent.click(screen.getByText('Discard'))
       expect(onClose).toHaveBeenCalled()
     })
+  })
+
+  it('names the item kind in the title instead of one of the options', () => {
+    open({ itemKind: 'search_set' })
+    expect(screen.getByRole('heading', { name: 'Share this extraction' })).toBeTruthy()
+  })
+
+  it('says Summary is required and will not go past Basics without it', () => {
+    open()
+    fireEvent.click(screen.getByText(/I've already validated it/))
+    fireEvent.change(screen.getByLabelText('Summary *'), { target: { value: '  ' } })
+    expect(screen.getByText('Summary is required.')).toBeTruthy()
+    expect((screen.getByText('Next').closest('button') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('explains the disabled final button when Review is reached with no Summary', () => {
+    open({ itemTitle: '' })
+    fireEvent.click(screen.getByText(/I've already validated it/))
+    fireEvent.click(screen.getByText('4. Review'))
+    expect(screen.getByText('Summary is required (Basics step).')).toBeTruthy()
+    expect((screen.getByRole('button', { name: /^Share with everyone$/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 })
