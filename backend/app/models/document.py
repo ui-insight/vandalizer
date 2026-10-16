@@ -15,6 +15,10 @@ class SmartDocument(Document):
     task_id: Optional[str] = None
     task_status: Optional[str] = None
     error_message: Optional[str] = None
+    # False when the failure is the file itself (damaged, wrong format, gone):
+    # re-reading the same bytes can't succeed, so no Retry is offered. None
+    # (the default, and every older document) means a retry may help.
+    error_retryable: Optional[bool] = None
     title: str
     raw_text: str = ""
     extension: str = "pdf"

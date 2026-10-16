@@ -713,8 +713,8 @@ async def chat_stream(
             "kind": "context_notice",
             "content": (
                 f"{len(errored_docs)} selected document(s) failed text extraction "
-                f"and can't be used here: {joined}. Open the document and use "
-                "\"Retry extraction\" to try again."
+                f"and can't be used here: {joined}. Open the document to see "
+                "why and what to do about it."
             ),
             "action": "documents_extraction_failed",
             "tokens_dropped": 0,
