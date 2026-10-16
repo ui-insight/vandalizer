@@ -30,7 +30,7 @@ interface Props {
   onShareWithTeam?: () => void
 }
 
-// The first step is what you want, not a form. "Get a second pair of eyes"
+// The first step is what you want, not a form. "I haven't validated it yet"
 // is the backend's pending_admin_validation path, promoted from an amber
 // opt-out checkbox on the last step to a door on the first one — asking for
 // help should feel like a normal thing to want, not an irregularity.
@@ -94,7 +94,11 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
-  const canGoNext = stepIndex < STEPS.length - 1 && (step !== 'intent' || intent !== null)
+  const summaryMissing = !summary.trim()
+  const canGoNext =
+    stepIndex < STEPS.length - 1 &&
+    (step !== 'intent' || intent !== null) &&
+    (step !== 'basics' || !summaryMissing)
   const isLastStep = stepIndex === STEPS.length - 1
   const chooseIntent = (i: Intent) => {
     setIntent(i)
@@ -142,6 +146,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
 
   const kindLabel = itemKind === 'workflow' ? 'Workflow' : itemKind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
   const shareLabel = useShareLabel()
+  // Neutral: the first step offers a team as well as everyone.
+  const title = `Share this ${kindLabel.toLowerCase()}`
 
   return createPortal(
     // Stop propagation at the overlay: this modal is portaled to document.body, but
@@ -155,12 +161,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
       onMouseDown={(e) => e.stopPropagation()}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label={shareLabel} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label={title} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-green-600" aria-hidden="true" />
-            <h3 className="text-base font-semibold text-gray-900">{shareLabel}</h3>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           </div>
           <button type="button" onClick={requestClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
@@ -226,8 +232,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 >
                   <ShieldCheck className="h-5 w-5 mt-0.5 text-green-600 shrink-0" aria-hidden="true" />
                   <span>
-                    <span className="block text-sm font-semibold text-gray-900">Share with everyone — it works for me</span>
-                    <span className="block text-xs text-gray-600 mt-0.5">An examiner looks it over and accepts it. Its score, if it has one, travels with it.</span>
+                    <span className="block text-sm font-semibold text-gray-900">I've already validated it — share it with its score</span>
+                    <span className="block text-xs text-gray-600 mt-0.5">An examiner checks it and shares it with everyone. Your validation score is shown with it.</span>
                   </span>
                 </button>
                 <button
@@ -238,8 +244,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 >
                   <Eye className="h-5 w-5 mt-0.5 text-blue-600 shrink-0" aria-hidden="true" />
                   <span>
-                    <span className="block text-sm font-semibold text-gray-900">Get a second pair of eyes</span>
-                    <span className="block text-xs text-gray-600 mt-0.5">Ask an examiner to look at it and run a validation for you. Takes a little longer; you'll get a score and notes back.</span>
+                    <span className="block text-sm font-semibold text-gray-900">I haven't validated it yet — ask an examiner to test it</span>
+                    <span className="block text-xs text-gray-600 mt-0.5">An examiner runs a validation for you and sends you a score and notes. Takes a little longer.</span>
                   </span>
                 </button>
               </div>
@@ -257,8 +263,13 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Brief name for this submission"
                   aria-required="true"
+                  aria-invalid={summaryMissing}
+                  aria-describedby={summaryMissing ? 'vsm-summary-error' : undefined}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
+                {summaryMissing && (
+                  <p id="vsm-summary-error" className="mt-1 text-xs text-red-600">Summary is required.</p>
+                )}
               </div>
               <div>
                 <label htmlFor="vsm-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -458,8 +469,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
               <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3.5 py-2.5">
                 <span className="text-xs text-gray-700">
                   {skipValidation
-                    ? <><span className="font-semibold">Second pair of eyes</span> — an examiner will look it over and run a validation, then get back to you with a score and notes.</>
-                    : <><span className="font-semibold">Share with everyone</span> — an examiner looks it over and accepts it. Its current score travels with it.</>}
+                    ? <><span className="font-semibold">Not validated yet</span> — an examiner will run a validation, then get back to you with a score and notes.</>
+                    : <><span className="font-semibold">Already validated</span> — an examiner checks it and shares it with everyone, with your validation score.</>}
                 </span>
                 <button type="button" onClick={() => setStep('intent')} className="text-xs text-gray-600 underline shrink-0">Change</button>
               </div>
@@ -511,6 +522,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
             >
               Cancel
             </button>
+            {isLastStep && summaryMissing && (
+              <span className="text-xs text-red-600">Summary is required (Basics step).</span>
+            )}
             {isLastStep ? (
               <button
                 onClick={handleSubmit}
