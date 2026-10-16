@@ -29,6 +29,16 @@ class DocumentReadError(RuntimeError):
     """
 
 
+class UnreadableFileError(DocumentReadError):
+    """The file's own bytes are the problem; reading it again cannot succeed.
+
+    A damaged workbook, a binary under a text extension, another format
+    renamed. A plain ``DocumentReadError`` may be a reader crash that a retry
+    gets past; this one is final, so the document is marked not retryable and
+    the user is told what to do with the file instead of offered Retry.
+    """
+
+
 MIN_PDF_TEXT_LENGTH = 100
 MAX_XLSX_COMMENT_LEN = 500
 
@@ -660,6 +670,52 @@ def _describe_misnamed_xlsx(xlsx_path: str) -> str | None:
     return None
 
 
+_DAMAGED_WORKBOOK_REMEDY = (
+    "If Excel can open it, use Save As → Excel Workbook (.xlsx) to save a "
+    "clean copy and upload that; otherwise get a fresh copy from wherever it "
+    "came from."
+)
+
+
+def describe_damaged_workbook(source) -> str | None:
+    """A user-facing message when an .xlsx package is physically damaged.
+
+    ``source`` is a path or a binary file object. Damaged means provably
+    broken bytes, not "openpyxl refused it": the zip can't be opened, a member
+    fails its checksum, or an XML part is not well-formed (a truncated or
+    corrupted download). A valid workbook that openpyxl merely can't handle is
+    not damaged, so it keeps its retry. None when nothing is wrong.
+    """
+    import zipfile
+    import zlib
+    from xml.etree.ElementTree import ParseError
+
+    from defusedxml.ElementTree import iterparse
+
+    def damaged(detail: str) -> str:
+        return f"This workbook is damaged — {detail} — so it can't be read. {_DAMAGED_WORKBOOK_REMEDY}"
+
+    try:
+        with zipfile.ZipFile(source) as zf:
+            bad_member = zf.testzip()
+            if bad_member:
+                return damaged(f"part of its contents ({bad_member}) is corrupted")
+            for name in zf.namelist():
+                if not name.lower().endswith((".xml", ".rels")):
+                    continue
+                with zf.open(name) as part:
+                    try:
+                        for _ in iterparse(part):
+                            pass
+                    except ParseError:
+                        return damaged(f"part of its contents ({name}) is cut off or corrupted")
+    except (zipfile.BadZipFile, EOFError, zlib.error):
+        # Only signals of broken bytes. A missing or unreadable path is not a
+        # verdict on the file, so OSError propagates to the caller's handling.
+        return damaged("the file is cut off or is not a complete Excel file")
+    return None
+
+
 def extract_text_from_xlsx(xlsx_path: str) -> str:
     """Extract every visible and hidden sheet from an .xlsx workbook.
 
@@ -686,13 +742,21 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
         # fails to parse for any other reason still falls back to MarkItDown.
         misnamed = _describe_misnamed_xlsx(xlsx_path) if _no_workbook_in_package(e) else None
         if misnamed:
-            raise DocumentReadError(misnamed) from e
+            raise UnreadableFileError(misnamed) from e
         if "no valid workbook part" in str(e):
-            raise DocumentReadError(
+            raise UnreadableFileError(
                 "This .xlsx file contains no Excel workbook. It may be damaged, "
                 "or a different kind of file renamed to .xlsx. Open it in Excel, "
                 "use Save As → Excel Workbook (.xlsx), and upload that."
             ) from e
+        # A damaged package fails MarkItDown the same way (it reads through
+        # openpyxl too), and its "File conversion failed" is no use to anyone.
+        try:
+            damaged = describe_damaged_workbook(xlsx_path)
+        except OSError:
+            damaged = None
+        if damaged:
+            raise UnreadableFileError(damaged) from e
         logger.warning(
             "openpyxl failed on %s (%s) — falling back to MarkItDown", xlsx_path, e
         )
@@ -841,8 +905,18 @@ def extract_sheet_json_from_xlsx(xlsx_path: str) -> dict:
     """
     import openpyxl
 
-    wb_values = openpyxl.load_workbook(xlsx_path, data_only=True)
-    wb_formulas = openpyxl.load_workbook(xlsx_path, data_only=False)
+    try:
+        wb_values = openpyxl.load_workbook(xlsx_path, data_only=True)
+        wb_formulas = openpyxl.load_workbook(xlsx_path, data_only=False)
+    except Exception as e:
+        # Say why there is no preview instead of a bare "not available".
+        try:
+            damaged = describe_damaged_workbook(xlsx_path)
+        except OSError:
+            damaged = None
+        if damaged:
+            raise UnreadableFileError(damaged) from e
+        raise
 
     needs_eval = False
     for sheet_name in wb_values.sheetnames:
@@ -916,7 +990,7 @@ def extract_sheet_json_from_csv(csv_path: str) -> dict:
     try:
         raw = read_text_file(csv_path, "csv")
     except DocumentReadError:
-        raise DocumentReadError(
+        raise UnreadableFileError(
             "This file is not a text CSV — its contents look binary. Re-save "
             "it as CSV (UTF-8) or upload the original spreadsheet."
         ) from None
@@ -2028,7 +2102,7 @@ def _refuse_binary(file_path: str, file_extension: str) -> "NoReturn":
     # DocumentReadError passthrough below skips the generic handler's log),
     # at warning rather than error so ordinary binary uploads don't page.
     logger.warning("Refusing to ingest %s as text — content looks binary", file_path)
-    raise DocumentReadError(
+    raise UnreadableFileError(
         f"This {desc} does not appear to contain readable text — it may be "
         "a binary format this system cannot read. If it is a document, "
         "re-save it as PDF, DOCX, or plain text (UTF-8) and upload that."

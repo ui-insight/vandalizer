@@ -58,3 +58,26 @@ describe('RawTextModal low-quality notice', () => {
     expect(screen.queryByText(/most of the stored text is unreadable/i)).toBeNull()
   })
 })
+
+describe('RawTextModal extraction failure', () => {
+  beforeEach(() => {
+    vi.mocked(pollStatus).mockReset()
+  })
+
+  it('offers no Retry when the file itself is the problem', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({
+      status: 'error', raw_text: '', error_message: 'This workbook is damaged', error_retryable: false,
+    }))
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText('This workbook is damaged')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /retry extraction/i })).toBeNull()
+  })
+
+  it('still offers Retry for a failure that may be temporary', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({
+      status: 'error', raw_text: '', error_message: 'Text extraction failed: timeout',
+    }))
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    expect(await screen.findByRole('button', { name: /retry extraction/i })).toBeTruthy()
+  })
+})

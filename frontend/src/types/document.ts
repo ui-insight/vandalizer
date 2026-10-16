@@ -54,6 +54,9 @@ export interface PollStatusResponse {
   valid: boolean
   path: string | null
   error_message: string | null
+  /** False when the file itself is the problem (damaged, wrong format, gone)
+   *  and a retry cannot help. Null/absent means a retry may help. */
+  error_retryable?: boolean | null
   processing: boolean
   title: string
   extraction_low_quality?: boolean

@@ -41,7 +41,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             message:
               res.error_message ||
               "We couldn't extract any text from this document.",
-            canRetry: true,
+            // A damaged or misnamed file fails the same way every time.
+            canRetry: res.error_retryable !== false,
           })
         } else {
           setState({
