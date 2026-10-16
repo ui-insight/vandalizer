@@ -462,6 +462,7 @@
 .admin-table-region .admin-kb-table :is(th, td):first-child { min-width: 48px; width: 48px; }
 .admin-table-region .admin-kb-table :is(th, td):nth-child(2) { min-width: 280px; }
 
+/* The same records/actions become summaries on phones; retain a comparison-table option. */
 .admin-table-view-toggle { display: none; }
 @media (max-width: 599px) {
   .admin-table-view-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #e2e8f0; }
@@ -484,4 +485,5 @@
 details[open] > .config-advanced-summary .config-disclosure { transform: rotate(90deg); }
 .config-advanced-summary:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
 
+/* Chart series colors describe marks; tooltip text needs readable contrast. */
 .section-page__content .recharts-default-tooltip .recharts-tooltip-item { color: #334155 !important; }

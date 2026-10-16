@@ -26,6 +26,7 @@ import { AttachKBModal } from './AttachKBModal'
 import { useChat } from '../../hooks/useChat'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { isCertificationWriteResult } from '../../lib/certificationEvents'
+import { useChatWriteAnnouncer } from '../../lib/chatWrites'
 import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
 import { CertificationChatRecovery } from '../certification/CertificationChatRecovery'
 import { useProject } from '../../hooks/useProjects'
@@ -101,6 +102,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange, workspaceLabel }: ChatPanelProps) {
   const certification = useCertificationPanelOptional()
+  const announceChatWrite = useChatWriteAnnouncer()
   const branding = useBranding()
   const brandIcon = branding.iconUrl
   const {
@@ -139,6 +141,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat({ onLiveToolResult: result => {
     if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
+    announceChatWrite(result)
   } })
 
   const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()

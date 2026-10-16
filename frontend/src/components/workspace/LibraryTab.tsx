@@ -46,6 +46,7 @@ import {
 } from 'lucide-react'
 import type { LibraryItem, VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
+import { useRefreshOnChatWrite } from '../../lib/chatWrites'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
 type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
@@ -234,6 +235,9 @@ export function LibraryTab() {
     prevEditorOpen.current = editorOpen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorOpen])
+
+  // Workflows and extractions the Assistant creates land in the personal library.
+  useRefreshOnChatWrite('library', refreshItems)
 
   // Delete-choice dialog: set when the user can permanently delete the
   // underlying workflow/extraction (not just remove the bookmark).

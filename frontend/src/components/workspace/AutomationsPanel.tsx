@@ -6,6 +6,7 @@ import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { AutomationSummary } from './AutomationSummary'
 import { useAutomationFolderNames } from '../../hooks/useAutomationFolderNames'
 import { useAutomations } from '../../hooks/useAutomations'
+import { useRefreshOnChatWrite } from '../../lib/chatWrites'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useProjectPins } from '../../hooks/useProjectPins'
@@ -26,6 +27,7 @@ type FilterMode = 'all' | 'folder_watch' | 'api' | 'schedule' | 'm365_intake'
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { automations, loading, error, refresh } = useAutomations()
+  useRefreshOnChatWrite('automations', refresh)
   const folderNames = useAutomationFolderNames()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
