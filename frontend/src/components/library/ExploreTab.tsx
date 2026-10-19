@@ -508,7 +508,7 @@ export function ExploreTab() {
     searchQuery, setSearchQuery, kindFilter, setKindFilter, qualityFilter, setQualityFilter,
     tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
     refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
-    topItems, otherItems,
+    topItems, topRatedCount, otherItems,
   } = browser
   const [libraries, setLibraries] = useState<Library[]>([])
   const [currentTeamName, setCurrentTeamName] = useState<string | null>(null)
@@ -827,10 +827,10 @@ export function ExploreTab() {
                     <div className="flex items-center gap-2 mb-3">
                       <div className="h-4 w-4 rounded-full bg-gradient-to-br from-green-400 to-green-600" />
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
-                      <span className="text-xs text-gray-500">{topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-500">{topRatedCount} excellent-tier item{topRatedCount !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-                      {topItems.slice(0, 6).map(item => (
+                      {topItems.map(item => (
                         <CatalogCard
                           key={item.id}
                           item={item}
