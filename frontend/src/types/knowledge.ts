@@ -92,6 +92,12 @@ export interface SourceCurrency {
   last_refresh_error: string | null
 }
 
+export interface KBSourceReviewFinding {
+  kind: 'hidden_text' | 'instruction_text' | string
+  reason: string
+  excerpt: string
+}
+
 export interface KnowledgeBaseSource {
   uuid: string
   source_type: 'document' | 'url'
@@ -107,9 +113,15 @@ export interface KnowledgeBaseSource {
   // Sources in this KB that this one revises (a supplement or notice).
   // Retrieval searches this source whenever one of those is retrieved.
   amends_source_uuids?: string[]
-  status: 'pending' | 'processing' | 'ready' | 'error'
+  // 'held': a fetched page carried hidden or AI-addressed text and was not
+  // indexed; it waits for the user (see `review_findings`).
+  status: 'pending' | 'processing' | 'ready' | 'error' | 'held'
   error_message?: string
   chunk_count: number
+  // Why the last fetch of a web source was held instead of indexed. On a
+  // "held" source nothing is indexed yet; on a "ready" one a refresh was held
+  // and the previous text still answers.
+  review_findings?: KBSourceReviewFinding[]
   // URL source whose extracted text was cut off at the fetcher size cap:
   // "ready" but incomplete, so the UI warns instead of showing a clean check.
   truncated?: boolean
@@ -157,4 +169,44 @@ export interface KBReference {
   note?: string
   pinned: boolean
   created_at?: string
+}
+
+/** One dated version of a URL source's text (backend KBSourceVersionResponse).
+ *  In effect from `in_effect_from` until `superseded_at` (null on the current one). */
+export interface KBSourceVersion {
+  uuid: string
+  number: number
+  is_current: boolean
+  /** ingest | refresh | supplied_text | baseline (the text held when history began) */
+  origin: string
+  url?: string | null
+  url_title?: string | null
+  content_hash: string
+  content_hash_algorithm: string
+  char_count: number
+  truncated: boolean
+  captured_at?: string | null
+  in_effect_from?: string | null
+  superseded_at?: string | null
+  last_confirmed_at?: string | null
+}
+
+export interface KBSourceVersionList {
+  versions: KBSourceVersion[]
+  at?: string | null
+  in_effect_version_uuid?: string | null
+}
+
+export interface KBSourceVersionDetail extends KBSourceVersion {
+  content: string
+}
+
+export interface KBSourceVersionCompare {
+  base: KBSourceVersion
+  target: KBSourceVersion
+  identical: boolean
+  added: number
+  removed: number
+  lines: { op: ' ' | '+' | '-' | '@'; text: string }[]
+  truncated: boolean
 }

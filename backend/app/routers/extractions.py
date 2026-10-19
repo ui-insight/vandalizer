@@ -1202,7 +1202,21 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
         )
-        raise
+        from app.exceptions import AppError
+
+        if isinstance(e, (AppError, HTTPException)):
+            raise  # already carry their own status and message (trial limits, …)
+        # Re-raised, this reached the browser as a plain-text 500 — production
+        # has no catch-all handler — which the client can only show as
+        # "Request failed", while History held the real reason (support
+        # ticket). The engine already logged it (Sentry for anything not an
+        # outage); the user gets a reason they can act on.
+        from app.services.extraction_errors import describe_extraction_failure
+
+        status_code, message = describe_extraction_failure(e)
+        if status_code == 500:
+            logger.exception("Extraction run failed for search set %s", req.search_set_uuid)
+        raise HTTPException(status_code=status_code, detail=message) from e
 
 
 # ---------------------------------------------------------------------------
