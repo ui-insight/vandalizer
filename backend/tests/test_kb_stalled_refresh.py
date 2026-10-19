@@ -25,7 +25,9 @@ from app.services import knowledge_service
 from app.services.web_fetcher import WebFetchResult
 
 NOW = datetime.datetime.now(tz=datetime.timezone.utc)
-URL = "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-50/subpart-F"
+# A page the catalog does not bundle, so refresh fetches it live (a bundled
+# eCFR URL is served from its bundle; see test_bundled_sources.py).
+URL = "https://grants.nih.gov/policy-and-compliance/fcoi"
 TEXT = "§ 50.601 Purpose. This subpart promotes objectivity in research. " * 200
 
 
