@@ -8,7 +8,6 @@ import { relativeTime } from '../../utils/time'
 import { getWorkflowStatus, downloadResults } from '../../api/workflows'
 import { FileOutputCard } from './FileOutputCard'
 import { summarizeFilePayload } from './outputFilePayload'
-import { runModelLabel } from '../../lib/runModel'
 
 export interface HistoryRun {
   id: string
@@ -26,22 +25,12 @@ export interface HistoryRun {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
-  /** Workflow runs: the run's model, and the models its steps ran on. */
-  model?: string | null
-  models_used?: string[]
-  /** Models the run's calls used, most tokens first; empty for runs recorded
-   * before models were. */
+  /** Models the run used, most tokens first. Runs recorded before calls were
+   * metered carry the models their steps were configured with; empty when
+   * neither is known. */
   models?: string[]
   /** Workflow runs: each step's models, in step order. */
   step_models?: { index: number; name: string | null; models: string[] }[]
-}
-
-/** The models a run used. Runs recorded before per-call models were kept
- * fall back to the models the run's steps were configured with. */
-function runModels(run: HistoryRun): string[] {
-  if (run.models?.length) return run.models
-  const used = (run.models_used ?? []).filter(Boolean)
-  return used.length ? used : run.model ? [run.model] : []
 }
 
 /** The History tab as a CSV: one row per run, with its model(s) and, for a
@@ -52,7 +41,7 @@ export function buildHistoryCSV(runs: HistoryRun[], type: 'workflow' | 'extracti
     ...(type === 'workflow' ? ['Models by step'] : []), 'Error']
   const rows = runs.map(run => [
     run.started_at, run.finished_at, run.status, run.duration_ms, run.tokens_input, run.tokens_output,
-    run.documents_touched, runModels(run).join('; '),
+    run.documents_touched, (run.models ?? []).join('; '),
     ...(type === 'workflow'
       ? [(run.step_models ?? []).map(s => `${s.name ?? `Step ${s.index + 1}`}: ${s.models.join(', ')}`).join('; ')]
       : []),
@@ -311,7 +300,6 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
                 {run.steps_completed ?? 0}/{run.steps_total} steps
               </span>
             )}
-            {models.length === 0 && type === 'workflow' && runModelLabel(run) && <span>{runModelLabel(run)}</span>}
             {(run.tokens_input > 0 || run.tokens_output > 0) && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <Zap style={{ width: 11, height: 11 }} />

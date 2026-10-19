@@ -1255,13 +1255,23 @@ async def get_workflow_history(
         .limit(limit)
         .to_list()
     )
-    # Which model each run used lives on its WorkflowResult; one query for all.
+    # What ran comes from the run's metered calls (model_usage). Runs recorded
+    # before calls were metered have none; for those only, fall back to the
+    # models their WorkflowResult recorded, in the same ``models`` field.
     from app.models.workflow import WorkflowResult
-    session_ids = [ev.workflow_session_id for ev in events if ev.workflow_session_id]
-    run_models: dict[str, tuple] = {}
-    if session_ids:
-        for r in await WorkflowResult.find({"session_id": {"$in": session_ids}}).to_list():
-            run_models[r.session_id] = (r.model, list(r.models_used or []))
+    unmetered = [ev.workflow_session_id for ev in events if ev.workflow_session_id and not ev.model_usage]
+    recorded: dict[str, list[str]] = {}
+    if unmetered:
+        for r in await WorkflowResult.find({"session_id": {"$in": unmetered}}).to_list():
+            used = [m for m in (r.models_used or []) if m]
+            recorded[r.session_id] = used or ([r.model] if r.model else [])
+
+    def models_of(ev) -> dict:
+        fields = run_model_fields(ev.model_usage)
+        if not fields["models"]:
+            fields["models"] = recorded.get(ev.workflow_session_id, [])
+        return fields
+
     return {
         "runs": [
             {
@@ -1282,12 +1292,9 @@ async def get_workflow_history(
                 # history row say "awaiting approval" and link to the review
                 # instead of showing a run that has been "running" for days.
                 "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
-                "model": run_models.get(ev.workflow_session_id, (None, []))[0],
-                "models_used": run_models.get(ev.workflow_session_id, (None, []))[1],
-                # What actually ran, from the metered calls (support ticket:
-                # History couldn't say which model a run used). Empty for runs
-                # recorded before models were.
-                **run_model_fields(ev.model_usage),
+                # What actually ran (support ticket: History couldn't say
+                # which model a run used).
+                **models_of(ev),
             }
             for ev in events
         ],

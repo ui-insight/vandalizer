@@ -108,23 +108,45 @@ def _query(items):
     return q
 
 
-@pytest.mark.asyncio
-async def test_history_rows_carry_the_run_model():
-    from app.routers import workflows as router
-
-    ev = MagicMock(
+def _history_event(model_usage):
+    return MagicMock(
         id="ev1", status="completed", started_at=None, finished_at=None, duration_ms=10,
         error="", tokens_input=1, tokens_output=1, documents_touched=1, steps_completed=2,
         steps_total=2, workflow_session_id="s-1", result_snapshot={}, meta_summary={},
+        model_usage=model_usage,
     )
+
+
+@pytest.mark.asyncio
+async def test_history_falls_back_to_the_recorded_models_for_an_unmetered_run():
+    # Runs from before calls were metered have no model_usage; History still
+    # names their model, in the same field a metered run uses.
+    from app.routers import workflows as router
+
     run = MagicMock(session_id="s-1", model="VandalAI", models_used=["moonshotai/kimi-k3"])
     with patch.object(router, "get_authorized_workflow", new=AsyncMock(return_value=MagicMock(id="wf"))), \
          patch("app.models.activity.ActivityEvent") as AE, \
          patch("app.models.workflow.WorkflowResult") as WR:
-        AE.find.return_value = _query([ev])
+        AE.find.return_value = _query([_history_event([])])
         WR.find.return_value = _query([run])
         body = await router.get_workflow_history("wf", limit=5, user=MagicMock(user_id="u"))
 
     row = body["runs"][0]
-    assert row["model"] == "VandalAI"
-    assert row["models_used"] == ["moonshotai/kimi-k3"]
+    assert row["models"] == ["moonshotai/kimi-k3"]
+    assert "models_used" not in row and "model" not in row
+
+
+@pytest.mark.asyncio
+async def test_history_uses_the_metered_models_and_skips_the_result_lookup():
+    from app.routers import workflows as router
+
+    usage = [{"step_index": 0, "step": "Extract", "model": "gpt-oss-120b", "tokens_input": 5, "tokens_output": 1}]
+    with patch.object(router, "get_authorized_workflow", new=AsyncMock(return_value=MagicMock(id="wf"))), \
+         patch("app.models.activity.ActivityEvent") as AE, \
+         patch("app.models.workflow.WorkflowResult") as WR:
+        AE.find.return_value = _query([_history_event(usage)])
+        body = await router.get_workflow_history("wf", limit=5, user=MagicMock(user_id="u"))
+
+    WR.find.assert_not_called()
+    assert body["runs"][0]["models"] == ["gpt-oss-120b"]
+    assert "models_used" not in body["runs"][0]
