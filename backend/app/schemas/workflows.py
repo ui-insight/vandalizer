@@ -115,6 +115,9 @@ class WorkflowStatusResponse(BaseModel):
     error: Optional[str] = None
     error_payload: Optional[dict] = None
     retrieved_sources: list[dict] = []
+    # Models used, the settings each call was sent with, and the run's
+    # configuration snapshot; None for runs recorded before it existed.
+    run_metadata: Optional[dict] = None
 
 
 class BatchStatusItem(BaseModel):

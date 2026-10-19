@@ -531,6 +531,17 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
+        from app.services.run_metadata import record_pass_usage, snapshot_run_config
+
+        # config_override is recorded as None because this path builds the
+        # engine without the optimizer's override.
+        snapshot_run_config(
+            db, result_id,
+            workflow_doc=workflow, steps_data=steps_data,
+            trigger_step_data=trigger_step_data, model=model, sys_config=sys_config,
+            config_override=None,
+        )
+
         def _check_budget() -> None:
             # Between-steps budget gate, same as the manual run path (#808).
             from app.services.trial_budget import check_sync
@@ -538,8 +549,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             check_sync(wf_user_id)
 
         from app.services.metering import metered
-        with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
-            final_output, data = engine.execute(check_budget=_check_budget)
+        with metered(
+            "workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id"),
+        ) as meter_scope:
+            try:
+                final_output, data = engine.execute(check_budget=_check_budget)
+            finally:
+                record_pass_usage(db, result_id, meter_scope, sys_config)
 
         # Update result
         completed_at = datetime.now(timezone.utc)
