@@ -329,6 +329,14 @@ export type KBJudgeVerdict = {
   evidence: string
   missing_facts: string[]
   hallucinated_facts: string[]
+  // Statements in the answer that contradict the expected answer. Absent on
+  // runs judged before the judge reported them.
+  contradicted_facts?: string[]
+  // The answer contradicts the expected answer, but a retrieved excerpt
+  // (conflict_evidence) supports it. Scored against the expected answer and
+  // left for a reviewer to decide which one is out of date.
+  expected_conflict?: boolean
+  conflict_evidence?: string
 }
 
 export type KBValidationDetail = {
@@ -394,6 +402,11 @@ export type KBValidationResult = {
     total_queries: number
     avg_precision: number
     avg_judge_score?: number | null
+    // Questions whose answer conflicts with the expected answer but is backed
+    // by a retrieved excerpt; included in avg_judge_score at their (low)
+    // score. Absent on runs judged before conflicts were scored apart.
+    num_expected_conflicts?: number
+    avg_judge_score_excluding_conflicts?: number | null
     avg_baseline_score?: number | null
     avg_lift?: number | null
     num_queries_judged?: number

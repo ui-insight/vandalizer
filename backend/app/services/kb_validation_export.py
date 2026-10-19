@@ -48,7 +48,12 @@ RUN_SCORE_MEANING = (
 )
 AVG_JUDGE_SCORE_MEANING = (
     "Answer accuracy (0-1): mean judge score across judged questions. Use this "
-    "for 'how accurate are the answers'."
+    "for 'how accurate are the answers'. Each answer is scored against its "
+    "expected answer; an answer that contradicts it is scored as wrong even "
+    "when a retrieved excerpt supports it. Those questions are flagged "
+    "expected_conflict for review, counted in num_expected_conflicts, and "
+    "included in this average; avg_judge_score_excluding_conflicts is the "
+    "same average with them left out."
 )
 
 
@@ -93,6 +98,8 @@ RUN_META_CSV_COLUMNS = [
     "run_score",
     "score_formula",
     "avg_judge_score",
+    "num_expected_conflicts",
+    "avg_judge_score_excluding_conflicts",
 ]
 
 # Per-query columns, in export order. List-valued cells ("; "-joined in
@@ -117,6 +124,9 @@ RESULT_COLUMNS = [
     "judge_reasoning",
     "missing_facts",
     "hallucinated_facts",
+    "contradicted_facts",
+    "expected_conflict",
+    "conflict_evidence",
     "baseline_answer",
     "baseline_answer_truncated",
     "baseline_generation_truncated",
@@ -196,6 +206,10 @@ def build_kb_validation_results_export(
             "judge_reasoning": judge.get("reasoning") or "",
             "missing_facts": judge.get("missing_facts") or [],
             "hallucinated_facts": judge.get("hallucinated_facts") or [],
+            # Empty / False on runs judged before the judge reported these.
+            "contradicted_facts": judge.get("contradicted_facts") or [],
+            "expected_conflict": bool(judge.get("expected_conflict")),
+            "conflict_evidence": judge.get("conflict_evidence") or "",
             "baseline_answer": det.get("baseline_answer") or "",
             "baseline_answer_truncated": bool(det.get("baseline_answer_truncated")),
             "baseline_generation_truncated": bool(det.get("baseline_generation_truncated")),
@@ -244,6 +258,10 @@ def build_kb_validation_results_export(
         "num_queries_baselined": rp.get("num_queries_baselined"),
         "avg_judge_score": rp.get("avg_judge_score"),
         "avg_judge_score_meaning": AVG_JUDGE_SCORE_MEANING,
+        # None on runs judged before conflicts were scored apart: those runs
+        # gave a conflicting answer partial credit and did not count them.
+        "num_expected_conflicts": rp.get("num_expected_conflicts"),
+        "avg_judge_score_excluding_conflicts": rp.get("avg_judge_score_excluding_conflicts"),
         "avg_baseline_score": rp.get("avg_baseline_score"),
         "avg_lift": rp.get("avg_lift"),
         "judge_variance": rp.get("judge_variance"),

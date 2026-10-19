@@ -874,9 +874,19 @@ _KB_JUDGE_COMMON_TAIL = (
     "\nReturn ONLY JSON (no markdown, no extra text) with this shape:\n"
     '{"score": 0.0..1.0, "verdict": "PASS|FAIL|WARN", "confidence": 0.0..1.0, '
     '"reasoning": "...", "evidence": "...", "missing_facts": [...], '
-    '"hallucinated_facts": [...]}\n'
+    '"hallucinated_facts": [...], "contradicted_facts": [...], '
+    '"expected_conflict": true|false, "conflict_evidence": "..."}\n'
     "\n"
     "General rules (apply across query types):\n"
+    "- Grade the complete answer, not its first sentence. Check every\n"
+    "  statement it makes: list each expected fact it leaves out in\n"
+    "  missing_facts, and each statement that contradicts the expected answer\n"
+    "  (the opposite yes/no, a different value, or 'not specified' where the\n"
+    "  expected answer gives a value) in contradicted_facts, worded as the\n"
+    "  answer's claim. A correct headline does not excuse a wrong detail.\n"
+    "- The expected answer may end with instructions to you, such as 'Accept\n"
+    "  equivalent wording' or 'flag unsupported additions'. Follow them; they\n"
+    "  are not facts, so never list them in missing_facts.\n"
     "- Be lenient on phrasing, strict on facts. Length is not quality.\n"
     "- A confident hallucination is still a FAIL. Confident phrasing is not\n"
     "  evidence of grounding.\n"
@@ -884,13 +894,19 @@ _KB_JUDGE_COMMON_TAIL = (
     "  context but worded differently from ``expected_answer`` is PASS, not FAIL.\n"
     "- Absence equality: when both expected and actual say 'not specified' /\n"
     "  'N/A' / 'unknown', that's PASS.\n"
-    "- Expected-answer conflict: if the actual answer contradicts the expected\n"
-    "  answer BUT the contradicting claim is directly supported by the retrieved\n"
-    "  context (e.g. its quoted text appears in the context), the expected\n"
-    "  answer is suspect — not the actual answer. Return WARN, do NOT list the\n"
-    "  grounded claim in hallucinated_facts, and start reasoning with\n"
-    "  'expected-answer conflict:'. Hallucination means unsupported by the\n"
-    "  context, never merely 'disagrees with the expected answer'.\n"
+    "- The expected answer is the answer key. Score the answer against it\n"
+    "  under the rubric above, whatever the retrieved context says: a claim\n"
+    "  that contradicts the expected answer is wrong for scoring purposes even\n"
+    "  when an excerpt supports it. Retrieved support never earns credit for\n"
+    "  a contradicted fact.\n"
+    "- Expected-answer conflict: when a contradicted claim is directly\n"
+    "  supported by the retrieved context (its substance appears there), set\n"
+    "  expected_conflict to true and quote the supporting excerpt in\n"
+    "  conflict_evidence, so a reviewer can decide whether the expected answer\n"
+    "  or the source is out of date. Do not list that claim in\n"
+    "  hallucinated_facts: hallucination means unsupported by the context,\n"
+    "  never merely 'disagrees with the expected answer'. Otherwise\n"
+    "  expected_conflict is false and conflict_evidence is empty.\n"
     "- Verdict mapping: score >= 0.7 -> PASS, 0.4..0.7 -> WARN, < 0.4 -> FAIL.\n"
     "- Reasoning must cite the specific discrepancy or agreement, not restate\n"
     "  the values. ≤ 40 words.\n"
@@ -998,11 +1014,32 @@ def _kb_judge_prompt_for_category(category: str | None) -> str:
 KB_JUDGE_SYSTEM_PROMPT = _kb_judge_prompt_for_category(None)
 
 
-def _parse_kb_verdict(raw) -> dict:
+# The most an answer flagged ``expected_conflict`` can score, per rubric: what
+# each rubric gives a contradicted fact. A summary's "one minor inaccuracy"
+# and a multi-hop answer's "final answer correct but one intermediate fact is
+# wrong" earn partial credit; every other rubric scores it 0. The prompt says
+# the same, but the judge used to be told to return WARN for these and gave
+# them 0.6, so the parser enforces it.
+_CONFLICT_SCORE_CEILING = {"summarization": 0.5, "multi_hop": 0.5}
+
+
+def _verdict_for_score(score: float) -> str:
+    return "PASS" if score >= 0.7 else ("WARN" if score >= 0.4 else "FAIL")
+
+
+def _parse_kb_verdict(raw, *, rubric: str | None = None, context_given: bool = True) -> dict:
     """Normalise LLM output into a KB judge verdict dict.
 
     Extends the workflow validator's verdict shape with score, missing_facts,
-    and hallucinated_facts.
+    hallucinated_facts, contradicted_facts, and the expected-answer conflict
+    flag.
+
+    ``expected_conflict`` marks an answer that contradicts the expected answer
+    where a retrieved excerpt supports the answer. It is a flag for review,
+    not credit: the score still grades the answer against the expected
+    answer, and is capped at what the rubric gives a contradicted fact. It is
+    never set without retrieved context (the no-KB baseline) or without a
+    contradicted fact to point at.
     """
     if isinstance(raw, list) and raw:
         raw = raw[0]
@@ -1017,7 +1054,7 @@ def _parse_kb_verdict(raw) -> dict:
     verdict = str(raw.get("verdict", "")).upper().strip()
     if verdict not in ("PASS", "FAIL", "WARN"):
         # Derive from score if model didn't supply a verdict.
-        verdict = "PASS" if score >= 0.7 else ("WARN" if score >= 0.4 else "FAIL")
+        verdict = _verdict_for_score(score)
 
     try:
         confidence = max(0.0, min(1.0, float(raw.get("confidence", 0.5))))
@@ -1029,6 +1066,14 @@ def _parse_kb_verdict(raw) -> dict:
             return [str(x) for x in v if x is not None][:10]
         return []
 
+    contradicted = _str_list(raw.get("contradicted_facts"))
+    conflict = bool(context_given and contradicted and raw.get("expected_conflict") is True)
+    if conflict:
+        ceiling = _CONFLICT_SCORE_CEILING.get(rubric or "", 0.0)
+        if score > ceiling:
+            score = ceiling
+        verdict = _verdict_for_score(score)
+
     return {
         "score": score,
         "verdict": verdict,
@@ -1037,6 +1082,9 @@ def _parse_kb_verdict(raw) -> dict:
         "evidence": str(raw.get("evidence", ""))[:1000],
         "missing_facts": _str_list(raw.get("missing_facts")),
         "hallucinated_facts": _str_list(raw.get("hallucinated_facts")),
+        "contradicted_facts": contradicted,
+        "expected_conflict": conflict,
+        "conflict_evidence": str(raw.get("conflict_evidence", ""))[:1000] if conflict else "",
     }
 
 
@@ -1107,7 +1155,7 @@ async def _judge_answer(
             "comparator": "llm_error",
             "rubric": rubric_key,
         }
-    verdict = _parse_kb_verdict(raw)
+    verdict = _parse_kb_verdict(raw, rubric=rubric_key, context_given=bool(retrieved_context))
     verdict["tokens_used"] = tokens
     verdict["comparator"] = "llm"
     verdict["rubric"] = rubric_key
@@ -1420,6 +1468,17 @@ async def judge_test_queries(
     ]
     avg_judge_score = sum(judged_scores) / len(judged_scores) if judged_scores else None
     avg_baseline_score = sum(baseline_scores) / len(baseline_scores) if baseline_scores else None
+    # Answers that contradict the expected answer where a retrieved excerpt
+    # sides with the answer. They are scored against the expected answer and
+    # stay in avg_judge_score; the second average shows what the accuracy
+    # would be with those questions left out until a reviewer resolves them.
+    conflict_flags = [
+        bool(r["judge"].get("expected_conflict"))
+        for r in judged_results if _judge_measured(r["judge"])
+    ]
+    num_expected_conflicts = sum(conflict_flags)
+    unconflicted = [sc for sc, flag in zip(judged_scores, conflict_flags) if not flag]
+    avg_excluding_conflicts = sum(unconflicted) / len(unconflicted) if unconflicted else None
     avg_lift = (
         avg_judge_score - avg_baseline_score
         if (avg_judge_score is not None and avg_baseline_score is not None)
@@ -1439,6 +1498,10 @@ async def judge_test_queries(
         "num_queries_judged": len(judged_scores),
         "num_queries_baselined": len(baseline_scores),
         "avg_judge_score": round(avg_judge_score, 3) if avg_judge_score is not None else None,
+        "num_expected_conflicts": num_expected_conflicts,
+        "avg_judge_score_excluding_conflicts": (
+            round(avg_excluding_conflicts, 3) if avg_excluding_conflicts is not None else None
+        ),
         "avg_baseline_score": round(avg_baseline_score, 3) if avg_baseline_score is not None else None,
         "avg_lift": round(avg_lift, 3) if avg_lift is not None else None,
         "discrimination_summary": summary_counts,
@@ -2133,6 +2196,10 @@ async def run_kb_validation(
                 retrieval.setdefault("details", []).append(det)
         # Top-level aggregates.
         retrieval["avg_judge_score"] = judge_payload.get("avg_judge_score")
+        retrieval["num_expected_conflicts"] = judge_payload.get("num_expected_conflicts", 0)
+        retrieval["avg_judge_score_excluding_conflicts"] = judge_payload.get(
+            "avg_judge_score_excluding_conflicts",
+        )
         retrieval["avg_baseline_score"] = judge_payload.get("avg_baseline_score")
         retrieval["avg_lift"] = judge_payload.get("avg_lift")
         retrieval["num_queries_judged"] = judge_payload.get("num_queries_judged", 0)
