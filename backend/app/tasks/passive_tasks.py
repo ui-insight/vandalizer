@@ -523,23 +523,26 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         wf_user_doc = db.user.find_one({"user_id": wf_user_id}) if wf_user_id else None
         wf_is_admin = bool(wf_user_doc and wf_user_doc.get("is_admin"))
 
+        # The optimizer's applied override (per-step model and prompt variant)
+        # holds for every run of the workflow. This path left it out, so a
+        # tuned workflow ran its tuned configuration when someone clicked Run
+        # and the untuned one when the schedule fired.
         engine = build_workflow_engine(
             steps_data=steps_data,
             model=model,
             user_id=wf_user_id,
             system_config_doc=sys_config,
             allow_code_execution=wf_is_admin,
+            config_override=workflow.get("config_override"),
         )
 
         from app.services.run_metadata import record_pass_usage, snapshot_run_config
 
-        # config_override is recorded as None because this path builds the
-        # engine without the optimizer's override.
         snapshot_run_config(
             db, result_id,
             workflow_doc=workflow, steps_data=steps_data,
             trigger_step_data=trigger_step_data, model=model, sys_config=sys_config,
-            config_override=None,
+            config_override=workflow.get("config_override"),
         )
 
         def _check_budget() -> None:
