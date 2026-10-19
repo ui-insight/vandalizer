@@ -159,6 +159,45 @@ class TestScheduledRunUsesTheSharedBuilder:
         execute_workflow_passive("0" * 24)
         assert mock_build.call_args.kwargs["model"] == "wf-default"
 
+    @patch("app.services.metering.metered")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_optimizer_override_applies_to_scheduled_runs(self, mock_get_db, mock_build, _metered):
+        """An applied Autovalidate override holds for every run of the
+        workflow. The scheduled path built its engine without it, so a tuned
+        workflow ran tuned when clicked and untuned on schedule."""
+        from app.tasks.passive_tasks import execute_workflow_passive
+
+        override = {
+            "step_overrides": {"Summarize": {"model": "tuned-model", "prompt_variant": "concise"}},
+            "from_run_uuid": "run-1",
+        }
+        workflow = {
+            "_id": ObjectId(), "user_id": "owner", "steps": [], "input_config": {},
+            "config_override": override,
+        }
+        db = _db_for(workflow, step_docs=[], task_docs=[])
+        mock_get_db.return_value = db
+        db.workflow_trigger_event.find_one.return_value = {
+            "_id": ObjectId(), "workflow": workflow["_id"], "documents": [], "trigger_type": "scheduled",
+        }
+        db.system_config.find_one.return_value = {
+            "available_models": [{"name": "sys-default"}], "default_model": "sys-default",
+        }
+        db.workflow_result.insert_one.return_value.inserted_id = ObjectId()
+        mock_build.return_value.execute.return_value = ("final", [])
+
+        execute_workflow_passive("0" * 24)
+
+        assert mock_build.call_args.kwargs["config_override"] == override
+        # The run's record says the override was applied.
+        run_config_writes = [
+            c.args[1]["$set"]["run_config"]
+            for c in db.workflow_result.update_one.call_args_list
+            if "run_config" in (c.args[1].get("$set") or {})
+        ]
+        assert run_config_writes[0]["workflow"]["config_override"] == override
+
 
 class TestOptimizerTrialUsesTheSharedBuilder:
     @pytest.mark.asyncio
