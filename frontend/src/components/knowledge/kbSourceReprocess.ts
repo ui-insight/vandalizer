@@ -50,6 +50,8 @@ export function settleReprocesses(
       settled.push({
         uuid, name: t.name, ok: false, chunkCount: s.chunk_count,
         error: 'It stopped without finishing', keptPrevious: s.chunk_count > 0, unchanged: false,
+        // A stalled refresh never got as far as the hidden-text screen.
+        held: false,
       })
       continue
     }
