@@ -25,6 +25,7 @@ from app.schemas.knowledge import (
     AddFolderRequest,
     AddUrlsRequest,
     AdoptKBRequest,
+    CommitUrlPreviewRequest,
     ConvertDocumentsRequest,
     CreateKBRequest,
     ImportKBRequest,
@@ -858,6 +859,98 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         "ok": True, "added": len(new_urls),
         "skipped": len(skipped_urls), "skipped_urls": skipped_urls,
     }
+
+
+@router.post("/{uuid}/add_urls/preview")
+@limiter.limit("10/minute")
+async def preview_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
+    """Fetch URLs (and crawl, if asked) for review without adding anything.
+
+    Runs in a worker for the same reason add_urls does; poll the GET below.
+    """
+    from app.services import kb_url_preview
+    from app.tasks.kb_validation_tasks import preview_urls_task
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        preview = await kb_url_preview.start_preview(
+            kb, user.user_id, req.urls,
+            crawl_enabled=req.crawl_enabled,
+            max_crawl_pages=req.max_crawl_pages,
+            allowed_domains=req.allowed_domains,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    preview_urls_task.delay(preview.uuid)
+    return {"preview_uuid": preview.uuid, "status": preview.status}
+
+
+async def _require_own_preview(uuid: str, preview_uuid: str, user: User):
+    from app.services import kb_url_preview
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    preview = await kb_url_preview.get_preview(kb.uuid, preview_uuid, user.user_id)
+    if not preview:
+        raise HTTPException(status_code=404, detail="Preview not found or expired")
+    return kb, preview
+
+
+@router.get("/{uuid}/add_urls/preview/{preview_uuid}")
+async def get_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get_current_user)):
+    """The pages fetched so far, each with what adding it would contribute."""
+    from app.services import kb_url_preview
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    pages = await kb_url_preview.list_pages(preview)
+    return {
+        "preview_uuid": preview.uuid,
+        "status": preview.status,
+        "error_message": preview.error_message,
+        "crawl_enabled": preview.crawl_enabled,
+        "pages": [kb_url_preview.page_summary(p) for p in pages],
+    }
+
+
+@router.get("/{uuid}/add_urls/preview/{preview_uuid}/pages/{page_id}")
+async def get_url_preview_page_text(
+    uuid: str, preview_uuid: str, page_id: str, user: User = Depends(get_current_user),
+):
+    """One previewed page's full extracted text."""
+    from app.models.knowledge import KBUrlPreviewPage
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    page = await KBUrlPreviewPage.find_one(
+        KBUrlPreviewPage.preview_uuid == preview.uuid,
+        KBUrlPreviewPage.page_id == page_id,
+    )
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return {"page_id": page.page_id, "text": page.text}
+
+
+@router.post("/{uuid}/add_urls/preview/{preview_uuid}/commit")
+@limiter.limit("10/minute")
+async def commit_url_preview(
+    request: Request, uuid: str, preview_uuid: str, req: CommitUrlPreviewRequest,
+    user: User = Depends(get_current_user),
+):
+    """Add the kept pages of a finished preview, from the text that was shown."""
+    from app.services import kb_url_preview
+    from app.tasks.kb_validation_tasks import commit_url_preview_task
+
+    kb, preview = await _require_own_preview(uuid, preview_uuid, user)
+    if not req.page_ids:
+        raise HTTPException(status_code=400, detail="No pages selected")
+    if preview.status == "running":
+        raise HTTPException(status_code=409, detail="The preview is still fetching pages")
+    if not await kb_url_preview.claim_for_commit(preview):
+        raise HTTPException(status_code=409, detail="This preview was already added or has failed")
+    kb.status = "building"
+    await kb.save()
+    commit_url_preview_task.delay(preview.uuid, req.page_ids)
+    return {"ok": True, "queued": len(req.page_ids)}
 
 
 @router.post("/{uuid}/source/{source_uuid}/refresh")

@@ -52,6 +52,11 @@ class AddUrlsRequest(BaseModel):
     allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
 
 
+class CommitUrlPreviewRequest(BaseModel):
+    """The previewed pages to add; any others in the preview are dropped."""
+    page_ids: list[str]
+
+
 class KBSourceCurrency(BaseModel):
     """Refresh / ingestion provenance for one source (see
     app.utils.kb_source_currency). Lets an evaluator verify source currency

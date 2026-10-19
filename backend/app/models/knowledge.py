@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from beanie import Document
 from pydantic import Field
+from pymongo import IndexModel
 
 
 class KnowledgeBaseSource(Document):
@@ -137,6 +138,77 @@ class KnowledgeBaseSourceVersion(Document):
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
+
+
+def _utcnow() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+#: How long a URL preview is kept for the user to review before it expires.
+URL_PREVIEW_TTL = datetime.timedelta(hours=2)
+
+#: Preview page verdicts. The first two can be added; the rest are shown so the
+#: user sees what happened to each URL, but adding them would do nothing useful.
+PREVIEW_ADDABLE_VERDICTS = frozenset({"good", "low"})
+
+
+class KBUrlPreview(Document):
+    """A fetch of URLs for review before any of them enter a knowledge base.
+
+    The pages live in ``KBUrlPreviewPage`` (one row each, since a page's text
+    can run to millions of characters). Committing ingests the stored text of
+    the pages the user kept, so what was reviewed is exactly what is indexed.
+    Expired previews are removed by the TTL index.
+    """
+
+    uuid: str = Field(default_factory=lambda: uuid4().hex)
+    knowledge_base_uuid: str
+    user_id: str
+    urls: list[str] = Field(default_factory=list)
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    allowed_domains: str = ""
+    # running → ready (or error) → committed
+    status: str = "running"
+    error_message: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=_utcnow)
+    expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
+
+    class Settings:
+        name = "kb_url_previews"
+        indexes = [
+            "uuid",
+            IndexModel([("expires_at", 1)], expireAfterSeconds=0),
+        ]
+
+
+class KBUrlPreviewPage(Document):
+    """One fetched page of a ``KBUrlPreview`` and what it would add."""
+
+    preview_uuid: str
+    page_id: str = Field(default_factory=lambda: uuid4().hex)
+    order: int = 0
+    url: str
+    final_url: Optional[str] = None
+    title: Optional[str] = None
+    # The page this one was crawled from; None for a URL the user entered.
+    parent_url: Optional[str] = None
+    # good | low (addable) · empty | error | duplicate | navigation (not addable)
+    verdict: str
+    reason: Optional[str] = None
+    text: str = ""
+    char_count: int = 0
+    chunk_count: int = 0
+    truncated: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
+
+    class Settings:
+        name = "kb_url_preview_pages"
+        indexes = [
+            [("preview_uuid", 1), ("order", 1)],
+            IndexModel([("expires_at", 1)], expireAfterSeconds=0),
+        ]
 
 
 class KnowledgeBaseReference(Document):
