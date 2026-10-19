@@ -766,7 +766,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Establish your workflow governance',
-        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes \u2014 its score is what the shared entry will show.\n5. Share the workflow with everyone (\u22ef \u2192 Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
+        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes \u2014 its score is what the shared entry will show.\n5. Share the workflow with everyone (\u22ef \u2192 Share\u2026, then pick the option for an already-validated workflow). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
         variant: 'walkthrough',
       },
       {
