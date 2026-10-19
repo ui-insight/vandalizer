@@ -1,17 +1,30 @@
 import { FieldLabel, FieldMessage } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { ArrowLeft, Loader2, X } from 'lucide-react'
 import { TopicSourceFinder } from './TopicSourceFinder'
 import { UrlReviewList, type UrlCandidate } from './UrlReviewList'
+import { UrlPreviewList, plural } from './UrlPreviewList'
 import { extractUrls } from '../../utils/extractUrls'
-import { getSourceSuggestionsAvailable, readSitemap } from '../../api/knowledge'
+import {
+  commitUrlPreview,
+  getSourceSuggestionsAvailable,
+  getUrlPreview,
+  previewUrlsForKB,
+  readSitemap,
+  type UrlPreview,
+} from '../../api/knowledge'
 
 // Mirrors MAX_URLS_PER_ADD / MAX_CRAWL_URLS_PER_ADD in routers/knowledge.py.
 const MAX_URLS_PER_ADD = 500
 const MAX_CRAWL_URLS_PER_ADD = 25
+// Mirrors MAX_URLS_PER_PREVIEW / MAX_CRAWL_URLS_PER_PREVIEW: a preview fetches
+// every page in one worker task, so it checks a handful, not a whole sitemap.
+const MAX_URLS_PER_PREVIEW = 50
+const MAX_CRAWL_URLS_PER_PREVIEW = 5
+const POLL_MS = 2000
 // A list of links is small; a file this size is a document, not a list.
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
@@ -28,6 +41,8 @@ interface AddUrlsModalProps {
   /** Enables the Sitemap and Topic ways in (both read on the server for this KB). */
   kbUuid?: string
   onSubmit: (urls: string[], crawlEnabled: boolean, maxCrawlPages: number, allowedDomains: string) => void | Promise<void>
+  /** Enables "Fetch & check": called once a checked preview's kept pages are queued. */
+  onCommitted?: (added: number) => void
   onClose: () => void
 }
 
@@ -36,9 +51,11 @@ interface AddUrlsModalProps {
  * links could only be typed one per line). Links come from pasted text of any
  * kind (an email, a document: the links are pulled out of it), a file, a
  * site's sitemap, or a topic search. The review step lists every one found;
- * only the checked ones are added.
+ * only the checked ones are added. "Fetch & check" optionally fetches the
+ * checked links first and shows each page's text and verdict (#1022); Add then
+ * indexes exactly the text that was shown.
  */
-export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
+export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrlsModalProps) {
   const [step, setStep] = useState<'choose' | 'review'>('choose')
   const [method, setMethod] = useState<Method>('paste')
   const [topicAvailable, setTopicAvailable] = useState(false)
@@ -60,6 +77,13 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
   const [allowedDomains, setAllowedDomains] = useState('')
   const [error, setError] = useState<string | null>(null)
   const pasteRef = useRef<HTMLTextAreaElement>(null)
+
+  const [preview, setPreview] = useState<UrlPreview | null>(null)
+  // Page ids the user has kept. Pages are judged once, as they arrive: good
+  // ones start kept, low-quality ones start dropped, the rest can't be kept.
+  const [kept, setKept] = useState<Set<string>>(new Set())
+  const judgedRef = useRef<Set<string>>(new Set())
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     if (!kbUuid) return
@@ -143,6 +167,98 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
 
   const limit = crawlEnabled ? MAX_CRAWL_URLS_PER_ADD : MAX_URLS_PER_ADD
   const overLimit = selected.size > limit
+  const previewLimit = crawlEnabled ? MAX_CRAWL_URLS_PER_PREVIEW : MAX_URLS_PER_PREVIEW
+  const canCheck = Boolean(kbUuid && onCommitted)
+
+  const absorb = useCallback((next: UrlPreview) => {
+    setPreview(next)
+    setKept(prev => {
+      const out = new Set(prev)
+      for (const page of next.pages) {
+        if (judgedRef.current.has(page.page_id)) continue
+        judgedRef.current.add(page.page_id)
+        if (page.verdict === 'good') out.add(page.page_id)
+      }
+      return out
+    })
+  }, [])
+
+  // Poll while the worker is still fetching.
+  const previewUuid = preview?.preview_uuid
+  const previewRunning = preview?.status === 'running'
+  useEffect(() => {
+    if (!kbUuid || !previewUuid || !previewRunning) return
+    let cancelled = false
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await getUrlPreview(kbUuid, previewUuid)
+        if (!cancelled) absorb(next)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Lost track of the preview')
+      }
+    }, POLL_MS)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [kbUuid, previewUuid, previewRunning, absorb])
+
+  const keptPages = useMemo(
+    () => (preview?.pages ?? []).filter(p => p.addable && kept.has(p.page_id)),
+    [preview, kept],
+  )
+  const keptChunks = keptPages.reduce((sum, p) => sum + p.chunk_count, 0)
+
+  const discardPreview = () => {
+    setPreview(null)
+    setKept(new Set())
+    judgedRef.current = new Set()
+    setError(null)
+  }
+
+  const handleCheck = async () => {
+    if (!kbUuid || submittedRef.current || selected.size === 0 || selected.size > previewLimit) return
+    submittedRef.current = true
+    setSubmitted(true)
+    setChecking(true)
+    setError(null)
+    try {
+      const urls = candidates.filter(c => selected.has(c.url)).map(c => c.url)
+      const started = await previewUrlsForKB(kbUuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
+      judgedRef.current = new Set()
+      setKept(new Set())
+      setPreview({
+        preview_uuid: started.preview_uuid,
+        status: 'running',
+        error_message: null,
+        crawl_enabled: crawlEnabled,
+        pages: [],
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start the check')
+    } finally { submittedRef.current = false; setSubmitted(false); setChecking(false) }
+  }
+
+  const handleCommit = async () => {
+    if (!kbUuid || !preview || submittedRef.current || keptPages.length === 0) return
+    submittedRef.current = true
+    setSubmitted(true)
+    setError(null)
+    try {
+      await commitUrlPreview(kbUuid, preview.preview_uuid, keptPages.map(p => p.page_id))
+      onCommitted?.(keptPages.length)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add the pages')
+    } finally { submittedRef.current = false; setSubmitted(false) }
+  }
+
+  const toggleKept = (pageId: string) =>
+    setKept(prev => {
+      const out = new Set(prev)
+      if (out.has(pageId)) out.delete(pageId)
+      else out.add(pageId)
+      return out
+    })
+
+  const canCommit = !submitted && preview?.status === 'ready' && keptPages.length > 0
 
   const handleSubmit = async () => {
     if (submittedRef.current || selected.size === 0 || overLimit) return
@@ -207,7 +323,7 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)' }}>
-            {step === 'choose' ? 'Add URLs' : 'Review links'}
+            {step === 'choose' ? 'Add URLs' : preview ? 'Review pages before adding' : 'Review links'}
           </span>
           <ActionButton variant="quiet" iconOnly onClick={onClose} aria-label="Close" disabled={submitted}>
             <X size={18} style={{ color: 'var(--workspace-muted)' }} />
@@ -317,7 +433,11 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
           </>
         )}
 
-        {step === 'review' && (
+        {step === 'review' && preview && kbUuid && (
+          <UrlPreviewList kbUuid={kbUuid} preview={preview} kept={kept} onToggle={toggleKept} disabled={submitted} />
+        )}
+
+        {step === 'review' && !preview && (
           <>
             {sourceNote && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{sourceNote}</div>}
             <UrlReviewList candidates={candidates} selected={selected} onChange={setSelected} disabled={submitted} />
@@ -379,6 +499,7 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
             )}
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
               Each page is fetched and becomes usable once its text is indexed. Links already in this knowledge base are skipped; use Refresh on their source rows to fetch them again.
+              {canCheck && ` To see each page's text first, use Fetch & check (up to ${previewLimit} links${crawlEnabled ? ' with crawling on' : ''}).`}
             </div>
           </>
         )}
@@ -387,9 +508,18 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
         {error && <FieldMessage id="add-urls-submit-error" error>{error}</FieldMessage>}
         <div style={{ display: 'flex', justifyContent: step === 'review' ? 'space-between' : 'flex-end', gap: 'var(--workspace-space-8)', flexShrink: 0 }}>
           {step === 'review' && (
-            <ActionButton variant="quiet" onClick={() => { setStep('choose'); setError(null) }} disabled={submitted}>
-              <ArrowLeft size={14} aria-hidden="true" /> Back
+            <ActionButton
+              variant="quiet"
+              onClick={() => { if (preview) discardPreview(); else { setStep('choose'); setError(null) } }}
+              disabled={submitted}
+            >
+              <ArrowLeft size={14} aria-hidden="true" /> {preview ? 'Back to links' : 'Back'}
             </ActionButton>
+          )}
+          {step === 'review' && preview?.status === 'ready' && (
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', alignSelf: 'center' }}>
+              {plural(keptPages.length, 'page')} kept · {plural(keptChunks, 'chunk')}
+            </div>
           )}
           <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
             <ActionButton variant="secondary" onClick={onClose} disabled={submitted}>Cancel</ActionButton>
@@ -398,9 +528,24 @@ export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
                 {readingSitemap ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Reading sitemap…</> : method === 'sitemap' ? 'Read sitemap' : 'Review links'}
               </ActionButton>
             )}
-            {step === 'review' && (
-              <ActionButton variant="primary" aria-busy={submitted} onClick={handleSubmit} disabled={selected.size === 0 || overLimit || submitted}>
-                {submitted ? 'Adding…' : `Add ${selected.size} URL${selected.size === 1 ? '' : 's'}`}
+            {step === 'review' && !preview && canCheck && (
+              <ActionButton
+                variant="secondary"
+                onClick={handleCheck}
+                disabled={selected.size === 0 || selected.size > previewLimit || submitted}
+                title={selected.size > previewLimit ? `Fetch & check reads up to ${previewLimit} links at once` : undefined}
+              >
+                {checking ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Starting…</> : 'Fetch & check'}
+              </ActionButton>
+            )}
+            {step === 'review' && !preview && (
+              <ActionButton variant="primary" aria-busy={submitted && !checking} onClick={handleSubmit} disabled={selected.size === 0 || overLimit || submitted}>
+                {submitted && !checking ? 'Adding…' : `Add ${selected.size} URL${selected.size === 1 ? '' : 's'}`}
+              </ActionButton>
+            )}
+            {step === 'review' && preview && (
+              <ActionButton variant="primary" aria-busy={submitted} onClick={handleCommit} disabled={!canCommit}>
+                {submitted ? 'Adding…' : `Add ${plural(keptPages.length, 'page')}`}
               </ActionButton>
             )}
           </div>

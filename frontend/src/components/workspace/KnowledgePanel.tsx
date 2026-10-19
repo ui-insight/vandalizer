@@ -475,6 +475,17 @@ export function KnowledgePanel() {
       .finally(() => setAddingUrls(false))
   }
 
+  // Add URLs' "Fetch & check" path: the reviewed pages were queued from the
+  // text the user saw (#1022), not fetched again.
+  const handleUrlsCommitted = (added: number) => {
+    if (!selectedKB) return
+    // Optimistically set status to building so the poller starts
+    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
+    toast(`Adding ${added} page${added === 1 ? '' : 's'} — indexing in the background`, 'success')
+    refreshSelectedDetail(selectedKB.uuid)
+    refresh()
+  }
+
   const sourceName = (source: KnowledgeBaseSource) =>
     source.custom_name || source.document_title || source.url_title || source.url || 'Source'
 
@@ -1901,6 +1912,7 @@ export function KnowledgePanel() {
           <AddUrlsModal
             kbUuid={selectedKB.uuid}
             onSubmit={handleAddUrls}
+            onCommitted={handleUrlsCommitted}
             onClose={() => setShowUrlModal(false)}
           />
         )}

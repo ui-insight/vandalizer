@@ -884,6 +884,11 @@ async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_
 MAX_URLS_PER_ADD = 500
 MAX_CRAWL_URLS_PER_ADD = 25
 URL_INGEST_BATCH = 10
+# A preview fetches (and crawls) every URL in one worker task with add_urls'
+# old 30-minute limit, so it checks a handful of links, not a sitemap's worth;
+# a large add takes the batched add_urls path. Mirrored in AddUrlsModal.
+MAX_URLS_PER_PREVIEW = 50
+MAX_CRAWL_URLS_PER_PREVIEW = 5
 URL_INGEST_STAGGER_SECONDS = 5
 
 
@@ -987,6 +992,12 @@ async def preview_urls(request: Request, uuid: str, req: AddUrlsRequest, user: U
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    limit = MAX_CRAWL_URLS_PER_PREVIEW if req.crawl_enabled else MAX_URLS_PER_PREVIEW
+    if len(req.urls) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Check at most {limit} URLs at a time{' with crawling on' if req.crawl_enabled else ''}",
+        )
     try:
         preview = await kb_url_preview.start_preview(
             kb, user.user_id, req.urls,
