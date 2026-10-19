@@ -25,6 +25,7 @@ from app.schemas.knowledge import (
     AddFolderRequest,
     AddUrlsRequest,
     AdoptKBRequest,
+    CommitUrlPreviewRequest,
     ConvertDocumentsRequest,
     CreateKBRequest,
     ImportKBRequest,
@@ -37,6 +38,10 @@ from app.schemas.knowledge import (
     KBSourceDetailResponse,
     KBSourceResponse,
     KBSourceReviewFinding,
+    KBSourceVersionCompareResponse,
+    KBSourceVersionDetailResponse,
+    KBSourceVersionListResponse,
+    KBSourceVersionResponse,
     KBStatusResponse,
     ShareKBRequest,
     UpdateKBRequest,
@@ -864,6 +869,98 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
     }
 
 
+@router.post("/{uuid}/add_urls/preview")
+@limiter.limit("10/minute")
+async def preview_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
+    """Fetch URLs (and crawl, if asked) for review without adding anything.
+
+    Runs in a worker for the same reason add_urls does; poll the GET below.
+    """
+    from app.services import kb_url_preview
+    from app.tasks.kb_validation_tasks import preview_urls_task
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        preview = await kb_url_preview.start_preview(
+            kb, user.user_id, req.urls,
+            crawl_enabled=req.crawl_enabled,
+            max_crawl_pages=req.max_crawl_pages,
+            allowed_domains=req.allowed_domains,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    preview_urls_task.delay(preview.uuid)
+    return {"preview_uuid": preview.uuid, "status": preview.status}
+
+
+async def _require_own_preview(uuid: str, preview_uuid: str, user: User):
+    from app.services import kb_url_preview
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    preview = await kb_url_preview.get_preview(kb.uuid, preview_uuid, user.user_id)
+    if not preview:
+        raise HTTPException(status_code=404, detail="Preview not found or expired")
+    return kb, preview
+
+
+@router.get("/{uuid}/add_urls/preview/{preview_uuid}")
+async def get_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get_current_user)):
+    """The pages fetched so far, each with what adding it would contribute."""
+    from app.services import kb_url_preview
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    pages = await kb_url_preview.list_pages(preview)
+    return {
+        "preview_uuid": preview.uuid,
+        "status": preview.status,
+        "error_message": preview.error_message,
+        "crawl_enabled": preview.crawl_enabled,
+        "pages": [kb_url_preview.page_summary(p) for p in pages],
+    }
+
+
+@router.get("/{uuid}/add_urls/preview/{preview_uuid}/pages/{page_id}")
+async def get_url_preview_page_text(
+    uuid: str, preview_uuid: str, page_id: str, user: User = Depends(get_current_user),
+):
+    """One previewed page's full extracted text."""
+    from app.models.knowledge import KBUrlPreviewPage
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    page = await KBUrlPreviewPage.find_one(
+        KBUrlPreviewPage.preview_uuid == preview.uuid,
+        KBUrlPreviewPage.page_id == page_id,
+    )
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return {"page_id": page.page_id, "text": page.text}
+
+
+@router.post("/{uuid}/add_urls/preview/{preview_uuid}/commit")
+@limiter.limit("10/minute")
+async def commit_url_preview(
+    request: Request, uuid: str, preview_uuid: str, req: CommitUrlPreviewRequest,
+    user: User = Depends(get_current_user),
+):
+    """Add the kept pages of a finished preview, from the text that was shown."""
+    from app.services import kb_url_preview
+    from app.tasks.kb_validation_tasks import commit_url_preview_task
+
+    kb, preview = await _require_own_preview(uuid, preview_uuid, user)
+    if not req.page_ids:
+        raise HTTPException(status_code=400, detail="No pages selected")
+    if preview.status == "running":
+        raise HTTPException(status_code=409, detail="The preview is still fetching pages")
+    if not await kb_url_preview.claim_for_commit(preview):
+        raise HTTPException(status_code=409, detail="This preview was already added or has failed")
+    kb.status = "building"
+    await kb.save()
+    commit_url_preview_task.delay(preview.uuid, req.page_ids)
+    return {"ok": True, "queued": len(req.page_ids)}
+
+
 @router.post("/{uuid}/source/{source_uuid}/refresh")
 @limiter.limit("10/minute")
 async def refresh_source(
@@ -1073,6 +1170,121 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
             )
             for c in children
         ],
+    )
+
+
+def _version_response(version, *, is_current: bool) -> dict:
+    from app.services.kb_source_versions import as_utc
+
+    def iso(value):
+        value = as_utc(value)
+        return value.isoformat() if value else None
+
+    return {
+        "uuid": version.uuid,
+        "number": version.number,
+        "is_current": is_current,
+        "origin": version.origin,
+        "url": version.url,
+        "url_title": version.url_title,
+        "content_hash": version.content_hash,
+        "char_count": version.char_count,
+        "truncated": version.truncated,
+        "captured_at": iso(version.captured_at),
+        "in_effect_from": iso(version.in_effect_from),
+        "superseded_at": iso(version.superseded_at),
+        "last_confirmed_at": iso(version.last_confirmed_at),
+    }
+
+
+async def _viewable_source(uuid: str, source_uuid: str, user: User):
+    """The source, for anyone who can view its KB — the same read access as
+    the source inspector."""
+    from app.models.knowledge import KnowledgeBaseSource
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return source
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions", response_model=KBSourceVersionListResponse)
+async def list_source_versions(
+    uuid: str,
+    source_uuid: str,
+    at: datetime.datetime | None = Query(None, description="Also report which version was in effect at this time (ISO 8601; no offset means UTC)"),
+    user: User = Depends(get_current_user),
+):
+    """The dated version history of a URL source, newest first.
+
+    A refresh that finds new page text keeps the old text here instead of
+    discarding it, so what the source said on any date it was used can be
+    shown and proved after the page has changed.
+    """
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    # Summaries: the listing never needs the text, and one version can be
+    # megabytes.
+    versions = await kb_source_versions.list_version_summaries(source.uuid)
+    in_effect = kb_source_versions.version_in_effect_at(versions, at) if at else None
+    return KBSourceVersionListResponse(
+        versions=[
+            KBSourceVersionResponse(**_version_response(v, is_current=v.superseded_at is None))
+            for v in versions
+        ],
+        at=kb_source_versions.as_utc(at).isoformat() if at else None,
+        in_effect_version_uuid=in_effect.uuid if in_effect else None,
+    )
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions/compare", response_model=KBSourceVersionCompareResponse)
+async def compare_source_versions(
+    uuid: str,
+    source_uuid: str,
+    base: str = Query(..., description="uuid of the older version"),
+    target: str = Query(..., description="uuid of the newer version"),
+    user: User = Depends(get_current_user),
+):
+    """A line diff between two versions of a source's text."""
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    base_v = await kb_source_versions.get_version(source.uuid, base)
+    target_v = await kb_source_versions.get_version(source.uuid, target)
+    if not base_v or not target_v:
+        raise HTTPException(status_code=404, detail="Version not found")
+    diff = await kb_source_versions.compare_versions(base_v, target_v)
+    return KBSourceVersionCompareResponse(
+        base=KBSourceVersionResponse(**_version_response(base_v, is_current=base_v.superseded_at is None)),
+        target=KBSourceVersionResponse(**_version_response(target_v, is_current=target_v.superseded_at is None)),
+        identical=base_v.content_hash == target_v.content_hash,
+        **diff,
+    )
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions/{version_uuid}", response_model=KBSourceVersionDetailResponse)
+async def get_source_version(
+    uuid: str, source_uuid: str, version_uuid: str, user: User = Depends(get_current_user),
+):
+    """One version of a source, with the full text it held."""
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    version = await kb_source_versions.get_version(source.uuid, version_uuid)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return KBSourceVersionDetailResponse(
+        **_version_response(version, is_current=version.superseded_at is None),
+        content=version.content,
     )
 
 

@@ -254,6 +254,28 @@ class TestListWorkflows:
         assert await count_workflows(self._user(team=None), scope="team") == 0
 
 
+class TestGetWorkflowVerified:
+    """The editor hides its share callout on a verified workflow, so the
+    workflow GET has to say whether it is verified."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("verified", [True, False])
+    async def test_get_workflow_reports_verified(self, verified):
+        from app.schemas.workflows import WorkflowResponse
+        from app.services.workflow_service import get_workflow
+
+        wf = _make_workflow()
+        wf.verified = verified
+        wf.output_config = {}
+        wf.created_by_user_id = "user1"
+        with patch("app.services.workflow_service.Workflow") as MockWF:
+            MockWF.get = AsyncMock(return_value=wf)
+            result = await get_workflow(str(wf.id))
+
+        assert result["verified"] is verified
+        assert WorkflowResponse(**result).verified is verified
+
+
 class TestGetWorkflowStatus:
     @patch("app.services.workflow_service.Workflow")
     @patch("app.services.workflow_service.WorkflowResult")
