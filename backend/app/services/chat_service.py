@@ -2157,7 +2157,12 @@ async def _render_kb_segment(
     return DocumentSegment(label="kb", text=kb_text), kb_sources
 
 
-_KB_SOURCE_HEADING_RE = re.compile(r"^\*\*Source: (.+?)\*\*$", re.MULTILINE)
+# The optional "[S3] " prefix is the snippet number a numbered rendering puts
+# before "Source:" (#993); without it every heading would go unmatched and
+# every citation would read as naming a source that was never retrieved.
+_KB_SOURCE_HEADING_RE = re.compile(
+    r"^\*\*(?:\[S\d+\]\s*)?Source: (.+?)\*\*$", re.MULTILINE,
+)
 
 
 def _cited_source_texts(segments: list[DocumentSegment]) -> dict[str, str]:

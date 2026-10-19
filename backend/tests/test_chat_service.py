@@ -354,6 +354,46 @@ class TestCitationPersistence:
         assert "body" in texts["award.pdf"]
 
     @pytest.mark.asyncio
+    async def test_cited_source_texts_reads_what_render_kb_segment_writes(self):
+        """Pinned to the real renderer, not a hand-written heading: a heading
+        format change (e.g. numbered snippets) must not silently empty the map
+        and flag every KB citation."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.services import chat_service
+
+        results = [
+            {
+                "content": f"passage about subrecipient monitoring {i}",
+                "metadata": {"source_name": name, "source_id": f"src-{i}", "page": p},
+                "chunk_id": f"c{i}",
+            }
+            for i, (name, p) in enumerate([("PAPPG.pdf", 54), ("Subpart F", 4)], start=1)
+        ]
+        with patch(
+            "app.services.knowledge_service.resolve_openable_documents",
+            new=AsyncMock(return_value={}),
+        ):
+            segment, _ = await chat_service._render_kb_segment(results, "q")
+
+        texts = chat_service._cited_source_texts([segment])
+        assert len(texts) == 2
+        assert any(n.startswith("PAPPG.pdf") and "passage about subrecipient monitoring 1" in t
+                   for n, t in texts.items())
+
+    def test_cited_source_texts_accepts_numbered_headings(self):
+        from app.services.chat_service import _cited_source_texts
+        from app.services.context_budget import DocumentSegment
+
+        kb = DocumentSegment(label="kb", text=(
+            "\n**[S1] Source: PAPPG.pdf (p. ~54)**\nfirst\n"
+            "\n**[S2] Source: Subpart F (p. 4)**\nsecond\n"
+        ))
+        texts = _cited_source_texts([kb])
+        assert set(texts) == {"PAPPG.pdf (p. ~54)", "Subpart F (p. 4)"}
+        assert "first" in texts["PAPPG.pdf (p. ~54)"]
+
+    @pytest.mark.asyncio
     async def test_finalize_passes_citations_to_add_message(self):
         from unittest.mock import AsyncMock
 
