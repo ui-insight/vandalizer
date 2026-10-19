@@ -265,21 +265,38 @@ def _err(message: str, hint: Optional[str] = None) -> dict:
 def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
     """Honest error for a document whose text is unavailable.
 
-    Distinguishes a permanent ingest failure (``task_status == "error"``) from
-    a document still processing — telling the user to "try again once
-    processing completes" for a document that permanently failed sends them
-    into a retry loop that can never succeed.
+    Distinguishes a failed ingest (``task_status == "error"``) from a document
+    still processing — telling the user to "try again once processing
+    completes" for a document that failed sends them into a loop that can
+    never succeed — and, among failures, a damaged file (no Retry) from one a
+    retry may fix.
     """
     label = doc.title or doc.uuid
     if getattr(doc, "task_status", None) == "error":
         detail = getattr(doc, "error_message", None) or "text extraction failed"
+        # ``error_retryable`` False: the file itself is the problem (damaged,
+        # another format renamed), so re-reading it can't succeed. Unset (every
+        # older document) or True: a crash or outage, and Retry may work.
+        if getattr(doc, "error_retryable", None) is False:
+            return _err(
+                f'Text extraction FAILED for "{label}" ({detail}). The file '
+                "itself can't be read as stored — retrying will not help.",
+                hint=(
+                    "Tell the user this file is damaged or not what its name "
+                    "says, and that they should re-save or re-export it (for a "
+                    "workbook: open it in Excel and use Save As → Excel "
+                    "Workbook) and upload it again. Do not suggest Retry "
+                    "extraction, and do not say it is still processing."
+                ),
+            )
         return _err(
-            f'Text extraction FAILED for "{label}" ({detail}). This is a '
-            "permanent processing failure — retrying will not help.",
+            f'Text extraction FAILED for "{label}" ({detail}).',
             hint=(
-                "Tell the user this document could not be read and suggest "
-                "re-uploading it (or checking the OCR configuration if it is "
-                "a scanned PDF). Do not say it is still processing."
+                "Tell the user this document could not be read. Suggest opening "
+                'it and using "Retry extraction" (the failure may have been '
+                "temporary); if that fails again, re-uploading it or, for a "
+                "scanned PDF, checking the OCR configuration. Do not say it is "
+                "still processing."
             ),
         )
     return _err(

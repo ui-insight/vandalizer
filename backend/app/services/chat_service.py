@@ -1204,8 +1204,14 @@ def _hold_message_for_unreadable_docs(
     attachment_segments: list,
     skipped_no_text: list[str],
     errored_docs: list[str],
+    final_failures: list[str] | None = None,
 ) -> Optional[str]:
     """Honest holding reply when attached docs aren't readable yet.
+
+    ``final_failures`` names the errored documents whose failure is the file
+    itself (``error_retryable`` False: a damaged workbook, another format
+    renamed): retrying reads the same bytes again, so they get "re-upload",
+    not "Retry extraction".
 
     Returns a message to stream (and persist) instead of running the agent when
     the user explicitly attached documents but none yielded readable text —
@@ -1229,13 +1235,28 @@ def _hold_message_for_unreadable_docs(
             f"processed (text extraction/OCR). I'll analyze {'them' if many else 'it'} as "
             "soon as that finishes — ask again in a moment."
         )
+    final = set(final_failures or ())
+    retryable = [d for d in errored_docs if d not in final]
+    damaged = [d for d in errored_docs if d in final]
     names = ", ".join(errored_docs[:3]) + ("…" if len(errored_docs) > 3 else "")
     many = len(errored_docs) != 1
-    return (
+    if not damaged:
+        return (
+            f"I couldn't read {names} — text extraction failed, so there's nothing for me "
+            f"to work from. Open {'each document' if many else 'the document'} and use "
+            '"Retry extraction", then ask again.'
+        )
+    damaged_names = ", ".join(damaged[:3]) + ("…" if len(damaged) > 3 else "")
+    message = (
         f"I couldn't read {names} — text extraction failed, so there's nothing for me "
-        f"to work from. Open {'each document' if many else 'the document'} and use "
-        '"Retry extraction", then ask again.'
+        f"to work from. {damaged_names} can't be read as stored (the file itself is "
+        "damaged or not what its name says), so retrying won't help: open "
+        f"{'them' if len(damaged) != 1 else 'it'} to see why, then re-save or re-export "
+        "and upload it again."
     )
+    if retryable:
+        message += ' For the others, open the document and use "Retry extraction", then ask again.'
+    return message
 
 
 REFERENCE_DOCUMENTS_BEGIN = (
@@ -1810,6 +1831,10 @@ async def chat_stream(
         attachment_segments=attachment_segments,
         skipped_no_text=skipped_no_text,
         errored_docs=errored_docs,
+        final_failures=[
+            d.title or d.uuid for d in documents
+            if d.task_status == "error" and getattr(d, "error_retryable", None) is False
+        ],
     )
     if hold_text is not None:
         yield json.dumps({"kind": "text", "content": hold_text}) + "\n"

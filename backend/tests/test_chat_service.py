@@ -358,6 +358,19 @@ class TestHoldMessageForUnreadableDocs:
         assert "extraction failed" in msg
         assert "Retry extraction" in msg
 
+    def test_a_damaged_file_is_not_sent_to_retry(self):
+        # #1021: a damaged workbook's failure is final; "Retry extraction"
+        # reads the same bytes again and can never work.
+        msg = self._hold(errored_docs=["budget.xlsx"], final_failures=["budget.xlsx"])
+        assert "budget.xlsx" in msg
+        assert "Retry extraction" not in msg
+        assert "retrying won't help" in msg and "upload it again" in msg
+
+    def test_mixed_failures_offer_retry_only_for_the_others(self):
+        msg = self._hold(errored_docs=["budget.xlsx", "scan.pdf"], final_failures=["budget.xlsx"])
+        assert "retrying won't help" in msg
+        assert 'For the others, open the document and use "Retry extraction"' in msg
+
     def test_processing_takes_priority_and_pluralizes(self):
         msg = self._hold(skipped_no_text=["a.pdf", "b.pdf"], errored_docs=["c.pdf"])
         assert "they are" in msg and "them" in msg  # plural phrasing
