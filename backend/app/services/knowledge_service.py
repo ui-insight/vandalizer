@@ -107,12 +107,24 @@ async def list_knowledge_bases(
 ) -> tuple[list[KnowledgeBase], int]:
     """List knowledge bases with optional scope filtering, search, and pagination.
 
-    Returns ``(items, total)`` where *total* is the unscoped count before
-    skip/limit (for pagination metadata).
+    Returns ``(items, total)`` where *total* counts every KB the query
+    matches before skip/limit. That is the number the KB tabs show.
     """
     query = build_kb_list_query(user_id, team_id, scope, search)
     if query is None:
         return [], 0
+
+    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
+    # Never filter out user's own KBs. This is part of the query, not a pass
+    # over the fetched page: filtering afterwards left ``total`` counting KBs
+    # the user can't see and made pages come back short.
+    if user_org_ancestry is not None:
+        query = {"$and": [query, {"$or": [
+            {"user_id": user_id},
+            # Missing (rows older than the field) or [] means "not org-scoped".
+            {"organization_ids": {"$in": [None, []]}},
+            {"organization_ids": {"$in": list(user_org_ancestry)}},
+        ]}]}
 
     total = await KnowledgeBase.find(query).count()
     kbs = await (
@@ -122,17 +134,6 @@ async def list_knowledge_bases(
         .limit(limit)
         .to_list()
     )
-
-    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
-    # Never filter out user's own KBs.
-    if user_org_ancestry is not None:
-        kbs = [
-            kb for kb in kbs
-            if kb.user_id == user_id
-            or not kb.organization_ids
-            or bool(set(kb.organization_ids) & set(user_org_ancestry))
-        ]
-
     return kbs, total
 
 
