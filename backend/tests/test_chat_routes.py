@@ -257,6 +257,10 @@ class TestChatConversations:
         ])
         conv.get_url_attachments = AsyncMock(return_value=[])
         conv.get_file_attachments = AsyncMock(return_value=[])
+        # Not recorded: no attached items to re-authorize on reopen.
+        conv.scope_document_uuids = None
+        conv.scope_folder_uuids = None
+        conv.scope_knowledge_base_uuids = None
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
@@ -308,6 +312,10 @@ class TestChatConversations:
         ])
         conv.get_url_attachments = AsyncMock(return_value=[])
         conv.get_file_attachments = AsyncMock(return_value=[])
+        # Not recorded: no attached items to re-authorize on reopen.
+        conv.scope_document_uuids = None
+        conv.scope_folder_uuids = None
+        conv.scope_knowledge_base_uuids = None
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
@@ -351,8 +359,10 @@ class TestChatDelete:
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.chat.ChatConversation") as MockConv,
+            patch("app.routers.chat.ActivityEvent") as MockActivity,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
+            MockActivity.find_one = AsyncMock(return_value=None)
             MockConv.find_one = AsyncMock(return_value=conv)
             MockConv.uuid = "uuid"
             MockConv.user_id = "user_id"
