@@ -1230,7 +1230,7 @@ async def chat_stream(
         try:
             await asyncio.shield(_save_failed_assistant_turn(
                 conversation,
-                _build_interrupted_body(full_response, "connection closed before completion"),
+                _build_interrupted_body(full_response, "connection closed before completion", kb_sources),
                 activity_id,
                 "client disconnected",
                 thinking="".join(full_thinking) or None,
@@ -1250,7 +1250,7 @@ async def chat_stream(
         try:
             await _save_failed_assistant_turn(
                 conversation,
-                _build_interrupted_body(full_response, user_message[:200]),
+                _build_interrupted_body(full_response, user_message[:200], kb_sources),
                 activity_id,
                 str(e),
                 thinking="".join(full_thinking) or None,
@@ -2170,9 +2170,18 @@ async def _render_kb_segment(
     return DocumentSegment(label="kb", text=kb_text), kb_sources
 
 
-def _build_interrupted_body(full_response: list[str], reason: str) -> str:
-    """Compose an assistant-turn body from any partial stream content + a reason."""
+def _build_interrupted_body(
+    full_response: list[str], reason: str, kb_sources: list[dict] | None = None,
+) -> str:
+    """Compose an assistant-turn body from any partial stream content + a reason.
+
+    A KB answer's ``[S3]`` snippet numbers are expanded here too, as on the
+    normal path: saved raw, they would be read back next turn against that
+    turn's numbering and point at different snippets.
+    """
     partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+    if partial and kb_sources:
+        partial = expand_snippet_refs(partial, kb_sources)
     if partial:
         return f"{partial}\n\n_(response interrupted — {reason})_"
     return f"_(no response — {reason})_"
