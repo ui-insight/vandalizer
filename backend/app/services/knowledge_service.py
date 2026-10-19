@@ -1063,14 +1063,31 @@ async def ingest_url_sources(
     A source deleted while queued is skipped. So is one already finished, which
     a retried task meets again; one still "processing" is picked up, since the
     attempt that started it is gone.
+
+    A big add can sit in the queue past the stalled-source sweep's window, and
+    the sweep settles a queued row it can't tell from an abandoned one as a
+    failed fetch. This batch arriving shows the add is alive, so such a row is
+    fetched after all. A row someone has since queued again (Try again,
+    Refresh) belongs to that task and is left to it.
     """
+    from app.services.kb_url_refresh import STALLED_ADD_MESSAGE
+
     added = 0
     for source_uuid in source_uuids:
         source = await KnowledgeBaseSource.find_one(
             KnowledgeBaseSource.uuid == source_uuid,
             KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
         )
-        if not source or source.status not in ("pending", "processing"):
+        if not source:
+            continue
+        settled_while_queued = (
+            source.status == "error"
+            and source.error_message == STALLED_ADD_MESSAGE
+            and not getattr(source, "chunk_count", 0)
+        )
+        if settled_while_queued:
+            source.error_message = None
+        elif source.status not in ("pending", "processing") or getattr(source, "refresh_queued_at", None):
             continue
         added += 1
         fetched = await _ingest_url_source(source, kb)
