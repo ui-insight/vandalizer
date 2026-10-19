@@ -183,9 +183,11 @@ async def _add_urls_async(
     soft_time_limit=3600,
     time_limit=3660,
 )
-def refresh_url_source_task(self, kb_uuid: str, source_uuid: str, queued_at: str | None = None):
+def refresh_url_source_task(
+    self, kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
+):
     """Re-fetch one URL source in place. See knowledge_service.refresh_url_source."""
-    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at))
+    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at, scheduled))
 
 
 def _same_stamp(stored, queued_at: str | None) -> bool:
@@ -211,7 +213,9 @@ def _same_stamp(stored, queued_at: str | None) -> bool:
     return abs((_utc(stored) - _utc(parsed)).total_seconds()) < 1
 
 
-async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: str | None = None):
+async def _refresh_url_source_async(
+    kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
+):
     from app.config import Settings
     from app.database import init_db
 
@@ -241,6 +245,11 @@ async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: s
         logger.info("Refresh of KB source %s superseded by a later queueing; skipping.", source_uuid)
         return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": False, "reason": "superseded"}
 
+    # What the page said before, for the change summary a scheduled refresh
+    # sends; refresh_url_source overwrites all three.
+    previous_text = getattr(source, "content", None)
+    previous_title = getattr(source, "url_title", None)
+    previous_outcome = getattr(source, "last_refresh_outcome", None)
     try:
         reason = await svc.refresh_url_source(source, kb)
     except TRANSIENT_EXCEPTIONS:
@@ -258,6 +267,19 @@ async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: s
             await source.save()
         except Exception:
             logger.exception("Could not restore KB source %s after a failed refresh", source_uuid)
+    if scheduled:
+        from app.services import kb_refresh_notifications as notify
+        from app.utils import kb_source_currency as currency
+
+        if reason is not None:
+            await notify.notify_source_refresh_failed(
+                kb, source, reason, previous_outcome=previous_outcome,
+            )
+        elif getattr(source, "last_refresh_outcome", None) == currency.OUTCOME_REFRESHED:
+            await notify.notify_source_changed(
+                kb, source,
+                notify.summarize_change(previous_text, source.content, previous_title, source.url_title),
+            )
     # Unconditional: the router set status="building" before dispatching.
     await svc.recalculate_stats(kb)
     return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": reason is None, "reason": reason}
