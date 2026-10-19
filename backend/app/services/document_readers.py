@@ -677,6 +677,35 @@ _DAMAGED_WORKBOOK_REMEDY = (
 )
 
 
+class _EntityDeclared(Exception):
+    """An XML part declares an entity, which no Excel-written workbook does."""
+
+
+def _xml_part_well_formed(stream) -> bool:
+    """Whether one package part is well-formed XML, checked as a stream.
+
+    Plain expat with no content handlers: nothing is kept, so a valid
+    workbook's large sheet parts cost no memory here (an ElementTree
+    ``iterparse`` keeps every element under the root, which on upload meant
+    holding a whole sheet as a tree in the web process). Entity declarations
+    are refused the way defusedxml refuses them, and counted as not readable.
+    """
+    import xml.parsers.expat as expat
+
+    def refuse(*_args):
+        raise _EntityDeclared()
+
+    parser = expat.ParserCreate()
+    parser.EntityDeclHandler = refuse
+    parser.UnparsedEntityDeclHandler = refuse
+    parser.ExternalEntityRefHandler = refuse
+    try:
+        parser.ParseFile(stream)
+    except (expat.ExpatError, _EntityDeclared):
+        return False
+    return True
+
+
 def describe_damaged_workbook(source) -> str | None:
     """A user-facing message when an .xlsx package is physically damaged.
 
@@ -688,9 +717,6 @@ def describe_damaged_workbook(source) -> str | None:
     """
     import zipfile
     import zlib
-    from xml.etree.ElementTree import ParseError
-
-    from defusedxml.ElementTree import iterparse
 
     def damaged(detail: str) -> str:
         return f"This workbook is damaged — {detail} — so it can't be read. {_DAMAGED_WORKBOOK_REMEDY}"
@@ -704,10 +730,7 @@ def describe_damaged_workbook(source) -> str | None:
                 if not name.lower().endswith((".xml", ".rels")):
                     continue
                 with zf.open(name) as part:
-                    try:
-                        for _ in iterparse(part):
-                            pass
-                    except ParseError:
+                    if not _xml_part_well_formed(part):
                         return damaged(f"part of its contents ({name}) is cut off or corrupted")
     except (zipfile.BadZipFile, EOFError, zlib.error):
         # Only signals of broken bytes. A missing or unreadable path is not a

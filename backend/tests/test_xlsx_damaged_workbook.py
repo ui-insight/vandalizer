@@ -73,6 +73,28 @@ def truncated_zip(tmp_path, good):
 
 
 class TestDescribeDamagedWorkbook:
+    def test_entity_declaration_is_refused_not_raised(self, tmp_path, good):
+        """A part declaring an entity (never written by Excel) is reported,
+        not left to raise out of the check (defusedxml raised EntitiesForbidden)."""
+        evil = _rewrite(
+            good, tmp_path / "entity.xlsx",
+            lambda n, d: (
+                b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaa">]><x>&a;</x>'
+                if n == "xl/workbook.xml" else d
+            ),
+        )
+        assert "xl/workbook.xml" in describe_damaged_workbook(evil)
+
+    def test_large_valid_part_is_not_damaged(self, tmp_path):
+        """A big valid sheet streams through without being called damaged."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        for r in range(1, 5001):
+            ws.append([r, f"row {r}", r * 1.5])
+        path = tmp_path / "big.xlsx"
+        wb.save(path)
+        assert describe_damaged_workbook(str(path)) is None
+
     def test_a_good_workbook_is_not_damaged(self, good):
         assert describe_damaged_workbook(good) is None
 
@@ -167,11 +189,11 @@ class TestExtractionTaskRecordsRetryability:
 
 class TestUploadRejectsDamagedWorkbook:
     @pytest.mark.asyncio
-    async def test_upload_refuses_with_the_reason(self, truncated_xml):
+    async def test_upload_refuses_with_the_reason(self, truncated_xml, tmp_path):
         from app.services.file_service import upload_document
 
         user = MagicMock(user_id="u1", is_admin=False)
-        settings = Settings(max_upload_size_mb=5, upload_dir="/tmp/x",
+        settings = Settings(max_upload_size_mb=5, upload_dir=str(tmp_path / "uploads"),
                             jwt_secret_key="t", environment="development")
         blob = base64.b64encode(open(truncated_xml, "rb").read()).decode()
         storage = MagicMock(write=AsyncMock())
