@@ -57,7 +57,7 @@ export function EditorShareCallout({
         ) : (
           <>
             {rounded !== null && <>This {kindNoun} scored {rounded}%. </>}
-            You can share it at any score. An examiner looks it over, or you can ask one for a second pair of eyes.
+            A low score is worth sharing too: the score travels with it. If you haven’t validated it yet, an examiner can test it for you.
           </>
         )}
       </div>
