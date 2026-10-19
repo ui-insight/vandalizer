@@ -655,6 +655,10 @@ export interface RunHistoryEntry {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
+  /** Models the run's calls used, most tokens first; empty for older runs. */
+  models?: string[]
+  /** Each step's models, in step order (steps that called no model are absent). */
+  step_models?: { index: number; name: string | null; models: string[] }[]
 }
 
 export function getWorkflowHistory(workflowId: string, limit = 50) {
