@@ -45,6 +45,10 @@ class AgenticChatDeps:
     # rationale as quality_annotations: citation plumbing (chunk ids, scores)
     # stays out of the LLM context.
     citation_annotations: dict[str, list[dict]] = field(default_factory=dict)
+    # The last snippet number given out this turn. Each citation a KB search
+    # returns takes the next one, after the pre-fetched snippets' [S1]..[Sn],
+    # so the finished answer can mark which of them it used (#993).
+    kb_snippet_ref: int = 0
 
     # The live conversation for this turn + a monotonic turn marker
     # (len(messages) captured at turn start). Write tools read/write

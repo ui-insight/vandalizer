@@ -79,6 +79,7 @@ def _make_deps(**overrides):
         active_project_uuid: str | None = None
         quality_annotations: dict = field(default_factory=dict)
         citation_annotations: dict = field(default_factory=dict)
+        kb_snippet_ref: int = 0
         conversation: object = field(default_factory=_PreApprovedConversation)
         turn_marker: int = 5
 

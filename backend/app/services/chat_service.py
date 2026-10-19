@@ -2325,6 +2325,10 @@ async def chat_stream(
                 e["title"] for e in kb_status_entries if not e.get("validated_at")
             ],
             user_message=message,
+            kb_snippet_ref=max(
+                (s["ref"] for s in kb_sources if isinstance(s.get("ref"), int)),
+                default=0,
+            ),
         )
         agent = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
@@ -2576,12 +2580,13 @@ async def chat_stream(
 
                 # Only the snippets the answer cites are its sources; the rest
                 # were searched and not used. Stored with the numbers expanded,
-                # because they mean nothing outside this turn.
-                if kb_sources:
-                    used_refs = used_snippet_refs(assistant_message, kb_sources)
-                    for src in kb_sources:
-                        src["used"] = src.get("ref") in used_refs
-                    assistant_message = expand_snippet_refs(assistant_message, kb_sources)
+                # because they mean nothing outside this turn. That holds for
+                # the passages the agent's own KB searches returned as much as
+                # for the pre-fetched ones; those are only ever cited by name.
+                used_refs = _mark_used_citations(assistant_message, streamed_citations)
+                if used_refs is not None:
+                    if kb_sources:
+                        assistant_message = expand_snippet_refs(assistant_message, kb_sources)
                     yield json.dumps({
                         "kind": "sources_used",
                         "content": "",
@@ -3996,6 +4001,22 @@ def _completed_tool_work(
         "tool_results": list(tool_results) or None,
         "segments": kept or None,
     }
+
+
+def _mark_used_citations(answer: str, citations: list[dict]) -> Optional[list[int]]:
+    """Mark each numbered citation ``used`` if *answer* cites it.
+
+    Covers the pre-fetched KB snippets and the passages the agent's own KB
+    searches returned alike. Returns the used numbers, or None when no
+    citation is numbered (web pages, attached documents, older turns).
+    """
+    numbered = [c for c in citations if isinstance(c.get("ref"), int)]
+    if not numbered:
+        return None
+    used_refs = used_snippet_refs(answer, numbered)
+    for c in numbered:
+        c["used"] = c["ref"] in used_refs
+    return used_refs
 
 
 def _replayed_tool_results(history: list[ModelMessage]) -> list[tuple[str, object]]:

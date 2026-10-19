@@ -33,7 +33,7 @@ from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
     ProvisionResult, ReflectionResult, certification_result,
 )
-from app.services.page_locator import annotate_chunk_pages, cited_pages
+from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range
 
 logger = logging.getLogger(__name__)
 
@@ -789,9 +789,20 @@ async def search_knowledge_base(
                 entry["source_reference"] = src.source_reference
         enriched.append(entry)
 
+        # Numbered after every snippet already shown this turn, so the
+        # finished answer can mark which passages it cited (#993). The model
+        # cites these by name; the number stays out of its context.
+        context.deps.kb_snippet_ref += 1
+        source_name = meta.get("source_name", "Unknown")
+        locator = (
+            format_page_range(page, page_end, approximate) if isinstance(page, int)
+            else (sheet if isinstance(sheet, str) and sheet else None)
+        )
         citations.append({
+            "ref": context.deps.kb_snippet_ref,
+            "cite_label": f"{source_name}, {locator}" if locator else source_name,
             "document_id": sid or None,
-            "document_title": meta.get("source_name", "Unknown"),
+            "document_title": source_name,
             "page": page if isinstance(page, int) else None,
             "page_end": page_end if isinstance(page_end, int) else None,
             # The chip renderer already hedges on this key; it was simply never
