@@ -2004,6 +2004,29 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         await source.save()
 
 
+async def fetch_source_page(url: str) -> WebFetchResult:
+    """The page a URL source indexes: the catalog's bundled text when it
+    ships one for this URL, else a live fetch.
+
+    ecfr.gov answers an automated fetch with a page shell, so the catalog
+    bundles its regulations (``bundled_sources``). Adding or refreshing such
+    a URL used to go to the live page anyway and index the shell.
+    """
+    from app.services.bundled_sources import bundled_source
+    from app.services.web_fetcher import WebFetchResult as _Result, fetch_url
+
+    bundled = bundled_source(url)
+    if bundled is None:
+        return await fetch_url(url, max_chars=_kb_text_cap())
+    text, title = bundled
+    cap = _kb_text_cap()
+    return _Result(
+        url=url, title=title or "", text=text[:cap], raw_html=None,
+        used_browser=False, status_code=200, final_url=url,
+        truncated=len(text) > cap,
+    )
+
+
 def _reject_fetched_page(result: WebFetchResult) -> str | None:
     """Why a fetched page must not be embedded, or None if it's real content.
 
@@ -2192,9 +2215,7 @@ async def refresh_url_source(
     reason: str | None
     result: WebFetchResult | None = None
     try:
-        from app.services.web_fetcher import fetch_url
-
-        result = await fetch_url(source.url, max_chars=_kb_text_cap())
+        result = await fetch_source_page(source.url)
         reason = _reject_fetched_page(result)
         if reason is None:
             reason = _reject_collapsed_refresh(
@@ -2332,9 +2353,7 @@ async def _ingest_url_source(
     source.status = "processing"
     await source.save()
     try:
-        from app.services.web_fetcher import fetch_url
-
-        result = await fetch_url(source.url, max_chars=_kb_text_cap())
+        result = await fetch_source_page(source.url)
         raw_text = result.text
 
         reject_reason = _reject_fetched_page(result)

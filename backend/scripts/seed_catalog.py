@@ -980,7 +980,8 @@ async def seed_knowledge_base(
             _ingest_url_source,
             ingest_text_into_source,
         )
-        from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.services.bundled_sources import falls_short_of_bundle
+        from app.utils.bot_challenge import looks_like_boilerplate_only, looks_like_bot_challenge
 
         changed = _reinstate_verified(existing)
         if existing.resource_config.get("seed_id") != seed_id:
@@ -1042,7 +1043,14 @@ async def seed_knowledge_base(
             src_data = bundled_by_url.get(src.url or "")
             if not src_data:
                 continue
-            poisoned = src.status == "error" or looks_like_bot_challenge(src.content)
+            # A shell (lockout page, search help) or anything far shorter
+            # than the bundle is not the regulation.
+            poisoned = (
+                src.status == "error"
+                or looks_like_bot_challenge(src.content)
+                or looks_like_boilerplate_only(src.content)
+                or falls_short_of_bundle(src.content, src.url)
+            )
             if not poisoned:
                 continue
             bundled_text = _load_seed_source_text(src_data)

@@ -54,7 +54,10 @@ def test_empty_content_is_broken():
 
 
 def test_healthy_source_is_not_broken():
-    src = _source(url=ECFR_URL, content="Subpart A—Definitions " * 300)
+    from app.services.bundled_sources import bundled_source
+
+    # Healthy means it holds the regulation: for a bundled URL, its bundle.
+    src = _source(url=ECFR_URL, content=bundled_source(ECFR_URL)[0])
     assert _is_broken(src) is None
 
 
