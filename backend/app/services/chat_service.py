@@ -2655,13 +2655,16 @@ async def chat_stream(
                 )
                 # And a source it cites must contain what the answer credits
                 # to it — not just a title the model then answered around.
-                miscited = (
-                    unsupported_citations(
-                        assistant_message,
-                        _cited_source_texts([*doc_segments, *attachment_segments]),
-                        message,
-                    )
-                    if active_kbs else []
+                # Passages the agent's own search_knowledge_base calls returned
+                # count as retrieved too: checked against the pre-fetched
+                # snippets alone, a correct citation of a searched passage
+                # was flagged, and an answer with no KB attached went
+                # unchecked however the agent searched.
+                miscited = _miscited_sources(
+                    assistant_message, message,
+                    [*doc_segments, *attachment_segments],
+                    streamed_tool_results, previous_messages,
+                    kbs_attached=bool(active_kbs),
                 )
                 await _finalize(
                     conversation, assistant_message, documents,
@@ -3993,6 +3996,71 @@ def _completed_tool_work(
         "tool_results": list(tool_results) or None,
         "segments": kept or None,
     }
+
+
+def _replayed_tool_results(history: list[ModelMessage]) -> list[tuple[str, object]]:
+    """(tool name, content) of every tool result replayed from earlier turns."""
+    return [
+        (part.tool_name, part.content)
+        for msg in history
+        for part in getattr(msg, "parts", ())
+        if isinstance(part, ToolReturnPart)
+    ]
+
+
+def _kb_tool_source_texts(results: list[tuple[str, object]]) -> dict[str, str]:
+    """What the agent's search_knowledge_base calls returned, by source name.
+
+    The same shape as ``_cited_source_texts``, so a citation of a passage the
+    agent searched for is judged against that passage. The unannotated text is
+    used where it differs: the ``[p. N]`` markers are not the source's words.
+    """
+    out: dict[str, str] = {}
+    for name, content in results:
+        if name != "search_knowledge_base":
+            continue
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except ValueError:
+                continue
+        if not isinstance(content, list):
+            continue
+        for entry in content:
+            if not isinstance(entry, dict) or not entry.get("source_name"):
+                continue
+            text = entry.get("content_verbatim") or entry.get("content") or ""
+            if isinstance(text, str) and text:
+                key = entry["source_name"]
+                out[key] = out.get(key, "") + "\n" + text
+    return out
+
+
+def _miscited_sources(
+    answer: str,
+    question: str,
+    segments: list[DocumentSegment],
+    tool_results: list[dict],
+    history: list[ModelMessage],
+    *,
+    kbs_attached: bool,
+) -> list[str]:
+    """Sources the answer cites for text they don't contain.
+
+    Checked when a KB is attached or the agent searched one, against both the
+    pre-fetched snippets and every passage search_knowledge_base returned this
+    turn or earlier.
+    """
+    kb_tool_texts = _kb_tool_source_texts(
+        [(r.get("tool_name"), r.get("content")) for r in tool_results]
+        + _replayed_tool_results(history)
+    )
+    if not (kbs_attached or kb_tool_texts):
+        return []
+    texts = _cited_source_texts(segments)
+    for name, text in kb_tool_texts.items():
+        texts[name] = texts.get(name, "") + "\n" + text
+    return unsupported_citations(answer, texts, question)
 
 
 def _replayed_tool_outputs(history: list[ModelMessage]) -> list[str]:

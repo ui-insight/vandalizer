@@ -228,3 +228,59 @@ def test_corpus_off_topic_citations_are_mostly_flagged():
     # the cost of keeping faithful paraphrase unflagged (see _MIN_SUPPORT).
     missed = sorted(c["id"] for c in CASES if c["kind"] == "wrong_source" and not _flags(c))
     assert missed == ["w_308_travel", "w_332_mon"]
+
+
+# --- Passages the agent's own search_knowledge_base calls returned ---------
+#
+# The check read only the pre-fetched KB snippets. A correct citation of a
+# passage the agent searched for was flagged as not retrieved, and an answer
+# with no KB attached was never checked however the agent searched.
+
+
+def _kb_search(*entries: tuple[str, str]) -> dict:
+    return {
+        "tool_name": "search_knowledge_base",
+        "tool_call_id": "t1",
+        "content": [{"source_name": name, "content": text} for name, text in entries],
+    }
+
+
+def _miscited(answer: str, tool_results: list[dict], history=(), *, kbs_attached: bool):
+    from app.services.chat_service import _miscited_sources
+
+    return _miscited_sources(
+        answer, QUESTION, [], tool_results, list(history), kbs_attached=kbs_attached,
+    )
+
+
+def test_a_citation_of_a_passage_the_agent_searched_is_supported():
+    results = [_kb_search((STUB_332, RULE_TEXT))]
+    assert _miscited(GROUNDED, results, kbs_attached=True) == []
+
+
+def test_a_title_only_passage_the_agent_searched_is_flagged():
+    results = [_kb_search((STUB_332, STUB_TEXT))]
+    assert _miscited(RECALLED, results, kbs_attached=True) == [STUB_332]
+
+
+def test_checked_when_the_agent_searched_with_no_kb_attached():
+    results = [_kb_search((STUB_332, STUB_TEXT))]
+    assert _miscited(RECALLED, results, kbs_attached=False) == [STUB_332]
+    # Nothing attached and nothing searched: nothing to check against.
+    assert _miscited(RECALLED, [], kbs_attached=False) == []
+
+
+def test_an_earlier_turns_search_counts():
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+
+    history = [ModelRequest(parts=[ToolReturnPart(
+        tool_name="search_knowledge_base", tool_call_id="old",
+        content=[{"source_name": STUB_332, "content": STUB_TEXT}],
+    )])]
+    assert _miscited(RECALLED, [], history, kbs_attached=False) == [STUB_332]
+
+
+def test_other_tools_results_are_not_sources():
+    results = [{"tool_name": "fetch_url", "tool_call_id": "t2",
+                "content": [{"source_name": STUB_332, "content": RULE_TEXT}]}]
+    assert _miscited(GROUNDED, results, kbs_attached=True) == [STUB_332]
