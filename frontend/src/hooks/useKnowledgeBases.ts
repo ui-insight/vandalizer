@@ -56,7 +56,7 @@ export function useScopedKnowledgeBases(params?: {
   const qc = useQueryClient()
   const queryKey = ['knowledgeBases', 'v2', params?.scope, params?.search, params?.skip, params?.limit] as const
 
-  const { data, isLoading: loading } = useQuery({
+  const { data, isLoading: loading, isError: failed } = useQuery({
     queryKey,
     queryFn: () => api.listKnowledgeBasesV2(params),
   })
@@ -113,6 +113,8 @@ export function useScopedKnowledgeBases(params?: {
     knowledgeBases: data?.items ?? [],
     total: data?.total ?? 0,
     loading,
+    // A failed list has no total; ``total`` then reads 0, which is not a count.
+    failed,
     refresh,
     create,
     remove,
@@ -151,7 +153,7 @@ export function useKBTabCounts(pinned?: Set<string>): KBTabCounts {
   })
 
   const count = (list: ReturnType<typeof useScopedKnowledgeBases>) => {
-    if (list.loading) return null
+    if (list.loading || list.failed) return null
     return pinned ? list.knowledgeBases.filter(kb => pinned.has(canonicalUuid(kb))).length : list.total
   }
 

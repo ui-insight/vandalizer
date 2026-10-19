@@ -10,8 +10,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useKBTabCounts } from './useKnowledgeBases'
 
+const teamFails = vi.hoisted(() => ({ current: false }))
+
 vi.mock('../api/knowledge', () => ({
-  listKnowledgeBasesV2: vi.fn(async (params?: { scope?: string }) => (
+  listKnowledgeBasesV2: vi.fn(async (params?: { scope?: string }) => {
+    if (params?.scope === 'team' && teamFails.current) throw new Error('500')
+    return (
     params?.scope === 'team'
       ? { items: [{ uuid: 'team-1', is_reference: false }], total: 1 }
       : {
@@ -22,7 +26,8 @@ vi.mock('../api/knowledge', () => ({
           ],
           total: 61,
         }
-  )),
+    )
+  }),
 }))
 vi.mock('../api/library', () => ({
   listVerifiedItems: vi.fn(async () => ({ items: [{}], total: 40 })),
@@ -43,6 +48,17 @@ describe('useKBTabCounts', () => {
     await waitFor(() => expect(result.current).toEqual({ mine: 61, team: 1, explore: 40 }))
     // The Everyone count asks the catalog for a total, not a page of items.
     expect(listVerifiedItems).toHaveBeenCalledWith({ kind: 'knowledge_base', limit: 1 })
+  })
+
+  it('hides a count whose list failed to load rather than showing 0', async () => {
+    teamFails.current = true
+    try {
+      const { result } = renderHook(() => useKBTabCounts(), { wrapper })
+      await waitFor(() => expect(result.current.mine).toBe(61))
+      expect(result.current.team).toBeNull()
+    } finally {
+      teamFails.current = false
+    }
   })
 
   it('counts only pinned KBs while scoped to a project, matching a bookmark by its source', async () => {
