@@ -171,6 +171,75 @@ async def _add_urls_async(
     return {"kb_uuid": kb_uuid, "added": added}
 
 
+# Crawl preview: the dry run, then the add of what the user ticked. Same time
+# budget as add_urls: both walk up to a full 50-page crawl serially.
+@celery.task(
+    bind=True,
+    name="tasks.kb.crawl_preview",
+    soft_time_limit=1800,
+    time_limit=1860,
+)
+def crawl_preview_task(self, preview_uuid: str):
+    """Discover the pages a crawl would add, without adding any."""
+    return _run_async(_crawl_preview_async(preview_uuid))
+
+
+async def _crawl_preview_async(preview_uuid: str):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KBCrawlPreview
+    from app.services import knowledge_service as svc
+
+    preview = await KBCrawlPreview.find_one(KBCrawlPreview.uuid == preview_uuid)
+    if not preview:
+        logger.warning("Crawl preview %s not found; skipping.", preview_uuid)
+        return {"preview_uuid": preview_uuid, "pages": 0}
+    try:
+        await svc.run_crawl_preview(preview)
+    except Exception as e:
+        # Not retried: a rerun would list the pages already found twice, and
+        # the user can start a new preview from the dialog.
+        logger.exception("Crawl preview %s failed", preview_uuid)
+        preview.status = "error"
+        preview.error_message = f"The crawl preview stopped: {e}"[:2000]
+        await preview.save()
+    return {"preview_uuid": preview_uuid, "pages": len(preview.pages)}
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.add_crawl_selection",
+    soft_time_limit=1800,
+    time_limit=1860,
+)
+def add_crawl_selection_task(self, kb_uuid: str, preview_uuid: str, urls: list[str]):
+    """Fetch, chunk and embed the pages the user ticked in a crawl preview."""
+    return _run_async(_add_crawl_selection_async(kb_uuid, preview_uuid, urls))
+
+
+async def _add_crawl_selection_async(kb_uuid: str, preview_uuid: str, urls: list[str]):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KBCrawlPreview, KnowledgeBase
+    from app.services import knowledge_service as svc
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    preview = await KBCrawlPreview.find_one(KBCrawlPreview.uuid == preview_uuid)
+    if not kb or not preview:
+        logger.warning("KB %s or crawl preview %s not found; skipping.", kb_uuid, preview_uuid)
+        if kb:
+            await svc.recalculate_stats(kb)
+        return {"kb_uuid": kb_uuid, "added": 0}
+    added = await svc.add_crawl_selection(kb, preview, urls)
+    return {"kb_uuid": kb_uuid, "added": added}
+
+
 @celery.task(
     bind=True,
     name="tasks.kb.refresh_url_source",

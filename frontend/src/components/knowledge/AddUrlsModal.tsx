@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
+import * as api from '../../api/knowledge'
+import type { CrawlPreview } from '../../api/knowledge'
+import { CrawlPreviewStep } from './CrawlPreviewStep'
+import { defaultSelection } from './crawlPreview'
 
 interface AddUrlsModalProps {
+  kbUuid: string
   onSubmit: (urls: string[], crawlEnabled: boolean, maxCrawlPages: number, allowedDomains: string) => void
+  /** A crawl's ticked pages were queued for adding (crawl previews add
+   *  through their own endpoint, not ``onSubmit``). */
+  onCrawlAdded: (added: number) => void
   onClose: () => void
 }
 
-export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
+const POLL_MS = 1500
+
+export function AddUrlsModal({ kbUuid, onSubmit, onCrawlAdded, onClose }: AddUrlsModalProps) {
   const [text, setText] = useState('')
   const [crawlEnabled, setCrawlEnabled] = useState(false)
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
@@ -27,18 +37,77 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
   const submittedRef = useRef(false)
   const [submitted, setSubmitted] = useState(false)
 
+  // Crawling is a dry run first: the crawl's pages are found and listed, and
+  // only the ones ticked are added. Without crawling, Add URLs adds directly.
+  const [preview, setPreview] = useState<CrawlPreview | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const seenRef = useRef<Set<string>>(new Set())
+
+  const enteredUrls = () => text
+    .split('\n')
+    .map(u => u.trim())
+    .filter(u => u.length > 0)
+
   const handleSubmit = () => {
     if (submittedRef.current) return
-    const urls = text
-      .split('\n')
-      .map(u => u.trim())
-      .filter(u => u.length > 0)
-    if (urls.length > 0) {
-      submittedRef.current = true
-      setSubmitted(true)
-      onSubmit(urls, crawlEnabled, maxCrawlPages, allowedDomains)
+    const urls = enteredUrls()
+    if (urls.length === 0) return
+    submittedRef.current = true
+    setSubmitted(true)
+    if (!crawlEnabled) {
+      onSubmit(urls, false, maxCrawlPages, allowedDomains)
+      return
     }
+    setPreviewError(null)
+    seenRef.current = new Set()
+    setSelected(new Set())
+    api.startCrawlPreview(kbUuid, urls, maxCrawlPages, allowedDomains)
+      .then(p => setPreview(p))
+      .catch(err => setPreviewError(err instanceof Error ? err.message : 'Could not start finding pages'))
+      .finally(() => { submittedRef.current = false; setSubmitted(false) })
   }
+
+  // Poll a running preview; pages appear as they are found.
+  const previewUuid = preview?.uuid
+  const previewRunning = preview?.status === 'running'
+  useEffect(() => {
+    if (!previewUuid || !previewRunning) return
+    const t = setInterval(() => {
+      api.getCrawlPreview(kbUuid, previewUuid)
+        .then(p => setPreview(p))
+        .catch(err => setPreviewError(err instanceof Error ? err.message : 'Lost track of the crawl preview'))
+    }, POLL_MS)
+    return () => clearInterval(t)
+  }, [kbUuid, previewUuid, previewRunning])
+
+  // A page newly found gets its default tick; one the user already changed
+  // keeps their choice.
+  const previewPages = preview?.pages
+  useEffect(() => {
+    if (!previewPages) return
+    const fresh = previewPages.filter(p => !seenRef.current.has(p.url))
+    if (fresh.length === 0) return
+    for (const p of fresh) seenRef.current.add(p.url)
+    const ticks = defaultSelection(fresh)
+    if (ticks.size) setSelected(prev => new Set([...prev, ...ticks]))
+  }, [previewPages])
+
+  const addingRef = useRef(false)
+  const [adding, setAdding] = useState(false)
+  const handleAddSelected = () => {
+    if (!preview || addingRef.current || selected.size === 0) return
+    addingRef.current = true
+    setAdding(true)
+    api.addCrawlPreviewSelection(kbUuid, preview.uuid, [...selected])
+      .then(r => onCrawlAdded(r.added))
+      .catch(err => {
+        addingRef.current = false
+        setAdding(false)
+        setPreviewError(err instanceof Error ? err.message : 'Failed to add the selected pages')
+      })
+  }
+
 
   return (
     <div
@@ -54,7 +123,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         role="dialog"
         aria-modal="true"
         style={{
-          width: 480, maxWidth: '100vw', maxHeight: '80vh',
+          width: preview ? 640 : 480, maxWidth: '100vw', maxHeight: '80vh',
           backgroundColor: '#1e1e1e', borderRadius: 12,
           border: '1px solid #3a3a3a', padding: 24,
           display: 'flex', flexDirection: 'column', gap: 16,
@@ -62,6 +131,18 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         }}
         onClick={e => e.stopPropagation()}
       >
+        {preview ? (
+          <CrawlPreviewStep
+            preview={preview}
+            selected={selected}
+            onChange={setSelected}
+            error={previewError}
+            adding={adding}
+            onAdd={handleAddSelected}
+            onBack={() => { setPreview(null); setPreviewError(null) }}
+            onClose={onClose}
+          />
+        ) : (<>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>Add URLs</span>
           <button
@@ -102,7 +183,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         {crawlEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
             <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-              The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
+              The crawler will follow links on each page — including links embedded in PDFs — and list the pages it finds.
+              Nothing is added until you choose which of them to include.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
@@ -164,9 +246,15 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
               opacity: text.trim() && !submitted ? 1 : 0.5,
             }}
           >
-            {submitted ? 'Adding…' : 'Add URLs'}
+            {crawlEnabled
+              ? (submitted ? 'Starting…' : 'Find pages')
+              : (submitted ? 'Adding…' : 'Add URLs')}
           </button>
         </div>
+        {previewError && (
+          <div role="alert" style={{ fontSize: 12, color: '#ef4444' }}>{previewError}</div>
+        )}
+        </>)}
       </div>
       </FocusTrap>
     </div>

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from beanie import Document
 from pydantic import Field
+from pymongo import ASCENDING, IndexModel
 
 
 class KnowledgeBaseSource(Document):
@@ -140,6 +141,45 @@ class KnowledgeBaseUsage(Document):
         name = "knowledge_base_usage"
         indexes = [
             [("user_id", 1), ("kb_uuid", 1)],
+        ]
+
+
+class KBCrawlPreview(Document):
+    """A crawl run as a dry run: the pages it would add, nothing added yet.
+
+    Crawling used to run blind: it followed links and embedded pages up to
+    the limit, and the user saw what it took only afterwards. A preview walks
+    the same links with the same scope, budget and navigation-page check, but
+    creates no sources and embeds nothing. The user then ticks the pages to
+    add, and only those are ingested (``add_crawl_selection``).
+
+    Each entry in ``pages`` is ``{url, start_url, title, chars, kind, note,
+    in_kb}``. ``kind`` is ``start`` (a URL the user typed), ``content`` (what
+    a crawl would have added), ``navigation`` (what a crawl would have skipped
+    as site chrome), or ``failed`` (could not be fetched). Previews expire a
+    day after creation; there is nothing in them that is not on the site.
+    """
+
+    uuid: str = Field(default_factory=lambda: uuid4().hex)
+    kb_uuid: str
+    user_id: str
+    start_urls: list[str] = Field(default_factory=list)
+    max_crawl_pages: int = 5
+    allowed_domains: str = ""
+    status: str = "running"  # running | complete | error | adding | added
+    error_message: Optional[str] = None
+    pages: list[dict] = Field(default_factory=list)
+    fetched: int = 0
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+    completed_at: Optional[datetime.datetime] = None
+
+    class Settings:
+        name = "kb_crawl_previews"
+        indexes = [
+            "uuid",
+            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=24 * 3600),
         ]
 
 

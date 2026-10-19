@@ -52,6 +52,16 @@ class AddUrlsRequest(BaseModel):
     allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
 
 
+class CrawlPreviewRequest(BaseModel):
+    urls: list[str]
+    max_crawl_pages: int = 5
+    allowed_domains: str = ""
+
+
+class CrawlSelectionRequest(BaseModel):
+    urls: list[str]  # the pages ticked in the preview
+
+
 class KBSourceCurrency(BaseModel):
     """Refresh / ingestion provenance for one source (see
     app.utils.kb_source_currency). Lets an evaluator verify source currency

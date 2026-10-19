@@ -89,6 +89,49 @@ export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   })
 }
 
+/** One page a crawl preview found. ``kind``: ``start`` (a URL you typed),
+ *  ``content`` (what a crawl would add), ``navigation`` (what it would skip
+ *  as site chrome), ``failed`` (could not be fetched). */
+export interface CrawlPreviewPage {
+  url: string
+  start_url: string
+  kind: 'start' | 'content' | 'navigation' | 'failed'
+  title: string
+  chars: number
+  note: string | null
+  in_kb: boolean
+}
+
+export interface CrawlPreview {
+  uuid: string
+  status: 'running' | 'complete' | 'error' | 'adding' | 'added'
+  error_message: string | null
+  start_urls: string[]
+  max_crawl_pages: number
+  fetched: number
+  pages: CrawlPreviewPage[]
+}
+
+/** Dry-run a crawl: find the pages it would add, adding none (background). */
+export function startCrawlPreview(uuid: string, urls: string[], maxCrawlPages: number, allowedDomains: string) {
+  return apiFetch<CrawlPreview>(`/api/knowledge/${uuid}/crawl_previews`, {
+    method: 'POST',
+    body: JSON.stringify({ urls, max_crawl_pages: maxCrawlPages, allowed_domains: allowedDomains }),
+  })
+}
+
+export function getCrawlPreview(uuid: string, previewUuid: string) {
+  return apiFetch<CrawlPreview>(`/api/knowledge/${uuid}/crawl_previews/${previewUuid}`)
+}
+
+/** Add the pages ticked in a finished crawl preview (background ingest). */
+export function addCrawlPreviewSelection(uuid: string, previewUuid: string, urls: string[]) {
+  return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/crawl_previews/${previewUuid}/add`, {
+    method: 'POST',
+    body: JSON.stringify({ urls }),
+  })
+}
+
 export interface AddUrlsResult {
   ok: boolean
   /** URLs actually queued for fetching. */

@@ -403,6 +403,15 @@ export function KnowledgePanel() {
       .finally(() => setAddingUrls(false))
   }
 
+  const handleCrawlSelectionAdded = (added: number) => {
+    setShowUrlModal(false)
+    if (!selectedKB) return
+    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
+    toast(`Adding ${added} ${added === 1 ? 'page' : 'pages'} in the background — only the pages you chose`, 'success')
+    loadDetail(selectedKB.uuid)
+    refresh()
+  }
+
   const sourceName = (source: KnowledgeBaseSource) =>
     source.custom_name || source.document_title || source.url_title || source.url || 'Source'
 
@@ -1721,7 +1730,9 @@ export function KnowledgePanel() {
 
         {showUrlModal && (
           <AddUrlsModal
+            kbUuid={selectedKB.uuid}
             onSubmit={(urls, crawlEnabled, maxCrawlPages, allowedDomains) => { handleAddUrls(urls, crawlEnabled, maxCrawlPages, allowedDomains); setShowUrlModal(false) }}
+            onCrawlAdded={handleCrawlSelectionAdded}
             onClose={() => setShowUrlModal(false)}
           />
         )}

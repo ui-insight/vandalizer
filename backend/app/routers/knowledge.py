@@ -24,6 +24,8 @@ from app.schemas.knowledge import (
     AddDocumentsRequest,
     AddFolderRequest,
     AddUrlsRequest,
+    CrawlPreviewRequest,
+    CrawlSelectionRequest,
     AdoptKBRequest,
     ConvertDocumentsRequest,
     CreateKBRequest,
@@ -854,6 +856,101 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         "ok": True, "added": len(new_urls),
         "skipped": len(skipped_urls), "skipped_urls": skipped_urls,
     }
+
+
+def _crawl_preview_response(preview) -> dict:
+    return {
+        "uuid": preview.uuid,
+        "status": preview.status,
+        "error_message": preview.error_message,
+        "start_urls": list(preview.start_urls),
+        "max_crawl_pages": preview.max_crawl_pages,
+        "fetched": preview.fetched,
+        "pages": list(preview.pages),
+    }
+
+
+async def _require_crawl_preview(kb, preview_uuid: str):
+    from app.models.knowledge import KBCrawlPreview
+
+    preview = await KBCrawlPreview.find_one({"uuid": preview_uuid, "kb_uuid": kb.uuid})
+    if not preview:
+        raise HTTPException(status_code=404, detail="Crawl preview not found — it may have expired; find pages again")
+    return preview
+
+
+@router.post("/{uuid}/crawl_previews")
+@limiter.limit("10/minute")
+async def start_crawl_preview(
+    request: Request, uuid: str, req: CrawlPreviewRequest, user: User = Depends(get_current_user),
+):
+    """Find the pages a crawl from ``urls`` would add, without adding any.
+
+    The dry run for a crawl: runs on a worker (it fetches up to five pages per
+    page asked for) and records each page found. Poll
+    ``GET /crawl_previews/{id}``, then add the ticked pages with
+    ``POST /crawl_previews/{id}/add``. Nothing is embedded until then.
+    """
+    from app.models.knowledge import KBCrawlPreview
+    from app.services.knowledge_service import _normalize_url
+    from app.tasks.kb_validation_tasks import crawl_preview_task
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    start_urls: list[str] = []
+    for raw in req.urls:
+        url = _normalize_url(raw or "")
+        if url and url not in start_urls:
+            start_urls.append(url)
+    if not start_urls:
+        raise HTTPException(status_code=400, detail="No URLs provided")
+    preview = KBCrawlPreview(
+        kb_uuid=kb.uuid, user_id=user.user_id, start_urls=start_urls[:20],
+        max_crawl_pages=max(1, min(req.max_crawl_pages, 50)),
+        allowed_domains=req.allowed_domains or "",
+    )
+    await preview.insert()
+    crawl_preview_task.delay(preview.uuid)
+    return _crawl_preview_response(preview)
+
+
+@router.get("/{uuid}/crawl_previews/{preview_uuid}")
+async def get_crawl_preview(uuid: str, preview_uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    return _crawl_preview_response(await _require_crawl_preview(kb, preview_uuid))
+
+
+@router.post("/{uuid}/crawl_previews/{preview_uuid}/add")
+@limiter.limit("10/minute")
+async def add_crawl_preview_selection(
+    request: Request, uuid: str, preview_uuid: str, req: CrawlSelectionRequest,
+    user: User = Depends(get_current_user),
+):
+    """Add the pages the user ticked in a finished crawl preview (background)."""
+    from app.services.knowledge_service import selectable_preview_urls
+    from app.tasks.kb_validation_tasks import add_crawl_selection_task
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    preview = await _require_crawl_preview(kb, preview_uuid)
+    if preview.status != "complete":
+        detail = (
+            "These pages were already added" if preview.status in ("adding", "added")
+            else "The crawl preview has not finished"
+        )
+        raise HTTPException(status_code=409, detail=detail)
+    selectable = selectable_preview_urls(preview)
+    urls = [u for u in dict.fromkeys(req.urls) if u in selectable]
+    if not urls:
+        raise HTTPException(status_code=400, detail="No pages selected")
+    # Claimed before dispatch so a second click cannot queue the add twice.
+    preview.status = "adding"
+    await preview.save()
+    kb.status = "building"
+    await kb.save()
+    add_crawl_selection_task.delay(kb.uuid, preview.uuid, urls)
+    return {"ok": True, "added": len(urls)}
 
 
 @router.post("/{uuid}/source/{source_uuid}/refresh")

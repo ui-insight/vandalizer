@@ -27,6 +27,7 @@ from app.models.verification import VerificationRequest, VerifiedItemMetadata, V
 from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
 from app.models.knowledge import (
+    KBCrawlPreview,
     KnowledgeBase,
     KnowledgeBaseReference,
     KnowledgeBaseSource,
@@ -96,6 +97,7 @@ ALL_MODELS = [
     KnowledgeBaseReference,
     KnowledgeBaseSource,
     KnowledgeBaseUsage,
+    KBCrawlPreview,
     KBTestQuery,
     KBOptimizationRun,
     KBSuggestion,

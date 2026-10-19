@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from app.models.document import SmartDocument
 from app.models.knowledge import (
+    KBCrawlPreview,
     KnowledgeBase,
     KnowledgeBaseReference,
     KnowledgeBaseSource,
@@ -1621,6 +1622,193 @@ async def _crawl_from_source(
         f"Crawl complete for {parent.url}: {added} child pages added, "
         f"{len(skipped_urls)} navigation pages skipped ({fetches} fetched)",
     )
+    return added
+
+
+# --- Crawl preview (dry run) ---
+
+
+def _preview_page(
+    url: str, start_url: str, kind: str, *,
+    title: str = "", chars: int = 0, note: str | None = None, in_kb: bool = False,
+) -> dict:
+    return {
+        "url": url, "start_url": start_url, "kind": kind, "title": (title or "")[:300],
+        "chars": chars, "note": (note or None) and note[:500], "in_kb": in_kb,
+    }
+
+
+async def run_crawl_preview(preview: KBCrawlPreview) -> None:
+    """Walk each start URL's links the way a crawl would, embedding nothing.
+
+    Same scope (``allowed_domains``, else the start URL's domain), same
+    budget (``max_crawl_pages`` content pages, at most five fetches per page)
+    and same navigation-page check as ``_crawl_from_source``, so the list is
+    what the crawl would have added and skipped. The only difference is that
+    no source is created: every page lands in ``preview.pages`` for the user
+    to choose from. Saved after every fetch so the UI can show progress.
+
+    A page the KB already holds is listed, not fetched, as the crawl skips
+    it without fetching too.
+    """
+    from app.config import Settings
+    from app.services.web_fetcher import fetch_url
+    from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
+    from app.utils.page_quality import describe_low_value_page
+
+    max_pages = max(1, min(preview.max_crawl_pages, 50))
+    max_fetches = max_pages * 5
+    min_content_chars = Settings().kb_crawl_min_content_chars
+    cap = _kb_text_cap()
+    in_kb = {s.url for s in await get_kb_sources(preview.kb_uuid) if s.url}
+    # Across start URLs, so two start pages linking the same page list it once.
+    listed: set[str] = set()
+
+    async def fetch(url: str) -> tuple[WebFetchResult | None, str | None]:
+        try:
+            result = await fetch_url(url, max_chars=cap)
+        except Exception as e:  # noqa: BLE001 — every failure is a row, not a crash
+            return None, describe_fetch_error(e)
+        finally:
+            preview.fetched += 1
+        return result, _reject_fetched_page(result)
+
+    for start in preview.start_urls:
+        listed.add(_normalize_crawl_url(start))
+        result, reason = await fetch(start)
+        if result is None or reason:
+            preview.pages.append(_preview_page(
+                start, start, "failed", note=reason, in_kb=start in in_kb,
+            ))
+            await preview.save()
+            # The crawl follows links only from a page it could ingest.
+            continue
+        preview.pages.append(_preview_page(
+            start, start, "start", title=result.title, chars=len(result.text),
+            in_kb=start in in_kb,
+        ))
+        await preview.save()
+
+        scope = parse_crawl_scope(preview.allowed_domains, start)
+        visited: set[str] = {_normalize_crawl_url(start)}
+        if result.final_url:
+            visited.add(_normalize_crawl_url(result.final_url))
+        landed = set(visited)
+        queue = [
+            link for link in _crawlable_links(result, start)
+            if link not in visited and url_in_crawl_scope(link, scope)
+        ]
+        visited.update(queue)
+        found = fetches = 0
+
+        while queue and found < max_pages and fetches < max_fetches:
+            url = queue.pop(0)
+            norm = _normalize_crawl_url(url)
+            if norm in landed or norm in listed:
+                continue
+            listed.add(norm)
+            if url in in_kb:
+                preview.pages.append(_preview_page(
+                    url, start, "content", note="Already in this knowledge base", in_kb=True,
+                ))
+                continue
+            fetches += 1
+            page, reason = await fetch(url)
+            landed.add(norm)
+            if page is not None and page.final_url:
+                final = _normalize_crawl_url(page.final_url)
+                visited.add(final)
+                landed.add(final)
+            if page is None or reason:
+                preview.pages.append(_preview_page(url, start, "failed", note=reason))
+                await preview.save()
+                continue
+            links = _crawlable_links(page, url)
+            nav = describe_low_value_page(page.text, len(links), min_chars=min_content_chars)
+            if nav:
+                preview.pages.append(_preview_page(
+                    url, start, "navigation", title=page.title, chars=len(page.text), note=nav,
+                ))
+            else:
+                found += 1
+                preview.pages.append(_preview_page(
+                    url, start, "content", title=page.title, chars=len(page.text),
+                ))
+            await preview.save()
+            if found < max_pages:
+                for link in links:
+                    if link not in visited and url_in_crawl_scope(link, scope):
+                        queue.append(link)
+                        visited.add(link)
+
+    preview.status = "complete"
+    preview.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await preview.save()
+
+
+def selectable_preview_urls(preview: KBCrawlPreview) -> set[str]:
+    """Pages in a preview that can be added: fetched, and not already in the KB."""
+    return {
+        p["url"] for p in preview.pages
+        if p.get("kind") != "failed" and not p.get("in_kb")
+    }
+
+
+async def add_crawl_selection(
+    kb: KnowledgeBase, preview: KBCrawlPreview, urls: list[str],
+) -> int:
+    """Ingest the pages the user ticked in a crawl preview. Returns count added.
+
+    The result is shaped like a crawl's: a ticked start page becomes the
+    parent source and the pages found from it its children, so the list,
+    the inspector and refresh treat them as crawled pages. Pages are added
+    exactly as chosen; the navigation check already ran in the preview and
+    the user overrode it if they ticked one. Each page is fetched again
+    here, because the preview kept titles and sizes, not page text.
+    """
+    chosen = set(urls) & selectable_preview_urls(preview)
+    added = 0
+    for start in preview.start_urls:
+        group = [p for p in preview.pages if p.get("start_url") == start and p["url"] in chosen]
+        if not group:
+            continue
+        parent: KnowledgeBaseSource | None = None
+        if any(p["kind"] == "start" for p in group):
+            parent = KnowledgeBaseSource(
+                knowledge_base_uuid=kb.uuid, source_type="url", url=start[:2000],
+                crawl_enabled=True, max_crawl_pages=preview.max_crawl_pages,
+            )
+            if await _insert_source_unless_duplicate(parent):
+                added += 1
+                await _ingest_url_source(parent, kb)
+            else:
+                parent = None
+        crawled: list[str] = []
+        for p in group:
+            if p["kind"] == "start":
+                continue
+            child = KnowledgeBaseSource(
+                knowledge_base_uuid=kb.uuid, source_type="url", url=p["url"][:2000],
+                parent_source_uuid=parent.uuid if parent else None,
+            )
+            if not await _insert_source_unless_duplicate(child):
+                continue
+            added += 1
+            await _ingest_url_source(child, kb)
+            if child.status != "deleted":
+                crawled.append(p["url"])
+        if parent is not None:
+            parent.crawled_urls = crawled
+            parent.skipped_urls = [
+                p["url"] for p in preview.pages
+                if p.get("start_url") == start and p.get("kind") == "navigation"
+                and p["url"] not in chosen
+            ] or None
+            await _save_unless_deleted(parent)
+
+    preview.status = "added"
+    await preview.save()
+    await recalculate_stats(kb)
     return added
 
 
