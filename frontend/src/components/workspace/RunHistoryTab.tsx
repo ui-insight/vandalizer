@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useCallback, useRef, useState } from 'react'
 import { useAdminQuery } from '../admin/shared/useAdminQuery'
-import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck, Cpu } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
@@ -29,6 +29,36 @@ export interface HistoryRun {
   /** Workflow runs: the run's model, and the models its steps ran on. */
   model?: string | null
   models_used?: string[]
+  /** Models the run's calls used, most tokens first; empty for runs recorded
+   * before models were. */
+  models?: string[]
+  /** Workflow runs: each step's models, in step order. */
+  step_models?: { index: number; name: string | null; models: string[] }[]
+}
+
+/** The models a run used. Runs recorded before per-call models were kept
+ * fall back to the models the run's steps were configured with. */
+function runModels(run: HistoryRun): string[] {
+  if (run.models?.length) return run.models
+  const used = (run.models_used ?? []).filter(Boolean)
+  return used.length ? used : run.model ? [run.model] : []
+}
+
+/** The History tab as a CSV: one row per run, with its model(s) and, for a
+ * workflow, which step used which — for comparing models across runs. */
+export function buildHistoryCSV(runs: HistoryRun[], type: 'workflow' | 'extraction'): string {
+  const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const header = ['Started', 'Finished', 'Status', 'Duration (ms)', 'Input tokens', 'Output tokens', 'Documents', 'Models',
+    ...(type === 'workflow' ? ['Models by step'] : []), 'Error']
+  const rows = runs.map(run => [
+    run.started_at, run.finished_at, run.status, run.duration_ms, run.tokens_input, run.tokens_output,
+    run.documents_touched, runModels(run).join('; '),
+    ...(type === 'workflow'
+      ? [(run.step_models ?? []).map(s => `${s.name ?? `Step ${s.index + 1}`}: ${s.models.join(', ')}`).join('; ')]
+      : []),
+    run.error,
+  ].map(escape).join(','))
+  return [header.map(escape).join(','), ...rows].join('\n') + '\n'
 }
 
 function formatDuration(ms: number): string {
@@ -216,7 +246,13 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
   // Workflow runs don't snapshot their output into the history payload — the
   // full result is fetched by session_id on expand instead.
   const canFetchOutput = type === 'workflow' && run.status === 'completed' && !!run.session_id
-  const hasResults = hasSnapshot || canFetchOutput
+  const models = run.models ?? []
+  // Shown when the steps differ — a per-step override, or a fallback model.
+  // One model throughout is already said on the row.
+  const stepModels = (run.step_models ?? []).filter(s => s.models.length > 0)
+  const showStepModels = type === 'workflow' && stepModels.length > 0 && models.length > 1
+  // A failed run's step models are the thing to look at when a model misbehaves.
+  const hasResults = hasSnapshot || canFetchOutput || showStepModels
 
   return (
     <div style={{
@@ -275,11 +311,17 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
                 {run.steps_completed ?? 0}/{run.steps_total} steps
               </span>
             )}
-            {type === 'workflow' && runModelLabel(run) && <span>{runModelLabel(run)}</span>}
+            {models.length === 0 && type === 'workflow' && runModelLabel(run) && <span>{runModelLabel(run)}</span>}
             {(run.tokens_input > 0 || run.tokens_output > 0) && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <Zap style={{ width: 11, height: 11 }} />
                 {(run.tokens_input + run.tokens_output).toLocaleString()} tokens
+              </span>
+            )}
+            {models.length > 0 && (
+              <span title={models.length > 1 ? `Models used: ${models.join(', ')}` : 'Model used'} style={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 0 }}>
+                <Cpu aria-hidden="true" style={{ width: 11, height: 11, flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{models.join(', ')}</span>
               </span>
             )}
           </div>
@@ -315,9 +357,21 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
 
       {expanded && hasResults && (
         <div style={{ padding: "0 var(--workspace-space-24) var(--workspace-space-12) 48px" }}>
+          {showStepModels && (
+            <table aria-label="Models by step" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#374151', borderCollapse: 'collapse' }}>
+              <tbody>
+                {stepModels.map(s => (
+                  <tr key={s.index}>
+                    <td style={{ padding: 'var(--workspace-space-2) var(--workspace-space-12) var(--workspace-space-2) 0', color: '#6b7280', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{s.name ?? `Step ${s.index + 1}`}</td>
+                    <td style={{ padding: 'var(--workspace-space-2) 0', wordBreak: 'break-word' }}>{s.models.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
           {canFetchOutput
             ? <WorkflowRunOutput sessionId={run.session_id!} />
-            : <ResultPreview snapshot={run.result_snapshot} type={type} />}
+            : hasSnapshot && <ResultPreview snapshot={run.result_snapshot} type={type} />}
         </div>
       )}
     </div>
@@ -354,8 +408,29 @@ export function RunHistoryTab({
 
   return (
     <div>
-      <div role="status" aria-live="polite" style={{ padding: "var(--workspace-space-12) var(--workspace-space-24) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
-        {runs.length} run{runs.length !== 1 ? 's' : ''}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--workspace-space-12) var(--workspace-space-24) var(--workspace-space-8)' }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
+          {runs.length} run{runs.length !== 1 ? 's' : ''}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const url = URL.createObjectURL(new Blob([buildHistoryCSV(runs, type)], { type: 'text/csv' }))
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${type}-run-history-${new Date().toISOString().slice(0, 10)}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+            fontFamily: 'inherit', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', backgroundColor: 'var(--workspace-surface)',
+            color: '#374151', cursor: 'pointer',
+          }}
+        >
+          <Download aria-hidden="true" style={{ width: 12, height: 12 }} />
+          Export CSV
+        </button>
       </div>
       {runs.map(run => (
         <RunRow key={run.id} run={run} type={type} />

@@ -264,6 +264,12 @@ async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str, force:
     """Apply a completed optimization's best config to the KB's rag_config_override."""
     _require_applyable(run)
     _require_not_tied(run, force, "KB")
+    if getattr(run, "winner", None) == "current" and not run.tied_with_baseline and not force:
+        raise OptimizationActionError(
+            "current_settings_won",
+            "No trial beat the KB's current settings — the best one scored "
+            "lower. Re-submit with force=true to apply it anyway.",
+        )
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     # Snapshot the prior override on the run so Revert can restore it.

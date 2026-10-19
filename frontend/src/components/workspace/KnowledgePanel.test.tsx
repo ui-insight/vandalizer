@@ -4,6 +4,9 @@ import { KnowledgePanel } from './KnowledgePanel'
 import type { KnowledgeBaseDetail } from '../../types/knowledge'
 
 const detail: { current: Partial<KnowledgeBaseDetail> } = { current: {} }
+const tabCounts: { current: { mine: number | null; team: number | null; explore: number | null } } = {
+  current: { mine: null, team: null, explore: null },
+}
 const getKnowledgeBase = vi.fn(async (_uuid: string) => detail.current as KnowledgeBaseDetail)
 
 vi.mock('../../contexts/WorkspaceContext', () => ({
@@ -35,6 +38,7 @@ vi.mock('../shared/useConfirm', () => ({
 }))
 
 vi.mock('../../hooks/useKnowledgeBases', () => ({
+  useKBTabCounts: () => tabCounts.current,
   useKnowledgeBases: () => ({
     knowledgeBases: [],
     loading: false,
@@ -583,5 +587,22 @@ describe('source action recovery and navigation', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not refresh “Policy source”')
     expect(screen.getByLabelText('Refresh source')).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Inspect source: Policy source' })).toBeInTheDocument()
+  })
+})
+
+describe('KnowledgePanel tab counts', () => {
+  it('shows how many knowledge bases each tab holds', () => {
+    tabCounts.current = { mine: 12, team: 3, explore: 40 }
+    render(<KnowledgePanel />)
+    expect(screen.getByRole('tab', { name: 'Mine 12' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Team 3' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Explore 40' })).toBeInTheDocument()
+  })
+
+  it('leaves a count off while it is loading', () => {
+    tabCounts.current = { mine: 0, team: null, explore: null }
+    render(<KnowledgePanel />)
+    expect(screen.getByRole('tab', { name: 'Mine 0' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Team' })).toBeInTheDocument()
   })
 })

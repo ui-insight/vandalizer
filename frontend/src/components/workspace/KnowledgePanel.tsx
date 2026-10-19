@@ -1,8 +1,8 @@
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
-import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy, ShieldAlert } from 'lucide-react'
+import { useKBTabCounts, useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
@@ -14,8 +14,9 @@ import { listOrganizationsFlat } from '../../api/organizations'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
-import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
+import { inFlightText, isInFlight, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
+import { KBSourceReviewFindings } from '../knowledge/KBSourceReviewFindings'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { describeKBAvailability } from '../knowledge/kbAvailability'
@@ -54,6 +55,7 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
   processing: { icon: Loader2, color: 'var(--workspace-warning)' },
   ready: { icon: CheckCircle2, color: '#15803d' },
   error: { icon: AlertCircle, color: '#b91c1c' },
+  held: { icon: ShieldAlert, color: '#d97706' },
 }
 
 export function KnowledgePanel() {
@@ -108,6 +110,7 @@ export function KnowledgePanel() {
 
   // Used for adopt/removeRef in the scoped views
   const scopedMine = useScopedKnowledgeBases({ scope: 'mine' })
+  const tabCounts = useKBTabCounts(isProjectScoped ? projectPins.idsByType('knowledge_base') : undefined)
 
   const isExaminerOrAdmin = !!(user?.is_examiner || user?.is_admin)
 
@@ -256,9 +259,7 @@ export function KnowledgePanel() {
   // Sources still being chunked and embedded by a worker. Tracked separately
   // from kb.status because a KB can report "ready" from an earlier build while
   // newly added sources are still pending.
-  const inFlightSources = (selectedKB?.sources ?? []).filter(
-    s => s.status === 'pending' || s.status === 'processing'
-  )
+  const inFlightSources = (selectedKB?.sources ?? []).filter(isInFlight)
   const inFlightCount = inFlightSources.length
 
   // Sources the user reprocessed (or refreshed) here, followed until they
@@ -272,7 +273,9 @@ export function KnowledgePanel() {
     setReprocessing(remaining)
     for (const r of settled) {
       const chunks = `${r.chunkCount} ${r.chunkCount === 1 ? 'chunk' : 'chunks'}`
-      if (r.unchanged) {
+      if (r.held) {
+        toast(`“${r.name}” was held again — the page has hidden or AI-addressed text you haven’t reviewed. It was not indexed.`, 'error')
+      } else if (r.unchanged) {
         toast(`“${r.name}” re-fetched — the page is unchanged, so its ${chunks} were kept.`, 'success')
       } else if (r.ok) {
         toast(`“${r.name}” reprocessed — ${chunks}, indexed just now.`, 'success')
@@ -283,6 +286,30 @@ export function KnowledgePanel() {
       }
     }
   }, [selectedKB, reprocessing, toast])
+
+  // A page held for review is announced once, when it settles held, so the
+  // user who added it hears about it even if the row is scrolled away.
+  const heldSeen = useRef<Set<string> | null>(null)
+  useEffect(() => { heldSeen.current = null }, [selectedKB?.uuid])
+  const kbSources = selectedKB?.sources
+  useEffect(() => {
+    const sources = kbSources
+    if (!sources) return
+    const held = sources.filter(s => (s.review_findings?.length ?? 0) > 0)
+    if (heldSeen.current === null) {
+      // First load of this KB: already-held rows speak for themselves.
+      heldSeen.current = new Set(held.map(s => s.uuid))
+      return
+    }
+    const fresh = held.filter(s => !heldSeen.current!.has(s.uuid) && !reprocessing[s.uuid])
+    for (const s of held) heldSeen.current.add(s.uuid)
+    if (fresh.length === 1) {
+      const name = fresh[0].custom_name || fresh[0].url_title || fresh[0].url || 'A page'
+      toast(`“${name}” was held for review: it contains hidden or AI-addressed text. Review it in the sources list before adding it.`, 'error')
+    } else if (fresh.length > 1) {
+      toast(`${fresh.length} pages were held for review: they contain hidden or AI-addressed text. Review them in the sources list before adding them.`, 'error')
+    }
+  }, [kbSources, reprocessing, toast])
 
   // Poll while the KB is building or any source is still indexing
   const pollingKbUuid = selectedKB?.uuid
@@ -493,6 +520,28 @@ export function KnowledgePanel() {
   const handleReprocessSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'reprocess')
   const handleRefreshSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'refresh')
   const handleRemoveSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'remove')
+
+  /** Add a page held for review (hidden or AI-addressed text) anyway. */
+  const handleAcceptReview = async (source: KnowledgeBaseSource) => {
+    if (!selectedKB) return
+    const kbUuid = selectedKB.uuid
+    try {
+      await api.acceptKBSourceReview(kbUuid, source.uuid)
+      setSelectedKB(prev => prev?.uuid === kbUuid ? {
+        ...prev,
+        status: 'building',
+        sources: prev.sources.map(s => s.uuid === source.uuid
+          ? { ...s, status: 'pending' as const, review_findings: [] } : s),
+      } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode: 'refetch', name: sourceName(source) } }))
+      toast('Adding the page — it is fetched again and indexed as it is now', 'success')
+      await refreshSelectedDetail(kbUuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to accept source review:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add the page', 'error')
+    }
+  }
 
   const [renamingSourceUuid, setRenamingSourceUuid] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
@@ -836,7 +885,10 @@ export function KnowledgePanel() {
     const noManageReason = "You don't have permission to manage this knowledge base."
     // A ready KB with zero indexed chunks has nothing to retrieve — chatting
     // with it only produces a misleading "still indexing" reply.
-    const canChatKB = selectedKB.status === 'ready' && selectedKB.total_chunks > 0
+    // Indexed text answers whatever else is going on: a source being
+    // refreshed (or whose refresh failed) keeps its previous chunks, so a
+    // "building" KB with chunks is still worth asking.
+    const canChatKB = selectedKB.total_chunks > 0 && selectedKB.status !== 'empty'
     // Export serializes the KB's sources. With none it downloads a file nobody
     // can use — the backend refuses it now, so say why before the click.
     const hasSources = selectedKB.total_sources > 0
@@ -1148,7 +1200,7 @@ export function KnowledgePanel() {
               </button>
               <button
                 onClick={() => setShowUrlModal(true)}
-                disabled={addingUrls || !canManageKB}
+                disabled={!canManageKB}
                 title={canManageKB ? undefined : noManageReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
@@ -1159,15 +1211,19 @@ export function KnowledgePanel() {
                   opacity: addingUrls || !canManageKB ? 0.5 : 1,
                 }}
               >
-                {addingUrls ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Globe size={13} />}
-                {addingUrls ? 'Adding...' : 'Add URLs'}
+                <Globe size={13} />
+                Add URLs
               </button>
               <button
                 onClick={handleChat}
                 disabled={!canChatKB}
-                title={!canChatKB && selectedKB.status === 'ready'
-                  ? 'This knowledge base has no indexed content yet'
-                  : undefined}
+                title={!canChatKB
+                  ? (selectedKB.status === 'ready' || selectedKB.status === 'building'
+                      ? 'This knowledge base has no indexed content yet'
+                      : undefined)
+                  : selectedKB.status === 'building'
+                    ? 'Some sources are still being indexed or refreshed; answers use the text indexed so far'
+                    : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                   padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
@@ -1430,7 +1486,9 @@ export function KnowledgePanel() {
                     : isPartial
                       ? `Incomplete — ${source.ingestion_warning_text}; answers from this source cover only part of it.`
                       : null
-                  const st = incompleteReason
+                  const st = (source.review_findings?.length ?? 0) > 0
+                    ? SOURCE_STATUS.held
+                    : incompleteReason || source.stalled
                     ? { icon: AlertTriangle, color: 'var(--workspace-warning)' }
                     : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
@@ -1559,8 +1617,16 @@ export function KnowledgePanel() {
                             </div>
                           ) : null
                         })()}
-                        {!isRenaming && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-4)' }}>{source.source_type === 'url' ? 'Web page' : 'Document'} · {requestPending ? 'Submitting change…' : source.status === 'ready' ? incompleteReason ? 'Partially indexed' : 'Ready' : source.status === 'error' ? 'Failed' : source.status === 'processing' ? 'Processing' : 'Queued'}</div>}
-                        {!isRenaming && source.error_message && (
+                        {!isRenaming && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-4)' }}>{source.source_type === 'url' ? 'Web page' : 'Document'} · {requestPending ? 'Submitting change…' : (source.review_findings?.length ?? 0) > 0 || source.status === 'held' ? 'Held for review' : source.stalled ? 'Stopped' : source.status === 'ready' ? incompleteReason ? 'Partially indexed' : 'Ready' : source.status === 'error' ? 'Failed' : source.status === 'processing' ? 'Processing' : 'Queued'}</div>}
+                        {!isRenaming && (source.review_findings?.length ?? 0) > 0 && (
+                          <KBSourceReviewFindings
+                            source={source}
+                            canManage={canManageKB}
+                            onAccept={() => handleAcceptReview(source)}
+                            onRemove={() => handleRemoveSource(source)}
+                          />
+                        )}
+                        {!isRenaming && source.error_message && !(source.review_findings?.length) && (
                           <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', marginTop: 'var(--workspace-space-2)' }}>
                             {source.error_message}
                             {canManageKB && source.status === 'error' && (
@@ -1627,9 +1693,34 @@ export function KnowledgePanel() {
                             </div>
                           )
                         })()}
-                        {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
+                        {!isRenaming && isInFlight(source) && (
                           <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', marginTop: 'var(--workspace-space-2)' }}>
-                            {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
+                            {inFlightText(source.status, reprocessing[source.uuid]?.mode, source.source_type)}
+                          </div>
+                        )}
+                        {!isRenaming && source.stalled && (
+                          <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', marginTop: 'var(--workspace-space-2)' }}>
+                            {source.chunk_count > 0
+                              ? 'This refresh stopped without finishing. The source still answers from its previous text.'
+                              : 'Fetching this page stopped without finishing.'}
+                            {canManageKB && (
+                              <button
+                                type="button"
+                                disabled={requestPending}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (source.source_type === 'url') handleRefreshSource(source)
+                                  else handleReprocessSource(source)
+                                }}
+                                style={{
+                                  marginLeft: 'var(--workspace-space-8)', padding: 0, background: 'transparent', border: 'none',
+                                  fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', fontWeight: 600,
+                                  color: 'var(--workspace-text)', textDecoration: 'underline', cursor: 'pointer',
+                                }}
+                              >
+                                Try again
+                              </button>
+                            )}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
@@ -1669,7 +1760,7 @@ export function KnowledgePanel() {
                             aria-label={isTruncated ? 'Source text was truncated' : isPartial ? 'Source document was only partly converted' : undefined}
                             style={{
                               color: st.color, flexShrink: 0,
-                              ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
+                              ...(isInFlight(source) ? { animation: 'spin 1s linear infinite' } : {}),
                             }}
                           >
                             {incompleteReason && <title>{incompleteReason}</title>}
@@ -1691,7 +1782,7 @@ export function KnowledgePanel() {
                                   type="button"
                                   aria-label="Refresh source"
                                   onClick={(e) => { e.stopPropagation(); handleRefreshSource(source) }}
-                                  disabled={requestPending || source.status === 'processing' || source.status === 'pending'}
+                                  disabled={requestPending || isInFlight(source)}
                                   title={
                                     source.processed_at
                                       ? `Re-fetch this page (last fetched ${new Date(source.processed_at).toLocaleDateString()})`
@@ -1707,7 +1798,7 @@ export function KnowledgePanel() {
                                   type="button"
                                   aria-label="Reprocess source"
                                   onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
-                                  disabled={requestPending || source.status === 'processing' || source.status === 'pending'}
+                                  disabled={requestPending || isInFlight(source)}
                                   title={
                                     'Reprocess: re-chunk and re-embed this document (it is read again first if it has no readable text)'
                                     + (source.processed_at ? `. Last indexed ${new Date(source.processed_at).toLocaleString()}` : '')
@@ -2027,6 +2118,19 @@ activeTab === 'mine' && (
             }}
           >
             {tab.label}
+            {/* The space keeps the tab's accessible name "My KBs 12", not "My KBs12". */}
+            {tabCounts[tab.key] !== null && <>{' '}
+              <span
+                style={{
+                  marginLeft: 'var(--workspace-space-2)', padding: '0 var(--workspace-space-6)', borderRadius: 'var(--workspace-radius-large)',
+                  fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+                  color: activeTab === tab.key ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+                  backgroundColor: 'var(--workspace-hover)',
+                }}
+              >
+                {tabCounts[tab.key]}
+              </span>
+            </>}
           </button>
         ))}
       </div>

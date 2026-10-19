@@ -1,8 +1,9 @@
 """Figures in a KB answer must come from the snippets the model was shown."""
 
 import json
+from pathlib import Path
 
-from app.services.kb_answer_grounding import tool_output_as_source, unsupported_figures
+from app.services.kb_answer_grounding import tool_output_as_source, unsupported_citations, unsupported_figures
 
 # The § 200.501 text the 2 CFR 200 KB actually holds (2024 revision).
 SNIPPETS = (
@@ -107,3 +108,123 @@ def test_figures_the_tool_did_not_return_are_still_flagged():
 
 def test_a_plain_text_tool_result_still_reads_bare_amounts_as_dollars():
     assert unsupported_figures("Budget: $1,250,000.", tool_output_as_source("budget 1250000")) == []
+
+
+# --- Citations: the cited source must contain what the answer credits to it ---
+
+# "Subaward Policies" ticket: the 200.332 source was a scraped eCFR page with
+# the title and site chrome but none of the rule text.
+STUB_332 = "2 CFR 200.332 — Requirements for pass-through entities."
+STUB_TEXT = (
+    "eCFR :: 2 CFR 200.332 -- Requirements for pass-through entities. "
+    "An official website of the United States government. Enhanced Content. "
+    "Displaying title 2, up to date as of 10/10/2026. Timeline. Published Edition."
+)
+QUESTION = (
+    "According to 2 CFR 200.332 in this knowledge base, what must a "
+    "pass-through entity do to monitor a subrecipient?"
+)
+RECALLED = (
+    "A pass-through entity must:\n"
+    "- Review financial and performance reports the subrecipient submits.\n"
+    "- Follow up on deficiencies found through audits and on-site reviews, and "
+    "ensure timely corrective action.\n"
+    "- Issue a management decision on audit findings within six months.\n"
+    "- Consider site visits, training and technical assistance as needed.\n\n"
+    f"[Source: {STUB_332}]"
+)
+RULE_TEXT = (
+    "(e) Monitor the activity of the subrecipient as necessary to ensure that the "
+    "subaward is used for authorized purposes, in compliance with the terms and "
+    "conditions of the subaward. Pass-through entity monitoring of the "
+    "subrecipient must include: (1) Reviewing financial and performance reports "
+    "required by the pass-through entity. (2) Following-up and ensuring that the "
+    "subrecipient takes timely and appropriate action on all deficiencies "
+    "detected through audits, on-site reviews, and written confirmation from the "
+    "subrecipient. (3) Issuing a management decision for applicable audit "
+    "findings pertaining only to the Federal award provided to the subrecipient."
+)
+GROUNDED = (
+    "Monitoring must include:\n"
+    "- Reviewing the financial and performance reports the pass-through requires.\n"
+    "- Following up on deficiencies detected through audits and on-site reviews, "
+    "making sure the subrecipient takes timely, appropriate action.\n"
+    "- Issuing a management decision on audit findings tied to its award.\n\n"
+    f"[Source: {STUB_332}]"
+)
+
+
+def test_flags_the_answer_from_the_ticket():
+    assert unsupported_citations(RECALLED, {STUB_332: STUB_TEXT}, QUESTION) == [
+        STUB_332
+    ]
+
+
+def test_the_same_answer_is_supported_by_the_rule_text():
+    assert unsupported_citations(GROUNDED, {STUB_332: RULE_TEXT}, QUESTION) == []
+
+
+def test_a_citation_naming_a_source_that_was_not_retrieved_is_flagged():
+    assert unsupported_citations(RECALLED, {"Subpart F": RULE_TEXT}, QUESTION) == [
+        STUB_332
+    ]
+
+
+def test_citations_name_the_source_loosely():
+    # A page locator, a dropped period, or the title cut short still finds
+    # the snippet the model was shown.
+    for cited in ("2 CFR 200.332 — Requirements for pass-through entities (p. 3)",
+                  "2 CFR 200.332"):
+        answer = GROUNDED.replace(STUB_332, cited)
+        assert unsupported_citations(answer, {STUB_332: RULE_TEXT}) == []
+
+
+def test_adjacent_citations_share_the_span_before_them():
+    answer = GROUNDED.replace(f"[Source: {STUB_332}]", f"[Source: {STUB_332}] [Source: Stub]")
+    assert unsupported_citations(answer, {STUB_332: RULE_TEXT, "Stub": STUB_TEXT}) == []
+
+
+def test_text_marked_as_general_knowledge_is_not_attributed_to_the_citation():
+    answer = (
+        "_Beyond the retrieved sources:_ Many universities also run annual "
+        "subrecipient risk questionnaires and desk reviews.\n\n" + GROUNDED
+    )
+    assert unsupported_citations(answer, {STUB_332: RULE_TEXT}) == []
+
+
+def test_short_fragments_and_uncited_answers_are_left_alone():
+    assert unsupported_citations("See the policy. [Source: Stub]", {"Stub": STUB_TEXT}) == []
+    assert unsupported_citations("No citation here at all.", {}) == []
+    assert unsupported_citations("", {}) == []
+
+
+# 52 answers written by a separate model, which had not seen this check, from
+# real 2 CFR 200 snippets: faithful (heavy paraphrase included), written from
+# memory against a title-only page, and citing a real but off-topic snippet.
+CASES = json.loads(
+    (Path(__file__).parent / "fixtures" / "kb_citation_support_cases.json").read_text()
+)
+
+
+def _flags(case):
+    texts: dict[str, str] = {}
+    for s in case["snippets"]:
+        texts[s["source"]] = texts.get(s["source"], "") + "\n" + s["text"]
+    return unsupported_citations(case["answer"], texts, case["question"])
+
+
+def test_corpus_faithful_answers_raise_no_flag():
+    flagged = [c["id"] for c in CASES if c["kind"] == "grounded" and _flags(c)]
+    assert flagged == []
+
+
+def test_corpus_title_only_sources_are_always_flagged():
+    missed = [c["id"] for c in CASES if c["kind"] == "stub" and not _flags(c)]
+    assert missed == []
+
+
+def test_corpus_off_topic_citations_are_mostly_flagged():
+    # Two of twelve share enough vocabulary with the snippet to clear the bar:
+    # the cost of keeping faithful paraphrase unflagged (see _MIN_SUPPORT).
+    missed = sorted(c["id"] for c in CASES if c["kind"] == "wrong_source" and not _flags(c))
+    assert missed == ["w_308_travel", "w_332_mon"]

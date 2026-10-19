@@ -15,6 +15,7 @@ import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallI
 import type { ReactNode } from 'react'
 import { formatPageLocator } from '../../utils/pageLocator'
 import { citationAnchor } from '../../utils/textMatch'
+import { isUsedCitation } from '../../utils/snippetRefs'
 
 const THINKING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -140,6 +141,7 @@ export function ChatMessage({
   const [commentSent, setCommentSent] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [openCitation, setOpenCitation] = useState<number | null>(null)
+  const [showUnusedSources, setShowUnusedSources] = useState(false)
   // Citation whose Preview/Open chooser is showing (null = none).
   const [citationMenu, setCitationMenu] = useState<number | null>(null)
   // The menu is absolutely positioned inside the chat scroller, which clips
@@ -583,16 +585,36 @@ export function ChatMessage({
             </div>
           )}
 
+          {message.unsupported_citations && message.unsupported_citations.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                The retrieved text from <strong>{message.unsupported_citations.join(', ')}</strong> doesn't
+                contain what this answer cites it for. That part likely comes from the model's general
+                knowledge, not the knowledge base. Open the source to check it, and if it holds only a
+                title or page navigation, re-add it with the full text.
+              </span>
+            </div>
+          )}
+
           {message.citations && message.citations.length > 0 && (() => {
-            const open = openCitation !== null ? message.citations[openCitation] : null
+            const citations = message.citations
+            const open = openCitation !== null ? citations[openCitation] : null
             const openPreview = open?.content_preview?.trim() || ''
-            return (
-              <div style={{ marginTop: 'var(--workspace-space-8)' }} ref={citationsRef}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
-                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', alignSelf: 'center', marginRight: 'var(--workspace-space-2)' }}>
-                    Sources:
-                  </span>
-                  {message.citations.map((c, i) => {
+            // Only the snippets the answer cited are its sources. The rest
+            // were retrieved and searched but not used — listing them as
+            // sources made "the KB doesn't cover this" look sourced (support
+            // ticket). They stay one click away for anyone checking.
+            const indexed = citations.map((c, i) => ({ c, i }))
+            const used = indexed.filter(({ c }) => isUsedCitation(c))
+            const unused = indexed.filter(({ c }) => !isUsedCitation(c))
+            const renderChip = (c: Citation, i: number, muted: boolean) => {
                     const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
                     const base = locator ? `${c.document_title} · ${locator}` : c.document_title
                     // With several knowledge bases attached, the filename
@@ -655,11 +677,11 @@ export function ChatMessage({
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                             padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
-                            backgroundColor: unverified ? '#fffbeb' : active ? '#e0e7ff' : '#f3f4f6',
-                            color: unverified ? '#92400e' : active ? '#3730a3' : '#374151',
+                            backgroundColor: unverified ? '#fffbeb' : active ? '#e0e7ff' : muted ? '#ffffff' : '#f3f4f6',
+                            color: unverified ? '#92400e' : active ? '#3730a3' : muted ? '#6b7280' : '#374151',
                             border: unverified
                               ? `1px dashed ${active ? '#b45309' : '#d97706'}`
-                              : `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
+                              : `1px ${muted && !active ? 'dashed' : 'solid'} ${active ? '#c7d2fe' : muted ? '#d1d5db' : '#e5e7eb'}`,
                             borderRadius: 'var(--workspace-radius-large)', overflowWrap: 'anywhere', textAlign: 'left',
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
@@ -702,8 +724,38 @@ export function ChatMessage({
                         )}
                       </span>
                     )
-                  })}
-                </div>
+            }
+            return (
+              <div style={{ marginTop: 'var(--workspace-space-8)' }} ref={citationsRef}>
+                {used.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', alignSelf: 'center', marginRight: 'var(--workspace-space-2)' }}>
+                      Sources:
+                    </span>
+                    {used.map(({ c, i }) => renderChip(c, i, false))}
+                  </div>
+                )}
+                {unused.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)', marginTop: used.length ? 'var(--workspace-space-6)' : 0 }}>
+                    <button
+                      type="button"
+                      aria-expanded={showUnusedSources}
+                      onClick={() => setShowUnusedSources(v => !v)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        padding: 0, fontSize: 'var(--workspace-font-meta)', color: '#6b7280',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      <ChevronRight
+                        size={12}
+                        style={{ transform: showUnusedSources ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }}
+                      />
+                      Searched but not used ({unused.length})
+                    </button>
+                    {showUnusedSources && unused.map(({ c, i }) => renderChip(c, i, true))}
+                  </div>
+                )}
                 {open && (
                   <div style={{
                     marginTop: 'var(--workspace-space-6)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5,

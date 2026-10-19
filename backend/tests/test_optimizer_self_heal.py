@@ -203,6 +203,7 @@ class TestKbStartSweepsFirst:
                  patch("app.routers.knowledge._require_manageable_kb", AsyncMock(return_value=kb)), \
                  patch("app.services.kb_optimizer.reap_stale_runs", new=reap), \
                  patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()), \
+                 patch("app.services.kb_optimizer.resolve_model_plan", new=AsyncMock(return_value={})), \
                  patch("app.models.kb_optimization_run.KBOptimizationRun", new=_model_cls("kb_uuid", active)):
                 MockUser.find_one = AsyncMock(return_value=_user())
                 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

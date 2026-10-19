@@ -7,6 +7,7 @@ import { getKBSource, setKBSourceAmends, setKBSourceReference } from '../../api/
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { sourceDisplayName } from './sourceName'
+import { KBSourceVersionHistory } from './KBSourceVersionHistory'
 
 interface Props {
   kbUuid: string
@@ -350,6 +351,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
             )
           ) : (
             <SourceContentInspector
+              kbUuid={kbUuid}
               loading={loading}
               error={error}
               detail={detail}
@@ -378,8 +380,9 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SourceContentInspector({
-  loading, error, detail, fallbackUrl, isDoc = false, partialText = null, onRetry,
+  kbUuid, loading, error, detail, fallbackUrl, isDoc = false, partialText = null, onRetry,
 }: {
+  kbUuid: string
   loading: boolean
   error: string | null
   onRetry?: () => void
@@ -540,6 +543,10 @@ function SourceContentInspector({
           </div>
         </div>
       )}
+
+      {/* Dated versions of a web page's text: a refresh that picks up a
+          revised page keeps the previous text here instead of discarding it. */}
+      {!isDoc && <KBSourceVersionHistory kbUuid={kbUuid} sourceUuid={detail.uuid} />}
 
       {/* Truncation warning — the page was longer than the fetcher's size cap,
           so the text below stops partway through and later sections were never

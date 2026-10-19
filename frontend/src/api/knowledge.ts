@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, URLRefreshInterval } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, KBSourceVersionCompare, KBSourceVersionDetail, KBSourceVersionList, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -116,6 +116,54 @@ export function addUrlsToKB(
   })
 }
 
+/** What adding one previewed page would do. Only `addable` pages can be kept. */
+export type UrlPreviewVerdict = 'good' | 'low' | 'empty' | 'error' | 'duplicate' | 'navigation'
+
+export interface UrlPreviewPage {
+  page_id: string
+  url: string
+  final_url: string | null
+  title: string | null
+  /** The URL this page was crawled from; null for a URL the user entered. */
+  parent_url: string | null
+  verdict: UrlPreviewVerdict
+  addable: boolean
+  reason: string | null
+  /** The start of the extracted text; fetch the rest with getUrlPreviewPageText. */
+  excerpt: string
+  char_count: number
+  chunk_count: number
+  truncated: boolean
+  warnings: string[]
+}
+
+export interface UrlPreview {
+  preview_uuid: string
+  status: 'running' | 'ready' | 'error' | 'committing' | 'committed'
+  error_message: string | null
+  crawl_enabled: boolean
+  pages: UrlPreviewPage[]
+}
+
+/** Fetch (and crawl) URLs for review; nothing is added until commitUrlPreview. */
+export function previewUrlsForKB(
+  uuid: string,
+  urls: string[],
+  crawlEnabled = false,
+  maxCrawlPages = 5,
+  allowedDomains = '',
+) {
+  return apiFetch<{ preview_uuid: string; status: string }>(`/api/knowledge/${uuid}/add_urls/preview`, {
+    method: 'POST',
+    body: JSON.stringify({
+      urls,
+      crawl_enabled: crawlEnabled,
+      max_crawl_pages: maxCrawlPages,
+      allowed_domains: allowedDomains,
+    }),
+  })
+}
+
 export interface SourceSuggestion {
   url: string
   title: string
@@ -174,6 +222,24 @@ export function readSitemap(uuid: string, url: string) {
   })
 }
 
+export function getUrlPreview(uuid: string, previewUuid: string) {
+  return apiFetch<UrlPreview>(`/api/knowledge/${uuid}/add_urls/preview/${previewUuid}`)
+}
+
+export function getUrlPreviewPageText(uuid: string, previewUuid: string, pageId: string) {
+  return apiFetch<{ page_id: string; text: string }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/pages/${pageId}`,
+  )
+}
+
+/** Add the kept pages, indexed from the text the preview showed. */
+export function commitUrlPreview(uuid: string, previewUuid: string, pageIds: string[]) {
+  return apiFetch<{ ok: boolean; queued: number }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/commit`,
+    { method: 'POST', body: JSON.stringify({ page_ids: pageIds }) },
+  )
+}
+
 export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',
@@ -192,6 +258,14 @@ export function refreshKBWebSources(uuid: string) {
 export function refreshKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
     `/api/knowledge/${uuid}/source/${sourceUuid}/refresh`,
+    { method: 'POST' },
+  )
+}
+
+/** Add a held web page anyway, after reviewing what was found (background re-fetch). */
+export function acceptKBSourceReview(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/accept_review`,
     { method: 'POST' },
   )
 }
@@ -224,6 +298,24 @@ export function reprocessKBSource(uuid: string, sourceUuid: string) {
 
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
+}
+
+/** A URL source's dated version history, newest first. With `at`, also says
+ *  which version was in effect at that moment. */
+export function listKBSourceVersions(uuid: string, sourceUuid: string, at?: string) {
+  const qs = at ? `?at=${encodeURIComponent(at)}` : ''
+  return apiFetch<KBSourceVersionList>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions${qs}`)
+}
+
+/** One version of a source, with the full text it held. */
+export function getKBSourceVersion(uuid: string, sourceUuid: string, versionUuid: string) {
+  return apiFetch<KBSourceVersionDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/${versionUuid}`)
+}
+
+/** A line diff from `base` to `target`. */
+export function compareKBSourceVersions(uuid: string, sourceUuid: string, base: string, target: string) {
+  const qs = `?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`
+  return apiFetch<KBSourceVersionCompare>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/compare${qs}`)
 }
 
 export interface KBSourceResponse {
@@ -323,6 +415,14 @@ export type KBJudgeVerdict = {
   evidence: string
   missing_facts: string[]
   hallucinated_facts: string[]
+  // Statements in the answer that contradict the expected answer. Absent on
+  // runs judged before the judge reported them.
+  contradicted_facts?: string[]
+  // The answer contradicts the expected answer, but a retrieved excerpt
+  // (conflict_evidence) supports it. Scored against the expected answer and
+  // left for a reviewer to decide which one is out of date.
+  expected_conflict?: boolean
+  conflict_evidence?: string
 }
 
 export type KBValidationDetail = {
@@ -390,6 +490,11 @@ export type KBValidationResult = {
     total_queries: number
     avg_precision: number
     avg_judge_score?: number | null
+    // Questions whose answer conflicts with the expected answer but is backed
+    // by a retrieved excerpt; included in avg_judge_score at their (low)
+    // score. Absent on runs judged before conflicts were scored apart.
+    num_expected_conflicts?: number
+    avg_judge_score_excluding_conflicts?: number | null
     avg_baseline_score?: number | null
     avg_lift?: number | null
     num_queries_judged?: number
@@ -883,6 +988,16 @@ export type KBOptimizationRun = {
   tied_with_baseline?: boolean
   // Apply-preview rollup (Phase 2 loop closure).
   apply_preview?: ApplyPreview | null
+  // Who judged, who answered today, who competed. Absent on older runs.
+  judge_source?: 'validation_grader' | 'selected' | null
+  judge_model_fallback?: { configured: string; used: string; reason: string } | null
+  current_model?: string | null
+  challenger_models?: string[]
+  judge_family_excluded_models?: string[]
+  current_shares_judge_family?: boolean
+  /** 'current' when no trial beat the current settings by more than the
+   * noise; 'challenger' when one did. Null on runs that predate the field. */
+  winner?: 'current' | 'challenger' | null
 }
 
 export type ApplyPreviewItem = {
@@ -920,6 +1035,34 @@ export type StartOptimizationOptions = {
   /** The exact reviewed test-question UUIDs to grade against — authoritative
    * when present so "generate only" / "combine" scope the run precisely. */
   test_query_uuids?: string[]
+  /** Omit to judge with the admin's Validation grader. */
+  judge_model?: string
+  /** Omit to let every eligible model compete. */
+  challenger_models?: string[]
+}
+
+export type KBOptimizationModelPlan = {
+  judge_model: string
+  judge_source: 'validation_grader' | 'selected'
+  judge_model_fallback: { configured: string; used: string; reason: string } | null
+  validation_grader: string
+  current_model: string
+  challenger_models: string[]
+  current_shares_judge_family: boolean
+  models: {
+    name: string
+    family: string
+    is_current: boolean
+    eligible: boolean
+    ineligible_reason: string | null
+  }[]
+}
+
+/** The judge / current / challenger plan a tuning run would use. Eligibility
+ * depends on the judge, so pass ``judgeModel`` to preview another one. */
+export function getKBOptimizationModels(uuid: string, judgeModel?: string | null) {
+  const qs = judgeModel ? `?judge_model=${encodeURIComponent(judgeModel)}` : ''
+  return apiFetch<KBOptimizationModelPlan>(`/api/knowledge/${uuid}/optimize/models${qs}`)
 }
 
 export function startKBOptimization(uuid: string, opts: StartOptimizationOptions) {

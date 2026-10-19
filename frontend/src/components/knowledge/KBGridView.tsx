@@ -81,9 +81,10 @@ function KBGridCard({
   kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onClone, onRemoveRef, pinned, onTogglePin,
 }: KBGridCardProps) {
   const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
-  // A ready KB with zero indexed chunks has nothing to retrieve, so chatting
-  // with it only produces a misleading "still indexing" reply.
-  const canChat = kb.status === 'ready' && kb.total_chunks > 0
+  // A KB with zero indexed chunks has nothing to retrieve, so chatting with
+  // it only produces a misleading "still indexing" reply. One with chunks
+  // answers from them even while a source is being refreshed ("building").
+  const canChat = kb.total_chunks > 0 && kb.status !== 'empty' && kb.status !== 'unavailable'
   const isReference = kb.is_reference
   // A broken bookmark has no underlying KB to open — the card is inert except
   // for its Remove button.
@@ -360,7 +361,7 @@ export function KBGridView({
   emptyComponent,
   filterUuids, pinnedUuids, onTogglePin,
 }: KBGridViewProps) {
-  const { knowledgeBases, loading, error, refresh } = useScopedKnowledgeBases({
+  const { knowledgeBases, total, loading, error, refresh } = useScopedKnowledgeBases({
     scope,
     search: search.trim() || undefined,
   })
@@ -410,6 +411,13 @@ export function KBGridView({
       {failure}
       {/* Sort */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
+        {/* The list is one page of the endpoint; the tab's count is the whole
+            total, so say when the grid holds less than that. */}
+        {!filterUuids && total > knowledgeBases.length && (
+          <span style={{ marginRight: 'auto', fontSize: 'var(--workspace-font-meta)', color: C.textFaint }}>
+            Showing {knowledgeBases.length} of {total} — search to find the rest
+          </span>
+        )}
         <ArrowUpDown size={13} style={{ color: C.textFaint }} />
         <select
           aria-label="Sort knowledge bases"

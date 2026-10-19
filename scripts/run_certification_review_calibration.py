@@ -8,7 +8,7 @@ case. Resume preserves prior results and rejects changed suites/model settings.
 import argparse
 import asyncio
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import fields
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -90,6 +90,14 @@ def summarize(report):
             'total_attempts': len(report['attempts']), 'release_ready': False, 'credit_awarded': False}
 
 
+def _usage_record(scope: metering.MeterScope) -> dict:
+    """The scope's totals plus its per-model rows. ``asdict`` can't copy the
+    scope's lock, and its ``usage`` map is keyed by tuples JSON can't hold."""
+    record = {f.name: getattr(scope, f.name) for f in fields(scope)
+              if f.name not in ('usage', '_lock')}
+    record['models'] = metering.model_usage_rows(scope)
+    return record
+
 async def run_batch(contract, suites, *, model_name, config, output, max_cases=1,
                     resume=False, retry_unavailable=False, call_model=None):
     if max_cases < 1:
@@ -134,7 +142,7 @@ async def run_batch(contract, suites, *, model_name, config, output, max_cases=1
                 result = await evaluate_draft_structured_review(contract, suite.module_id, case.evidence,
                     model_name=model_name, system_config=config, call_model=call_model)
             row = {'module_id': suite.module_id, **measure_calibration_case(case, result),
-                   'recorded_at': datetime.now(timezone.utc).isoformat(), 'usage': asdict(usage)}
+                   'recorded_at': datetime.now(timezone.utc).isoformat(), 'usage': _usage_record(usage)}
             row['row_sha256'] = encode(row)[1]
             report['attempts'].append(row)
             report['summary'] = summarize(report)

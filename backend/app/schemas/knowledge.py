@@ -61,6 +61,11 @@ class ReadSitemapRequest(BaseModel):
     url: str
 
 
+class CommitUrlPreviewRequest(BaseModel):
+    """The previewed pages to add; any others in the preview are dropped."""
+    page_ids: list[str]
+
+
 class KBSourceCurrency(BaseModel):
     """Refresh / ingestion provenance for one source (see
     app.utils.kb_source_currency). Lets an evaluator verify source currency
@@ -82,6 +87,13 @@ class KBSourceCurrency(BaseModel):
     content_hash_recorded: bool = False
     last_refresh_outcome: Optional[str] = None
     last_refresh_error: Optional[str] = None
+
+
+class KBSourceReviewFinding(BaseModel):
+    # hidden_text | instruction_text (see fetched_page_screen)
+    kind: str
+    reason: str
+    excerpt: str
 
 
 class KBSourceResponse(BaseModel):
@@ -115,6 +127,13 @@ class KBSourceResponse(BaseModel):
     # incomplete" shape as ``truncated``, read live from the document.
     ingestion_warnings: list[str] = []
     ingestion_warning_text: Optional[str] = None
+    # Pending or processing past the stale window: its worker is gone and
+    # nothing will finish it. The UI offers a retry instead of a spinner.
+    stalled: bool = False
+    # Why the last fetch of a URL source was held instead of embedded: hidden
+    # or AI-addressed text the user reviews before choosing "Add anyway".
+    # Status is "held" for a page never indexed, "ready" for a held refresh.
+    review_findings: list[KBSourceReviewFinding] = []
     created_at: Optional[str] = None
     # When the source's text was last fetched/ingested. Surfaced on the list
     # so a user can tell how stale a URL snapshot is before refreshing it.
@@ -145,6 +164,56 @@ class KBSourceDetailResponse(KBSourceResponse):
     # Navigation pages the crawl followed for links but did not embed
     skipped_urls: Optional[list[str]] = None
     child_sources: list[KBSourceResponse] = []  # Crawled children (when this is a parent)
+
+
+class KBSourceVersionResponse(BaseModel):
+    """One dated version of a URL source's text, without the text itself.
+
+    Dates are ISO 8601 in UTC. A version is in effect from
+    ``in_effect_from`` until ``superseded_at`` (None on the current one).
+    """
+
+    uuid: str
+    number: int
+    is_current: bool
+    origin: str
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content_hash: str
+    content_hash_algorithm: str = "sha256"
+    char_count: int = 0
+    truncated: bool = False
+    captured_at: Optional[str] = None
+    in_effect_from: Optional[str] = None
+    superseded_at: Optional[str] = None
+    last_confirmed_at: Optional[str] = None
+
+
+class KBSourceVersionListResponse(BaseModel):
+    versions: list[KBSourceVersionResponse]  # newest first
+    # Echo of the ``at`` query parameter, and the version that was in effect
+    # then (None if the source had no recorded text at that time).
+    at: Optional[str] = None
+    in_effect_version_uuid: Optional[str] = None
+
+
+class KBSourceVersionDetailResponse(KBSourceVersionResponse):
+    content: str
+
+
+class KBSourceVersionDiffLine(BaseModel):
+    op: Literal[" ", "+", "-", "@"]  # context, added, removed, hunk header
+    text: str
+
+
+class KBSourceVersionCompareResponse(BaseModel):
+    base: KBSourceVersionResponse
+    target: KBSourceVersionResponse
+    identical: bool
+    added: int
+    removed: int
+    lines: list[KBSourceVersionDiffLine]
+    truncated: bool  # the diff was longer than the line cap and was cut off
 
 
 class UpdateSourceRequest(BaseModel):

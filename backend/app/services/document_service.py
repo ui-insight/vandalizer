@@ -205,6 +205,7 @@ async def list_contents(
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,
                 "error_message": d.error_message,
+                "error_retryable": d.error_retryable,
                 "extraction_low_quality": is_extraction_low_quality(d),
                 "ingestion_warnings": ingestion_warnings(d),
                 # The list endpoint is what feeds the file browser; serving
@@ -316,6 +317,7 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "valid": doc.valid,
         "path": doc.path,
         "error_message": doc.error_message,
+        "error_retryable": doc.error_retryable,
         "processing": doc.processing,
         "title": doc.title,
         "extraction_low_quality": is_extraction_low_quality(doc),
@@ -378,6 +380,7 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
         'task_status': 'extracting', 'processing': True,
         'validating': True, '_validation_heartbeat_at': _datetime.datetime.now(),
         'updated_at': _datetime.datetime.now(), 'error_message': None,
+        'error_retryable': None,
         'raw_text': '', 'token_count': 0, 'text_markers': [],
         'extraction_nonletter_ratio': None, 'ingestion_warnings': [],
         **({'text_layer_rejected': True} if ocr_required else {}),

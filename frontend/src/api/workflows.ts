@@ -658,6 +658,10 @@ export interface RunHistoryEntry {
   /** Workflow runs: the run's model, and the models its steps ran on. */
   model?: string | null
   models_used?: string[]
+  /** Models the run's calls used, most tokens first; empty for older runs. */
+  models?: string[]
+  /** Each step's models, in step order (steps that called no model are absent). */
+  step_models?: { index: number; name: string | null; models: string[] }[]
 }
 
 export interface WorkflowVersionEntry {

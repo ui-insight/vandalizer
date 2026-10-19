@@ -1,6 +1,5 @@
 import { ExtractionFieldInstructions } from '../extractions/ExtractionFieldInstructions'
 import { useTestCaseSave } from '../../hooks/useTestCaseSave'
-import { SHARE_LABEL } from '../../lib/catalogLabels'
 import React, { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
@@ -40,7 +39,7 @@ import { ApiError } from '../../api/client'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry, ExtractionFieldSource, ExtractionSourceMap, CrossFieldRunReport, FieldSupportState, DocumentWarning } from '../../api/extractions'
 import { fieldSupportState } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
-import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
+import { EditorShareCallout } from '../library/EditorShareCallout'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
 import { ExtractionNeedsFieldsNotice } from '../extractions/ExtractionNeedsFieldsNotice'
 import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
@@ -131,6 +130,8 @@ export function ExtractionEditorPanel() {
   // Per-field source info, index-aligned with resultSets.
   const [resultSourceSets, setResultSourceSets] = useState<ExtractionSourceMap[]>([])
   const [resultDocNames, setResultDocNames] = useState<string[]>([])
+  // The models the shown run used — the CSV export's Model column.
+  const [resultModels, setResultModels] = useState<string[]>([])
   const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
   // Cross-field rule outcomes for the last run. null = the set defines no
@@ -202,6 +203,7 @@ export function ExtractionEditorPanel() {
     setResultSets(pending ? [pending.values] : [])
     setResultSourceSets(pending ? [pending.sources ?? {}] : [])
     setResultDocNames([])
+    setResultModels([])
     setActiveResultIdx(0)
     // A previous run's rule outcomes must not sit under a new run's values —
     // the run path already resets this; the open path (rail click, or a
@@ -350,6 +352,7 @@ export function ExtractionEditorPanel() {
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setCrossFieldSets(resp.cross_field_sets ?? (resp.cross_field ? [resp.cross_field] : []))
       setDocumentWarnings(resp.document_warnings ?? [])
+      setResultModels(resp.models ?? [])
       setActiveResultIdx(0)
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
@@ -371,6 +374,7 @@ export function ExtractionEditorPanel() {
           // The history snapshot merges all documents into one value map, so
           // a multi-doc run recovers as a single combined result set.
           setResultDocNames([docUuids.length > 1 ? `Combined (${docUuids.length} docs)` : runDocNames[0] ?? 'Result 1'])
+          setResultModels(run.models ?? [])
           setActiveResultIdx(0)
         } else if (run) {
           toast(`Extraction failed: ${run.error || 'unknown error'}`, 'error')
@@ -490,11 +494,13 @@ export function ExtractionEditorPanel() {
         if (!seen.has(k)) { seen.add(k); keys.push(k) }
       }
     }
-    // One row per document, fields as columns, with a leading Document column.
-    const header = [escape('Document'), ...keys.map(escape)].join(',')
+    // One row per document, fields as columns, with a leading Document column
+    // and, when the run recorded it, the model that produced the values.
+    const model = resultModels.join('; ')
+    const header = [escape('Document'), ...(model ? [escape('Model')] : []), ...keys.map(escape)].join(',')
     const rows = allSets.map((set, i) => {
       const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
-      return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
+      return [escape(docName), ...(model ? [escape(model)] : []), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
     })
     return header + '\n' + rows.join('\n') + '\n'
   }
@@ -1004,6 +1010,7 @@ export function ExtractionEditorPanel() {
             portability={searchSet?.validation_portability ?? null}
             canManage={searchSet?.can_manage !== false}
             onAddFields={() => setActiveTab('design')}
+            verified={!!searchSet?.verified}
           />
         </div>
       )}
@@ -3173,6 +3180,7 @@ function ValidateTab({
   portability,
   canManage = true,
   onAddFields,
+  verified,
 }: {
   searchSetUuid: string
   itemTitle?: string
@@ -3185,6 +3193,8 @@ function ValidateTab({
   canManage?: boolean
   /** Where fields get added (the Design tab) — offered when there are none. */
   onAddFields?: () => void
+  /** Verified items are already shared; the share callout hides. */
+  verified?: boolean
 }) {
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const { toast } = useToast()
@@ -3212,8 +3222,6 @@ function ValidateTab({
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
-  const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
   const [downloadingResults, setDownloadingResults] = useState(false)
 
   const handleDownloadResults = async () => {
@@ -4070,53 +4078,22 @@ function ValidateTab({
         </div>
       )}
 
-      {/* Submit to public library nudge — shown directly after suggestions/history, not in results */}
-      {results && (() => {
-        // Use the actual quality score (includes sample size penalty) if available
-        const latestScore = qualityHistory.length > 0 ? qualityHistory[0].score : null
-        const displayScore = latestScore ?? Math.round((results.executive_summary.mean_accuracy ?? 0) * 60 + (results.executive_summary.mean_consistency ?? 0) * 40)
-        if (displayScore < 80) return null
-        return (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
-            padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)',
-            backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
-          }}>
-            <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#15803d', flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 'var(--workspace-font-control)', color: '#065f46' }}>
-              <strong>Great results!</strong> This extraction has a quality score of {Math.round(displayScore)}%. Consider sharing it with Explore so others can benefit.
-            </div>
-            {submitLibraryResult === 'success' ? (
-              <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#15803d', whiteSpace: 'nowrap' }}>Submitted!</span>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setShowSubmitDialog(true) }}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-                  padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 'var(--workspace-radius-small)', border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                  color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-              >
-                {SHARE_LABEL}
-              </button>
-            )}
-            {showSubmitDialog && (
-              <VerificationSubmitModal
-                itemKind="search_set"
-                itemId={searchSetUuid!}
-                itemTitle={itemTitle}
-                onClose={() => setShowSubmitDialog(false)}
-                onSubmitted={() => {
-                  setSubmitLibraryResult('success')
-                  toast('Sent to the examiners — you\'ll hear back when someone has looked', 'success')
-                }}
-              />
-            )}
-          </div>
-        )
-      })()}
+      {/* Share — offered at any score; the server takes any score */}
+      <EditorShareCallout
+        itemKind="search_set"
+        itemId={searchSetUuid}
+        itemTitle={itemTitle}
+        kindNoun="extraction"
+        score={
+          qualityHistory.length > 0
+            ? qualityHistory[0].score
+            : results
+              // No quality record yet: the same estimate this run's summary uses
+              ? Math.round((results.executive_summary.mean_accuracy ?? 0) * 60 + (results.executive_summary.mean_consistency ?? 0) * 40)
+              : null
+        }
+        verified={verified}
+      />
 
       {/* 4. Results — Executive Summary */}
       {results && (

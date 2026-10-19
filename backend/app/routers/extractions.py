@@ -1065,13 +1065,13 @@ async def run_recorded_extraction(
     assert activity.id is not None
 
     try:
-        from app.services.metering import metered_async
+        from app.services.metering import metered_async, model_usage_rows, summarize_model_usage
         async with metered_async(
             "extraction",
             user_id=user_id,
             team_id=team_id,
             activity_id=str(activity.id),
-        ):
+        ) as meter:
             # Degraded inputs the run should disclose: text that is garbled,
             # or that is only part of the document. Chat already warns about
             # these; a wrong extracted deadline or dollar amount is the more
@@ -1192,6 +1192,7 @@ async def run_recorded_extraction(
                 "document_warnings": document_warnings,
                 "error": EXTRACTION_NO_VALUES_ERROR,
                 "activity_id": str(activity.id),
+                "models": summarize_model_usage(model_usage_rows(meter))["models"],
             }
 
         # Fire-and-forget auto-validation if test cases exist
@@ -1205,6 +1206,8 @@ async def run_recorded_extraction(
             "cross_field_sets": cross_field_sets,
             "document_warnings": document_warnings,
             "activity_id": str(activity.id),
+            # The models the run's calls used, for the results export.
+            "models": summarize_model_usage(model_usage_rows(meter))["models"],
         }
     except asyncio.CancelledError:
         # The caller gave up (chat's tool timeout). Without this the run
@@ -1217,7 +1220,21 @@ async def run_recorded_extraction(
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
         )
-        raise
+        from app.exceptions import AppError
+
+        if isinstance(e, (AppError, HTTPException)):
+            raise  # already carry their own status and message (trial limits, …)
+        # Re-raised, this reached the browser as a plain-text 500 — production
+        # has no catch-all handler — which the client can only show as
+        # "Request failed", while History held the real reason (support
+        # ticket). The engine already logged it (Sentry for anything not an
+        # outage); the user gets a reason they can act on.
+        from app.services.extraction_errors import describe_extraction_failure
+
+        status_code, message = describe_extraction_failure(e)
+        if status_code == 500:
+            logger.exception("Extraction run failed for search set %s", ss.uuid)
+        raise HTTPException(status_code=status_code, detail=message) from e
 
 
 @router.post("/run-sync")
@@ -1727,6 +1744,8 @@ async def get_extraction_history(
     """List the current user's past runs of this extraction."""
     await _get_search_set_or_404(uuid, user)
     from app.models.activity import ActivityEvent
+    from app.services.metering import run_model_fields
+
     events = (
         await ActivityEvent.find(
             ActivityEvent.search_set_uuid == uuid,
@@ -1750,6 +1769,10 @@ async def get_extraction_history(
                 "tokens_output": ev.tokens_output,
                 "documents_touched": ev.documents_touched,
                 "result_snapshot": ev.result_snapshot or {},
+                # What actually ran, from the metered calls (support ticket:
+                # History couldn't say which model a run used). Empty for runs
+                # recorded before models were.
+                **run_model_fields(ev.model_usage),
             }
             for ev in events
         ],

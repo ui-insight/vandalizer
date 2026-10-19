@@ -6,10 +6,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { Plus, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { useToast } from '../../contexts/ToastContext'
-import type { Project } from '../../types/project'
+import { PROJECT_STATES } from '../../types/project'
+import type { Project, ProjectState } from '../../types/project'
 import { ProjectStateBadge } from '../projects/ProjectStateBadge'
 import { ProjectSummaryStats } from '../projects/ProjectSummaryStats'
 import { ProjectsExplainer } from '../projects/ProjectsExplainer'
+import { PROJECT_SORT_LABELS, applyProjectListView, countByStage } from '../projects/projectListView'
+import type { ProjectSort } from '../projects/projectListView'
 
 /**
  * The Projects drawer — a slideout panel (like Automations/Knowledge) listing
@@ -35,8 +38,15 @@ export function ProjectsPanel() {
   const duplicatePending = useRef(false)
   const [visibleLimit, setVisibleLimit] = useState(40)
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('updated')
-  const visibleProjects = useMemo(() => projects.filter(p => `${p.title} ${p.description ?? ''}`.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => sort === 'name' ? a.title.localeCompare(b.title) : new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()), [projects, search, sort])
+  const [stage, setStage] = useState<ProjectState | 'all'>('all')
+  const [sort, setSort] = useState<ProjectSort>('updated')
+  const stageCounts = useMemo(() => countByStage(projects), [projects])
+  const visibleProjects = useMemo(
+    () => applyProjectListView(projects, { query: search, stage, sort }),
+    [projects, search, stage, sort],
+  )
+  const filtered = search.trim() !== '' || stage !== 'all'
+  const clearFilters = () => { setSearch(''); setStage('all'); setVisibleLimit(40) }
   const [creating, setCreating] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
@@ -108,7 +118,7 @@ export function ProjectsPanel() {
         >
           <HelpCircle size={12} />
           About
-        </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : `${projects.length} projects`}>
+        </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : filtered ? `${visibleProjects.length} of ${projects.length} projects` : `${projects.length} projects`}>
 
         <div>
         <FieldLabel htmlFor="new-project-name" required>New project name</FieldLabel>
@@ -140,8 +150,38 @@ export function ProjectsPanel() {
         </div>
         {projects.length > 0 && <div className="project-list-tools">
           <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
-          <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value); setVisibleLimit(40) }}><option value="updated">Recently updated</option><option value="name">Name A–Z</option></select>
+          <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value as ProjectSort); setVisibleLimit(40) }}>
+            {(Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]).map(key => (
+              <option key={key} value={key}>{PROJECT_SORT_LABELS[key]}</option>
+            ))}
+          </select>
         </div>}
+        {/* Stage filter. A stage with no projects has no pill, unless it is
+            the one selected, so the selection can always be undone. */}
+        {projects.length > 0 && (
+          <div role="group" aria-label="Filter by stage" className="mt-2 flex flex-wrap gap-1.5">
+            {(['all', ...PROJECT_STATES] as const)
+              .filter(s => s === 'all' || s === stage || stageCounts[s] > 0)
+              .map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setStage(s); setVisibleLimit(40) }}
+                  aria-pressed={stage === s}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                    stage === s
+                      ? 'border-gray-700 bg-gray-800 text-white'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {s}
+                  <span className={stage === s ? 'text-gray-300' : 'text-gray-600'}>
+                    {s === 'all' ? projects.length : stageCounts[s]}
+                  </span>
+                </button>
+              ))}
+          </div>
+        )}
       </WorkspaceSectionHeader>
       {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
       <div className="p-5 pb-24">
@@ -151,7 +191,7 @@ export function ProjectsPanel() {
           ) : error ? (<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Projects could not be loaded. <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry projects</button></div>) : projects.length === 0 ? (
             <div className="project-empty"><h3>Bring your work together</h3><p>A project keeps related files, knowledge and reusable tools in one place. Name your first project above to get started.</p></div>
           ) : (
-            visibleProjects.length === 0 ? <p role="status" className="py-6 text-sm text-gray-600">No projects match “{search}”. <button type="button" onClick={() => setSearch('')}>Clear search</button></p> : visibleProjects.slice(0, visibleLimit).map(p => (
+            visibleProjects.length === 0 ? <p role="status" className="py-6 text-sm text-gray-600">No projects match{search.trim() ? ` “${search.trim()}”` : ''}{stage !== 'all' ? ` in ${stage}` : ''}. <button type="button" onClick={clearFilters}>Clear filters</button></p> : visibleProjects.slice(0, visibleLimit).map(p => (
               <div
                 key={p.uuid}
                 className="group relative rounded-lg border border-gray-200 bg-white transition-colors hover:border-highlight"

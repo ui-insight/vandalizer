@@ -144,7 +144,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -393,7 +393,30 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
-      loadHistory(conversationToLoad).then(() => {
+      loadHistory(conversationToLoad).then((data) => {
+        if (data) {
+          // Re-attach what the conversation was asked against (support
+          // ticket): without it a follow-up went out with no document context.
+          setFileAttachments(data.file_attachments ?? [])
+          setUrlAttachments(data.url_attachments ?? [])
+          const scope = data.scope
+          if (scope?.documents) {
+            setSelectedDocUuids(scope.documents.map(d => d.uuid))
+            setSelectedDocNames(Object.fromEntries(scope.documents.map(d => [d.uuid, d.title])))
+          }
+          if (scope?.folders) {
+            setSelectedFolderUuids(scope.folders.map(f => f.uuid))
+            setSelectedFolderNames(Object.fromEntries(scope.folders.map(f => [f.uuid, f.title])))
+          }
+          if (scope?.knowledge_bases) replaceKBs(scope.knowledge_bases)
+          if (scope?.unavailable) {
+            const n = scope.unavailable
+            toast(
+              `${n} item${n === 1 ? '' : 's'} this conversation used ${n === 1 ? 'is' : 'are'} no longer available to you and ${n === 1 ? 'wasn\u2019t' : 'weren\u2019t'} re-attached.`,
+              'info',
+            )
+          }
+        }
         setTimeout(() => {
           const el = scrollContainerRef.current
           if (el) el.scrollTop = el.scrollHeight
@@ -403,7 +426,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
-  }, [conversationToLoad, loadHistory])
+  }, [conversationToLoad, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {

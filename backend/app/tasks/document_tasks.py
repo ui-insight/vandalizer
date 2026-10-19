@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from app.celery_app import celery_app
-from app.services.document_readers import DocumentReadError
+from app.services.document_readers import DocumentReadError, UnreadableFileError
 from app.services.extraction_generations import extraction_generation_filter
 from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
@@ -709,6 +709,7 @@ def perform_extraction_and_update(
             "ingestion_warnings": ingestion_warnings,
             "unread_pages": unread_pages,
             "error_message": None,
+            "error_retryable": None,
             # The refusal this run was retrying is resolved: the document has
             # a stored reading again, and the next retry starts from its
             # status and ratio like any other. Left set, a ratio false
@@ -750,6 +751,8 @@ def perform_extraction_and_update(
                     "ingestion_warnings": [],
                     "task_status": "error",
                     "error_message": message,
+                    # Nothing left to re-read.
+                    "error_retryable": False,
                 }
             },
         )
@@ -818,6 +821,9 @@ def perform_extraction_and_update(
                     "ingestion_warnings": [],
                     "task_status": "error",
                     "error_message": message,
+                    # A damaged or misnamed file fails the same way every
+                    # time; a reader crash wrapped as DocumentReadError may not.
+                    "error_retryable": not isinstance(e, UnreadableFileError),
                 }
             },
         )

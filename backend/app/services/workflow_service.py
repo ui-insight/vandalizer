@@ -233,6 +233,9 @@ async def get_workflow(
         "validation_inputs": _sanitize_for_json(wf.validation_inputs),
         "can_manage": can_manage,
         "can_validate": can_validate,
+        # The editor hides its share callout once the workflow is verified,
+        # as the Library menu does.
+        "verified": bool(wf.verified),
         "created_by_user_id": wf.created_by_user_id or wf.user_id,
     }
 

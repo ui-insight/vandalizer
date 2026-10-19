@@ -14,6 +14,9 @@ export interface ChatMessage {
   unsupported_figures?: string[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
+  /** KB answers only: sources the answer cites for text they don't contain —
+   *  e.g. a scraped page holding only its title. */
+  unsupported_citations?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -195,6 +198,14 @@ export interface Citation {
   source_reference?: string | null
   // Set when the KB source is a URL — citation chip links out to it.
   url?: string | null
+  /** The snippet's number in its turn's prompt; the answer cites it as [S#]. */
+  ref?: number
+  /** What [S#] reads as, e.g. "PAPPG.pdf, p. ~54". */
+  cite_label?: string
+  /** Whether the answer cited this snippet. false = retrieved and searched
+   *  but not used. Absent on answers saved before the distinction, which
+   *  show every snippet as a source. */
+  used?: boolean
 }
 
 // Live task checklist from the update_plan tool (chat_tools Phase 8).
@@ -220,6 +231,7 @@ export interface StreamChunk {
     | 'plan_update'
     | 'queue_consumed'
     | 'sources'
+    | 'sources_used'
     | 'grounding_warning'
   content: string
   duration?: number
@@ -249,10 +261,14 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+  // sources_used only: the [S#] numbers the finished answer cited.
+  used_refs?: number[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
+  // grounding_warning only: cited sources that don't contain the cited text.
+  unsupported_citations?: string[]
 }
 
 export interface SuggestedModel {

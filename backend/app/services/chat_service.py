@@ -45,7 +45,13 @@ from app.services.context_budget import (
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
 from app.services.approval_claims import unprepared_card_note
-from app.services.kb_answer_grounding import tool_output_as_source, unsupported_figures
+from app.services.kb_answer_grounding import (
+    expand_snippet_refs,
+    tool_output_as_source,
+    unsupported_citations,
+    unsupported_figures,
+    used_snippet_refs,
+)
 from app.services.silence_inference import inferences_from_silence
 from app.services.model_routing import (
     RoutingDecision,
@@ -1652,8 +1658,8 @@ async def chat_stream(
             "kind": "context_notice",
             "content": (
                 f"{len(errored_docs)} selected document(s) failed text extraction "
-                f"and can't be used here: {joined}. Open the document and use "
-                "\"Retry extraction\" to try again."
+                f"and can't be used here: {joined}. Open the document to see "
+                "why and what to do about it."
             ),
             "action": "documents_extraction_failed",
             "tokens_dropped": 0,
@@ -2568,6 +2574,20 @@ async def chat_stream(
                 )
                 thinking_text = "".join(full_thinking) or None
 
+                # Only the snippets the answer cites are its sources; the rest
+                # were searched and not used. Stored with the numbers expanded,
+                # because they mean nothing outside this turn.
+                if kb_sources:
+                    used_refs = used_snippet_refs(assistant_message, kb_sources)
+                    for src in kb_sources:
+                        src["used"] = src.get("ref") in used_refs
+                    assistant_message = expand_snippet_refs(assistant_message, kb_sources)
+                    yield json.dumps({
+                        "kind": "sources_used",
+                        "content": "",
+                        "used_refs": used_refs,
+                    }) + "\n"
+
                 # Clean think tags from text segments before persisting
                 cleaned_segments: list[dict] = []
                 for seg in streamed_segments:
@@ -2575,6 +2595,8 @@ async def chat_stream(
                         cleaned = normalize_citation_markup(
                             _THINK_BLOCK_RE.sub("", seg["content"]).strip()
                         )
+                        if cleaned and kb_sources:
+                            cleaned = expand_snippet_refs(cleaned, kb_sources)
                         if cleaned:
                             cleaned_segments.append({"kind": "text", "content": cleaned})
                     else:
@@ -2631,6 +2653,16 @@ async def chat_stream(
                     inferences_from_silence(assistant_message)
                     if active_kbs or documents else []
                 )
+                # And a source it cites must contain what the answer credits
+                # to it — not just a title the model then answered around.
+                miscited = (
+                    unsupported_citations(
+                        assistant_message,
+                        _cited_source_texts([*doc_segments, *attachment_segments]),
+                        message,
+                    )
+                    if active_kbs else []
+                )
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -2646,13 +2678,15 @@ async def chat_stream(
                     plan_state=deps.plan_state if deps is not None else None,
                     unsupported_figures=unsupported or None,
                     silence_inferences=silent or None,
+                    unsupported_citations=miscited or None,
                 )
-                if unsupported or silent:
+                if unsupported or silent or miscited:
                     yield json.dumps({
                         "kind": "grounding_warning",
                         "content": "",
                         "unsupported_figures": unsupported,
                         "silence_inferences": silent,
+                        "unsupported_citations": miscited,
                     }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
@@ -2720,7 +2754,7 @@ async def chat_stream(
             await _save_failed_assistant_turn(
                 conversation,
                 _build_interrupted_body(
-                    full_response, "stopped at the per-turn tool budget"
+                    full_response, "stopped at the per-turn tool budget", kb_sources,
                 ),
                 activity_id,
                 "usage limit",
@@ -2769,6 +2803,7 @@ async def chat_stream(
                     full_response,
                     "stopped by the user" if stopped
                     else "connection closed before completion",
+                    kb_sources,
                 ),
                 activity_id,
                 "stopped by the user" if stopped else "client disconnected",
@@ -2791,7 +2826,7 @@ async def chat_stream(
         try:
             await _save_failed_assistant_turn(
                 conversation,
-                _build_interrupted_body(full_response, user_message[:200]),
+                _build_interrupted_body(full_response, user_message[:200], kb_sources),
                 activity_id,
                 str(e),
                 thinking="".join(full_thinking) or None,
@@ -3782,7 +3817,7 @@ async def _render_kb_segment(
     any_approximate = False
     any_spanning = False
     any_amendment = False
-    for r in kb_results:
+    for ref, r in enumerate(kb_results, start=1):
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
         src = meta.get("source_name", "Unknown")
@@ -3802,8 +3837,14 @@ async def _render_kb_segment(
         any_approximate = any_approximate or approximate
         annotated = annotate_chunk_pages(content, meta)
         any_spanning = any_spanning or annotated != content
-        snippet_blocks.append(f"\n**Source: {label}**\n{annotated}\n")
+        # Numbered so the answer can say which snippets it used: a filename
+        # can't, when one document contributes several.
+        snippet_blocks.append(f"\n**[S{ref}] Source: {label}**\n{annotated}\n")
         kb_sources.append({
+            "ref": ref,
+            # What [S{ref}] reads as in the answer the user sees and the one
+            # stored.
+            "cite_label": f"{src}, {locator}" if locator else src,
             "document_id": meta.get("source_id"),
             "document_title": src,
             "page": page,
@@ -3824,8 +3865,10 @@ async def _render_kb_segment(
         "\n\n## Retrieved Knowledge Base Snippets\n"
         "_The following are partial excerpts from a larger corpus, ranked "
         "by similarity to the user's question. They may be incomplete, "
-        "off-topic, or miss the best answer. Cite by filename only when a "
-        "snippet actually supports your claim._\n"
+        "off-topic, or miss the best answer. Each is numbered, e.g. `[S3]`. "
+        "Cite a snippet by its number right after the claim it supports — "
+        "`[S3]`, or `[S1, S3]` for several. Cite only snippets you actually "
+        "used. If none answers the question, say so and cite none._\n"
     )
     if any_approximate:
         # A tilde the model has not had explained to it does not survive: it
@@ -3876,9 +3919,49 @@ async def _render_kb_segment(
     return DocumentSegment(label="kb", text=kb_text, required=True), kb_sources
 
 
-def _build_interrupted_body(full_response: list[str], reason: str) -> str:
-    """Compose an assistant-turn body from any partial stream content + a reason."""
+# The optional "[S3] " prefix is the snippet number a numbered rendering puts
+# before "Source:" (#993); without it every heading would go unmatched and
+# every citation would read as naming a source that was never retrieved.
+_KB_SOURCE_HEADING_RE = re.compile(
+    r"^\*\*(?:\[S\d+\]\s*)?Source: (.+?)\*\*$", re.MULTILINE,
+)
+
+
+def _cited_source_texts(segments: list[DocumentSegment]) -> dict[str, str]:
+    """What each citable source put in front of the model, keyed by its name.
+
+    A KB segment holds many snippets, each under the ``**Source: <label>**``
+    heading the model is told to cite, so it is split back apart on those
+    headings and a source's snippets are joined. A document, file or web page
+    is one segment, named by what follows its label prefix.
+    """
+    out: dict[str, str] = {}
+    for seg in segments:
+        if seg.label == "kb":
+            heads = list(_KB_SOURCE_HEADING_RE.finditer(seg.text))
+            for i, h in enumerate(heads):
+                end = heads[i + 1].start() if i + 1 < len(heads) else len(seg.text)
+                name = h.group(1).strip()
+                out[name] = out.get(name, "") + "\n" + seg.text[h.end():end]
+        elif ":" in seg.label:
+            kind, name = seg.label.split(":", 1)
+            if kind in ("doc", "file", "web") and name:
+                out[name] = out.get(name, "") + "\n" + seg.text
+    return out
+
+
+def _build_interrupted_body(
+    full_response: list[str], reason: str, kb_sources: list[dict] | None = None,
+) -> str:
+    """Compose an assistant-turn body from any partial stream content + a reason.
+
+    A KB answer's ``[S3]`` snippet numbers are expanded here too, as on the
+    normal path: saved raw, they would be read back next turn against that
+    turn's numbering and point at different snippets.
+    """
     partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+    if partial and kb_sources:
+        partial = expand_snippet_refs(partial, kb_sources)
     if partial:
         return f"{partial}\n\n_(response interrupted — {reason})_"
     return f"_(no response — {reason})_"
@@ -4479,6 +4562,7 @@ async def _finalize(
     plan_state: Optional[list[dict]] = None,
     unsupported_figures: Optional[list[str]] = None,
     silence_inferences: Optional[list[str]] = None,
+    unsupported_citations: Optional[list[str]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -4492,6 +4576,7 @@ async def _finalize(
         citations=citations,
         unsupported_figures=unsupported_figures,
         silence_inferences=silence_inferences,
+        unsupported_citations=unsupported_citations,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

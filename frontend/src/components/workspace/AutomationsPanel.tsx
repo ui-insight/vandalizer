@@ -1,6 +1,6 @@
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { AutomationSummary } from './AutomationSummary'
@@ -14,6 +14,10 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
 import { formatRunTime } from '../../utils/schedule'
+import {
+  AUTOMATION_SORT_OPTIONS, AUTOMATION_STATUS, automationStatus, loadAutomationSort,
+  saveAutomationSort, sortAutomations, type AutomationSort,
+} from './automationList'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string }> = {
   folder_watch: { label: 'Folder Watch' },
@@ -35,6 +39,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<AutomationSort>(loadAutomationSort)
   const [showWizard, setShowWizard] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [m365Enabled, setM365Enabled] = useState(false)
@@ -77,8 +82,8 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         (a.description || '').toLowerCase().includes(q),
       )
     }
-    return list
-  }, [base, filter, search])
+    return sortAutomations(list, sort, activeIds)
+  }, [base, filter, search, sort, activeIds])
 
   const counts = useMemo(() => ({
     all: base.length,
@@ -202,6 +207,23 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               </button>
             )}
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', flexShrink: 0 }}>
+            <ArrowUpDown size={12} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
+            <select
+              aria-label="Sort automations"
+              value={sort}
+              onChange={e => { const v = e.target.value as AutomationSort; setSort(v); saveAutomationSort(v) }}
+              style={{
+                padding: 'var(--workspace-space-2) var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+                color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
+              }}
+            >
+              {AUTOMATION_SORT_OPTIONS.map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -257,6 +279,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             {filtered.map(auto => {
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
               const isRunning = activeIds.has(auto.id)
+              const status = AUTOMATION_STATUS[automationStatus(auto, isRunning)]
               return (
                 <div
                   key={auto.id}
@@ -279,6 +302,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
                     <span
+                      aria-hidden="true"
                       style={{
                         width: 8,
                         height: 8,
@@ -314,6 +338,15 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-4)' }}>
                     <span
+                      title={status.title}
+                      style={{
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-large)',
+                        color: status.color, backgroundColor: status.bg,
+                      }}
+                    >
+                      {status.label}
+                    </span>
+                    <span
                       style={{
                         fontSize: 'var(--workspace-font-meta)',
                         fontWeight: 600,
@@ -325,7 +358,6 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                     >
                       {badge.label}
                     </span>
-                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{isRunning ? 'Running' : auto.enabled ? 'Enabled' : 'Disabled'}</span>
                     {auto.shared_with_team && (
                       <span style={{
                         fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
@@ -339,11 +371,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: auto.last_event_status === 'failed' ? '#b91c1c' : 'var(--workspace-muted)' }}>
                     {auto.last_event_status ? `Last run: ${{ completed: 'Succeeded', failed: 'Failed', pending: 'Pending', queued: 'Queued', running: 'Running', skipped: 'Skipped' }[auto.last_event_status] || auto.last_event_status}${auto.last_event_at ? ` · ${formatRunTime(auto.last_event_at, String(auto.trigger_config?.timezone || 'UTC'))}` : ''}` : auto.last_event_status === null ? 'No runs yet' : 'Run history not reported'}
                   </div>
-                  {auto.trigger_type === 'schedule'  && (auto.next_run_at || !auto.enabled) && !isRunning && (
+                  {/* Paused is on the status pill for every trigger type now. */}
+                  {auto.trigger_type === 'schedule' && auto.next_run_at && auto.enabled && !isRunning && (
                     <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>
-                      {auto.enabled
-                        ? `Next run ${formatRunTime(auto.next_run_at!, String(auto.trigger_config?.timezone || 'UTC'))}`
-                        : 'Paused'}
+                      {`Next run ${formatRunTime(auto.next_run_at, String(auto.trigger_config?.timezone || 'UTC'))}`}
                     </div>
                   )}
                 </div>

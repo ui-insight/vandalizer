@@ -19,7 +19,7 @@ import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { AuthorChip } from '../shared/AuthorChip'
 import { useAuth } from '../../hooks/useAuth'
-import { useShareLabel } from '../../lib/catalogLabels'
+import { SHARE_MENU_LABEL } from '../../lib/catalogLabels'
 import { useToast } from '../../contexts/ToastContext'
 import { useShareLink } from '../../lib/shareLink'
 import { relativeTime } from '../../utils/time'
@@ -44,7 +44,6 @@ interface Props {
 }
 
 export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
-  const shareLabel = useShareLabel()
   const { user } = useAuth()
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -409,14 +408,6 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                           setMenuOpen(false)
                         }}
                       />
-                      <MenuItem disabled={busy}
-                        icon={<Share2 size={14} />}
-                        label="Send to team…"
-                        onClick={() => {
-                          onShare(item.id)
-                          setMenuOpen(false)
-                        }}
-                      />
                     </>
                   ) : (
                     <MenuItem disabled={busy}
@@ -429,13 +420,16 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                       }}
                     />
                   )}
-                  {!item.verified && (
+                  {/* One entry for every kind of sharing. A verified item is already
+                      shared with everyone, so it goes straight to team sharing. */}
+                  {(scope === 'mine' || !item.verified) && (
                     <MenuItem disabled={busy}
-                      icon={<ShieldCheck size={14} />}
-                      label={shareLabel}
+                      icon={<Share2 size={14} />}
+                      label={SHARE_MENU_LABEL}
                       onClick={() => {
                         setMenuOpen(false)
-                        setShowVerifyModal(true)
+                        if (item.verified) onShare(item.id)
+                        else setShowVerifyModal(true)
                       }}
                     />
                   )}

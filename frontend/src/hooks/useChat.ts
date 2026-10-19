@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, queueChatMessage, stopChatTurn } from '../api/chat'
+import { streamChat, getHistory, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
+import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
@@ -113,6 +114,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const unsupportedFiguresRef = useRef<string[]>([])
   const silenceInferencesRef = useRef<string[]>([])
+  const unsupportedCitationsRef = useRef<string[]>([])
 
   /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
@@ -157,6 +159,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       citationsRef.current = []
       unsupportedFiguresRef.current = []
       silenceInferencesRef.current = []
+      unsupportedCitationsRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
@@ -165,7 +168,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       // far. Shared by the normal-completion, user-stop, and network-failure
       // paths so a partial response is never silently discarded.
       const commitAssistantMessage = (interruption?: 'stopped' | 'connection') => {
-        const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
+        // Expanded the same way the server stores it, so a reload reads the same.
+        const finalContent = expandSnippetRefs(
+          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
+          citationsRef.current,
+        )
         if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
         const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(interruption ? { interruption } : {}) }
         if (thinkingRef.current) {
@@ -189,7 +196,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           assistantMsg.segments = segmentsRef.current
             .map((seg) =>
               seg.kind === 'text'
-                ? { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
+                ? { ...seg, content: expandSnippetRefs(seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''), citationsRef.current) }
                 : seg,
             )
             .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
@@ -202,6 +209,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
         if (silenceInferencesRef.current.length) {
           assistantMsg.silence_inferences = silenceInferencesRef.current
+        }
+        if (unsupportedCitationsRef.current.length) {
+          assistantMsg.unsupported_citations = unsupportedCitationsRef.current
         }
         setMessages((prev) => [...prev, assistantMsg])
       }
@@ -226,7 +236,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               const display = streamingRef.current
                 .replace(THINK_BLOCK_RE, '')
                 .replace(THINK_TRAILING_RE, '')
-              setStreamingContent(display)
+              setStreamingContent(expandSnippetRefs(display, citationsRef.current))
 
               // Build ordered segments
               const segs = segmentsRef.current
@@ -326,9 +336,12 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
                 }
                 citationsRef.current = merged
               }
+            } else if (chunk.kind === 'sources_used') {
+              citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
               silenceInferencesRef.current = chunk.silence_inferences ?? []
+              unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,
@@ -416,7 +429,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     void told.then(() => controller.abort())
   }, [conversationUuid])
 
-  const loadHistory = useCallback(async (uuid: string) => {
+  // Resolves to the loaded history so the caller can restore what the
+  // conversation was attached to; null on failure, or when another chat was
+  // opened before this one's history arrived.
+  const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
     const version = ++historyLoadVersion.current
     detachLiveTurn()
     setIsLoadingHistory(true)
@@ -428,16 +444,18 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     lastSendArgsRef.current = null
     try {
       const data = await getHistory(uuid)
-      if (version !== historyLoadVersion.current) return
+      if (version !== historyLoadVersion.current) return null
       setMessages(data.messages)
       setActivityId(data.activity_id ?? null)
       setContextMode(data.context_mode ?? 'full')
       setContextCutoffIndex(data.context_cutoff_index ?? 0)
       setPlanTasks(data.active_plan ?? null)
+      return data
     } catch (e) {
       if (version === historyLoadVersion.current) {
         setError(e instanceof Error ? e.message : 'Failed to load history')
       }
+      return null
     } finally {
       if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }

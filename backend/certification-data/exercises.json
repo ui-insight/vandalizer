@@ -444,7 +444,7 @@
       "Use a workflow already built; no new source document is required. Inspect its purpose, inputs, outputs and current evidence before sharing.",
       "If practicing another permitted team or workspace, select it using the available workspace controls and check access before copying work. Keep credentials and private source data out of exports.",
       "Give the workflow a clear description of its intended use and limitations.",
-      "For the original base requirement, choose **Share with everyone** from the workflow’s available sharing menu. Inspect the saved request. Examiner acceptance is optional enrichment under the original criteria and is not required to pass.",
+      "For the original base requirement, choose **Share…** from the workflow’s ⋯ menu, then **I’ve already validated it — share it with its score**. Inspect the saved request. Examiner acceptance is optional enrichment under the original criteria and is not required to pass.",
       "Then use **Check Progress** and **Complete Module**, or ask chat to perform those course actions and inspect the saved result. Submitting the sharing request alone does not save module completion.",
       "For portability practice, inspect the exported `.vandalizer.json` contents, resolve permitted local dependencies after import and test the imported revision. Export or import success alone does not establish portability.",
       "Reviewed status, measured validation and suitability for your use are separate. Preserve the original course’s credit and credentials; this exercise creates no new staff certification grading queue."
@@ -453,7 +453,7 @@
       "Ask chat for this module’s saved original requirements. Use a workflow already built; no new source document is required. Inspect its purpose, inputs, outputs and current evidence before sharing.",
       "If practicing another permitted team or workspace, select it using the available workspace controls and check access before copying work. Keep credentials and private source data out of exports.",
       "Give the workflow a clear description of its intended use and limitations.",
-      "For the original base requirement, choose **Share with everyone** from the workflow’s available sharing menu. Inspect the saved request. Examiner acceptance is optional enrichment under the original criteria and is not required to pass.",
+      "For the original base requirement, choose **Share…** from the workflow’s ⋯ menu, then **I’ve already validated it — share it with its score**. Inspect the saved request. Examiner acceptance is optional enrichment under the original criteria and is not required to pass.",
       "Then ask chat to check the module, review the criteria and request completion. Inspect the saved result. Submitting the sharing request alone does not save module completion.",
       "For portability practice, inspect the exported `.vandalizer.json` contents, resolve permitted local dependencies after import and test the imported revision. Export or import success alone does not establish portability.",
       "Reviewed status, measured validation and suitability for your use are separate. Preserve the original course’s credit and credentials; this exercise creates no new staff certification grading queue."

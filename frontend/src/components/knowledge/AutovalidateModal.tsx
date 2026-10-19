@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import {
   formatBudgetEstimate,
@@ -32,6 +32,7 @@ import { recommendLevel, recommendationReason } from '../shared/baselineRecommen
 import { TermDef } from '../shared/TermDef'
 import { QuestionExpectations } from './QuestionExpectations'
 import { useConfirm } from '../shared/useConfirm'
+import { TuningModelsPicker } from './TuningModels'
 
 interface Props {
   kbUuid: string
@@ -58,6 +59,10 @@ interface KBWizardOptions {
   noKbScore: number | null
   /** Computed in BaselineStep from ``noKbScore``. Null until the probe completes. */
   recommendedTier: Tier | null
+  /** Null = the admin's Validation grader judges. */
+  judgeModel: string | null
+  /** Null = every eligible model competes. */
+  challengerModels: string[] | null
 }
 
 const INITIAL_OPTIONS: KBWizardOptions = {
@@ -71,6 +76,17 @@ const INITIAL_OPTIONS: KBWizardOptions = {
   sampleQueryIds: [],
   noKbScore: null,
   recommendedTier: null,
+  judgeModel: null,
+  challengerModels: null,
+}
+
+// Mirrors the backend's pacing estimate (kb_optimizer.DEFAULT_TRIAL_TOKEN_ESTIMATE,
+// MAX_TRIAL_COUNT); the run can stop sooner when it converges.
+const TRIAL_TOKEN_ESTIMATE = 100_000
+const MAX_TRIALS = 100
+function trialsLabelFor(tokens: number): string {
+  const n = Math.min(MAX_TRIALS, Math.floor(tokens / TRIAL_TOKEN_ESTIMATE))
+  return `up to ${n}`
 }
 
 export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQueries }: Props) {
@@ -174,7 +190,16 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
             description="Each candidate uses model tokens. Choose a spending limit for this experiment. More trials may help, but results depend on your test questions and are not guaranteed."
           />
           <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)', marginTop: 'var(--workspace-space-16)' }}>{opts.sampleQueryIds.length} reviewed questions · {tokens_label}{cost_label ? ` · ${cost_label}` : ' · Dollar estimate unavailable for this model'}. You review the results before applying changes unless you enable automatic application below.</p>
-          <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)' }}>Grader: {grader?.model || 'details unavailable'}. Time: {KB_BUDGET_TIERS.find(t => t.id === opts.tier)?.timeEstimate || 'no estimate for a custom budget'}{opts.tier !== 'custom' && ' (approximate)'}. Queue, models and question length affect duration. Results cover this reviewed test set; more trials do not guarantee improvement.</p>
+          <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)' }}>Grader: {opts.judgeModel || grader?.model || 'details unavailable'}. Time: {KB_BUDGET_TIERS.find(t => t.id === opts.tier)?.timeEstimate || 'no estimate for a custom budget'}{opts.tier !== 'custom' && ' (approximate)'}. Queue, models and question length affect duration. Results cover this reviewed test set; more trials do not guarantee improvement.</p>
+          <TuningModelsPicker
+            kbUuid={kbUuid}
+            judgeModel={opts.judgeModel}
+            challengerModels={opts.challengerModels}
+            onChange={(judgeModel, challengerModels) =>
+              set(o => ({ ...o, judgeModel, challengerModels }))}
+            questionCount={opts.sampleQueryIds.length}
+            trialsLabel={trialsLabelFor(tokens)}
+          />
           <details style={{ marginTop: 'var(--workspace-space-16)', color: 'var(--workspace-text)', fontSize: 'var(--workspace-font-control)' }}><summary style={{ cursor: 'pointer' }}>Optional settings</summary><AdvancedStep applyOnFinish={opts.applyOnFinish} onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))} tokensLabel={tokens_label} costLabel={cost_label} /></details>
           </>
         )
@@ -192,6 +217,8 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
       // The exact set the user reviewed in Preview — makes the run grade against
       // precisely these questions regardless of what else is saved on the KB.
       test_query_uuids: opts.sampleQueryIds,
+      ...(opts.judgeModel ? { judge_model: opts.judgeModel } : {}),
+      ...(opts.challengerModels ? { challenger_models: opts.challengerModels } : {}),
     })
   }
 
@@ -785,12 +812,15 @@ function recommendTier(noKbScore: number | null): Tier {
 }
 
 function AdvancedStep({
-  applyOnFinish, onApplyOnFinish, tokensLabel, costLabel,
+  applyOnFinish, onApplyOnFinish, tokensLabel, costLabel, models,
 }: {
   applyOnFinish: boolean
   onApplyOnFinish: (b: boolean) => void
   tokensLabel: string
   costLabel: string | null
+  /** Judge / current / challengers summary with its Advanced pickers. The
+   *  budget step shows them itself, so this is optional. */
+  models?: ReactNode
 }) {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
@@ -809,9 +839,10 @@ function AdvancedStep({
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)' }}>
           Ready to start
         </div>
-        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-8)' }}>
           Budget: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
         </div>
+        {models}
       </div>
     </div>
   )

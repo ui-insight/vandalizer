@@ -238,6 +238,60 @@ async def _ingest_url_sources_async(
 
 @celery.task(
     bind=True,
+    name="tasks.kb.preview_urls",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    soft_time_limit=1800,  # same budget as add_urls: a preview runs the same crawl
+    time_limit=1860,
+)
+def preview_urls_task(self, preview_uuid: str):
+    """Fetch (and crawl) URLs for review, writing nothing to the KB."""
+    return _run_async(_preview_urls_async(preview_uuid))
+
+
+async def _preview_urls_async(preview_uuid: str):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.services import kb_url_preview
+
+    await kb_url_preview.run_preview(preview_uuid)
+    return {"preview_uuid": preview_uuid}
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.commit_url_preview",
+    soft_time_limit=1800,
+    time_limit=1860,
+)
+def commit_url_preview_task(self, preview_uuid: str, page_ids: list[str]):
+    """Index the pages a user kept from a URL preview.
+
+    Not auto-retried: a retry after some pages were indexed would skip them
+    as duplicates and report a lower count, and the rows it did write stand.
+    """
+    return _run_async(_commit_url_preview_async(preview_uuid, page_ids))
+
+
+async def _commit_url_preview_async(preview_uuid: str, page_ids: list[str]):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.services import kb_url_preview
+
+    added = await kb_url_preview.commit_preview(preview_uuid, page_ids)
+    return {"preview_uuid": preview_uuid, "added": added}
+
+
+@celery.task(
+    bind=True,
     name="tasks.kb.refresh_url_source",
     autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,
@@ -248,9 +302,11 @@ async def _ingest_url_sources_async(
     soft_time_limit=3600,
     time_limit=3660,
 )
-def refresh_url_source_task(self, kb_uuid: str, source_uuid: str, queued_at: str | None = None):
+def refresh_url_source_task(
+    self, kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
+):
     """Re-fetch one URL source in place. See knowledge_service.refresh_url_source."""
-    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at))
+    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at, scheduled))
 
 
 def _same_stamp(stored, queued_at: str | None) -> bool:
@@ -276,7 +332,9 @@ def _same_stamp(stored, queued_at: str | None) -> bool:
     return abs((_utc(stored) - _utc(parsed)).total_seconds()) < 1
 
 
-async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: str | None = None):
+async def _refresh_url_source_async(
+    kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
+):
     from app.config import Settings
     from app.database import init_db
 
@@ -306,6 +364,11 @@ async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: s
         logger.info("Refresh of KB source %s superseded by a later queueing; skipping.", source_uuid)
         return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": False, "reason": "superseded"}
 
+    # What the page said before, for the change summary a scheduled refresh
+    # sends; refresh_url_source overwrites all three.
+    previous_text = getattr(source, "content", None)
+    previous_title = getattr(source, "url_title", None)
+    previous_outcome = getattr(source, "last_refresh_outcome", None)
     try:
         reason = await svc.refresh_url_source(source, kb)
     except TRANSIENT_EXCEPTIONS:
@@ -319,10 +382,28 @@ async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: s
         source.status = "ready" if source.chunk_count else "error"
         source.error_message = reason
         source.last_refresh_error = reason
+        # Recorded so the next scheduled pass sees the source already failing
+        # and stays quiet, as it does for a failed fetch.
+        from app.utils import kb_source_currency as _currency
+
+        source.last_refresh_outcome = _currency.OUTCOME_RETRIEVAL_FAILED
         try:
             await source.save()
         except Exception:
             logger.exception("Could not restore KB source %s after a failed refresh", source_uuid)
+    if scheduled:
+        from app.services import kb_refresh_notifications as notify
+        from app.utils import kb_source_currency as currency
+
+        if reason is not None:
+            await notify.notify_source_refresh_failed(
+                kb, source, reason, previous_outcome=previous_outcome,
+            )
+        elif getattr(source, "last_refresh_outcome", None) == currency.OUTCOME_REFRESHED:
+            await notify.notify_source_changed(
+                kb, source,
+                notify.summarize_change(previous_text, source.content, previous_title, source.url_title),
+            )
     # Unconditional: the router set status="building" before dispatching.
     await svc.recalculate_stats(kb)
     return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": reason is None, "reason": reason}
@@ -349,7 +430,10 @@ async def _refresh_due_url_sources_async():
 
     from app.services import kb_url_refresh
 
-    return await kb_url_refresh.refresh_due_sources()
+    # First, so a source whose refresh died is settled (and its KB stops
+    # reporting "building") even in a KB with no refresh interval.
+    recovered = await kb_url_refresh.recover_stalled_sources()
+    return {**await kb_url_refresh.refresh_due_sources(), "recovered": recovered["sources"]}
 
 
 # ---------------------------------------------------------------------------

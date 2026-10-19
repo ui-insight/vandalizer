@@ -85,4 +85,14 @@ describe('switching chats while an answer is still streaming', () => {
     act(() => { result.current.stop() })
     expect(pending.signal.aborted).toBe(false)
   })
+
+  it("reopening a chat sends follow-ups to that chat's activity, not the last one used", async () => {
+    const { result } = renderHook(() => useChat())
+    vi.mocked(streamChat).mockResolvedValueOnce({ conversationUuid: 'conversation-a', activityId: 'activity-a' })
+    await act(async () => { await result.current.send('First question in Chat A') })
+    expect(result.current.activityId).toBe('activity-a')
+
+    await act(async () => { await result.current.loadHistory('conversation-b') })
+    expect(result.current.activityId).toBe('activity-b')
+  })
 })

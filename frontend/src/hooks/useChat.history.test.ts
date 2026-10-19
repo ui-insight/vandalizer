@@ -34,7 +34,7 @@ describe('resuming a saved conversation', () => {
     let resolveFirst!: (value: typeof saved) => void
     vi.mocked(getHistory).mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
     const { result } = renderHook(() => useChat())
-    let first!: Promise<void>
+    let first!: Promise<unknown>
     act(() => { first = result.current.loadHistory('first') })
     expect(result.current.isLoadingHistory).toBe(true)
     await act(async () => { await result.current.send('Too early') })

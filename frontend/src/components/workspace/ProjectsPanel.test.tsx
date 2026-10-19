@@ -55,7 +55,7 @@ describe('Projects recovery', () => {
     expect(screen.getByText('Project 60')).toBeInTheDocument()
     expect(screen.queryByText('Project 00')).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search projects' }), { target: { value: 'absent' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(screen.getByText('Project 00')).toBeInTheDocument()
   })
 })

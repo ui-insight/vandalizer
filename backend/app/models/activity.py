@@ -65,6 +65,10 @@ class ActivityEvent(Document):
     meta_summary: dict = Field(default_factory=dict)
     result_snapshot: dict = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
+    # The models this run's LLM calls used, per workflow step: one row per
+    # (step, model) per pass, written by metering on flush. Read through
+    # metering.summarize_model_usage.
+    model_usage: list[dict] = Field(default_factory=list)
 
     class Settings:
         name = "activity_event"

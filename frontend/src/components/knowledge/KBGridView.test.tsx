@@ -6,11 +6,13 @@ import type { KnowledgeBase } from '../../types/knowledge'
 let failure: Error | null = null
 const refresh = vi.fn()
 const kbs: { current: KnowledgeBase[] } = { current: [] }
+// The endpoint's total; null means "same as the page", which most tests want.
+const listTotal: { current: number | null } = { current: null }
 
 vi.mock('../../hooks/useKnowledgeBases', () => ({
   useScopedKnowledgeBases: () => ({
     knowledgeBases: kbs.current,
-    total: kbs.current.length,
+    total: listTotal.current ?? kbs.current.length,
     loading: false,
     refresh,
     error: failure,
@@ -114,6 +116,40 @@ describe('KBGridView clone action', () => {
 
     fireEvent.click(screen.getByText('Clone'))
     expect(onClone).not.toHaveBeenCalled()
+  })
+
+  // FCOI/NSF ticket: a stuck source refresh held the KB at "building" and
+  // turned Chat off, though every previous chunk was still in the index.
+  it('keeps Chat on for a building KB that already has indexed text', () => {
+    kbs.current = [makeKB({ status: 'building', total_chunks: 208 })]
+    const onChat = vi.fn()
+    render(<KBGridView {...baseProps} onChat={onChat} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Chat' }))
+    expect(onChat).toHaveBeenCalled()
+  })
+
+  it('keeps Chat off for a KB with nothing indexed yet', () => {
+    kbs.current = [makeKB({ status: 'building', total_chunks: 0 })]
+    const onChat = vi.fn()
+    render(<KBGridView {...baseProps} onChat={onChat} />)
+    expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull()
+  })
+})
+
+describe('KBGridView partial page', () => {
+  beforeEach(() => { listTotal.current = null })
+
+  it('says when the grid holds fewer KBs than the tab count', () => {
+    kbs.current = [makeKB()]
+    listTotal.current = 73
+    render(<KBGridView {...baseProps} />)
+    expect(screen.getByText('Showing 1 of 73 — search to find the rest')).toBeInTheDocument()
+  })
+
+  it('says nothing when the whole list is loaded', () => {
+    kbs.current = [makeKB()]
+    render(<KBGridView {...baseProps} />)
+    expect(screen.queryByText(/Showing \d+ of/)).not.toBeInTheDocument()
   })
 })
 

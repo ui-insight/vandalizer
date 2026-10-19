@@ -147,6 +147,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const [isDocx, setIsDocx] = useState(false)
   const [docxText, setDocxText] = useState<string | null>(null)
   const [extractionError, setExtractionError] = useState<string | null>(null)
+  // False when the file itself is the problem: no Retry is offered then.
+  const [extractionRetryable, setExtractionRetryable] = useState(true)
   const [retrying, setRetrying] = useState(false)
   const retryGeneration = useRef(0)
   const retryPending = useRef(false)
@@ -257,6 +259,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             setLowQuality(Boolean(res.extraction_low_quality))
             if (res.status === 'error' || (res.complete && !res.raw_text)) {
               setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+              setExtractionRetryable(res.error_retryable !== false)
               setDocxText('')
             } else {
               setExtractionError(null)
@@ -307,6 +310,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       setLowQuality(Boolean(res.extraction_low_quality))
       if (res.status === 'error' || (res.complete && !res.raw_text)) {
         setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+        setExtractionRetryable(res.error_retryable !== false)
         setDocxText('')
       } else {
         setExtractionError(null)
@@ -331,6 +335,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           setLowQuality(Boolean(res.extraction_low_quality))
           if (res.status === 'error' || (res.complete && !res.raw_text)) {
             setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+            setExtractionRetryable(res.error_retryable !== false)
             setDocxText('')
           } else { setDocxText(res.raw_text || ''); setExtractionError(null) }
           finish()
@@ -1004,6 +1009,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {extractionError}
               </div>
+              {extractionRetryable && (
               <button
                 type="button"
                 onClick={handleRetryExtraction}
@@ -1024,6 +1030,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 />
                 {retrying ? 'Retrying...' : 'Retry extraction'}
               </button>
+              )}
             </div>
           ) : (
             <div style={{
