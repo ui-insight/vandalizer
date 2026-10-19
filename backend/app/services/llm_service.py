@@ -738,9 +738,17 @@ class MeteredModel(WrapperModel):
     records zero.
     """
 
+    # The System Config name this model was built from. ``model_name`` is the
+    # provider's (a leading "anthropic/" or "openrouter/" is stripped), and
+    # the config, which a run's record reports, is keyed by this one.
+    configured_model = None
+
     async def request(self, messages, model_settings, model_request_parameters):
         resp = await self.wrapped.request(messages, model_settings, model_request_parameters)
-        self._record(messages, getattr(resp, "usage", None), getattr(resp, "parts", None))
+        self._record(
+            messages, getattr(resp, "usage", None), getattr(resp, "parts", None),
+            model_settings, model_request_parameters,
+        )
         self._note_finish(resp, model_settings)
         return resp
 
@@ -769,7 +777,9 @@ class MeteredModel(WrapperModel):
                     parts = response.parts
                 except Exception:
                     pass
-                self._record(messages, usage, parts)
+                self._record(
+                    messages, usage, parts, model_settings, model_request_parameters,
+                )
                 self._note_finish(response, model_settings)
 
     def _note_finish(self, response, model_settings) -> None:
@@ -783,12 +793,13 @@ class MeteredModel(WrapperModel):
             # Truncation reporting must never break an LLM call.
             pass
 
-    def _record(self, messages, usage, parts):
+    def _record(self, messages, usage, parts, model_settings=None, model_request_parameters=None):
         from app.services.metering import (
             estimate_messages_tokens,
             estimate_parts_tokens,
             record_usage,
         )
+        from app.services.run_metadata import request_fingerprint
 
         in_tok = int(getattr(usage, "input_tokens", 0) or 0)
         out_tok = int(getattr(usage, "output_tokens", 0) or 0)
@@ -798,7 +809,10 @@ class MeteredModel(WrapperModel):
             out_tok = estimate_parts_tokens(parts)
             estimated = True
         try:
-            record_usage(self.model_name, in_tok, out_tok, estimated=estimated)
+            record_usage(
+                self.model_name, in_tok, out_tok, estimated=estimated,
+                settings=request_fingerprint(self, model_settings, model_request_parameters),
+            )
         except Exception:
             # Metering must never break an LLM call.
             pass
@@ -815,7 +829,9 @@ def get_agent_model(
     Model that Agent(...) accepts unchanged.
     """
     model = _build_agent_model(agent_model, thinking_override, system_config_doc)
-    return MeteredModel(model)
+    metered = MeteredModel(model)
+    metered.configured_model = agent_model
+    return metered
 
 
 def _build_agent_model(
