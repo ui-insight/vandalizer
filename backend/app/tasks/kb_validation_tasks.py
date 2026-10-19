@@ -365,7 +365,10 @@ async def _refresh_due_url_sources_async():
 
     from app.services import kb_url_refresh
 
-    return await kb_url_refresh.refresh_due_sources()
+    # First, so a source whose refresh died is settled (and its KB stops
+    # reporting "building") even in a KB with no refresh interval.
+    recovered = await kb_url_refresh.recover_stalled_sources()
+    return {**await kb_url_refresh.refresh_due_sources(), "recovered": recovered["sources"]}
 
 
 # ---------------------------------------------------------------------------

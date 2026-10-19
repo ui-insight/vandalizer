@@ -337,13 +337,14 @@ async def test_get_kb_manifest_resolves_effective_names():
 
     sources = [
         SimpleNamespace(uuid="s1", source_type="document", document_uuid="d1",
-                        custom_name=None, url=None, url_title=None, status="ready"),
+                        custom_name=None, url=None, url_title=None, status="ready",
+                        chunk_count=4),
         SimpleNamespace(uuid="s2", source_type="document", document_uuid="d2",
                         custom_name="My Custom Label", url=None, url_title=None,
-                        status="processing"),
+                        status="processing", chunk_count=0),
         SimpleNamespace(uuid="s3", source_type="url", document_uuid=None,
                         custom_name=None, url="https://x.test/page",
-                        url_title="Page Title", status="ready"),
+                        url_title="Page Title", status="ready", chunk_count=2),
     ]
 
     with patch.object(knowledge_service, "get_kb_sources",

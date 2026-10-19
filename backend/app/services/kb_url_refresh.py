@@ -70,6 +70,68 @@ def is_in_flight(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
     return not stamps or now - max(stamps) < STALE_IN_FLIGHT
 
 
+def is_stalled(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
+    """Pending or processing, but past ``STALE_IN_FLIGHT``: its worker is gone.
+
+    Nothing else ever moves such a source on. It sat "pending" for good,
+    holding its KB at "building" and showing a spinner (support ticket: FCOI
+    and NSF sources "Reprocessing — queued" over a weekend, after v4.14.0's
+    per-source Refresh crashed before fetching).
+    """
+    return source.status in ("pending", "processing") and not is_in_flight(source, now)
+
+
+STALLED_REFRESH_MESSAGE = (
+    "The last refresh did not finish, so this source still answers from its "
+    "previous text. Refresh to try again."
+)
+STALLED_ADD_MESSAGE = "Fetching this page did not finish. Use Try again to fetch it again."
+
+
+async def recover_stalled_sources(now: datetime.datetime | None = None) -> dict[str, int]:
+    """Settle every web source whose refresh or first fetch lost its worker.
+
+    A source with indexed text goes back to ``ready``. Its chunks never left
+    the index, so it answers as before, and the source says the refresh did
+    not finish. One with nothing indexed is an ``error`` with a retry. Each
+    touched KB is recalculated, so it stops reporting "building".
+    """
+    from app.services import knowledge_service
+    from app.utils import kb_source_currency as currency
+
+    now = now or datetime.datetime.now(tz=datetime.timezone.utc)
+    sources = await KnowledgeBaseSource.find(
+        {"source_type": "url", "status": {"$in": ["pending", "processing"]}},
+    ).to_list()
+    kb_uuids: set[str] = set()
+    recovered = 0
+    for source in sources:
+        if not is_stalled(source, now):
+            continue
+        if source.chunk_count:
+            source.status = "ready"
+            source.error_message = STALLED_REFRESH_MESSAGE
+            source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
+            source.last_refresh_error = STALLED_REFRESH_MESSAGE
+        else:
+            source.status = "error"
+            source.error_message = STALLED_ADD_MESSAGE
+        try:
+            await source.save()
+        except Exception:
+            logger.exception("Could not recover stalled KB source %s", source.uuid)
+            continue
+        recovered += 1
+        kb_uuids.add(source.knowledge_base_uuid)
+    for kb_uuid in kb_uuids:
+        kb = await KnowledgeBase.find_one({"uuid": kb_uuid})
+        if kb:
+            await knowledge_service.recalculate_stats(kb)
+    if recovered:
+        logger.warning("Recovered %d stalled web source(s) in %d KB(s)", recovered, len(kb_uuids))
+    return {"sources": recovered, "knowledge_bases": len(kb_uuids)}
+
+
 def is_refreshable(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
     return (
         source.source_type == "url"

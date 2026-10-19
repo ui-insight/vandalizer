@@ -118,6 +118,9 @@ class KBSourceResponse(BaseModel):
     # incomplete" shape as ``truncated``, read live from the document.
     ingestion_warnings: list[str] = []
     ingestion_warning_text: Optional[str] = None
+    # Pending or processing past the stale window: its worker is gone and
+    # nothing will finish it. The UI offers a retry instead of a spinner.
+    stalled: bool = False
     # Why the last fetch of a URL source was held instead of embedded: hidden
     # or AI-addressed text the user reviews before choosing "Add anyway".
     # Status is "held" for a page never indexed, "ready" for a held refresh.

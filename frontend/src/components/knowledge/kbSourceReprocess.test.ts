@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { inFlightText, settleReprocesses } from './kbSourceReprocess'
+import { inFlightText, isInFlight, settleReprocesses } from './kbSourceReprocess'
 import type { KnowledgeBaseSource, SourceCurrency } from '../../types/knowledge'
 
 function src(uuid: string, overrides: Partial<KnowledgeBaseSource> = {}): KnowledgeBaseSource {
@@ -57,5 +57,29 @@ describe('inFlightText', () => {
     // Without a reprocess in this session, a pending document source is
     // waiting on its extraction, as before.
     expect(inFlightText('pending')).toMatch(/Waiting for document text/)
+  })
+})
+
+// FCOI/NSF ticket: a page refresh whose task died sat at "Reprocessing —
+// queued", then "Waiting for document text to finish extracting…", for days.
+describe('a stalled web-source refresh', () => {
+  it('is never described as waiting on document text', () => {
+    expect(inFlightText('pending', undefined, 'url')).not.toMatch(/document text/)
+    expect(inFlightText('pending', 'refetch', 'url')).toMatch(/Queued to fetch the page/)
+    expect(inFlightText('processing', undefined, 'url')).toMatch(/previous text/)
+  })
+
+  it('is not in flight, so nothing waits on it', () => {
+    expect(isInFlight(src('s', { status: 'pending' }))).toBe(true)
+    expect(isInFlight(src('s', { status: 'pending', stalled: true }))).toBe(false)
+  })
+
+  it('settles a tracked refresh as failed, keeping the previous text', () => {
+    const { remaining, settled } = settleReprocesses(
+      { u: { mode: 'refetch', name: 'FCOI' } },
+      [src('u', { source_type: 'url', status: 'pending', stalled: true, chunk_count: 208 })],
+    )
+    expect(remaining).toEqual({})
+    expect(settled[0]).toMatchObject({ ok: false, keptPrevious: true })
   })
 })
