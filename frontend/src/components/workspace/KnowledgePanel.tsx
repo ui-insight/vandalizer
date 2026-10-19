@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy, ShieldAlert } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
@@ -14,6 +14,7 @@ import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
 import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
+import { KBSourceReviewFindings } from '../knowledge/KBSourceReviewFindings'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBGridView } from '../knowledge/KBGridView'
@@ -51,6 +52,7 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
   processing: { icon: Loader2, color: '#d97706' },
   ready: { icon: CheckCircle2, color: '#15803d' },
   error: { icon: AlertCircle, color: '#b91c1c' },
+  held: { icon: ShieldAlert, color: '#d97706' },
 }
 
 export function KnowledgePanel() {
@@ -223,7 +225,9 @@ export function KnowledgePanel() {
     setReprocessing(remaining)
     for (const r of settled) {
       const chunks = `${r.chunkCount} ${r.chunkCount === 1 ? 'chunk' : 'chunks'}`
-      if (r.unchanged) {
+      if (r.held) {
+        toast(`“${r.name}” was held again — the page has hidden or AI-addressed text you haven’t reviewed. It was not indexed.`, 'error')
+      } else if (r.unchanged) {
         toast(`“${r.name}” re-fetched — the page is unchanged, so its ${chunks} were kept.`, 'success')
       } else if (r.ok) {
         toast(`“${r.name}” reprocessed — ${chunks}, indexed just now.`, 'success')
@@ -234,6 +238,30 @@ export function KnowledgePanel() {
       }
     }
   }, [selectedKB, reprocessing, toast])
+
+  // A page held for review is announced once, when it settles held, so the
+  // user who added it hears about it even if the row is scrolled away.
+  const heldSeen = useRef<Set<string> | null>(null)
+  useEffect(() => { heldSeen.current = null }, [selectedKB?.uuid])
+  const kbSources = selectedKB?.sources
+  useEffect(() => {
+    const sources = kbSources
+    if (!sources) return
+    const held = sources.filter(s => (s.review_findings?.length ?? 0) > 0)
+    if (heldSeen.current === null) {
+      // First load of this KB: already-held rows speak for themselves.
+      heldSeen.current = new Set(held.map(s => s.uuid))
+      return
+    }
+    const fresh = held.filter(s => !heldSeen.current!.has(s.uuid) && !reprocessing[s.uuid])
+    for (const s of held) heldSeen.current.add(s.uuid)
+    if (fresh.length === 1) {
+      const name = fresh[0].custom_name || fresh[0].url_title || fresh[0].url || 'A page'
+      toast(`“${name}” was held for review: it contains hidden or AI-addressed text. Review it in the sources list before adding it.`, 'error')
+    } else if (fresh.length > 1) {
+      toast(`${fresh.length} pages were held for review: they contain hidden or AI-addressed text. Review them in the sources list before adding them.`, 'error')
+    }
+  }, [kbSources, reprocessing, toast])
 
   // Poll while the KB is building or any source is still indexing
   useEffect(() => {
@@ -446,6 +474,26 @@ export function KnowledgePanel() {
     } catch (err) {
       console.error('Failed to refresh source:', err)
       toast(err instanceof Error ? err.message : 'Failed to refresh source', 'error')
+    }
+  }
+
+  const handleAcceptReview = async (source: KnowledgeBaseSource) => {
+    if (!selectedKB) return
+    try {
+      await api.acceptKBSourceReview(selectedKB.uuid, source.uuid)
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        status: 'building',
+        sources: prev.sources.map(s => s.uuid === source.uuid
+          ? { ...s, status: 'pending' as const, review_findings: [] } : s),
+      } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode: 'refetch', name: sourceName(source) } }))
+      toast('Adding the page — it is fetched again and indexed as it is now', 'success')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to accept source review:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add the page', 'error')
     }
   }
 
@@ -1354,7 +1402,9 @@ export function KnowledgePanel() {
                     : isPartial
                       ? `Incomplete — ${source.ingestion_warning_text}; answers from this source cover only part of it.`
                       : null
-                  const st = incompleteReason
+                  const st = (source.review_findings?.length ?? 0) > 0
+                    ? SOURCE_STATUS.held
+                    : incompleteReason
                     ? { icon: AlertTriangle, color: '#d97706' }
                     : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
@@ -1493,7 +1543,15 @@ export function KnowledgePanel() {
                             </div>
                           ) : null
                         })()}
-                        {!isRenaming && source.error_message && (
+                        {!isRenaming && (source.review_findings?.length ?? 0) > 0 && (
+                          <KBSourceReviewFindings
+                            source={source}
+                            canManage={canManageKB}
+                            onAccept={() => handleAcceptReview(source)}
+                            onRemove={() => handleRemoveSource(source.uuid)}
+                          />
+                        )}
+                        {!isRenaming && source.error_message && !(source.review_findings?.length) && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>
                             {source.error_message}
                             {canManageKB && source.status === 'error' && (

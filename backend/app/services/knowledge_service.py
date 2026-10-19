@@ -804,9 +804,11 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
     kb.sources_ready = sum(1 for s in sources if s.status == "ready")
     kb.sources_failed = sum(1 for s in sources if s.status == "error")
     kb.total_chunks = sum(s.chunk_count for s in sources if s.status == "ready")
+    # Held sources are settled: nothing is running, they wait on the user.
+    held = sum(1 for s in sources if s.status == "held")
     if kb.total_sources == 0:
         kb.status = "empty"
-    elif kb.sources_ready + kb.sources_failed >= kb.total_sources:
+    elif kb.sources_ready + kb.sources_failed + held >= kb.total_sources:
         kb.status = "error" if kb.sources_failed > 0 and kb.sources_ready == 0 else "ready"
     else:
         kb.status = "building"
@@ -1241,8 +1243,10 @@ async def clone_knowledge_base(
 
         if src.source_type == "document":
             await _ingest_document_source(new_src, clone)
-        elif src.source_type == "url" and src.content:
-            # Re-use cached content instead of re-fetching
+        elif src.source_type == "url" and src.content and src.status != "held":
+            # Re-use cached content instead of re-fetching. A held page's
+            # snapshot was never reviewed, so it is re-fetched (and screened)
+            # below instead.
             dm = _get_dm()
             try:
                 chunk_count = await asyncio.to_thread(
@@ -1865,6 +1869,34 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
     return None
 
 
+def _unreviewed_findings(source: KnowledgeBaseSource, result: WebFetchResult) -> list[dict]:
+    """What the user must see about a fetched page before it is embedded:
+    hidden or AI-addressed text (``fetched_page_screen``), less anything they
+    already chose to add anyway. Empty means the page can be indexed."""
+    from app.services.fetched_page_screen import screen_fetched_page
+
+    accepted = set(getattr(source, "accepted_finding_fingerprints", None) or [])
+    return [
+        f.to_dict() for f in screen_fetched_page(result.raw_html, result.text)
+        if f.fingerprint not in accepted
+    ]
+
+
+def describe_held_page(findings: list[dict]) -> str:
+    """The one-line reason a held source shows; the excerpts sit beside it."""
+    hidden = sum(1 for f in findings if f.get("kind") == "hidden_text")
+    addressed = len(findings) - hidden
+    parts = []
+    if hidden:
+        parts.append(f"{hidden} passage{'s' if hidden != 1 else ''} of text the page does not show")
+    if addressed:
+        parts.append(f"{addressed} passage{'s' if addressed != 1 else ''} addressed to an AI")
+    return (
+        "Held for review: this page contains " + " and ".join(parts)
+        + ". It was not added — review what was found, then add it anyway or remove it"
+    )
+
+
 # A refresh that returns a small fraction of the text it is replacing is not a
 # revised page, it is a page that did not load — a JavaScript app's shell, an
 # error page served with a 200, a login wall. Below this share of the retained
@@ -2008,6 +2040,10 @@ async def refresh_url_source(
             )
         if reason is None and getattr(source, "parent_source_uuid", None):
             reason = _reject_crawled_navigation_page(result, source.url)
+        if reason is None:
+            findings = _unreviewed_findings(source, result)
+            if findings:
+                return await _hold_refresh(source, result, findings)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
@@ -2041,6 +2077,7 @@ async def refresh_url_source(
         # The fetch is what carries the caveat, so a successful fetch
         # rewrites it: a clean refetch clears an earlier one.
         source.warnings = list(result.advisories)
+        source.review_findings = []
         source.last_refresh_outcome = currency.OUTCOME_UNCHANGED
         source.last_refresh_error = None
         await source.save()
@@ -2072,6 +2109,7 @@ async def refresh_url_source(
     source.url_title = result.title or source.url_title
     source.truncated = bool(result.truncated)
     source.warnings = list(result.advisories)
+    source.review_findings = []
     source.chunk_count = chunk_count
     source.status = "ready"
     source.error_message = None
@@ -2080,6 +2118,33 @@ async def refresh_url_source(
     currency.stamp_ingested(source, raw_text)
     await source.save()
     return None
+
+
+async def _hold_refresh(
+    source: KnowledgeBaseSource, result: WebFetchResult, findings: list[dict],
+) -> str:
+    """Record a refreshed page that must be reviewed instead of indexing it.
+
+    A source that already answers keeps its previous text and stays
+    ``ready``: a page that turned hostile must not take the source down, and
+    must not reach the index either. A source with nothing indexed yet is
+    ``held`` with the fetched text stored, so the inspector shows the user
+    what they would be adding.
+    """
+    reason = describe_held_page(findings)
+    source.review_findings = findings
+    source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
+    source.last_refresh_error = reason[:2000]
+    if source.chunk_count:
+        source.status = "ready"
+        source.error_message = f"Refresh held — previous content kept. {reason}"[:2000]
+    else:
+        source.status = "held"
+        source.error_message = reason[:2000]
+        source.content = _kb_snapshot(result.text)
+        source.url_title = result.title or source.url_title
+    await source.save()
+    return reason
 
 
 async def _ingest_url_source(
@@ -2126,6 +2191,19 @@ async def _ingest_url_source(
         # e.g. a fetched PDF whose hidden-text scrub could not run: the text
         # is indexed, and the source row says what was not checked.
         source.warnings = list(result.advisories)
+
+        findings = _unreviewed_findings(source, result)
+        source.review_findings = findings
+        if findings:
+            # Stored, not embedded: the user sees what was found and the
+            # text it sits in, and nothing reaches the index until they add
+            # it. The result is still returned so a crawl can follow the
+            # page's links; each child page is screened on its own.
+            source.status = "held"
+            source.error_message = describe_held_page(findings)[:2000]
+            if not await _save_unless_deleted(source):
+                return None
+            return result
 
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(

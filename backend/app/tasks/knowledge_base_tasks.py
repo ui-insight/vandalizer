@@ -31,11 +31,13 @@ def _recalculate_kb(db, kb_uuid: str) -> None:
     total = len(sources)
     ready = sum(1 for s in sources if s.get("status") == "ready")
     failed = sum(1 for s in sources if s.get("status") == "error")
+    # Held sources wait on the user, not on a worker.
+    held = sum(1 for s in sources if s.get("status") == "held")
     total_chunks = sum(s.get("chunk_count", 0) for s in sources)
 
     if total == 0:
         status = "empty"
-    elif ready == total:
+    elif ready + held == total:
         status = "ready"
     elif failed == total:
         status = "error"
@@ -293,6 +295,10 @@ def kb_reingest(self, kb_uuid: str) -> None:
         source_uuid = source["uuid"]
         document_uuid = source.get("document_uuid")
         try:
+            if source.get("status") == "held":
+                # Stored for the user to review, never indexed: re-chunking
+                # it would add the page without that review.
+                continue
             if source.get("source_type") == "url":
                 raw_text = source.get("content") or ""
                 source_name = (
@@ -474,6 +480,27 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             },
         )
 
+        from app.services.fetched_page_screen import screen_fetched_page
+        from app.services.knowledge_service import describe_held_page
+
+        # Same hold as knowledge_service._ingest_url_source: hidden or
+        # AI-addressed text waits for the user instead of being embedded.
+        accepted = set(source.get("accepted_finding_fingerprints") or [])
+        findings = [
+            f.to_dict() for f in screen_fetched_page(result.raw_html, raw_text)
+            if f.fingerprint not in accepted
+        ]
+        if findings:
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {
+                    "status": "held",
+                    "review_findings": findings,
+                    "error_message": describe_held_page(findings)[:2000],
+                }},
+            )
+            return
+
         dm = get_document_manager()
         # Idempotent: clear any chunks from a prior (partial) run so a Celery
         # autoretry can't double-add or collide on chunk ids.
@@ -491,6 +518,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
+                    "review_findings": [],
                     **currency.ingestion_stamp(raw_text),
                 }
             },
