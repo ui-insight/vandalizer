@@ -354,7 +354,7 @@ export function KBGridView({
   emptyComponent,
   filterUuids, pinnedUuids, onTogglePin,
 }: KBGridViewProps) {
-  const { knowledgeBases, loading } = useScopedKnowledgeBases({
+  const { knowledgeBases, total, loading } = useScopedKnowledgeBases({
     scope,
     search: search || undefined,
   })
@@ -395,6 +395,13 @@ export function KBGridView({
     <div>
       {/* Sort */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
+        {/* The list is one page of the endpoint; the tab's count is the whole
+            total, so say when the grid holds less than that. */}
+        {!filterUuids && total > knowledgeBases.length && (
+          <span style={{ marginRight: 'auto', fontSize: 12, color: C.textFaint }}>
+            Showing {knowledgeBases.length} of {total} — search to find the rest
+          </span>
+        )}
         <ArrowUpDown size={13} style={{ color: C.textFaint }} />
         <select
           value={sort}

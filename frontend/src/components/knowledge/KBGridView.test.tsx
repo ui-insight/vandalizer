@@ -4,11 +4,13 @@ import { KBGridView } from './KBGridView'
 import type { KnowledgeBase } from '../../types/knowledge'
 
 const kbs: { current: KnowledgeBase[] } = { current: [] }
+// The endpoint's total; null means "same as the page", which most tests want.
+const listTotal: { current: number | null } = { current: null }
 
 vi.mock('../../hooks/useKnowledgeBases', () => ({
   useScopedKnowledgeBases: () => ({
     knowledgeBases: kbs.current,
-    total: kbs.current.length,
+    total: listTotal.current ?? kbs.current.length,
     loading: false,
     refresh: vi.fn(),
   }),
@@ -109,5 +111,22 @@ describe('KBGridView clone action', () => {
 
     fireEvent.click(screen.getByText('Clone'))
     expect(onClone).not.toHaveBeenCalled()
+  })
+})
+
+describe('KBGridView partial page', () => {
+  beforeEach(() => { listTotal.current = null })
+
+  it('says when the grid holds fewer KBs than the tab count', () => {
+    kbs.current = [makeKB()]
+    listTotal.current = 73
+    render(<KBGridView {...baseProps} />)
+    expect(screen.getByText('Showing 1 of 73 — search to find the rest')).toBeInTheDocument()
+  })
+
+  it('says nothing when the whole list is loaded', () => {
+    kbs.current = [makeKB()]
+    render(<KBGridView {...baseProps} />)
+    expect(screen.queryByText(/Showing \d+ of/)).not.toBeInTheDocument()
   })
 })

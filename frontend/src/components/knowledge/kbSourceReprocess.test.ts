@@ -24,8 +24,8 @@ describe('settleReprocesses', () => {
 
     expect(Object.keys(remaining)).toEqual(['c'])
     expect(settled).toEqual([
-      { uuid: 'a', name: 'A', ok: true, chunkCount: 42, error: null, keptPrevious: false, unchanged: false },
-      { uuid: 'b', name: 'B', ok: false, chunkCount: 12, error: 'OCR service returned 500', keptPrevious: false, unchanged: false },
+      { uuid: 'a', name: 'A', ok: true, chunkCount: 42, error: null, keptPrevious: false, unchanged: false, held: false },
+      { uuid: 'b', name: 'B', ok: false, chunkCount: 12, error: 'OCR service returned 500', keptPrevious: false, unchanged: false, held: false },
     ])
   })
 

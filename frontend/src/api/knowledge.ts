@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, URLRefreshInterval } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, KBSourceVersionCompare, KBSourceVersionDetail, KBSourceVersionList, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -89,23 +89,44 @@ export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   })
 }
 
-export interface AddUrlsResult {
-  ok: boolean
-  /** URLs actually queued for fetching. */
-  added: number
-  /** URLs the KB already held — not re-fetched (use refreshKBSource for that). */
-  skipped?: number
-  skipped_urls?: string[]
+/** What adding one previewed page would do. Only `addable` pages can be kept. */
+export type UrlPreviewVerdict = 'good' | 'low' | 'empty' | 'error' | 'duplicate' | 'navigation'
+
+export interface UrlPreviewPage {
+  page_id: string
+  url: string
+  final_url: string | null
+  title: string | null
+  /** The URL this page was crawled from; null for a URL the user entered. */
+  parent_url: string | null
+  verdict: UrlPreviewVerdict
+  addable: boolean
+  reason: string | null
+  /** The start of the extracted text; fetch the rest with getUrlPreviewPageText. */
+  excerpt: string
+  char_count: number
+  chunk_count: number
+  truncated: boolean
+  warnings: string[]
 }
 
-export function addUrlsToKB(
+export interface UrlPreview {
+  preview_uuid: string
+  status: 'running' | 'ready' | 'error' | 'committing' | 'committed'
+  error_message: string | null
+  crawl_enabled: boolean
+  pages: UrlPreviewPage[]
+}
+
+/** Fetch (and crawl) URLs for review; nothing is added until commitUrlPreview. */
+export function previewUrlsForKB(
   uuid: string,
   urls: string[],
   crawlEnabled = false,
   maxCrawlPages = 5,
   allowedDomains = '',
 ) {
-  return apiFetch<AddUrlsResult>(`/api/knowledge/${uuid}/add_urls`, {
+  return apiFetch<{ preview_uuid: string; status: string }>(`/api/knowledge/${uuid}/add_urls/preview`, {
     method: 'POST',
     body: JSON.stringify({
       urls,
@@ -114,6 +135,24 @@ export function addUrlsToKB(
       allowed_domains: allowedDomains,
     }),
   })
+}
+
+export function getUrlPreview(uuid: string, previewUuid: string) {
+  return apiFetch<UrlPreview>(`/api/knowledge/${uuid}/add_urls/preview/${previewUuid}`)
+}
+
+export function getUrlPreviewPageText(uuid: string, previewUuid: string, pageId: string) {
+  return apiFetch<{ page_id: string; text: string }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/pages/${pageId}`,
+  )
+}
+
+/** Add the kept pages, indexed from the text the preview showed. */
+export function commitUrlPreview(uuid: string, previewUuid: string, pageIds: string[]) {
+  return apiFetch<{ ok: boolean; queued: number }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/commit`,
+    { method: 'POST', body: JSON.stringify({ page_ids: pageIds }) },
+  )
 }
 
 export function removeKBSource(uuid: string, sourceUuid: string) {
@@ -134,6 +173,14 @@ export function refreshKBWebSources(uuid: string) {
 export function refreshKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
     `/api/knowledge/${uuid}/source/${sourceUuid}/refresh`,
+    { method: 'POST' },
+  )
+}
+
+/** Add a held web page anyway, after reviewing what was found (background re-fetch). */
+export function acceptKBSourceReview(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/accept_review`,
     { method: 'POST' },
   )
 }
@@ -166,6 +213,24 @@ export function reprocessKBSource(uuid: string, sourceUuid: string) {
 
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
+}
+
+/** A URL source's dated version history, newest first. With `at`, also says
+ *  which version was in effect at that moment. */
+export function listKBSourceVersions(uuid: string, sourceUuid: string, at?: string) {
+  const qs = at ? `?at=${encodeURIComponent(at)}` : ''
+  return apiFetch<KBSourceVersionList>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions${qs}`)
+}
+
+/** One version of a source, with the full text it held. */
+export function getKBSourceVersion(uuid: string, sourceUuid: string, versionUuid: string) {
+  return apiFetch<KBSourceVersionDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/${versionUuid}`)
+}
+
+/** A line diff from `base` to `target`. */
+export function compareKBSourceVersions(uuid: string, sourceUuid: string, base: string, target: string) {
+  const qs = `?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`
+  return apiFetch<KBSourceVersionCompare>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/compare${qs}`)
 }
 
 export interface KBSourceResponse {

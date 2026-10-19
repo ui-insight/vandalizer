@@ -15,6 +15,9 @@ vi.mock('../../api/knowledge', () => ({
   getKBSource: vi.fn(),
   setKBSourceReference: vi.fn(),
   setKBSourceAmends: vi.fn(),
+  listKBSourceVersions: vi.fn(() => Promise.resolve({ versions: [] })),
+  getKBSourceVersion: vi.fn(),
+  compareKBSourceVersions: vi.fn(),
 }))
 // The viewer fetches the file itself; this suite is about whether the toggle
 // is offered, not about rendering a PDF in jsdom.

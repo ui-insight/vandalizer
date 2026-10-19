@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCheck, FileX, Globe, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -31,6 +31,8 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   kb_optimization_failed: AlertTriangle,
   extraction_optimization_failed: AlertTriangle,
   workflow_optimization_failed: AlertTriangle,
+  kb_source_updated: Globe,
+  kb_source_refresh_failed: Globe,
 }
 
 const kindColors: Record<string, string> = {
@@ -58,6 +60,9 @@ const kindColors: Record<string, string> = {
   kb_optimization_failed: '#d97706',
   extraction_optimization_failed: '#d97706',
   workflow_optimization_failed: '#d97706',
+  kb_source_updated: '#2563eb',
+  // The previous text is still answering, so a warning rather than red.
+  kb_source_refresh_failed: '#d97706',
 }
 
 const SUPPORT_KINDS = new Set([
