@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
-import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { useKBTabCounts, useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
@@ -105,6 +105,7 @@ export function KnowledgePanel() {
 
   // Used for adopt/removeRef in the scoped views
   const scopedMine = useScopedKnowledgeBases({ scope: 'mine' })
+  const tabCounts = useKBTabCounts(isProjectScoped ? projectPins.idsByType('knowledge_base') : undefined)
 
   const isExaminerOrAdmin = !!(user?.is_examiner || user?.is_admin)
 
@@ -121,7 +122,6 @@ export function KnowledgePanel() {
   const [showDocPicker, setShowDocPicker] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [addingDocs, setAddingDocs] = useState(false)
-  const [addingUrls, setAddingUrls] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [editingDescription, setEditingDescription] = useState(false)
@@ -368,39 +368,15 @@ export function KnowledgePanel() {
     }
   }
 
-  const handleAddUrls = (urls: string[], crawlEnabled = false, maxCrawlPages = 5, allowedDomains = '') => {
+  /** The URL preview's kept pages are queued: show the KB as building. */
+  const handleUrlsCommitted = (added: number) => {
     if (!selectedKB) return
-    setAddingUrls(true)
+    setShowUrlModal(false)
     // Optimistically set status to building so the poller starts
     setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
-    api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
-      .then((result) => {
-        const n = result?.added ?? urls.length
-        const skipped = result?.skipped ?? 0
-        const plural = (c: number) => (c === 1 ? '' : 's')
-        if (n === 0 && skipped > 0) {
-          // Nothing was fetched: re-adding an existing URL is a no-op. Say so —
-          // a silent "Added 2" here sent one user on a fruitless refresh loop.
-          toast(
-            `${skipped} URL${plural(skipped)} already in this KB — nothing was fetched. Use the ↻ button on a source to re-fetch its page.`,
-            'info',
-          )
-        } else if (skipped > 0) {
-          toast(
-            `Added ${n} URL${plural(n)} — crawling in background. ${skipped} already in this KB and not re-fetched.`,
-            'success',
-          )
-        } else {
-          toast(`Added ${n} URL${plural(n)} — crawling in background`, 'success')
-        }
-        loadDetail(selectedKB.uuid)
-        refresh()
-      })
-      .catch(err => {
-        console.error('Failed to add URLs:', err)
-        toast(err instanceof Error ? err.message : 'Failed to add URLs', 'error')
-      })
-      .finally(() => setAddingUrls(false))
+    toast(`Adding ${added} page${added === 1 ? '' : 's'} — indexing in the background`, 'success')
+    loadDetail(selectedKB.uuid)
+    refresh()
   }
 
   const sourceName = (source: KnowledgeBaseSource) =>
@@ -1025,26 +1001,6 @@ export function KnowledgePanel() {
               <span>{selectedKB.total_chunks} chunks</span>
             </div>
 
-            {/* Crawling / adding URLs progress banner */}
-            {addingUrls && (
-              <div role="status" aria-live="polite" style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px', marginBottom: 16, borderRadius: 8,
-                backgroundColor: 'rgba(217, 119, 6, 0.1)',
-                border: '1px solid rgba(217, 119, 6, 0.25)',
-              }}>
-                <Loader2 size={16} aria-hidden="true" style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
-                    Adding URLs & crawling pages...
-                  </div>
-                  <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                    Sources will appear below as they are processed.
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Indexing progress banner — covers the wait right after adding and
                 the case where the user navigates back while work is still queued. */}
             {(addingDocs || inFlightCount > 0) && (
@@ -1089,19 +1045,19 @@ export function KnowledgePanel() {
               </button>
               <button
                 onClick={() => setShowUrlModal(true)}
-                disabled={addingUrls || !canManageKB}
+                disabled={!canManageKB}
                 title={canManageKB ? undefined : noManageReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   color: '#e5e5e5', backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a',
                   borderRadius: 6,
-                  cursor: addingUrls || !canManageKB ? 'default' : 'pointer',
-                  opacity: addingUrls || !canManageKB ? 0.5 : 1,
+                  cursor: !canManageKB ? 'default' : 'pointer',
+                  opacity: !canManageKB ? 0.5 : 1,
                 }}
               >
-                {addingUrls ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Globe size={13} />}
-                {addingUrls ? 'Adding...' : 'Add URLs'}
+                <Globe size={13} />
+                Add URLs
               </button>
               <button
                 onClick={handleChat}
@@ -1721,7 +1677,8 @@ export function KnowledgePanel() {
 
         {showUrlModal && (
           <AddUrlsModal
-            onSubmit={(urls, crawlEnabled, maxCrawlPages, allowedDomains) => { handleAddUrls(urls, crawlEnabled, maxCrawlPages, allowedDomains); setShowUrlModal(false) }}
+            kbUuid={selectedKB.uuid}
+            onCommitted={handleUrlsCommitted}
             onClose={() => setShowUrlModal(false)}
           />
         )}
@@ -1961,6 +1918,19 @@ export function KnowledgePanel() {
             }}
           >
             {tab.label}
+            {/* The space keeps the tab's accessible name "My KBs 12", not "My KBs12". */}
+            {tabCounts[tab.key] !== null && <>{' '}
+              <span
+                style={{
+                  marginLeft: 3, padding: '0 6px', borderRadius: 8,
+                  fontSize: 10, fontWeight: 600,
+                  color: activeTab === tab.key ? '#ccc' : '#666',
+                  backgroundColor: activeTab === tab.key ? '#3a3a3a' : '#2a2a2a',
+                }}
+              >
+                {tabCounts[tab.key]}
+              </span>
+            </>}
           </button>
         ))}
       </div>

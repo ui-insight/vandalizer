@@ -173,6 +173,60 @@ async def _add_urls_async(
 
 @celery.task(
     bind=True,
+    name="tasks.kb.preview_urls",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    soft_time_limit=1800,  # same budget as add_urls: a preview runs the same crawl
+    time_limit=1860,
+)
+def preview_urls_task(self, preview_uuid: str):
+    """Fetch (and crawl) URLs for review, writing nothing to the KB."""
+    return _run_async(_preview_urls_async(preview_uuid))
+
+
+async def _preview_urls_async(preview_uuid: str):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.services import kb_url_preview
+
+    await kb_url_preview.run_preview(preview_uuid)
+    return {"preview_uuid": preview_uuid}
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.commit_url_preview",
+    soft_time_limit=1800,
+    time_limit=1860,
+)
+def commit_url_preview_task(self, preview_uuid: str, page_ids: list[str]):
+    """Index the pages a user kept from a URL preview.
+
+    Not auto-retried: a retry after some pages were indexed would skip them
+    as duplicates and report a lower count, and the rows it did write stand.
+    """
+    return _run_async(_commit_url_preview_async(preview_uuid, page_ids))
+
+
+async def _commit_url_preview_async(preview_uuid: str, page_ids: list[str]):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.services import kb_url_preview
+
+    added = await kb_url_preview.commit_preview(preview_uuid, page_ids)
+    return {"preview_uuid": preview_uuid, "added": added}
+
+
+@celery.task(
+    bind=True,
     name="tasks.kb.refresh_url_source",
     autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,

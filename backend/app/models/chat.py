@@ -48,6 +48,10 @@ class ChatMessage(Document):
     # states — likely recalled from the model's memory, which can predate the
     # current regulation. Chat shows them under the answer.
     unsupported_figures: Optional[list[str]] = None
+    # Sources a KB answer cites for text they don't contain — the cited snippet
+    # shares almost none of the words the answer attributes to it. Chat shows
+    # them under the answer.
+    unsupported_citations: Optional[list[str]] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -73,6 +77,8 @@ class ChatMessage(Document):
             d["citations"] = self.citations
         if self.unsupported_figures:
             d["unsupported_figures"] = self.unsupported_figures
+        if self.unsupported_citations:
+            d["unsupported_citations"] = self.unsupported_citations
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -141,6 +147,15 @@ class ChatConversation(Document):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+    # What was attached when the latest turn was asked — the library
+    # documents and folders as selected (folders not expanded) and the
+    # knowledge bases — so reopening the conversation re-attaches them. None
+    # means not recorded (conversations from before this existed), which the
+    # history route tells apart from "nothing was attached".
+    scope_document_uuids: Optional[list[str]] = None
+    scope_folder_uuids: Optional[list[str]] = None
+    scope_knowledge_base_uuids: Optional[list[str]] = None
+
     # Context management
     context_mode: str = "full"  # "full" | "truncated" | "compacted"
     context_cutoff_index: int = 0
@@ -165,6 +180,7 @@ class ChatConversation(Document):
         citations: Optional[list[dict]] = None,
         source_documents: Optional[list[dict]] = None,
         unsupported_figures: Optional[list[str]] = None,
+        unsupported_citations: Optional[list[str]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -173,6 +189,7 @@ class ChatConversation(Document):
             thinking_duration=thinking_duration,
             citations=citations or None,
             unsupported_figures=unsupported_figures or None,
+            unsupported_citations=unsupported_citations or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

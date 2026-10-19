@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
+import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy, Search, X } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { useToast } from '../../contexts/ToastContext'
-import type { Project } from '../../types/project'
+import { PROJECT_STATES } from '../../types/project'
+import type { Project, ProjectState } from '../../types/project'
 import { ProjectStateBadge } from '../projects/ProjectStateBadge'
 import { ProjectSummaryStats } from '../projects/ProjectSummaryStats'
 import { ProjectsExplainer } from '../projects/ProjectsExplainer'
+import { PROJECT_SORT_LABELS, applyProjectListView, countByStage } from '../projects/projectListView'
+import type { ProjectSort } from '../projects/projectListView'
 
 /**
  * The Projects drawer — a slideout panel (like Automations/Knowledge) listing
@@ -23,6 +26,17 @@ export function ProjectsPanel() {
   const [showExplainer, setShowExplainer] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [stage, setStage] = useState<ProjectState | 'all'>('all')
+  const [sort, setSort] = useState<ProjectSort>('updated')
+
+  const stageCounts = useMemo(() => countByStage(projects), [projects])
+  const shown = useMemo(
+    () => applyProjectListView(projects, { query, stage, sort }),
+    [projects, query, stage, sort],
+  )
+  const filtered = query.trim() !== '' || stage !== 'all'
+  const clearFilters = () => { setQuery(''); setStage('all') }
 
   // Scope the workspace to the project. The `?project=` param is consumed by
   // WorkspaceContext, which activates the project scope and lands in chat.
@@ -82,7 +96,9 @@ export function ProjectsPanel() {
           <HelpCircle size={12} />
           What are Projects?
         </button>
-        <span className="ml-auto text-xs text-gray-400">{projects.length}</span>
+        <span className="ml-auto text-xs text-gray-400">
+          {filtered ? `${shown.length} of ${projects.length}` : projects.length}
+        </span>
       </div>
 
       {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
@@ -106,13 +122,83 @@ export function ProjectsPanel() {
           </button>
         </div>
 
+        {projects.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="flex gap-2">
+              <div className="flex flex-1 items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 focus-within:ring-2 focus-within:ring-highlight">
+                <Search size={14} className="shrink-0 text-gray-400" aria-hidden="true" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search projects..."
+                  aria-label="Search projects"
+                  className="min-w-0 flex-1 py-1.5 text-sm focus:outline-none"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    aria-label="Clear search"
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as ProjectSort)}
+                aria-label="Sort projects"
+                className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-highlight"
+              >
+                {(Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]).map(key => (
+                  <option key={key} value={key}>{PROJECT_SORT_LABELS[key]}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Stage filter. A stage with no projects has no pill, unless it is
+                the one selected, so the selection can always be undone. */}
+            <div role="group" aria-label="Filter by stage" className="flex flex-wrap gap-1.5">
+              {(['all', ...PROJECT_STATES] as const)
+                .filter(s => s === 'all' || s === stage || stageCounts[s] > 0)
+                .map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStage(s)}
+                    aria-pressed={stage === s}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                      stage === s
+                        ? 'border-gray-700 bg-gray-800 text-white'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {s}
+                    <span className={stage === s ? 'text-gray-300' : 'text-gray-400'}>
+                      {s === 'all' ? projects.length : stageCounts[s]}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 space-y-2">
           {loading ? (
             <div className="text-sm text-gray-500">Loading...</div>
           ) : projects.length === 0 ? (
             <ProjectsExplainer />
+          ) : shown.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
+              No projects match{query.trim() ? ` “${query.trim()}”` : ''}{stage !== 'all' ? ` in ${stage}` : ''}.{' '}
+              <button type="button" onClick={clearFilters} className="font-medium text-gray-700 underline hover:text-gray-900">
+                Clear filters
+              </button>
+            </div>
           ) : (
-            projects.map(p => (
+            shown.map(p => (
               <div
                 key={p.uuid}
                 className="group relative rounded-lg border border-gray-200 bg-white transition-colors hover:border-highlight"
