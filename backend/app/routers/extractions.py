@@ -1056,13 +1056,13 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
     assert activity.id is not None
 
     try:
-        from app.services.metering import metered_async
+        from app.services.metering import metered_async, model_usage_rows, summarize_model_usage
         async with metered_async(
             "extraction",
             user_id=user.user_id,
             team_id=str(user.current_team) if user.current_team else None,
             activity_id=str(activity.id),
-        ):
+        ) as meter:
             # Degraded inputs the run should disclose: text that is garbled,
             # or that is only part of the document. Chat already warns about
             # these; a wrong extracted deadline or dollar amount is the more
@@ -1182,6 +1182,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 "cross_field_sets": [],
                 "document_warnings": document_warnings,
                 "error": EXTRACTION_NO_VALUES_ERROR,
+                "models": summarize_model_usage(model_usage_rows(meter))["models"],
             }
 
         # Fire-and-forget auto-validation if test cases exist
@@ -1194,6 +1195,8 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             "cross_field": cross_field,
             "cross_field_sets": cross_field_sets,
             "document_warnings": document_warnings,
+            # The models the run's calls used, for the results export.
+            "models": summarize_model_usage(model_usage_rows(meter))["models"],
         }
     except Exception as e:
         await activity_service.activity_finish(
@@ -1695,6 +1698,8 @@ async def get_extraction_history(
     """List the current user's past runs of this extraction."""
     await _get_search_set_or_404(uuid, user)
     from app.models.activity import ActivityEvent
+    from app.services.metering import run_model_fields
+
     events = (
         await ActivityEvent.find(
             ActivityEvent.search_set_uuid == uuid,
@@ -1718,6 +1723,10 @@ async def get_extraction_history(
                 "tokens_output": ev.tokens_output,
                 "documents_touched": ev.documents_touched,
                 "result_snapshot": ev.result_snapshot or {},
+                # What actually ran, from the metered calls (support ticket:
+                # History couldn't say which model a run used). Empty for runs
+                # recorded before models were.
+                **run_model_fields(ev.model_usage),
             }
             for ev in events
         ],
