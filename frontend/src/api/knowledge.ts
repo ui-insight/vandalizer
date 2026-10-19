@@ -148,6 +148,32 @@ export function suggestSources(uuid: string, topic: string) {
   })
 }
 
+export interface SitemapPage {
+  url: string
+  lastmod: string | null
+  /** The KB already holds this page. */
+  in_kb: boolean
+}
+
+export interface SitemapResult {
+  /** The sitemap that was read (found via robots.txt or the usual names). */
+  sitemap_url: string
+  pages: SitemapPage[]
+  sitemaps_read: number
+  /** More pages or child sitemaps than the reader takes. */
+  truncated: boolean
+  /** Child sitemaps that could not be read. */
+  errors: string[]
+}
+
+/** The pages a site's sitemap lists. Takes a sitemap or any address on the site. */
+export function readSitemap(uuid: string, url: string) {
+  return apiFetch<SitemapResult>(`/api/knowledge/${uuid}/sitemap`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  })
+}
+
 export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',

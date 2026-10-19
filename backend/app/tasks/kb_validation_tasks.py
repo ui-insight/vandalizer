@@ -183,6 +183,61 @@ async def _add_urls_async(
 
 @celery.task(
     bind=True,
+    name="tasks.kb.ingest_url_sources",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    # Batches are sized so one fits: ten pages, or one page and its crawl.
+    soft_time_limit=1800,
+    time_limit=1860,
+)
+def ingest_url_sources_task(
+    self,
+    kb_uuid: str,
+    source_uuids: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+):
+    """Fetch, crawl, chunk and embed one batch of pre-registered URL sources.
+    See knowledge_service.register_url_sources."""
+    return _run_async(_ingest_url_sources_async(
+        kb_uuid, source_uuids, crawl_enabled, max_crawl_pages, allowed_domains,
+    ))
+
+
+async def _ingest_url_sources_async(
+    kb_uuid: str,
+    source_uuids: list[str],
+    crawl_enabled: bool,
+    max_crawl_pages: int,
+    allowed_domains: str,
+):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KnowledgeBase
+    from app.services import knowledge_service as svc
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        logger.warning("KB %s not found for ingest_url_sources; skipping.", kb_uuid)
+        return {"kb_uuid": kb_uuid, "added": 0}
+
+    added = await svc.ingest_url_sources(
+        kb, source_uuids,
+        crawl_enabled=crawl_enabled,
+        max_crawl_pages=max_crawl_pages,
+        allowed_domains=allowed_domains,
+    )
+    return {"kb_uuid": kb_uuid, "added": added}
+
+
+@celery.task(
+    bind=True,
     name="tasks.kb.refresh_url_source",
     autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,

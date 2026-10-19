@@ -1013,7 +1013,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1021,6 +1021,7 @@ class TestKnowledgeDocSources:
             mock_svc.partition_new_urls = AsyncMock(
                 return_value=(["https://example.com", "https://example.org"], []),
             )
+            mock_svc.register_url_sources = AsyncMock(return_value=["s1", "s2"])
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/add_urls",
@@ -1035,10 +1036,11 @@ class TestKnowledgeDocSources:
         assert resp.json() == {"ok": True, "added": 2, "skipped": 0, "skipped_urls": []}
         # Work was handed off to the worker, not run inline.
         mock_svc.add_urls.assert_not_called()
-        mock_delay.assert_called_once()
-        args, kwargs = mock_delay.call_args
-        assert args[0] == kb.uuid
-        assert args[1] == ["https://example.com", "https://example.org"]
+        mock_svc.ingest_url_sources.assert_not_called()
+        assert mock_svc.register_url_sources.await_args.args[1] == ["https://example.com", "https://example.org"]
+        # With crawling on, each URL gets its own task: a crawl fills one.
+        assert [c.kwargs["args"] for c in mock_delay.call_args_list] == [(kb.uuid, ["s1"]), (kb.uuid, ["s2"])]
+        kwargs = mock_delay.call_args.kwargs["kwargs"]
         assert kwargs["crawl_enabled"] is True
         assert kwargs["max_crawl_pages"] == 5
 
@@ -1057,7 +1059,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1095,7 +1097,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1103,6 +1105,7 @@ class TestKnowledgeDocSources:
             mock_svc.partition_new_urls = AsyncMock(
                 return_value=(["https://example.org/new"], ["https://example.org/old"]),
             )
+            mock_svc.register_url_sources = AsyncMock(return_value=["s-new"])
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/add_urls",
@@ -1114,7 +1117,67 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 200
         assert resp.json()["added"] == 1
         assert resp.json()["skipped_urls"] == ["https://example.org/old"]
-        assert mock_delay.call_args.args[1] == ["https://example.org/new"]
+        assert mock_svc.register_url_sources.await_args.args[1] == ["https://example.org/new"]
+        assert mock_delay.call_args.kwargs["args"] == (kb.uuid, ["s-new"])
+
+    @pytest.mark.asyncio
+    async def test_bulk_add_is_split_into_staggered_batches(self, client):
+        """One task used to fetch every URL in turn, so a sitemap's few hundred
+        pages outran its time limit and the rest were never added."""
+        from app.routers import knowledge as router_mod
+
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        urls = [f"https://example.org/p{i}" for i in range(25)]
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.partition_new_urls = AsyncMock(return_value=(urls, []))
+            mock_svc.register_url_sources = AsyncMock(return_value=[f"s{i}" for i in range(25)])
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls", json={"urls": urls}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.json()["added"] == 25
+        batch = router_mod.URL_INGEST_BATCH
+        assert [len(c.kwargs["args"][1]) for c in mock_delay.call_args_list] == [batch, batch, 25 - 2 * batch]
+        assert [c.kwargs["countdown"] for c in mock_delay.call_args_list] == [
+            0, router_mod.URL_INGEST_STAGGER_SECONDS, 2 * router_mod.URL_INGEST_STAGGER_SECONDS,
+        ]
+        assert kb.status == "building"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("crawl,count", [(False, 501), (True, 26)])
+    async def test_add_urls_caps_one_request(self, client, crawl, count):
+        user = _make_user()
+        cookies, headers = _auth()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=_mock_kb())
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": [f"https://example.org/{i}" for i in range(count)], "crawl_enabled": crawl},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 400 and "at most" in resp.json()["detail"]
+        mock_delay.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_refresh_stamp_keeps_its_timezone_through_save(self, client):
