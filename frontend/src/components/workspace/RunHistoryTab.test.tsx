@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { RunHistoryTab, type HistoryRun } from './RunHistoryTab'
+import { RunHistoryTab, buildHistoryCSV, type HistoryRun } from './RunHistoryTab'
 import { getWorkflowStatus, downloadResults } from '../../api/workflows'
 
 vi.mock('../../api/workflows', () => ({
@@ -134,5 +134,63 @@ describe('RunHistoryTab — extraction runs (unchanged behavior)', () => {
     renderTab([makeRun()], 'extraction')
     await screen.findByText('completed')
     expect(screen.queryByRole('button', { expanded: false })).toBeNull()
+  })
+})
+
+
+// Support ticket: History showed status, time, duration and tokens but not the
+// model, and a workflow with per-step overrides gave no way to see which step
+// used which model.
+describe('models in run history', () => {
+  it('names the model on the row', async () => {
+    renderTab([makeRun({ models: ['gpt-oss-120b'] })], 'extraction')
+    expect(await screen.findByText('gpt-oss-120b')).toBeTruthy()
+  })
+
+  it('shows which step used which model when they differ', async () => {
+    mockGetWorkflowStatus.mockResolvedValue({ final_output: { output: 'done' } } as never)
+    renderTab([makeRun({
+      models: ['gpt-oss-120b', 'glm-5.3-flash'],
+      step_models: [
+        { index: 0, name: 'Extract dates', models: ['gpt-oss-120b'] },
+        { index: 1, name: 'Summarize', models: ['glm-5.3-flash'] },
+      ],
+    })])
+    fireEvent.click(await screen.findByText('gpt-oss-120b, glm-5.3-flash'))
+    const table = await screen.findByRole('table', { name: 'Models by step' })
+    expect(table.textContent).toContain('Extract datesgpt-oss-120b')
+    expect(table.textContent).toContain('Summarizeglm-5.3-flash')
+  })
+
+  it('lets a failed run be expanded to see its step models', async () => {
+    renderTab([makeRun({
+      status: 'failed', session_id: undefined, error: 'Step failed',
+      models: ['a', 'b'], step_models: [{ index: 0, name: 'One', models: ['a'] }, { index: 1, name: 'Two', models: ['b'] }],
+    })])
+    fireEvent.click(await screen.findByText('a, b'))
+    expect(await screen.findByRole('table', { name: 'Models by step' })).toBeTruthy()
+  })
+
+  it('omits the step table when one model ran throughout', async () => {
+    mockGetWorkflowStatus.mockResolvedValue({ final_output: { output: 'done' } } as never)
+    renderTab([makeRun({ models: ['a'], step_models: [{ index: 0, name: 'One', models: ['a'] }] })])
+    fireEvent.click(await screen.findByText('a'))
+    await waitFor(() => expect(mockGetWorkflowStatus).toHaveBeenCalled())
+    expect(screen.queryByRole('table', { name: 'Models by step' })).toBeNull()
+  })
+
+  it('exports models and per-step models to CSV', () => {
+    const csv = buildHistoryCSV([
+      makeRun({
+        started_at: '2026-10-01T10:00:00Z', finished_at: '2026-10-01T10:00:04Z',
+        models: ['gpt-oss-120b', 'glm-5.3-flash'],
+        step_models: [{ index: 0, name: 'Extract', models: ['gpt-oss-120b'] }, { index: 1, name: null, models: ['glm-5.3-flash'] }],
+      }),
+      makeRun({ status: 'failed', error: 'Model said "no"' }),
+    ], 'workflow')
+    const [header, first, second] = csv.trim().split('\n')
+    expect(header).toBe('"Started","Finished","Status","Duration (ms)","Input tokens","Output tokens","Documents","Models","Models by step","Error"')
+    expect(first).toBe('"2026-10-01T10:00:00Z","2026-10-01T10:00:04Z","completed","4200","100","50","1","gpt-oss-120b; glm-5.3-flash","Extract: gpt-oss-120b; Step 2: glm-5.3-flash",""')
+    expect(second.endsWith('"","","Model said ""no"""')).toBe(true)
   })
 })

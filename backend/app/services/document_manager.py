@@ -87,6 +87,17 @@ def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAP
     )
 
 
+#: Characters per chunk and overlap between neighbours, for every collection.
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+
+
+def count_chunks(text: str) -> int:
+    """How many chunks ``text`` would be indexed as — the same split
+    ``DocumentManager.add_to_kb`` makes, without a Chroma client."""
+    return len(_split_text_with_offsets(text, CHUNK_SIZE, CHUNK_OVERLAP))
+
+
 def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     """Split text into overlapping chunks without external dependencies."""
     return [c for c, _ in _split_text_with_offsets(text, chunk_size, chunk_overlap)]
@@ -273,8 +284,8 @@ class DocumentManager:
             from app.config import Settings
             persist_directory = Settings().chromadb_persist_dir
         self.persist_directory = persist_directory
-        self.chunk_size = 1000
-        self.chunk_overlap = 200
+        self.chunk_size = CHUNK_SIZE
+        self.chunk_overlap = CHUNK_OVERLAP
 
         self.client = get_chroma_client(persist_directory)
         # Always pass an explicit embedding function to get_or_create_collection

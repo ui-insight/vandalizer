@@ -1199,6 +1199,59 @@ class TestKnowledgeDocSources:
         # The refresh must not run inline — the service isn't touched here.
         mock_svc.refresh_url_source.assert_not_called()
 
+    async def _post_accept_review(self, client, src):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource.find_one", AsyncMock(return_value=src)),
+            patch("app.tasks.kb_validation_tasks.refresh_url_source_task.apply_async") as mock_async,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/source/src-1/accept_review",
+                cookies=cookies, headers=headers,
+            )
+        return resp, kb, mock_async
+
+    @pytest.mark.asyncio
+    async def test_accept_review_records_the_findings_and_refetches(self, client):
+        """"Add anyway" accepts exactly what the user was shown, then indexes
+        the page through the normal refresh, so text they did not see would
+        hold it again."""
+        src = SimpleNamespace(
+            uuid="src-1", source_type="url", url="https://example.edu/policy",
+            status="held", created_at=None, refresh_queued_at=None,
+            last_refresh_attempted_at=None, save=AsyncMock(),
+            review_findings=[{"kind": "hidden_text", "reason": "zero-size text", "excerpt": "x", "fingerprint": "fp-1"}],
+            accepted_finding_fingerprints=["fp-0"],
+        )
+        resp, kb, mock_async = await self._post_accept_review(client, src)
+
+        assert resp.status_code == 200
+        assert src.accepted_finding_fingerprints == ["fp-0", "fp-1"]
+        assert src.review_findings == []
+        assert src.status == "pending"
+        mock_async.assert_called_once()
+        assert kb.status == "building"
+
+    @pytest.mark.asyncio
+    async def test_accept_review_refuses_a_source_with_nothing_held(self, client):
+        src = SimpleNamespace(
+            uuid="src-1", source_type="url", url="https://example.edu/policy",
+            status="ready", created_at=None, save=AsyncMock(),
+            review_findings=[], accepted_finding_fingerprints=[],
+        )
+        resp, _, mock_async = await self._post_accept_review(client, src)
+        assert resp.status_code == 409
+        mock_async.assert_not_called()
+
     async def _post_reprocess(self, client, src, reprocess):
         user = _make_user()
         cookies, headers = _auth()

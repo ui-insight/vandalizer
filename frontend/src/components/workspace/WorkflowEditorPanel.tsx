@@ -71,7 +71,7 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { SaveWorkflowOutputDialog } from './SaveWorkflowOutputDialog'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
-import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
+import { EditorShareCallout } from '../library/EditorShareCallout'
 import { getReview, approveReview, rejectReview } from '../../api/reviews'
 import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import type { ReviewDetail } from '../../api/reviews'
@@ -1081,6 +1081,7 @@ export function WorkflowEditorPanel() {
               bumpActivitySignal={bumpActivitySignal}
               canValidate={canValidate}
               canApply={canManage}
+              verified={!!(workflow as Workflow & { verified?: boolean })?.verified}
               onValidated={() => {
                 refreshSparkline()
                 if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
@@ -6876,6 +6877,7 @@ function ValidateTab({
   onValidated,
   canValidate,
   canApply,
+  verified,
 }: {
   workflowId: string | null
   itemTitle?: string
@@ -6886,6 +6888,8 @@ function ValidateTab({
   canValidate: boolean
   /** May write an optimization winner back to the workflow (manage rights). */
   canApply: boolean
+  /** Verified items are already shared; the share callout hides. */
+  verified?: boolean
 }) {
   const { toast } = useToast()
   const confirm = useConfirm()
@@ -6996,8 +7000,6 @@ function ValidateTab({
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
-  const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
 
   // Unified-flow layout: "Validate & improve" (autovalidate) leads the tab;
   // test data and the per-check diagnostic run are collapsible support
@@ -8517,51 +8519,17 @@ function ValidateTab({
               )
             })()}
 
-            {/* Submit to library nudge */}
-            {(() => {
-              const latestScore = qualityHistory.length > 0 ? qualityHistory[0].score : null
-              const displayScore = latestScore ?? 0
-              if (displayScore < 80) return null
-              return (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px', borderRadius: 8,
-                  backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
-                }}>
-                  <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
-                    <strong>Great results!</strong> This workflow scored {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
-                  </div>
-                  {submitLibraryResult === 'success' ? (
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
-                  ) : (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (workflowId) setShowSubmitDialog(true) }}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                        borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                        color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Submit to Public Library
-                    </button>
-                  )}
-                  {showSubmitDialog && workflowId && (
-                    <VerificationSubmitModal
-                      itemKind="workflow"
-                      itemId={workflowId}
-                      itemTitle={itemTitle}
-                      onClose={() => setShowSubmitDialog(false)}
-                      onSubmitted={() => {
-                        setSubmitLibraryResult('success')
-                        toast('Sent to the examiners — you\'ll hear back when someone has looked', 'success')
-                      }}
-                    />
-                  )}
-                </div>
-              )
-            })()}
+            {/* Share — offered at any score; the server takes any score */}
+            {workflowId && (
+              <EditorShareCallout
+                itemKind="workflow"
+                itemId={workflowId}
+                itemTitle={itemTitle}
+                kindNoun="workflow"
+                score={qualityHistory.length > 0 ? qualityHistory[0].score : null}
+                verified={verified}
+              />
+            )}
 
             {/* Check results */}
             <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
