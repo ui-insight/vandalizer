@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
-import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { useKBTabCounts, useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
@@ -105,6 +105,7 @@ export function KnowledgePanel() {
 
   // Used for adopt/removeRef in the scoped views
   const scopedMine = useScopedKnowledgeBases({ scope: 'mine' })
+  const tabCounts = useKBTabCounts(isProjectScoped ? projectPins.idsByType('knowledge_base') : undefined)
 
   const isExaminerOrAdmin = !!(user?.is_examiner || user?.is_admin)
 
@@ -1961,6 +1962,19 @@ export function KnowledgePanel() {
             }}
           >
             {tab.label}
+            {/* The space keeps the tab's accessible name "My KBs 12", not "My KBs12". */}
+            {tabCounts[tab.key] !== null && <>{' '}
+              <span
+                style={{
+                  marginLeft: 3, padding: '0 6px', borderRadius: 8,
+                  fontSize: 10, fontWeight: 600,
+                  color: activeTab === tab.key ? '#ccc' : '#666',
+                  backgroundColor: activeTab === tab.key ? '#3a3a3a' : '#2a2a2a',
+                }}
+              >
+                {tabCounts[tab.key]}
+              </span>
+            </>}
           </button>
         ))}
       </div>

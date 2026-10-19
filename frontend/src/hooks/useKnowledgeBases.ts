@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/knowledge'
+import { listVerifiedItems } from '../api/library'
 import type { KnowledgeBase, KBScope } from '../types/knowledge'
 
 /** Legacy hook — returns the flat, unpaginated list. Used by existing components. */
@@ -119,4 +120,40 @@ export function useScopedKnowledgeBases(params?: {
     adopt,
     removeRef,
   }
+}
+
+export interface KBTabCounts {
+  mine: number | null
+  team: number | null
+  explore: number | null
+}
+
+const canonicalUuid = (kb: KnowledgeBase) => (kb.is_reference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid)
+
+/**
+ * How many knowledge bases each tab of the KB page holds, for the tab labels.
+ * `null` while a count is still loading.
+ *
+ * My KBs and Team read the list endpoint's `total` through the same queries
+ * the tab grids use, so the open tab costs no extra request. Everyone is the
+ * catalog's total for knowledge bases, the population its tab browses.
+ * `pinned` (canonical KB uuids) is set while the page is scoped to a project:
+ * the My KBs and Team grids then show only the pinned KBs, and so do their
+ * counts.
+ */
+export function useKBTabCounts(pinned?: Set<string>): KBTabCounts {
+  const mine = useScopedKnowledgeBases({ scope: 'mine' })
+  const team = useScopedKnowledgeBases({ scope: 'team' })
+  const { data: catalog } = useQuery({
+    // Under 'knowledgeBases' so the page's refresh recounts it too.
+    queryKey: ['knowledgeBases', 'catalog-count'] as const,
+    queryFn: () => listVerifiedItems({ kind: 'knowledge_base', limit: 1 }),
+  })
+
+  const count = (list: ReturnType<typeof useScopedKnowledgeBases>) => {
+    if (list.loading) return null
+    return pinned ? list.knowledgeBases.filter(kb => pinned.has(canonicalUuid(kb))).length : list.total
+  }
+
+  return { mine: count(mine), team: count(team), explore: catalog?.total ?? null }
 }
