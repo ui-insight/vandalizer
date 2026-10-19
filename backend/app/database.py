@@ -32,6 +32,7 @@ from app.models.knowledge import (
     KnowledgeBase,
     KnowledgeBaseReference,
     KnowledgeBaseSource,
+    KnowledgeBaseSourceVersion,
     KnowledgeBaseUsage,
 )
 from app.models.kb_test_query import KBTestQuery
@@ -97,6 +98,7 @@ ALL_MODELS = [
     KnowledgeBase,
     KnowledgeBaseReference,
     KnowledgeBaseSource,
+    KnowledgeBaseSourceVersion,
     KnowledgeBaseUsage,
     KBUrlPreview,
     KBUrlPreviewPage,

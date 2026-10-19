@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, URLRefreshInterval } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, KBSourceVersionCompare, KBSourceVersionDetail, KBSourceVersionList, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -205,6 +205,24 @@ export function reprocessKBSource(uuid: string, sourceUuid: string) {
 
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
+}
+
+/** A URL source's dated version history, newest first. With `at`, also says
+ *  which version was in effect at that moment. */
+export function listKBSourceVersions(uuid: string, sourceUuid: string, at?: string) {
+  const qs = at ? `?at=${encodeURIComponent(at)}` : ''
+  return apiFetch<KBSourceVersionList>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions${qs}`)
+}
+
+/** One version of a source, with the full text it held. */
+export function getKBSourceVersion(uuid: string, sourceUuid: string, versionUuid: string) {
+  return apiFetch<KBSourceVersionDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/${versionUuid}`)
+}
+
+/** A line diff from `base` to `target`. */
+export function compareKBSourceVersions(uuid: string, sourceUuid: string, base: string, target: string) {
+  const qs = `?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`
+  return apiFetch<KBSourceVersionCompare>(`/api/knowledge/${uuid}/source/${sourceUuid}/versions/compare${qs}`)
 }
 
 export interface KBSourceResponse {
