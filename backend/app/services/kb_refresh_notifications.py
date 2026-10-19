@@ -101,10 +101,32 @@ async def kb_managers(kb: Any) -> list[str]:
                 memberships = await TeamMembership.find(
                     {"team": team.id, "role": {"$in": sorted(TEAM_MANAGE_ROLES)}},
                 ).to_list()
-                recipients.extend(m.user_id for m in memberships)
+                recipients.extend(await _within_org_scope(kb, [m.user_id for m in memberships]))
         except Exception:
             logger.exception("Could not resolve team managers for KB %s", getattr(kb, "uuid", "?"))
     return list(dict.fromkeys(u for u in recipients if u and u != "system"))
+
+
+async def _within_org_scope(kb: Any, user_ids: list[str]) -> list[str]:
+    """The team managers the KB's organization scope lets see it.
+
+    ``can_manage_knowledge_base`` refuses a team admin outside the KB's
+    organizations; telling them about it would show them its title and
+    source names all the same.
+    """
+    org_ids = list(getattr(kb, "organization_ids", None) or [])
+    if not org_ids or not user_ids:
+        return user_ids
+    from app.models.user import User
+    from app.services import organization_service
+    from app.services.access_control import _org_scope_allows
+
+    kept: list[str] = []
+    for user in await User.find({"user_id": {"$in": user_ids}}).to_list():
+        ancestry = await organization_service.get_user_org_ancestry(user)
+        if _org_scope_allows(org_ids, ancestry):
+            kept.append(user.user_id)
+    return kept
 
 
 def _source_name(source: Any) -> str:

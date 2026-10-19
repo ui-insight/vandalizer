@@ -317,6 +317,11 @@ async def _refresh_url_source_async(
         source.status = "ready" if source.chunk_count else "error"
         source.error_message = reason
         source.last_refresh_error = reason
+        # Recorded so the next scheduled pass sees the source already failing
+        # and stays quiet, as it does for a failed fetch.
+        from app.utils import kb_source_currency as _currency
+
+        source.last_refresh_outcome = _currency.OUTCOME_RETRIEVAL_FAILED
         try:
             await source.save()
         except Exception:

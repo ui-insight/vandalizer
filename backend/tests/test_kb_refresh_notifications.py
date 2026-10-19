@@ -67,6 +67,33 @@ class TestRecipients:
         assert out == ["owner", "admin-1"]
         assert find.call_args.args[0] == {"team": "team-oid", "role": {"$in": ["admin", "owner"]}}
 
+    @pytest.mark.asyncio
+    async def test_org_scoped_kb_leaves_out_team_admins_outside_its_orgs(self):
+        """A team admin the KB's organization scope hides it from can't manage
+        it, and must not learn its title from the bell either."""
+        from app.models.team import Team, TeamMembership
+        from app.models.user import User
+        from app.services import organization_service
+
+        members = MagicMock()
+        members.to_list = AsyncMock(return_value=[
+            SimpleNamespace(user_id="admin-in"), SimpleNamespace(user_id="admin-out"),
+        ])
+        users = MagicMock()
+        users.to_list = AsyncMock(return_value=[
+            SimpleNamespace(user_id="admin-in"), SimpleNamespace(user_id="admin-out"),
+        ])
+        ancestry = {"admin-in": ["org-eng", "org-univ"], "admin-out": ["org-law"]}
+        with patch.object(Team, "find_one", AsyncMock(return_value=SimpleNamespace(id="team-oid"))), \
+             patch.object(TeamMembership, "find", return_value=members), \
+             patch.object(User, "find", return_value=users), \
+             patch.object(organization_service, "get_user_org_ancestry",
+                          AsyncMock(side_effect=lambda u: ancestry[u.user_id])):
+            out = await n.kb_managers(_kb(
+                team_id="team-uuid", shared_with_team=True, organization_ids=["org-eng"],
+            ))
+        assert out == ["owner", "admin-in"]
+
 
 async def _emit(coro_fn, *args, managers=("owner", "admin-1"), **kw):
     create = AsyncMock()
@@ -146,6 +173,20 @@ def _outcome(outcome, *, reason=None, content=None, title=None):
 
 
 class TestTaskWiring:
+    @pytest.mark.asyncio
+    async def test_a_crashed_refresh_is_recorded_as_failing_so_it_rings_once(self):
+        """The crash branch didn't set an outcome, so a source that kept
+        crashing looked newly failed on every scheduled pass."""
+        source = _source()
+        source.save = AsyncMock()
+
+        async def crash(src, kb):
+            raise RuntimeError("bug")
+
+        changed, failed = await _run_task(source, crash, scheduled=True)
+        failed.assert_awaited_once()
+        assert source.last_refresh_outcome == currency.OUTCOME_RETRIEVAL_FAILED
+
     @pytest.mark.asyncio
     async def test_scheduled_change_summarizes_against_the_previous_text(self):
         changed, failed = await _run_task(
