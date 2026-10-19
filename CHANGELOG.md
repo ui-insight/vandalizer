@@ -6,8 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v4.14.1] - 2026-10-19
+
 ### Fixed
 - **Refreshing a single web source works again (regression in v4.14.0).** In v4.14.0, the per-source **Refresh** button on a knowledge-base web source failed every time before fetching anything. The task crashed with "can't subtract offset-naive and offset-aware datetimes", the source stayed "pending", and the knowledge base stayed "building" until the stale-refresh window passed (Sentry 7755236750). The check that stops two refreshes of one source from racing compared a timestamp with a time zone against one without. **Refresh all** and scheduled auto-refresh were not affected. Refreshes that were queued before upgrading run normally.
+- **A web-source refresh that never finishes no longer leaves its knowledge base stuck at "building" with chat turned off.** When a refresh's worker died (v4.14.0's per-source **Refresh** and **Reprocess** crashed before fetching), the source sat at "Reprocessing — queued" for good, and the knowledge base stayed "building" with **Chat** disabled. Nothing ever moved the source on, and its Refresh button stayed disabled. An hourly check now settles any web source whose refresh stopped more than two hours ago. A source with indexed text goes back to ready and says the refresh did not finish; one with nothing indexed shows an error with **Try again**. Until that check runs, the source shows the same message and **Try again** instead of a spinner. A web source being refreshed now reads "Queued to fetch the page…" instead of "Waiting for document text to finish extracting…". **Chat** stays available whenever the knowledge base has indexed text, including while a source refreshes, and chat no longer tells the model a refreshing source "can't be searched yet".
+- **A failed refresh of a working web source keeps it answering from its previous text.** Every way of refreshing marks the source "pending" before the refresh runs. The refresh then never saw it as "ready", so a failed fetch turned a working source into an error while its chunks still answered. The "page unchanged, nothing to re-embed" shortcut never applied either, so every refresh re-embedded the whole page.
 
 ## [v4.14.0] - 2026-09-30
 

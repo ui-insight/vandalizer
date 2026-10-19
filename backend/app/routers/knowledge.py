@@ -43,6 +43,7 @@ from app.schemas.knowledge import (
 )
 from app.utils.kb_source_currency import derive_source_currency
 from app.services import access_control
+from app.services import kb_url_refresh
 from app.services import knowledge_service as svc
 from app.services.name_conflicts import DuplicateNameError
 from app.services.kb_optimization_status import OptimizationStatus, optimization_status_by_kb
@@ -300,6 +301,10 @@ def _source_response(
         ingestion_warnings=warnings,
         ingestion_warning_text=(
             "; ".join(INGESTION_WARNING_LABELS[c] for c in warnings) or None
+        ),
+        stalled=(
+            s.source_type == "url"
+            and kb_url_refresh.is_stalled(s, datetime.datetime.now(tz=datetime.timezone.utc))
         ),
         created_at=s.created_at.isoformat() if s.created_at else None,
         processed_at=_iso_or_none(getattr(s, "processed_at", None)),
