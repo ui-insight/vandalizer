@@ -951,20 +951,15 @@ async def partition_new_urls(
     router uses this to tell the user which URLs were skipped and to point
     them at the per-source refresh instead.
     """
-    new: list[str] = []
-    present: list[str] = []
-    seen: set[str] = set()
-    for raw in urls:
-        url = _normalize_url(raw or "")
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        existing = await KnowledgeBaseSource.find_one(
-            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
-            KnowledgeBaseSource.url == url,
-        )
-        (present if existing else new).append(url)
-    return new, present
+    ordered = list(dict.fromkeys(u for u in (_normalize_url(raw or "") for raw in urls) if u))
+    if not ordered:
+        return [], []
+    # One query, not one per URL: a sitemap or a file of links is hundreds.
+    rows = await KnowledgeBaseSource.find(
+        {"knowledge_base_uuid": kb.uuid, "url": {"$in": ordered}},
+    ).to_list()
+    held = {row.url for row in rows}
+    return [u for u in ordered if u not in held], [u for u in ordered if u in held]
 
 
 async def add_urls(
@@ -1010,6 +1005,63 @@ async def add_urls(
     # Unconditional: the router set status="building" before dispatching this
     # run, and a run that added nothing (every URL already present) must still
     # restore the real status or the KB shows "building" forever.
+    await recalculate_stats(kb)
+    return added
+
+
+async def register_url_sources(
+    kb: KnowledgeBase, urls: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+) -> list[str]:
+    """Create a pending source row for each URL the KB doesn't hold; returns their uuids.
+
+    Rows go in before any fetch so a bulk add (a sitemap's pages, a file of
+    links) can be split across several worker tasks: every page shows as
+    queued at once, and the KB stays "building" until the last batch is done
+    rather than reading "ready" between batches. ``ingest_url_sources`` does
+    the fetching.
+    """
+    source_uuids: list[str] = []
+    new_urls, _ = await partition_new_urls(kb, urls)
+    for url in new_urls:
+        source = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type="url",
+            url=url[:2000],
+            crawl_enabled=crawl_enabled,
+            max_crawl_pages=max_crawl_pages,
+        )
+        if await _insert_source_unless_duplicate(source):
+            source_uuids.append(source.uuid)
+    return source_uuids
+
+
+async def ingest_url_sources(
+    kb: KnowledgeBase, source_uuids: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+) -> int:
+    """Fetch and index sources made by ``register_url_sources``. Returns pages added
+    (crawled children included).
+
+    A source deleted while queued is skipped. So is one already finished, which
+    a retried task meets again; one still "processing" is picked up, since the
+    attempt that started it is gone.
+    """
+    added = 0
+    for source_uuid in source_uuids:
+        source = await KnowledgeBaseSource.find_one(
+            KnowledgeBaseSource.uuid == source_uuid,
+            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+        )
+        if not source or source.status not in ("pending", "processing"):
+            continue
+        added += 1
+        fetched = await _ingest_url_source(source, kb)
+        if crawl_enabled and fetched:
+            added += await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, fetched)
     await recalculate_stats(kb)
     return added
 

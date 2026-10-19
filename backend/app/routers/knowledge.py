@@ -37,6 +37,7 @@ from app.schemas.knowledge import (
     KBSourceDetailResponse,
     KBSourceResponse,
     KBStatusResponse,
+    ReadSitemapRequest,
     ShareKBRequest,
     SuggestSourcesRequest,
     UpdateKBRequest,
@@ -860,6 +861,14 @@ async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_
     return {"ok": True, "added": len(source_uuids), "queued": len(source_uuids)}
 
 
+# One add request. A crawl turns each URL into up to max_crawl_pages pages,
+# so crawling requests take fewer. Mirrored in AddUrlsModal.
+MAX_URLS_PER_ADD = 500
+MAX_CRAWL_URLS_PER_ADD = 25
+URL_INGEST_BATCH = 10
+URL_INGEST_STAGGER_SECONDS = 5
+
+
 @router.post("/{uuid}/add_urls")
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
@@ -867,6 +876,12 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     if not req.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
+    limit = MAX_CRAWL_URLS_PER_ADD if req.crawl_enabled else MAX_URLS_PER_ADD
+    if len(req.urls) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Add at most {limit} URLs at a time{' with crawling on' if req.crawl_enabled else ''}",
+        )
     # The worker skips URLs the KB already holds, so decide here what will
     # actually be fetched and report it honestly: "Added 2" on a request that
     # re-submitted two existing pages sent one support ticket author on a
@@ -880,20 +895,65 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         }
     # Ingestion (fetch + optional crawl + embed) can run for minutes and would
     # blow past the proxy read timeout if awaited inline — dispatch it to a
-    # worker and let the frontend poll source status. See tasks.kb.add_urls.
-    from app.tasks.kb_validation_tasks import add_urls_task
+    # worker and let the frontend poll source status. One task used to take
+    # every URL in turn, so a sitemap's few hundred pages outran its time
+    # limit and the rest were silently never added. The rows are created now
+    # and fetched in batches a task can finish.
+    from app.tasks.kb_validation_tasks import ingest_url_sources_task
 
-    kb.status = "building"
-    await kb.save()
-    add_urls_task.delay(
-        kb.uuid, new_urls,
+    source_uuids = await svc.register_url_sources(
+        kb, new_urls,
         crawl_enabled=req.crawl_enabled,
         max_crawl_pages=req.max_crawl_pages,
-        allowed_domains=req.allowed_domains,
     )
+    if source_uuids:
+        kb.status = "building"
+        await kb.save()
+    batch = 1 if req.crawl_enabled else URL_INGEST_BATCH
+    for i, start in enumerate(range(0, len(source_uuids), batch)):
+        ingest_url_sources_task.apply_async(
+            args=(kb.uuid, source_uuids[start:start + batch]),
+            kwargs={
+                "crawl_enabled": req.crawl_enabled,
+                "max_crawl_pages": req.max_crawl_pages,
+                "allowed_domains": req.allowed_domains,
+            },
+            # A bulk add is usually one site's pages; don't open them all at once.
+            countdown=i * URL_INGEST_STAGGER_SECONDS,
+        )
     return {
-        "ok": True, "added": len(new_urls),
+        "ok": True, "added": len(source_uuids),
         "skipped": len(skipped_urls), "skipped_urls": skipped_urls,
+    }
+
+
+@router.post("/{uuid}/sitemap")
+@limiter.limit("10/minute")
+async def read_sitemap(request: Request, uuid: str, req: ReadSitemapRequest, user: User = Depends(get_current_user)):
+    """The pages a site's sitemap lists, for the user to pick which to add.
+    Nothing is added here; picked pages go through ``add_urls``. Each page
+    says whether the KB already holds it."""
+    from app.services import sitemap_reader
+
+    if not req.url.strip():
+        raise HTTPException(status_code=400, detail="Enter a sitemap or site address")
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        result = await sitemap_reader.read_sitemap(req.url)
+    except sitemap_reader.SitemapError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    _, held = await svc.partition_new_urls(kb, [p.url for p in result.pages])
+    held_set = set(held)
+    return {
+        "sitemap_url": result.sitemap_url,
+        "pages": [
+            {"url": p.url, "lastmod": p.lastmod, "in_kb": p.url in held_set}
+            for p in result.pages
+        ],
+        "sitemaps_read": result.sitemaps_read,
+        "truncated": result.truncated,
+        "errors": result.errors[:5],
     }
 
 
