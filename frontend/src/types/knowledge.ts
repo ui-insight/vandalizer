@@ -158,3 +158,43 @@ export interface KBReference {
   pinned: boolean
   created_at?: string
 }
+
+/** One dated version of a URL source's text (backend KBSourceVersionResponse).
+ *  In effect from `in_effect_from` until `superseded_at` (null on the current one). */
+export interface KBSourceVersion {
+  uuid: string
+  number: number
+  is_current: boolean
+  /** ingest | refresh | supplied_text | baseline (the text held when history began) */
+  origin: string
+  url?: string | null
+  url_title?: string | null
+  content_hash: string
+  content_hash_algorithm: string
+  char_count: number
+  truncated: boolean
+  captured_at?: string | null
+  in_effect_from?: string | null
+  superseded_at?: string | null
+  last_confirmed_at?: string | null
+}
+
+export interface KBSourceVersionList {
+  versions: KBSourceVersion[]
+  at?: string | null
+  in_effect_version_uuid?: string | null
+}
+
+export interface KBSourceVersionDetail extends KBSourceVersion {
+  content: string
+}
+
+export interface KBSourceVersionCompare {
+  base: KBSourceVersion
+  target: KBSourceVersion
+  identical: boolean
+  added: number
+  removed: number
+  lines: { op: ' ' | '+' | '-' | '@'; text: string }[]
+  truncated: boolean
+}

@@ -138,6 +138,56 @@ class KBSourceDetailResponse(KBSourceResponse):
     child_sources: list[KBSourceResponse] = []  # Crawled children (when this is a parent)
 
 
+class KBSourceVersionResponse(BaseModel):
+    """One dated version of a URL source's text, without the text itself.
+
+    Dates are ISO 8601 in UTC. A version is in effect from
+    ``in_effect_from`` until ``superseded_at`` (None on the current one).
+    """
+
+    uuid: str
+    number: int
+    is_current: bool
+    origin: str
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content_hash: str
+    content_hash_algorithm: str = "sha256"
+    char_count: int = 0
+    truncated: bool = False
+    captured_at: Optional[str] = None
+    in_effect_from: Optional[str] = None
+    superseded_at: Optional[str] = None
+    last_confirmed_at: Optional[str] = None
+
+
+class KBSourceVersionListResponse(BaseModel):
+    versions: list[KBSourceVersionResponse]  # newest first
+    # Echo of the ``at`` query parameter, and the version that was in effect
+    # then (None if the source had no recorded text at that time).
+    at: Optional[str] = None
+    in_effect_version_uuid: Optional[str] = None
+
+
+class KBSourceVersionDetailResponse(KBSourceVersionResponse):
+    content: str
+
+
+class KBSourceVersionDiffLine(BaseModel):
+    op: Literal[" ", "+", "-", "@"]  # context, added, removed, hunk header
+    text: str
+
+
+class KBSourceVersionCompareResponse(BaseModel):
+    base: KBSourceVersionResponse
+    target: KBSourceVersionResponse
+    identical: bool
+    added: int
+    removed: int
+    lines: list[KBSourceVersionDiffLine]
+    truncated: bool  # the diff was longer than the line cap and was cut off
+
+
 class UpdateSourceRequest(BaseModel):
     """Patch a single KB source. Only fields explicitly present are applied;
     an empty string clears that field (reverts to the auto-derived value)."""

@@ -36,6 +36,10 @@ from app.schemas.knowledge import (
     KBResponse,
     KBSourceDetailResponse,
     KBSourceResponse,
+    KBSourceVersionCompareResponse,
+    KBSourceVersionDetailResponse,
+    KBSourceVersionListResponse,
+    KBSourceVersionResponse,
     KBStatusResponse,
     ShareKBRequest,
     UpdateKBRequest,
@@ -1025,6 +1029,119 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
             )
             for c in children
         ],
+    )
+
+
+def _version_response(version, *, is_current: bool) -> dict:
+    from app.services.kb_source_versions import as_utc
+
+    def iso(value):
+        value = as_utc(value)
+        return value.isoformat() if value else None
+
+    return {
+        "uuid": version.uuid,
+        "number": version.number,
+        "is_current": is_current,
+        "origin": version.origin,
+        "url": version.url,
+        "url_title": version.url_title,
+        "content_hash": version.content_hash,
+        "char_count": version.char_count,
+        "truncated": version.truncated,
+        "captured_at": iso(version.captured_at),
+        "in_effect_from": iso(version.in_effect_from),
+        "superseded_at": iso(version.superseded_at),
+        "last_confirmed_at": iso(version.last_confirmed_at),
+    }
+
+
+async def _viewable_source(uuid: str, source_uuid: str, user: User):
+    """The source, for anyone who can view its KB — the same read access as
+    the source inspector."""
+    from app.models.knowledge import KnowledgeBaseSource
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return source
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions", response_model=KBSourceVersionListResponse)
+async def list_source_versions(
+    uuid: str,
+    source_uuid: str,
+    at: datetime.datetime | None = Query(None, description="Also report which version was in effect at this time (ISO 8601; no offset means UTC)"),
+    user: User = Depends(get_current_user),
+):
+    """The dated version history of a URL source, newest first.
+
+    A refresh that finds new page text keeps the old text here instead of
+    discarding it, so what the source said on any date it was used can be
+    shown and proved after the page has changed.
+    """
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    versions = await kb_source_versions.list_versions(source.uuid)
+    in_effect = kb_source_versions.version_in_effect_at(versions, at) if at else None
+    return KBSourceVersionListResponse(
+        versions=[
+            KBSourceVersionResponse(**_version_response(v, is_current=v.superseded_at is None))
+            for v in versions
+        ],
+        at=kb_source_versions.as_utc(at).isoformat() if at else None,
+        in_effect_version_uuid=in_effect.uuid if in_effect else None,
+    )
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions/compare", response_model=KBSourceVersionCompareResponse)
+async def compare_source_versions(
+    uuid: str,
+    source_uuid: str,
+    base: str = Query(..., description="uuid of the older version"),
+    target: str = Query(..., description="uuid of the newer version"),
+    user: User = Depends(get_current_user),
+):
+    """A line diff between two versions of a source's text."""
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    base_v = await kb_source_versions.get_version(source.uuid, base)
+    target_v = await kb_source_versions.get_version(source.uuid, target)
+    if not base_v or not target_v:
+        raise HTTPException(status_code=404, detail="Version not found")
+    diff = await kb_source_versions.compare_versions(base_v, target_v)
+    return KBSourceVersionCompareResponse(
+        base=KBSourceVersionResponse(**_version_response(base_v, is_current=base_v.superseded_at is None)),
+        target=KBSourceVersionResponse(**_version_response(target_v, is_current=target_v.superseded_at is None)),
+        identical=base_v.content_hash == target_v.content_hash,
+        **diff,
+    )
+
+
+@router.get("/{uuid}/source/{source_uuid}/versions/{version_uuid}", response_model=KBSourceVersionDetailResponse)
+async def get_source_version(
+    uuid: str, source_uuid: str, version_uuid: str, user: User = Depends(get_current_user),
+):
+    """One version of a source, with the full text it held."""
+    from app.services import kb_source_versions
+
+    source = await _viewable_source(uuid, source_uuid, user)
+    version = await kb_source_versions.get_version(source.uuid, version_uuid)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return KBSourceVersionDetailResponse(
+        **_version_response(version, is_current=version.superseded_at is None),
+        content=version.content,
     )
 
 

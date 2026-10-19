@@ -93,6 +93,52 @@ class KnowledgeBaseSource(Document):
             self.uuid = uuid4().hex
 
 
+class KnowledgeBaseSourceVersion(Document):
+    """One dated version of a URL source's text.
+
+    ``KnowledgeBaseSource.content`` holds only the text the source serves now;
+    a refresh that picks up a revised page overwrites it. Each distinct text
+    the source has served is kept here, so what the source said when an
+    answer was produced can still be read, compared and exported after the
+    page has changed. Written by app.services.kb_source_versions.
+
+    A version is in effect from ``in_effect_from`` until ``superseded_at``
+    (None on the current version). ``last_confirmed_at`` is the latest
+    refresh that fetched the page and found this exact text again.
+    """
+
+    uuid: str = ""
+    source_uuid: str
+    knowledge_base_uuid: str
+    number: int  # 1, 2, … per source, in the order the versions took effect
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content: str = ""
+    content_hash: str
+    char_count: int = 0
+    truncated: bool = False
+    # When this text was fetched (the capture date) and when its chunks were
+    # written, i.e. when answers started coming from it.
+    captured_at: Optional[datetime.datetime] = None
+    in_effect_from: Optional[datetime.datetime] = None
+    superseded_at: Optional[datetime.datetime] = None
+    last_confirmed_at: Optional[datetime.datetime] = None
+    # How this text arrived: ingest (first fetch), refresh, supplied_text
+    # (catalog/repair text, no fetch) or baseline (the text a source already
+    # held when history began; its dates are the source's own).
+    origin: str = "ingest"
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+
+    class Settings:
+        name = "knowledge_base_source_versions"
+        indexes = ["uuid", "source_uuid", "knowledge_base_uuid"]
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.uuid:
+            self.uuid = uuid4().hex
+
+
 class KnowledgeBaseReference(Document):
     """A lightweight bookmark to a verified/shared KB.
 

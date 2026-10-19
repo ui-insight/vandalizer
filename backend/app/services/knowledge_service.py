@@ -28,7 +28,7 @@ from app.models.knowledge import (
     KnowledgeBaseUsage,
 )
 from app.models.user import User
-from app.services import access_control, audit_service, name_conflicts
+from app.services import access_control, audit_service, kb_source_versions, name_conflicts
 from app.services.document_manager import DocumentManager
 from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_fetch_error
@@ -342,6 +342,7 @@ async def _remove_duplicate_url_sources() -> int:
                     f"Error deleting chunks of duplicate KB source {extra.uuid}: {e}",
                 )
             await extra.delete()
+            await kb_source_versions.delete_for_sources([extra.uuid])
             removed += 1
         affected_kbs.add(kb_uuid)
     for kb_uuid in affected_kbs:
@@ -776,6 +777,7 @@ async def delete_knowledge_base(
     await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
     ).delete()
+    await kb_source_versions.delete_for_kb(kb.uuid)
     # Clean up any references pointing to this KB
     await KnowledgeBaseReference.find(
         KnowledgeBaseReference.source_kb_uuid == kb.uuid,
@@ -1113,6 +1115,7 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = F
         if strict:
             raise
     await source.delete()
+    await kb_source_versions.delete_for_sources([source.uuid])
     # Nothing may go on claiming to amend a source that is gone.
     try:
         await KnowledgeBaseSource.find(
@@ -1984,6 +1987,10 @@ async def refresh_url_source(
     if source.source_type != "url" or not source.url:
         return "Only URL sources can be refreshed"
 
+    # Before any field changes: a source with no history yet keeps the text
+    # it holds now as version 1, dated from its own currency fields.
+    await kb_source_versions.ensure_baseline(source)
+
     previous_status = source.status
     source.last_refresh_attempted_at = currency.utcnow()
     source.status = "processing"
@@ -2044,6 +2051,7 @@ async def refresh_url_source(
         source.last_refresh_outcome = currency.OUTCOME_UNCHANGED
         source.last_refresh_error = None
         await source.save()
+        await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_REFRESH)
         return None
 
     name = source.custom_name or result.title or source.url_title or source.url
@@ -2079,6 +2087,8 @@ async def refresh_url_source(
     source.last_refresh_error = None
     currency.stamp_ingested(source, raw_text)
     await source.save()
+    # The previous text stays readable as the version this one supersedes.
+    await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_REFRESH)
     return None
 
 
@@ -2140,6 +2150,7 @@ async def _ingest_url_source(
             # else will ever delete these, and they would keep answering.
             await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
             return None
+        await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_INGEST)
         return result
     except httpx.HTTPStatusError as e:
         if 400 <= e.response.status_code < 500:
@@ -2184,6 +2195,7 @@ async def ingest_text_into_source(
         source.error_message = "No text provided for ingestion"
         await source.save()
         return None
+    await kb_source_versions.ensure_baseline(source)
     source.status = "processing"
     await source.save()
     try:
@@ -2209,6 +2221,7 @@ async def ingest_text_into_source(
         source.error_message = None
         currency.stamp_ingested(source, text)
         await source.save()
+        await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_SUPPLIED_TEXT)
         return chunk_count
     except Exception as e:
         logger.error(f"Error ingesting text into source {source.uuid}: {e}")
