@@ -430,6 +430,9 @@ def _replay_step_entries(engine, steps_output: dict, upto_index: int) -> list[di
         warning = output.get("warning")
         if isinstance(warning, str) and warning:
             entry["warning"] = warning
+        models = output.get("models")
+        if isinstance(models, list) and models:
+            entry["models"] = models
         entries.append(entry)
 
     return entries
