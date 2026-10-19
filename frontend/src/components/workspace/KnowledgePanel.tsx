@@ -1808,6 +1808,7 @@ export function KnowledgePanel() {
 
         {showUrlModal && (
           <AddUrlsModal
+            kbUuid={selectedKB.uuid}
             onSubmit={handleAddUrls}
             onClose={() => setShowUrlModal(false)}
           />

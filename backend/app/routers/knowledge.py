@@ -38,6 +38,7 @@ from app.schemas.knowledge import (
     KBSourceResponse,
     KBStatusResponse,
     ShareKBRequest,
+    SuggestSourcesRequest,
     UpdateKBRequest,
     UpdateSourceRequest,
 )
@@ -988,6 +989,46 @@ async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     result = await kb_url_refresh.refresh_all(kb)
     return {"ok": True, **result}
+
+
+@router.get("/{uuid}/suggest-sources")
+async def source_suggestions_available(uuid: str, user: User = Depends(get_current_user)):
+    """Whether topic search can run here: it needs web search configured.
+    Add URLs hides the finder rather than offer one that cannot answer."""
+    from app.services import kb_source_suggestions
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    await _require_manageable_kb(uuid, user, user_org_ancestry)
+    return {"available": await kb_source_suggestions.is_available()}
+
+
+@router.post("/{uuid}/suggest-sources")
+@limiter.limit("10/minute")
+async def suggest_sources(
+    request: Request, uuid: str, req: SuggestSourcesRequest, user: User = Depends(get_current_user),
+):
+    """Web pages to add for a described topic, for the user to approve.
+    Nothing is added here; approved pages go through ``add_urls``."""
+    from app.exceptions import TrialSpendBlockedError
+    from app.services import kb_source_suggestions
+
+    topic = " ".join(req.topic.split())
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Describe the topic in a few words")
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        result = await kb_source_suggestions.suggest_sources(kb, topic, user_id=user.user_id)
+    except TrialSpendBlockedError:
+        raise  # the AppError handler answers with the gate's own status
+    except Exception as exc:
+        logger.exception("Source suggestions failed for KB %s", uuid)
+        raise HTTPException(status_code=502, detail=f"Could not search for pages: {exc}")
+    if not result["available"]:
+        raise HTTPException(status_code=409, detail="Web search is not configured on this deployment")
+    if result["error"] and not result["suggestions"]:
+        raise HTTPException(status_code=502, detail=f"Web search failed: {result['error']}")
+    return result
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)
