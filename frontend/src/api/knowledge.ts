@@ -177,6 +177,14 @@ export function refreshKBSource(uuid: string, sourceUuid: string) {
   )
 }
 
+/** Add a held web page anyway, after reviewing what was found (background re-fetch). */
+export function acceptKBSourceReview(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/accept_review`,
+    { method: 'POST' },
+  )
+}
+
 /** The model that grades this KB's validation runs (one system-wide setting). */
 export type KBValidationGrader = {
   model: string | null

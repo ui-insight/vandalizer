@@ -32,7 +32,9 @@ class KnowledgeBaseSource(Document):
     content: Optional[str] = None
     # "skipped" is transient: the crawler marks a navigation page skipped and
     # then deletes the record, so it should not be seen on a stored source.
-    status: str = "pending"  # pending | processing | ready | error | skipped
+    # "held": a fetched page carried hidden or AI-addressed text and was not
+    # embedded; it waits for the user to add it anyway or remove it.
+    status: str = "pending"  # pending | processing | ready | error | skipped | held
     error_message: Optional[str] = None
     chunk_count: int = 0
     # True when the fetched web page's extracted text was cut off at the fetcher
@@ -46,6 +48,16 @@ class KnowledgeBaseSource(Document):
     # so cleared — by every later successful fetch. Rows from before this
     # field existed read as empty. Only set for URL sources.
     warnings: list[str] = Field(default_factory=list)
+    # Why the last fetch was held instead of embedded
+    # (``fetched_page_screen.PageFinding.to_dict()``: kind, reason, excerpt,
+    # fingerprint). Empty once a fetch is indexed. On a source that already
+    # answers, a held refresh leaves status "ready" and the previous text in
+    # place, and this list is what the user reviews.
+    review_findings: list[dict] = Field(default_factory=list)
+    # Fingerprints of findings the user chose to add anyway. A later fetch is
+    # held only for findings not in this list, so approving a page once does
+    # not re-hold it on every refresh, and new hidden text still does.
+    accepted_finding_fingerprints: list[str] = Field(default_factory=list)
     # Crawl fields
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
@@ -201,6 +213,10 @@ class KBUrlPreviewPage(Document):
     chunk_count: int = 0
     truncated: bool = False
     warnings: list[str] = Field(default_factory=list)
+    # Hidden or AI-addressed text found when the page was fetched
+    # (fetched_page_screen). Committing such a page holds it for review
+    # instead of indexing it, as adding the URL directly would.
+    review_findings: list[dict] = Field(default_factory=list)
     expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
 
     class Settings:

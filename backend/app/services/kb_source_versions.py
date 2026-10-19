@@ -87,8 +87,14 @@ async def ensure_baseline(source: KnowledgeBaseSource) -> None:
     the baseline's dates come from them. The baseline's dates are the
     source's own: when its text was retrieved and when it was last indexed.
     For an older row these all fall back to ``processed_at``.
+
+    Only text that was indexed is a version. A source held for review with
+    nothing indexed stores the unreviewed page in ``content``; answers never
+    came from it, so it is not history.
     """
     if not _tracked(source) or not (source.content or "").strip():
+        return
+    if getattr(source, "status", None) == "held" or not getattr(source, "chunk_count", 0):
         return
     try:
         if await _latest(source.uuid) is not None:

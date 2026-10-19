@@ -92,6 +92,12 @@ export interface SourceCurrency {
   last_refresh_error: string | null
 }
 
+export interface KBSourceReviewFinding {
+  kind: 'hidden_text' | 'instruction_text' | string
+  reason: string
+  excerpt: string
+}
+
 export interface KnowledgeBaseSource {
   uuid: string
   source_type: 'document' | 'url'
@@ -107,9 +113,15 @@ export interface KnowledgeBaseSource {
   // Sources in this KB that this one revises (a supplement or notice).
   // Retrieval searches this source whenever one of those is retrieved.
   amends_source_uuids?: string[]
-  status: 'pending' | 'processing' | 'ready' | 'error'
+  // 'held': a fetched page carried hidden or AI-addressed text and was not
+  // indexed; it waits for the user (see `review_findings`).
+  status: 'pending' | 'processing' | 'ready' | 'error' | 'held'
   error_message?: string
   chunk_count: number
+  // Why the last fetch of a web source was held instead of indexed. On a
+  // "held" source nothing is indexed yet; on a "ready" one a refresh was held
+  // and the previous text still answers.
+  review_findings?: KBSourceReviewFinding[]
   // URL source whose extracted text was cut off at the fetcher size cap:
   // "ready" but incomplete, so the UI warns instead of showing a clean check.
   truncated?: boolean

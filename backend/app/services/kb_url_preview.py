@@ -160,6 +160,18 @@ async def _preview_page(
             return result, "navigation"
 
     reasons = _low_quality_reasons(result, is_seed=parent_url is None)
+    # The preview keeps only the text, so the page is screened now, while its
+    # HTML is at hand; committing it holds it for review like a direct add.
+    from app.services.fetched_page_screen import screen_fetched_page
+
+    findings = [f.to_dict() for f in screen_fetched_page(result.raw_html, result.text)]
+    if findings:
+        reasons.append(
+            ks.describe_held_page(findings).replace(
+                ". It was not added — review what was found, then add it anyway or remove it",
+                ". If added, it is held for review before anything is indexed",
+            )
+        )
     verdict = "low" if reasons else "good"
     await rec.record(
         url, verdict,
@@ -168,6 +180,7 @@ async def _preview_page(
         chunk_count=count_chunks(result.text),
         truncated=bool(result.truncated),
         warnings=list(result.advisories),
+        review_findings=findings,
         **common,
     )
     return result, verdict
@@ -308,12 +321,24 @@ async def commit_preview(preview_uuid: str, page_ids: list[str]) -> int:
         if not await ks._insert_source_unless_duplicate(source):
             continue
         try:
-            stored = await ks._store_url_text(
-                source, kb, page.text,
-                title=page.title,
-                truncated=page.truncated,
-                warnings=list(page.warnings),
-            )
+            if page.review_findings:
+                # Not indexed: held with what was found, as _ingest_url_source
+                # holds a page it screens, until the user adds it anyway.
+                source.content = ks._kb_snapshot(page.text)
+                source.url_title = page.title
+                source.truncated = page.truncated
+                source.warnings = list(page.warnings)
+                source.review_findings = list(page.review_findings)
+                source.status = "held"
+                source.error_message = ks.describe_held_page(page.review_findings)[:2000]
+                stored = await ks._save_unless_deleted(source)
+            else:
+                stored = await ks._store_url_text(
+                    source, kb, page.text,
+                    title=page.title,
+                    truncated=page.truncated,
+                    warnings=list(page.warnings),
+                )
         except Exception as e:
             logger.error("Error indexing previewed page %s: %s", page.url, e)
             source.status = "error"

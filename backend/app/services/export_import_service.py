@@ -563,7 +563,9 @@ async def export_knowledge_base(kb_uuid: str, user_email: str) -> dict:
             "url_title": src.url_title,
             "custom_name": src.custom_name,
             "document_uuid": src.document_uuid,
-            "content": (src.content or "")[:100000],  # Truncate for export
+            # A held page's text was never reviewed; leaving it out makes the
+            # import re-fetch and screen the page instead of embedding it.
+            "content": "" if src.status == "held" else (src.content or "")[:100000],
         }
         sources_out.append(entry)
 

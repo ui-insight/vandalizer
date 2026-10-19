@@ -80,6 +80,13 @@ class KBSourceCurrency(BaseModel):
     last_refresh_error: Optional[str] = None
 
 
+class KBSourceReviewFinding(BaseModel):
+    # hidden_text | instruction_text (see fetched_page_screen)
+    kind: str
+    reason: str
+    excerpt: str
+
+
 class KBSourceResponse(BaseModel):
     uuid: str
     source_type: str
@@ -111,6 +118,10 @@ class KBSourceResponse(BaseModel):
     # incomplete" shape as ``truncated``, read live from the document.
     ingestion_warnings: list[str] = []
     ingestion_warning_text: Optional[str] = None
+    # Why the last fetch of a URL source was held instead of embedded: hidden
+    # or AI-addressed text the user reviews before choosing "Add anyway".
+    # Status is "held" for a page never indexed, "ready" for a held refresh.
+    review_findings: list[KBSourceReviewFinding] = []
     created_at: Optional[str] = None
     # When the source's text was last fetched/ingested. Surfaced on the list
     # so a user can tell how stale a URL snapshot is before refreshing it.

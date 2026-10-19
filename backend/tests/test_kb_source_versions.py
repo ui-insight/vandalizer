@@ -73,6 +73,20 @@ async def test_recording_never_fails_the_caller():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status, chunk_count", [("held", 0), ("held", 3), ("error", 0)])
+async def test_text_that_was_never_indexed_is_not_a_baseline(status, chunk_count):
+    """A page held for review stores its unreviewed text in ``content``;
+    answers never came from it, so it must not become version 1."""
+    src = SimpleNamespace(
+        uuid="s", source_type="url", content="unreviewed page", status=status,
+        chunk_count=chunk_count, content_hash=None,
+    )
+    with patch.object(kb_source_versions, "_latest", AsyncMock(return_value=None)) as latest:
+        await kb_source_versions.ensure_baseline(src)
+    latest.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_document_sources_have_no_history():
     src = SimpleNamespace(uuid="s", source_type="document", content="text")
     with patch.object(kb_source_versions, "_latest", AsyncMock()) as latest:

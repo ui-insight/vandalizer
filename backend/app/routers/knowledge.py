@@ -37,6 +37,7 @@ from app.schemas.knowledge import (
     KBResponse,
     KBSourceDetailResponse,
     KBSourceResponse,
+    KBSourceReviewFinding,
     KBSourceVersionCompareResponse,
     KBSourceVersionDetailResponse,
     KBSourceVersionListResponse,
@@ -306,6 +307,13 @@ def _source_response(
         ingestion_warning_text=(
             "; ".join(INGESTION_WARNING_LABELS[c] for c in warnings) or None
         ),
+        review_findings=[
+            KBSourceReviewFinding(
+                kind=f.get("kind", ""), reason=f.get("reason", ""), excerpt=f.get("excerpt", ""),
+            )
+            for f in (getattr(s, "review_findings", None) or [])
+            if isinstance(f, dict)
+        ],
         created_at=s.created_at.isoformat() if s.created_at else None,
         processed_at=_iso_or_none(getattr(s, "processed_at", None)),
         currency=KBSourceCurrency(**derive_source_currency(s)),
@@ -999,6 +1007,46 @@ async def refresh_source(
     kb.status = "building"
     await kb.save()
     refresh_url_source_task.delay(kb.uuid, source.uuid, queued_stamp)
+    return {"ok": True, "status": "queued", "source_uuid": source.uuid}
+
+
+@router.post("/{uuid}/source/{source_uuid}/accept_review")
+@limiter.limit("10/minute")
+async def accept_source_review(
+    request: Request, uuid: str, source_uuid: str, user: User = Depends(get_current_user),
+):
+    """Add a held web page anyway, after the user has read what was found.
+
+    The findings shown are recorded as accepted and the page is fetched again
+    through the normal refresh, so what gets indexed is the page as it is now,
+    held again only for hidden or AI-addressed text the user has not seen.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+    from app.services import kb_url_refresh
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.review_findings:
+        raise HTTPException(status_code=409, detail="This source has nothing waiting for review")
+    if kb_url_refresh.is_in_flight(source, datetime.datetime.now(tz=datetime.timezone.utc)):
+        raise HTTPException(status_code=409, detail="This source is already being refreshed")
+
+    accepted = list(source.accepted_finding_fingerprints or [])
+    accepted += [
+        f["fingerprint"] for f in source.review_findings
+        if isinstance(f, dict) and f.get("fingerprint") and f["fingerprint"] not in accepted
+    ]
+    source.accepted_finding_fingerprints = accepted
+    source.review_findings = []
+    await source.save()
+    await kb_url_refresh.queue_refresh(kb, [source])
+    kb.status = "building"
+    await kb.save()
     return {"ok": True, "status": "queued", "source_uuid": source.uuid}
 
 
