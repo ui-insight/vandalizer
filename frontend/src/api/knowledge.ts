@@ -116,6 +116,38 @@ export function addUrlsToKB(
   })
 }
 
+export interface SourceSuggestion {
+  url: string
+  title: string
+  snippet: string
+  host: string
+  /** Why the page fits the topic; null when ranking was unavailable. */
+  reason: string | null
+}
+
+export interface SourceSuggestionsResult {
+  available: boolean
+  /** The web searches that were run. */
+  queries: string[]
+  suggestions: SourceSuggestion[]
+  /** Pages the searches found that the KB already holds (left out). */
+  already_in_kb: number
+  error: string | null
+}
+
+/** Whether topic search can run: it needs web search configured. */
+export function getSourceSuggestionsAvailable(uuid: string) {
+  return apiFetch<{ available: boolean }>(`/api/knowledge/${uuid}/suggest-sources`)
+}
+
+/** Web pages for a described topic. Nothing is added; approve with addUrlsToKB. */
+export function suggestSources(uuid: string, topic: string) {
+  return apiFetch<SourceSuggestionsResult>(`/api/knowledge/${uuid}/suggest-sources`, {
+    method: 'POST',
+    body: JSON.stringify({ topic }),
+  })
+}
+
 export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',

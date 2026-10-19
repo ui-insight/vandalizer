@@ -4,13 +4,16 @@ import { usePanelEffect } from '../shared/usePanelEffect'
 import { useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
+import { TopicSourceFinder } from './TopicSourceFinder'
 
 interface AddUrlsModalProps {
+  /** Enables "Find pages by topic" (where web search is configured). */
+  kbUuid?: string
   onSubmit: (urls: string[], crawlEnabled: boolean, maxCrawlPages: number, allowedDomains: string) => void | Promise<void>
   onClose: () => void
 }
 
-export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
+export function AddUrlsModal({ kbUuid, onSubmit, onClose }: AddUrlsModalProps) {
   const [text, setText] = useState('')
   const [crawlEnabled, setCrawlEnabled] = useState(false)
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
@@ -18,6 +21,16 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [urlError, setUrlError] = useState<string | null>(null)
   const urlsRef = useRef<HTMLTextAreaElement>(null)
+
+  // A checked suggestion is a line of the URL list, so the list stays the one
+  // thing Add submits and a user can still edit or remove it by hand.
+  const listedUrls = new Set(text.split('\n').map(line => line.trim()).filter(Boolean))
+  const toggleSuggestion = (url: string, checked: boolean) => {
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
+    const next = checked ? (lines.includes(url) ? lines : [...lines, url]) : lines.filter(line => line !== url)
+    setText(next.join('\n'))
+    setUrlError(null)
+  }
 
   usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -91,6 +104,9 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         <div id="add-urls-help" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           Paste one website URL per line; addresses without a scheme use https://. Adding queues retrieval; each source becomes usable after its text is indexed. Existing URLs are skipped; use Refresh on their source rows to fetch them again.
         </div>
+        {kbUuid && (
+          <TopicSourceFinder kbUuid={kbUuid} selectedUrls={listedUrls} onToggle={toggleSuggestion} disabled={submitted} />
+        )}
         <FieldLabel htmlFor="add-urls-input" required>URLs to add, one per line</FieldLabel>
         <textarea
           id="add-urls-input"
