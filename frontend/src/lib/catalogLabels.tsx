@@ -5,6 +5,12 @@
  */
 export const SHARE_LABEL = 'Share with everyone'
 
+/**
+ * The Library menu entry that opens the share wizard. Neutral, because the
+ * wizard offers a team as well as everyone.
+ */
+export const SHARE_MENU_LABEL = 'Share…'
+
 export function useShareLabel(): string {
   return SHARE_LABEL
 }

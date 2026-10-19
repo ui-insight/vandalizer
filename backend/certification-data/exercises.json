@@ -237,7 +237,7 @@
       "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
       "Build or duplicate a workflow in your second space.",
       "Ensure your workflow has a clear description explaining what it does.",
-      "**Share the workflow with everyone** (⋯ → Share with everyone) — this completes the module. An examiner looks it over later, and once they accept it the shared entry is Checked; you don't wait on that to finish your certification.",
+      "**Share the workflow with everyone** (⋯ → Share…, then pick the option for an already-validated workflow) — this completes the module. An examiner looks it over later, and once they accept it the shared entry is Checked; you don't wait on that to finish your certification.",
       "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
       "You now have a submitted, portable, well-documented workflow."
     ],

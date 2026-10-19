@@ -143,15 +143,31 @@ export function listConversations(limit: number = 50) {
   return apiFetch<ConversationSummary[]>(`/api/chat/conversations?limit=${limit}`)
 }
 
+// What a reopened conversation was last asked against, re-authorized by the
+// server. A null list was never recorded (older conversations): leave that
+// part of the current selection alone. `unavailable` counts items deleted or
+// no longer shared since, which are left out.
+export interface ChatHistoryScope {
+  documents: { uuid: string; title: string }[] | null
+  folders: { uuid: string; title: string }[] | null
+  knowledge_bases: { uuid: string; title: string }[] | null
+  unavailable: number
+}
+
+export interface ChatHistory {
+  messages: ChatMessage[]
+  url_attachments: UrlAttachment[]
+  file_attachments: FileAttachment[]
+  context_mode?: 'full' | 'truncated' | 'compacted'
+  context_cutoff_index?: number
+  compact_summary?: string | null
+  // The conversation's activity, which a follow-up must send to continue it.
+  activity_id?: string | null
+  scope?: ChatHistoryScope
+}
+
 export function getHistory(conversationUuid: string) {
-  return apiFetch<{
-    messages: ChatMessage[]
-    url_attachments: UrlAttachment[]
-    file_attachments: FileAttachment[]
-    context_mode?: 'full' | 'truncated' | 'compacted'
-    context_cutoff_index?: number
-    compact_summary?: string | null
-  }>(`/api/chat/history/${conversationUuid}`)
+  return apiFetch<ChatHistory>(`/api/chat/history/${conversationUuid}`)
 }
 
 export function deleteHistory(conversationUuid: string) {
