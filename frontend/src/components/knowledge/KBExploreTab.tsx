@@ -301,7 +301,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
     searchQuery, setSearchQuery, qualityFilter, setQualityFilter,
     tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
     refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
-    topItems, otherItems,
+    topItems, topRatedCount, otherItems,
   } = useCatalogBrowser({
     lockedKind: 'knowledge_base',
     loadErrorMessage: 'Failed to load knowledge bases. Please try again.',
@@ -660,11 +660,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                         Top Rated
                       </h3>
                       <span style={{ fontSize: 11, color: C.textFaint }}>
-                        {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
+                        {topRatedCount} excellent-tier item{topRatedCount !== 1 ? 's' : ''}
                       </span>
                     </div>
                     <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-                      {topItems.slice(0, 6).map(item => (
+                      {topItems.map(item => (
                         <KBCatalogCard
                           key={item.id}
                           item={item}

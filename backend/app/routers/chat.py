@@ -764,6 +764,7 @@ async def get_chat_history(
     file_attachments = await conversation.get_file_attachments()
 
     return {
+        "activity_id": str(activity.id) if activity else None,
         "messages": messages,
         "url_attachments": [
             {
@@ -785,7 +786,6 @@ async def get_chat_history(
         ],
         "context_mode": conversation.context_mode,
         "context_cutoff_index": conversation.context_cutoff_index,
-        "activity_id": str(activity.id) if activity else None,
         "scope": await _restore_scope(conversation, messages, user),
     }
 

@@ -266,10 +266,9 @@ class TestChatConversations:
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.chat.ChatConversation") as MockConv,
-            patch("app.routers.chat.ActivityEvent") as MockActivity,
+            patch("app.routers.chat.ActivityEvent.find_one", new_callable=AsyncMock, return_value=MagicMock(id="original-activity")) as find_activity,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
-            MockActivity.find_one = AsyncMock(return_value=None)
             MockConv.find_one = AsyncMock(return_value=conv)
             MockConv.uuid = "uuid"
             MockConv.user_id = "user_id"
@@ -283,6 +282,10 @@ class TestChatConversations:
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["messages"]) == 2
+        assert data["activity_id"] == "original-activity"
+        find_activity.assert_awaited_once_with({
+            "conversation_id": "conv-1", "user_id": "testuser", "type": "conversation",
+        })
 
     @pytest.mark.asyncio
     async def test_get_history_includes_persisted_citations(self, client):
@@ -318,10 +321,9 @@ class TestChatConversations:
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.chat.ChatConversation") as MockConv,
-            patch("app.routers.chat.ActivityEvent") as MockActivity,
+            patch("app.routers.chat.ActivityEvent.find_one", new_callable=AsyncMock, return_value=None),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
-            MockActivity.find_one = AsyncMock(return_value=None)
             MockConv.find_one = AsyncMock(return_value=conv)
             MockConv.uuid = "uuid"
             MockConv.user_id = "user_id"
