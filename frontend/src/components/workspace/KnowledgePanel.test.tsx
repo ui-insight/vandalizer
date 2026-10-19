@@ -4,6 +4,9 @@ import { KnowledgePanel } from './KnowledgePanel'
 import type { KnowledgeBaseDetail } from '../../types/knowledge'
 
 const detail: { current: Partial<KnowledgeBaseDetail> } = { current: {} }
+const tabCounts: { current: { mine: number | null; team: number | null; explore: number | null } } = {
+  current: { mine: null, team: null, explore: null },
+}
 const getKnowledgeBase = vi.fn(async (_uuid: string) => detail.current as KnowledgeBaseDetail)
 
 vi.mock('../../contexts/WorkspaceContext', () => ({
@@ -35,6 +38,7 @@ vi.mock('../shared/useConfirm', () => ({
 }))
 
 vi.mock('../../hooks/useKnowledgeBases', () => ({
+  useKBTabCounts: () => tabCounts.current,
   useKnowledgeBases: () => ({
     knowledgeBases: [],
     loading: false,
@@ -517,4 +521,21 @@ describe('KnowledgePanel export on an empty KB', () => {
     // The visible line carries the pipeline's own clause, not only a hover.
     expect(screen.getByText(/Only part of this document is indexed — only part of this document could be converted/)).toBeInTheDocument()
   }, 30000)
+})
+
+describe('KnowledgePanel tab counts', () => {
+  it('shows how many knowledge bases each tab holds', () => {
+    tabCounts.current = { mine: 12, team: 3, explore: 40 }
+    render(<KnowledgePanel />)
+    expect(screen.getByRole('tab', { name: 'My KBs 12' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Team 3' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Everyone 40' })).toBeInTheDocument()
+  })
+
+  it('leaves a count off while it is loading', () => {
+    tabCounts.current = { mine: 0, team: null, explore: null }
+    render(<KnowledgePanel />)
+    expect(screen.getByRole('tab', { name: 'My KBs 0' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Team' })).toBeInTheDocument()
+  })
 })
