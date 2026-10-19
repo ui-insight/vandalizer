@@ -584,3 +584,42 @@ def test_export_names_the_question_set_the_run_measured():
         exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
     )
     assert older_meta["question_set_fingerprint"] is None
+
+
+def test_export_separates_an_expected_answer_conflict_from_partial_credit():
+    """An answer that contradicts the expected answer but agrees with a source
+    exports as a flagged, contradicted row, and the run says how many such
+    rows its accuracy includes (NSF PAPPG validation ticket, 2026-10-14)."""
+    vr = _make_vr()
+    rp = vr.result_snapshot["retrieval_precision"]
+    rp["num_expected_conflicts"] = 1
+    rp["avg_judge_score_excluding_conflicts"] = 0.9
+    rp["details"][1]["judge"].update({
+        "score": 0.0,
+        "verdict": "FAIL",
+        "contradicted_facts": ["The PI signs the budget"],
+        "expected_conflict": True,
+        "conflict_evidence": "Budget guide: the PI signs.",
+    })
+
+    payload, run_meta, rows = _build(vr)
+
+    conflicted = rows[1]
+    assert conflicted["expected_conflict"] is True
+    assert conflicted["contradicted_facts"] == ["The PI signs the budget"]
+    assert conflicted["conflict_evidence"] == "Budget guide: the PI signs."
+    assert run_meta["num_expected_conflicts"] == 1
+    assert run_meta["avg_judge_score_excluding_conflicts"] == 0.9
+    assert "expected_conflict" in run_meta["avg_judge_score_meaning"]
+    # A row without the new fields (an older run) exports them empty.
+    assert rows[0]["expected_conflict"] is False
+    assert rows[0]["contradicted_facts"] == []
+
+    first = dict(zip(*list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))[:2]))
+    assert first["num_expected_conflicts"] == "1"
+
+
+def test_an_older_run_exports_no_conflict_count():
+    _, run_meta, _ = _build()
+    assert run_meta["num_expected_conflicts"] is None
+    assert run_meta["avg_judge_score_excluding_conflicts"] is None

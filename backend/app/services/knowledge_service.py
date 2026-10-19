@@ -6,6 +6,7 @@ import asyncio
 import datetime
 import logging
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import httpx
@@ -15,7 +16,7 @@ from beanie.exceptions import DocumentNotFound
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from app.models.kb_suggestion import KBSuggestion
     from app.services.web_fetcher import WebFetchResult
@@ -28,7 +29,7 @@ from app.models.knowledge import (
     KnowledgeBaseUsage,
 )
 from app.models.user import User
-from app.services import access_control, audit_service, name_conflicts
+from app.services import access_control, audit_service, kb_source_versions, name_conflicts
 from app.services.document_manager import DocumentManager
 from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_fetch_error
@@ -106,12 +107,24 @@ async def list_knowledge_bases(
 ) -> tuple[list[KnowledgeBase], int]:
     """List knowledge bases with optional scope filtering, search, and pagination.
 
-    Returns ``(items, total)`` where *total* is the unscoped count before
-    skip/limit (for pagination metadata).
+    Returns ``(items, total)`` where *total* counts every KB the query
+    matches before skip/limit. That is the number the KB tabs show.
     """
     query = build_kb_list_query(user_id, team_id, scope, search)
     if query is None:
         return [], 0
+
+    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
+    # Never filter out user's own KBs. This is part of the query, not a pass
+    # over the fetched page: filtering afterwards left ``total`` counting KBs
+    # the user can't see and made pages come back short.
+    if user_org_ancestry is not None:
+        query = {"$and": [query, {"$or": [
+            {"user_id": user_id},
+            # Missing (rows older than the field) or [] means "not org-scoped".
+            {"organization_ids": {"$in": [None, []]}},
+            {"organization_ids": {"$in": list(user_org_ancestry)}},
+        ]}]}
 
     total = await KnowledgeBase.find(query).count()
     kbs = await (
@@ -121,17 +134,6 @@ async def list_knowledge_bases(
         .limit(limit)
         .to_list()
     )
-
-    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
-    # Never filter out user's own KBs.
-    if user_org_ancestry is not None:
-        kbs = [
-            kb for kb in kbs
-            if kb.user_id == user_id
-            or not kb.organization_ids
-            or bool(set(kb.organization_ids) & set(user_org_ancestry))
-        ]
-
     return kbs, total
 
 
@@ -342,6 +344,7 @@ async def _remove_duplicate_url_sources() -> int:
                     f"Error deleting chunks of duplicate KB source {extra.uuid}: {e}",
                 )
             await extra.delete()
+            await kb_source_versions.delete_for_sources([extra.uuid])
             removed += 1
         affected_kbs.add(kb_uuid)
     for kb_uuid in affected_kbs:
@@ -779,6 +782,7 @@ async def delete_knowledge_base(
     await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
     ).delete()
+    await kb_source_versions.delete_for_kb(kb.uuid)
     # Clean up any references pointing to this KB
     await KnowledgeBaseReference.find(
         KnowledgeBaseReference.source_kb_uuid == kb.uuid,
@@ -811,9 +815,11 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
     kb.total_chunks = sum(
         s.chunk_count for s in sources if s.status in ("ready", "pending", "processing")
     )
+    # Held sources are settled: nothing is running, they wait on the user.
+    held = sum(1 for s in sources if s.status == "held")
     if kb.total_sources == 0:
         kb.status = "empty"
-    elif kb.sources_ready + kb.sources_failed >= kb.total_sources:
+    elif kb.sources_ready + kb.sources_failed + held >= kb.total_sources:
         kb.status = "error" if kb.sources_failed > 0 and kb.sources_ready == 0 else "ready"
     else:
         kb.status = "building"
@@ -1120,6 +1126,7 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = F
         if strict:
             raise
     await source.delete()
+    await kb_source_versions.delete_for_sources([source.uuid])
     # Nothing may go on claiming to amend a source that is gone.
     try:
         await KnowledgeBaseSource.find(
@@ -1248,8 +1255,10 @@ async def clone_knowledge_base(
 
         if src.source_type == "document":
             await _ingest_document_source(new_src, clone)
-        elif src.source_type == "url" and src.content:
-            # Re-use cached content instead of re-fetching
+        elif src.source_type == "url" and src.content and src.status != "held":
+            # Re-use cached content instead of re-fetching. A held page's
+            # snapshot was never reviewed, so it is re-fetched (and screened)
+            # below instead.
             dm = _get_dm()
             try:
                 chunk_count = await asyncio.to_thread(
@@ -1496,26 +1505,37 @@ def _crawlable_links(fetched: WebFetchResult, base_url: str) -> list[str]:
     return links
 
 
-async def _crawl_from_source(
-    parent: KnowledgeBaseSource,
-    kb: KnowledgeBase,
+@dataclass
+class _CrawlVisit:
+    """What visiting one crawl candidate did.
+
+    ``kind``: ``known`` (already held — not fetched, costs nothing), ``added``
+    (counts toward max_pages; a page that failed to fetch counts too, as it
+    always has), ``skipped`` (navigation: fetched for its links, not kept) or
+    ``gone`` (deleted by the user mid-visit: not counted, links not followed).
+    """
+
+    kind: str
+    fetched: WebFetchResult | None = None
+
+
+async def _crawl_bfs(
+    parent_url: str,
+    parent_fetched: WebFetchResult,
     max_pages: int,
     allowed_domains: str,
-    parent_fetched: WebFetchResult,
-) -> int:
-    """BFS crawl from parent URL, creating child sources. Returns count added.
+    visit: Callable[[str], Awaitable[_CrawlVisit]],
+) -> tuple[list[str], list[str], int]:
+    """Breadth-first crawl from an already-fetched page.
 
-    Only pages with real content become sources. Navigation pages (Home,
-    Topics, Agencies) are fetched and mined for links but never embedded, so
-    ``max_pages`` counts documents the user wanted rather than being spent on
-    site chrome — without anyone having to fill in Allowed domains.
+    Owns the queue, scope, redirect dedup and budgets; ``visit`` decides what
+    happens to each page (ingest it, or only record it for a preview), so the
+    crawl a preview shows is the crawl an add performs. Returns the URLs that
+    counted as added, the navigation URLs skipped, and the number fetched.
     """
-    from app.config import Settings
     from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
-    from app.utils.page_quality import describe_low_value_page
 
     max_pages = max(1, min(max_pages, 50))
-    min_content_chars = Settings().kb_crawl_min_content_chars
     # Skipped pages don't consume a page slot, so bound the total fetches too —
     # otherwise a site that is nothing but navigation would crawl until it ran
     # out of links. Mirrors the workflow CrawlerNode's budget.
@@ -1524,9 +1544,9 @@ async def _crawl_from_source(
 
     # Explicit allowed-domains entries (which may carry path prefixes) define
     # the scope; blank falls back to the parent URL's whole domain.
-    scope = parse_crawl_scope(allowed_domains, parent.url)
+    scope = parse_crawl_scope(allowed_domains, parent_url)
 
-    parent_normalized = _normalize_crawl_url(parent.url)
+    parent_normalized = _normalize_crawl_url(parent_url)
     # visited dedups the queue; landed tracks pages whose content was actually
     # ingested — including the URL a redirect landed on (uidaho.edu →
     # www.uidaho.edu), which only becomes known after the fetch, when the
@@ -1541,8 +1561,8 @@ async def _crawl_from_source(
     added = 0
 
     # Extract seed links from the already-fetched parent (HTML page or PDF)
-    seed_links = _crawlable_links(parent_fetched, parent.url)
-    logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent.url}")
+    seed_links = _crawlable_links(parent_fetched, parent_url)
+    logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent_url}")
     for link in seed_links:
         if link not in visited and url_in_crawl_scope(link, scope):
             queue.append(link)
@@ -1562,6 +1582,56 @@ async def _crawl_from_source(
             logger.debug(f"Crawl: skipping {url} — already ingested via redirect")
             continue
 
+        outcome = await visit(url)
+        if outcome.kind == "known":
+            continue
+        fetches += 1
+        child_fetched = outcome.fetched
+        landed.add(_normalize_crawl_url(url))
+        if child_fetched and child_fetched.final_url:
+            child_final = _normalize_crawl_url(child_fetched.final_url)
+            visited.add(child_final)
+            landed.add(child_final)
+
+        if outcome.kind == "gone":
+            continue
+        if outcome.kind == "skipped":
+            skipped_urls.append(url)
+        else:
+            added += 1
+            crawled_urls.append(url)
+            logger.info(f"Crawl: added child {added}/{max_pages} — {url}")
+
+        # Extract more links from this page for BFS
+        if child_fetched and added < max_pages:
+            for link in _crawlable_links(child_fetched, url):
+                if link not in visited and url_in_crawl_scope(link, scope):
+                    queue.append(link)
+                    visited.add(link)
+
+    return crawled_urls, skipped_urls, fetches
+
+
+async def _crawl_from_source(
+    parent: KnowledgeBaseSource,
+    kb: KnowledgeBase,
+    max_pages: int,
+    allowed_domains: str,
+    parent_fetched: WebFetchResult,
+) -> int:
+    """BFS crawl from parent URL, creating child sources. Returns count added.
+
+    Only pages with real content become sources. Navigation pages (Home,
+    Topics, Agencies) are fetched and mined for links but never embedded, so
+    ``max_pages`` counts documents the user wanted rather than being spent on
+    site chrome — without anyone having to fill in Allowed domains.
+    """
+    from app.config import Settings
+    from app.utils.page_quality import describe_low_value_page
+
+    min_content_chars = Settings().kb_crawl_min_content_chars
+
+    async def ingest_child(url: str) -> _CrawlVisit:
         # Skip if already in this KB
         existing = await KnowledgeBaseSource.find_one(
             KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
@@ -1569,7 +1639,7 @@ async def _crawl_from_source(
         )
         if existing:
             logger.debug(f"Crawl: skipping duplicate URL {url}")
-            continue
+            return _CrawlVisit("known")
 
         child = KnowledgeBaseSource(
             knowledge_base_uuid=kb.uuid,
@@ -1578,8 +1648,7 @@ async def _crawl_from_source(
             parent_source_uuid=parent.uuid,
         )
         if not await _insert_source_unless_duplicate(child):
-            continue
-        fetches += 1
+            return _CrawlVisit("known")
         # _ingest_url_source returns the fetch result on success
         child_fetched = await _ingest_url_source(
             child, kb,
@@ -1589,33 +1658,21 @@ async def _crawl_from_source(
                 min_chars=min_content_chars,
             ),
         )
-        landed.add(_normalize_crawl_url(url))
-        if child_fetched and child_fetched.final_url:
-            child_final = _normalize_crawl_url(child_fetched.final_url)
-            visited.add(child_final)
-            landed.add(child_final)
-
         if child.status == "deleted":
             # Removed by the user while it was being ingested: not added.
             logger.info(f"Crawl: {url} was deleted during ingest")
-            continue
+            return _CrawlVisit("gone", child_fetched)
         if child.status == "skipped":
             # Navigation, not content: drop the source record entirely so it
             # never shows up in the KB, but fall through to harvest its links.
-            skipped_urls.append(url)
             await child.delete()
             logger.info(f"Crawl: skipped {url} — {child.error_message}")
-        else:
-            added += 1
-            crawled_urls.append(url)
-            logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
+            return _CrawlVisit("skipped", child_fetched)
+        return _CrawlVisit("added", child_fetched)
 
-        # Extract more links from this page for BFS
-        if child_fetched and added < max_pages:
-            for link in _crawlable_links(child_fetched, url):
-                if link not in visited and url_in_crawl_scope(link, scope):
-                    queue.append(link)
-                    visited.add(link)
+    crawled_urls, skipped_urls, fetches = await _crawl_bfs(
+        parent.url, parent_fetched, max_pages, allowed_domains, ingest_child,
+    )
 
     # Update parent with crawled URL list. A crawl runs for many pages, so
     # the parent may have been deleted (or deleted and re-added) meanwhile;
@@ -1625,10 +1682,10 @@ async def _crawl_from_source(
     await _save_unless_deleted(parent)
 
     logger.info(
-        f"Crawl complete for {parent.url}: {added} child pages added, "
+        f"Crawl complete for {parent.url}: {len(crawled_urls)} child pages added, "
         f"{len(skipped_urls)} navigation pages skipped ({fetches} fetched)",
     )
-    return added
+    return len(crawled_urls)
 
 
 # --- Export / Import ---
@@ -1872,6 +1929,34 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
     return None
 
 
+def _unreviewed_findings(source: KnowledgeBaseSource, result: WebFetchResult) -> list[dict]:
+    """What the user must see about a fetched page before it is embedded:
+    hidden or AI-addressed text (``fetched_page_screen``), less anything they
+    already chose to add anyway. Empty means the page can be indexed."""
+    from app.services.fetched_page_screen import screen_fetched_page
+
+    accepted = set(getattr(source, "accepted_finding_fingerprints", None) or [])
+    return [
+        f.to_dict() for f in screen_fetched_page(result.raw_html, result.text)
+        if f.fingerprint not in accepted
+    ]
+
+
+def describe_held_page(findings: list[dict]) -> str:
+    """The one-line reason a held source shows; the excerpts sit beside it."""
+    hidden = sum(1 for f in findings if f.get("kind") == "hidden_text")
+    addressed = len(findings) - hidden
+    parts = []
+    if hidden:
+        parts.append(f"{hidden} passage{'s' if hidden != 1 else ''} of text the page does not show")
+    if addressed:
+        parts.append(f"{addressed} passage{'s' if addressed != 1 else ''} addressed to an AI")
+    return (
+        "Held for review: this page contains " + " and ".join(parts)
+        + ". It was not added — review what was found, then add it anyway or remove it"
+    )
+
+
 # A refresh that returns a small fraction of the text it is replacing is not a
 # revised page, it is a page that did not load — a JavaScript app's shell, an
 # error page served with a 200, a login wall. Below this share of the retained
@@ -1991,6 +2076,10 @@ async def refresh_url_source(
     if source.source_type != "url" or not source.url:
         return "Only URL sources can be refreshed"
 
+    # Before any field changes: a source with no history yet keeps the text
+    # it holds now as version 1, dated from its own currency fields.
+    await kb_source_versions.ensure_baseline(source)
+
     # Whether the source answers from indexed text right now. Not its status:
     # every caller marks the source "pending" before queueing this (the
     # per-source Refresh, Reprocess, Refresh all, the schedule), so the status
@@ -2021,6 +2110,10 @@ async def refresh_url_source(
             )
         if reason is None and getattr(source, "parent_source_uuid", None):
             reason = _reject_crawled_navigation_page(result, source.url)
+        if reason is None:
+            findings = _unreviewed_findings(source, result)
+            if findings:
+                return await _hold_refresh(source, result, findings)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
@@ -2053,9 +2146,11 @@ async def refresh_url_source(
         # The fetch is what carries the caveat, so a successful fetch
         # rewrites it: a clean refetch clears an earlier one.
         source.warnings = list(result.advisories)
+        source.review_findings = []
         source.last_refresh_outcome = currency.OUTCOME_UNCHANGED
         source.last_refresh_error = None
         await source.save()
+        await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_REFRESH)
         return None
 
     name = source.custom_name or result.title or source.url_title or source.url
@@ -2084,6 +2179,7 @@ async def refresh_url_source(
     source.url_title = result.title or source.url_title
     source.truncated = bool(result.truncated)
     source.warnings = list(result.advisories)
+    source.review_findings = []
     source.chunk_count = chunk_count
     source.status = "ready"
     source.error_message = None
@@ -2091,7 +2187,36 @@ async def refresh_url_source(
     source.last_refresh_error = None
     currency.stamp_ingested(source, raw_text)
     await source.save()
+    # The previous text stays readable as the version this one supersedes.
+    await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_REFRESH)
     return None
+
+
+async def _hold_refresh(
+    source: KnowledgeBaseSource, result: WebFetchResult, findings: list[dict],
+) -> str:
+    """Record a refreshed page that must be reviewed instead of indexing it.
+
+    A source that already answers keeps its previous text and stays
+    ``ready``: a page that turned hostile must not take the source down, and
+    must not reach the index either. A source with nothing indexed yet is
+    ``held`` with the fetched text stored, so the inspector shows the user
+    what they would be adding.
+    """
+    reason = describe_held_page(findings)
+    source.review_findings = findings
+    source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
+    source.last_refresh_error = reason[:2000]
+    if source.chunk_count:
+        source.status = "ready"
+        source.error_message = f"Refresh held — previous content kept. {reason}"[:2000]
+    else:
+        source.status = "held"
+        source.error_message = reason[:2000]
+        source.content = _kb_snapshot(result.text)
+        source.url_title = result.title or source.url_title
+    await source.save()
+    return reason
 
 
 async def _ingest_url_source(
@@ -2132,25 +2257,29 @@ async def _ingest_url_source(
                 # Not an error — the caller still wants the links off this page.
                 return result
 
-        source.content = _kb_snapshot(raw_text)
-        source.url_title = result.title
-        source.truncated = bool(result.truncated)
-        # e.g. a fetched PDF whose hidden-text scrub could not run: the text
-        # is indexed, and the source row says what was not checked.
-        source.warnings = list(result.advisories)
+        findings = _unreviewed_findings(source, result)
+        source.review_findings = findings
+        if findings:
+            # Stored, not embedded: the user sees what was found and the
+            # text it sits in, and nothing reaches the index until they add
+            # it. The result is still returned so a crawl can follow the
+            # page's links; each child page is screened on its own.
+            source.content = _kb_snapshot(raw_text)
+            source.url_title = result.title
+            source.truncated = bool(result.truncated)
+            source.warnings = list(result.advisories)
+            source.status = "held"
+            source.error_message = describe_held_page(findings)[:2000]
+            if not await _save_unless_deleted(source):
+                return None
+            return result
 
-        dm = _get_dm()
-        chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid,
-            source.url_title or source.url, raw_text,
-        )
-        source.chunk_count = chunk_count
-        source.status = "ready"
-        currency.stamp_ingested(source, raw_text)
-        if not await _save_unless_deleted(source):
-            # remove_source cleared the chunks before ours landed; nothing
-            # else will ever delete these, and they would keep answering.
-            await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        if not await _store_url_text(
+            source, kb, raw_text,
+            title=result.title,
+            truncated=bool(result.truncated),
+            warnings=list(result.advisories),
+        ):
             return None
         return result
     except httpx.HTTPStatusError as e:
@@ -2176,6 +2305,46 @@ async def _ingest_url_source(
         return None
 
 
+async def _store_url_text(
+    source: KnowledgeBaseSource,
+    kb: KnowledgeBase,
+    raw_text: str,
+    *,
+    title: str | None,
+    truncated: bool,
+    warnings: list[str],
+) -> bool:
+    """Index a URL source's fetched text and mark it ready.
+
+    Shared by a fresh fetch and a committed preview, so text the user reviewed
+    is indexed exactly as a direct add would have indexed it. False when the
+    row was deleted meanwhile (its chunks are removed again).
+    """
+    source.content = _kb_snapshot(raw_text)
+    source.url_title = title
+    source.truncated = truncated
+    # e.g. a fetched PDF whose hidden-text scrub could not run: the text
+    # is indexed, and the source row says what was not checked.
+    source.warnings = warnings
+
+    dm = _get_dm()
+    chunk_count = await asyncio.to_thread(
+        dm.add_to_kb, kb.uuid, source.uuid,
+        source.url_title or source.url, raw_text,
+    )
+    source.chunk_count = chunk_count
+    source.status = "ready"
+    currency.stamp_ingested(source, raw_text)
+    if not await _save_unless_deleted(source):
+        # remove_source cleared the chunks before ours landed; nothing
+        # else will ever delete these, and they would keep answering.
+        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        return False
+    # A fresh fetch and a committed preview both start the source's history.
+    await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_INGEST)
+    return True
+
+
 async def ingest_text_into_source(
     source: KnowledgeBaseSource,
     kb: KnowledgeBase,
@@ -2196,6 +2365,7 @@ async def ingest_text_into_source(
         source.error_message = "No text provided for ingestion"
         await source.save()
         return None
+    await kb_source_versions.ensure_baseline(source)
     source.status = "processing"
     await source.save()
     try:
@@ -2221,6 +2391,7 @@ async def ingest_text_into_source(
         source.error_message = None
         currency.stamp_ingested(source, text)
         await source.save()
+        await kb_source_versions.record_current(source, origin=kb_source_versions.ORIGIN_SUPPLIED_TEXT)
         return chunk_count
     except Exception as e:
         logger.error(f"Error ingesting text into source {source.uuid}: {e}")

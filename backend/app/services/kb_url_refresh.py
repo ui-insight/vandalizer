@@ -146,8 +146,15 @@ def is_due(source: KnowledgeBaseSource, interval: datetime.timedelta, now: datet
     return checked is None or now - checked >= interval
 
 
-async def queue_refresh(kb: KnowledgeBase, sources: list[KnowledgeBaseSource]) -> int:
-    """Mark each source pending and dispatch its refresh, staggered. Returns the count."""
+async def queue_refresh(
+    kb: KnowledgeBase, sources: list[KnowledgeBaseSource], *, scheduled: bool = False,
+) -> int:
+    """Mark each source pending and dispatch its refresh, staggered. Returns the count.
+
+    ``scheduled`` refreshes tell the KB's managers when a page changed or
+    stopped updating (kb_refresh_notifications); one a person asked for does
+    not — they are looking at the result.
+    """
     from app.tasks.kb_validation_tasks import refresh_url_source_task
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -161,7 +168,9 @@ async def queue_refresh(kb: KnowledgeBase, sources: list[KnowledgeBaseSource]) -
         source.refresh_queued_at = due
         await source.save()
         refresh_url_source_task.apply_async(
-            args=(kb.uuid, source.uuid, due.isoformat()), countdown=countdown,
+            args=(kb.uuid, source.uuid, due.isoformat()),
+            kwargs={"scheduled": True} if scheduled else None,
+            countdown=countdown,
         )
     return len(sources)
 
@@ -196,7 +205,7 @@ async def refresh_due_sources(now: datetime.datetime | None = None) -> dict[str,
             ).to_list()
             due = [s for s in sources if is_refreshable(s, now) and is_due(s, interval, now)]
             if due:
-                queued += await queue_refresh(kb, due)
+                queued += await queue_refresh(kb, due, scheduled=True)
                 kbs_touched += 1
         except Exception:
             # One KB's bad row must not stop every other KB's refresh.

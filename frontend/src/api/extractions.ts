@@ -211,6 +211,8 @@ export function runExtractionSync(data: {
      * document was read whole — never "not checked". */
     document_warnings?: DocumentWarning[]
     error?: string
+    /** The models the run's calls used, most tokens first. */
+    models?: string[]
   }>('/api/extractions/run-sync', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -434,6 +436,16 @@ export interface ExtractionRunHistoryEntry {
   tokens_output: number
   documents_touched: number
   result_snapshot: Record<string, unknown>
+  /** Models the run's calls used, most tokens first; empty for older runs. */
+  models?: string[]
+  step_models?: RunStepModels[]
+}
+
+/** One workflow step's models, in step order. */
+export interface RunStepModels {
+  index: number
+  name: string | null
+  models: string[]
 }
 
 export function getExtractionHistory(uuid: string, limit = 50) {

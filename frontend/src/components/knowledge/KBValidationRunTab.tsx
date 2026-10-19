@@ -446,11 +446,28 @@ function LiftCard({ run }: { run: KBValidationResult }) {
           </div>
         )}
       </div>
+      <ConflictNote run={run} />
       {run.retrieval_precision.judge_variance != null && (
         <div style={{ fontSize: 10, color: '#666', marginTop: 6 }}>
           Judge variance: ±{(run.retrieval_precision.judge_variance * 100).toFixed(1)} pts (sampled on first run)
         </div>
       )}
+    </div>
+  )
+}
+
+/** How unresolved expected-answer conflicts weigh on the accuracy above. */
+function ConflictNote({ run }: { run: KBValidationResult }) {
+  const n = run.retrieval_precision.num_expected_conflicts ?? 0
+  const without = run.retrieval_precision.avg_judge_score_excluding_conflicts
+  if (n === 0) return null
+  return (
+    <div role="note" style={{ fontSize: 11, color: '#c4b5fd', marginTop: 8, lineHeight: 1.5 }}>
+      {n} question{n === 1 ? ' has' : 's have'} an unresolved conflict: the answer contradicts the
+      expected answer, but a retrieved source supports it. {n === 1 ? 'It is' : 'They are'} scored
+      against the expected answer and included in the accuracy above
+      {without != null ? <> — leaving {n === 1 ? 'it' : 'them'} out, accuracy is {(without * 100).toFixed(0)}%</> : null}.
+      Review {n === 1 ? 'it' : 'each one'} below and correct the expected answer or the source.
     </div>
   )
 }
@@ -520,6 +537,17 @@ function DetailRow({
             {detail.discrimination}
           </span>
         )}
+        {j?.expected_conflict && (
+          <span
+            title="The answer contradicts the expected answer, but a retrieved source supports it. Scored against the expected answer; review which one is out of date."
+            style={{
+              fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 6,
+              color: '#c4b5fd', backgroundColor: '#c4b5fd1a',
+            }}
+          >
+            conflict
+          </span>
+        )}
         {j && (
           <span style={{ fontSize: 11, color: '#aaa', minWidth: 40, textAlign: 'right' }}>
             {(j.score * 100).toFixed(0)}%
@@ -553,6 +581,20 @@ function DetailRow({
           )}
           {j?.reasoning && (
             <Block label="Judge reasoning" body={j.reasoning} muted />
+          )}
+          {j?.expected_conflict && (
+            <div role="note" style={{ fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
+              <b>Unresolved conflict with the expected answer.</b> The answer is scored as
+              contradicting the expected answer, but this retrieved excerpt supports it. If the
+              source is right, correct the expected answer; if the expected answer is right, the
+              source is out of date.
+              {j.conflict_evidence && <Block label="Supporting excerpt" body={j.conflict_evidence} muted />}
+            </div>
+          )}
+          {(j?.contradicted_facts?.length ?? 0) > 0 && (
+            <div style={{ fontSize: 11, color: '#ef4444' }}>
+              <b>Contradicts expected:</b> {j!.contradicted_facts!.join(' · ')}
+            </div>
           )}
           {(j?.missing_facts.length ?? 0) > 0 && (
             <div style={{ fontSize: 11, color: '#f59e0b' }}>

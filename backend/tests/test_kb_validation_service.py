@@ -954,9 +954,12 @@ def test_resolve_rubric_key_maps_generator_categories():
 
 
 def test_judge_prompt_includes_expected_answer_conflict_rule():
-    """A context-grounded claim that contradicts the expected answer must be
-    judged as an expected-answer conflict (WARN), not a hallucination."""
-    assert "expected-answer conflict" in kb_validation_service.KB_JUDGE_SYSTEM_PROMPT
+    """A context-grounded claim that contradicts the expected answer is flagged
+    as an expected-answer conflict, not a hallucination. It earns no credit:
+    see test_kb_judge_expected_conflict.py."""
+    prompt = kb_validation_service.KB_JUDGE_SYSTEM_PROMPT
+    assert "Expected-answer conflict" in prompt
+    assert "never merely 'disagrees with the expected answer'" in prompt
 
 
 @pytest.mark.asyncio

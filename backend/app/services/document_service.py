@@ -198,6 +198,7 @@ async def list_contents(
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,
                 "error_message": d.error_message,
+                "error_retryable": d.error_retryable,
                 "extraction_low_quality": is_extraction_low_quality(d),
                 "ingestion_warnings": ingestion_warnings(d),
                 # The list endpoint is what feeds the file browser; serving
@@ -291,6 +292,7 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "valid": doc.valid,
         "path": doc.path,
         "error_message": doc.error_message,
+        "error_retryable": doc.error_retryable,
         "processing": doc.processing,
         "title": doc.title,
         "extraction_low_quality": is_extraction_low_quality(doc),
@@ -356,6 +358,7 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
     doc.processing = True
     doc.updated_at = _datetime.datetime.now()
     doc.error_message = None
+    doc.error_retryable = None
     doc.raw_text = ""
     doc.token_count = 0
     doc.text_markers = []

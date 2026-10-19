@@ -7,6 +7,9 @@ export interface ChatMessage {
   /** KB answers only: dollar amounts / percentages in the answer that no
    *  retrieved snippet states — likely recalled from the model's memory. */
   unsupported_figures?: string[]
+  /** KB answers only: sources the answer cites for text they don't contain —
+   *  e.g. a scraped page holding only its title. */
+  unsupported_citations?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -107,6 +110,14 @@ export interface Citation {
   chunk_id?: string | null
   score?: number | null
   content_preview?: string
+  /** The snippet's number in its turn's prompt; the answer cites it as [S#]. */
+  ref?: number
+  /** What [S#] reads as, e.g. "PAPPG.pdf, p. ~54". */
+  cite_label?: string
+  /** Whether the answer cited this snippet. false = retrieved and searched
+   *  but not used. Absent on answers saved before the distinction, which
+   *  show every snippet as a source. */
+  used?: boolean
 }
 
 export interface StreamChunk {
@@ -119,6 +130,7 @@ export interface StreamChunk {
     | 'context_budget'
     | 'context_notice'
     | 'sources'
+    | 'sources_used'
     | 'grounding_warning'
   content: string
   duration?: number
@@ -138,8 +150,12 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+  // sources_used only: the [S#] numbers the finished answer cited.
+  used_refs?: number[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
+  // grounding_warning only: cited sources that don't contain the cited text.
+  unsupported_citations?: string[]
 }
 
 export interface SuggestedModel {
