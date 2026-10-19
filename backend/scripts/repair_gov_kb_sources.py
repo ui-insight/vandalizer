@@ -49,6 +49,7 @@ import httpx
 from app.config import Settings
 from app.database import init_db
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.services.bundled_sources import falls_short_of_bundle
 from app.utils.bot_challenge import (
     looks_like_boilerplate_only,
     looks_like_bot_challenge,
@@ -126,6 +127,10 @@ def _is_broken(source: KnowledgeBaseSource) -> str | None:
         return f"error status ({(source.error_message or '')[:80]})"
     if not (source.content or "").strip():
         return "no cached content"
+    if falls_short_of_bundle(source.content, getattr(source, "url", None)):
+        # eCFR's 434-character search help passed every check above while
+        # the FCOI KB held nothing else.
+        return "holds far less text than the bundled regulation"
     return None
 
 

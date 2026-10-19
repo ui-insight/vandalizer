@@ -103,6 +103,44 @@ _CHROME_MARKERS = tuple(
 _MIN_CHROME_FAMILIES = 2
 
 
+# Search help a site renders where its content would be. ecfr.gov returns
+# exactly this (434 characters, title set, HTTP 200) to an automated fetch:
+# no gov banner and no JavaScript notice, so the family check below misses
+# it, and an FCOI knowledge base answered from it for a week. Each entry is
+# one sentence; a page that is nothing else once they are removed is a shell.
+_SEARCH_SHELL_SENTENCES: tuple[str, ...] = (
+    "navigate by entering citations or phrases",
+    "choosing an item from citations and headings will bring you directly to the content.",
+    "choosing an item from full text search results will bring you to those results.",
+    "pressing enter in the search box will also bring you to search results.",
+    "background and more details are available in the search & navigation guide.",
+)
+_MIN_SEARCH_SHELL_SENTENCES = 2
+# What may remain once the sentences are removed: the example citations that
+# follow the first one, punctuation. A real regulation section is longer.
+_MAX_SEARCH_SHELL_REMAINDER = 200
+
+
+def looks_like_search_shell(text: str | None) -> bool:
+    """True when the text is a site's search help and nothing else.
+
+    Measured by what is left, not by the sentences' presence: a full eCFR
+    page carries the same help above the regulation, and must not be refused
+    for it.
+    """
+    if not text:
+        return False
+    lowered = " ".join(text.lower().split())
+    found = 0
+    for sentence in _SEARCH_SHELL_SENTENCES:
+        if sentence in lowered:
+            found += 1
+            lowered = lowered.replace(sentence, " ")
+    if found < _MIN_SEARCH_SHELL_SENTENCES:
+        return False
+    return len(" ".join(lowered.split())) <= _MAX_SEARCH_SHELL_REMAINDER
+
+
 def looks_like_boilerplate_only(text: str | None) -> bool:
     """True when extracted page text is site chrome with no real content.
 
@@ -115,6 +153,8 @@ def looks_like_boilerplate_only(text: str | None) -> bool:
     """
     if not text:
         return False
+    if looks_like_search_shell(text):
+        return True
     stripped = text.strip()
     if not stripped or len(stripped) > _MAX_CHROME_TEXT_CHARS:
         return False

@@ -127,11 +127,10 @@ async def _preview_page(
     ingestion — also means its links are not followed.
     """
     from app.config import Settings
-    from app.services.web_fetcher import fetch_url
     from app.utils.page_quality import describe_low_value_page
 
     try:
-        result = await fetch_url(url, max_chars=ks._kb_text_cap())
+        result = await ks.fetch_source_page(url)
     except Exception as e:  # noqa: BLE001 — every failure is shown, as ingestion records it
         logger.info("URL preview fetch failed for %s: %s", url, e)
         await rec.record(url, "error", parent_url=parent_url, reason=describe_fetch_error(e)[:2000])
