@@ -43,6 +43,8 @@ class WorkflowResponse(BaseModel):
     # also granted to an examiner while the workflow's verification request
     # is open, so a reviewer can grade a submission they cannot edit.
     can_validate: bool = True
+    # Verified items are already shared; the editor's share callout hides.
+    verified: bool = False
     created_by: Optional[AuthorRef] = None
 
 

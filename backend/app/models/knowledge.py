@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from beanie import Document
 from pydantic import Field
+from pymongo import IndexModel
 
 
 class KnowledgeBaseSource(Document):
@@ -31,7 +32,9 @@ class KnowledgeBaseSource(Document):
     content: Optional[str] = None
     # "skipped" is transient: the crawler marks a navigation page skipped and
     # then deletes the record, so it should not be seen on a stored source.
-    status: str = "pending"  # pending | processing | ready | error | skipped
+    # "held": a fetched page carried hidden or AI-addressed text and was not
+    # embedded; it waits for the user to add it anyway or remove it.
+    status: str = "pending"  # pending | processing | ready | error | skipped | held
     error_message: Optional[str] = None
     chunk_count: int = 0
     # True when the fetched web page's extracted text was cut off at the fetcher
@@ -45,6 +48,16 @@ class KnowledgeBaseSource(Document):
     # so cleared — by every later successful fetch. Rows from before this
     # field existed read as empty. Only set for URL sources.
     warnings: list[str] = Field(default_factory=list)
+    # Why the last fetch was held instead of embedded
+    # (``fetched_page_screen.PageFinding.to_dict()``: kind, reason, excerpt,
+    # fingerprint). Empty once a fetch is indexed. On a source that already
+    # answers, a held refresh leaves status "ready" and the previous text in
+    # place, and this list is what the user reviews.
+    review_findings: list[dict] = Field(default_factory=list)
+    # Fingerprints of findings the user chose to add anyway. A later fetch is
+    # held only for findings not in this list, so approving a page once does
+    # not re-hold it on every refresh, and new hidden text still does.
+    accepted_finding_fingerprints: list[str] = Field(default_factory=list)
     # Crawl fields
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
@@ -91,6 +104,127 @@ class KnowledgeBaseSource(Document):
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
+
+
+class KnowledgeBaseSourceVersion(Document):
+    """One dated version of a URL source's text.
+
+    ``KnowledgeBaseSource.content`` holds only the text the source serves now;
+    a refresh that picks up a revised page overwrites it. Each distinct text
+    the source has served is kept here, so what the source said when an
+    answer was produced can still be read, compared and exported after the
+    page has changed. Written by app.services.kb_source_versions.
+
+    A version is in effect from ``in_effect_from`` until ``superseded_at``
+    (None on the current version). ``last_confirmed_at`` is the latest
+    refresh that fetched the page and found this exact text again.
+    """
+
+    uuid: str = ""
+    source_uuid: str
+    knowledge_base_uuid: str
+    number: int  # 1, 2, … per source, in the order the versions took effect
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content: str = ""
+    content_hash: str
+    char_count: int = 0
+    truncated: bool = False
+    # When this text was fetched (the capture date) and when its chunks were
+    # written, i.e. when answers started coming from it.
+    captured_at: Optional[datetime.datetime] = None
+    in_effect_from: Optional[datetime.datetime] = None
+    superseded_at: Optional[datetime.datetime] = None
+    last_confirmed_at: Optional[datetime.datetime] = None
+    # How this text arrived: ingest (first fetch), refresh, supplied_text
+    # (catalog/repair text, no fetch) or baseline (the text a source already
+    # held when history began; its dates are the source's own).
+    origin: str = "ingest"
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+
+    class Settings:
+        name = "knowledge_base_source_versions"
+        indexes = ["uuid", "source_uuid", "knowledge_base_uuid"]
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.uuid:
+            self.uuid = uuid4().hex
+
+
+def _utcnow() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+#: How long a URL preview is kept for the user to review before it expires.
+URL_PREVIEW_TTL = datetime.timedelta(hours=2)
+
+#: Preview page verdicts. The first two can be added; the rest are shown so the
+#: user sees what happened to each URL, but adding them would do nothing useful.
+PREVIEW_ADDABLE_VERDICTS = frozenset({"good", "low"})
+
+
+class KBUrlPreview(Document):
+    """A fetch of URLs for review before any of them enter a knowledge base.
+
+    The pages live in ``KBUrlPreviewPage`` (one row each, since a page's text
+    can run to millions of characters). Committing ingests the stored text of
+    the pages the user kept, so what was reviewed is exactly what is indexed.
+    Expired previews are removed by the TTL index.
+    """
+
+    uuid: str = Field(default_factory=lambda: uuid4().hex)
+    knowledge_base_uuid: str
+    user_id: str
+    urls: list[str] = Field(default_factory=list)
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    allowed_domains: str = ""
+    # running → ready (or error) → committed
+    status: str = "running"
+    error_message: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=_utcnow)
+    expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
+
+    class Settings:
+        name = "kb_url_previews"
+        indexes = [
+            "uuid",
+            IndexModel([("expires_at", 1)], expireAfterSeconds=0),
+        ]
+
+
+class KBUrlPreviewPage(Document):
+    """One fetched page of a ``KBUrlPreview`` and what it would add."""
+
+    preview_uuid: str
+    page_id: str = Field(default_factory=lambda: uuid4().hex)
+    order: int = 0
+    url: str
+    final_url: Optional[str] = None
+    title: Optional[str] = None
+    # The page this one was crawled from; None for a URL the user entered.
+    parent_url: Optional[str] = None
+    # good | low (addable) · empty | error | duplicate | navigation (not addable)
+    verdict: str
+    reason: Optional[str] = None
+    text: str = ""
+    char_count: int = 0
+    chunk_count: int = 0
+    truncated: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    # Hidden or AI-addressed text found when the page was fetched
+    # (fetched_page_screen). Committing such a page holds it for review
+    # instead of indexing it, as adding the URL directly would.
+    review_findings: list[dict] = Field(default_factory=list)
+    expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
+
+    class Settings:
+        name = "kb_url_preview_pages"
+        indexes = [
+            [("preview_uuid", 1), ("order", 1)],
+            IndexModel([("expires_at", 1)], expireAfterSeconds=0),
+        ]
 
 
 class KnowledgeBaseReference(Document):
