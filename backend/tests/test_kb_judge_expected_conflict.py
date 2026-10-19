@@ -63,6 +63,16 @@ def test_a_summary_with_one_conflicting_point_keeps_at_most_half_credit():
     assert v["expected_conflict"] is True
 
 
+def test_a_multi_hop_answer_with_one_conflicting_step_keeps_half_credit():
+    """The multi-hop rubric gives 0.5 when the final answer is right and one
+    intermediate fact is wrong; a conflict on that step must not zero it."""
+    raw = {**Q004_CONFLICT, "score": 0.5, "verdict": "WARN"}
+    v = svc._parse_kb_verdict(raw, rubric="multi_hop")
+
+    assert (v["score"], v["verdict"]) == (0.5, "WARN")
+    assert v["expected_conflict"] is True
+
+
 def test_a_lower_score_than_the_ceiling_is_left_alone():
     raw = {**Q004_CONFLICT, "score": 0.2, "verdict": "FAIL"}
     assert svc._parse_kb_verdict(raw, rubric="summarization")["score"] == 0.2

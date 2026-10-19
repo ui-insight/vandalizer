@@ -1015,11 +1015,12 @@ KB_JUDGE_SYSTEM_PROMPT = _kb_judge_prompt_for_category(None)
 
 
 # The most an answer flagged ``expected_conflict`` can score, per rubric: what
-# each rubric gives a contradicted fact. Only a summary's "one minor
-# inaccuracy" earns partial credit; every other rubric scores it 0. The
-# prompt says the same, but the judge used to be told to return WARN for
-# these and gave them 0.6, so the parser enforces it.
-_CONFLICT_SCORE_CEILING = {"summarization": 0.5}
+# each rubric gives a contradicted fact. A summary's "one minor inaccuracy"
+# and a multi-hop answer's "final answer correct but one intermediate fact is
+# wrong" earn partial credit; every other rubric scores it 0. The prompt says
+# the same, but the judge used to be told to return WARN for these and gave
+# them 0.6, so the parser enforces it.
+_CONFLICT_SCORE_CEILING = {"summarization": 0.5, "multi_hop": 0.5}
 
 
 def _verdict_for_score(score: float) -> str:
