@@ -34,6 +34,23 @@ export const QUALITY_FILTER_OPTIONS: [QualityFilter, string][] = [
   ['fair', 'Fair'],
 ]
 
+/** How many excellent-tier items the "Top Rated" spotlight shows. */
+export const SPOTLIGHT_SIZE = 6
+
+/** The landing view's two sections: the spotlight, and everything else.
+ *  Every item lands in exactly one. The main grid used to drop *every*
+ *  excellent-tier item while the spotlight showed only the first six, so the
+ *  seventh and later appeared nowhere (support ticket: DOE, DOD/DFARS and
+ *  FAR were in the catalog but not on the Knowledge Bases tab). */
+export function splitSpotlight(items: VerifiedCatalogItem[]): {
+  spotlight: VerifiedCatalogItem[]; rest: VerifiedCatalogItem[]; topRatedCount: number
+} {
+  const top = items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder)
+  const spotlight = top.slice(0, SPOTLIGHT_SIZE)
+  const shown = new Set(spotlight.map(i => i.id))
+  return { spotlight, rest: items.filter(i => !shown.has(i.id)), topRatedCount: top.length }
+}
+
 /** Measured top-tier items lead the spotlight; hand-asserted ones follow. Both
  *  stay eligible so a fresh install still has a landing page, but the earned
  *  rating always outranks the typed one. */
@@ -159,15 +176,12 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
   // Show the hero landing when no filters are active
   const showHero = !hasActiveFilters && !loading
 
-  // Split items by tier for the hero landing
-  const topItems = useMemo(
-    () => items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder),
-    [items],
-  )
-  const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'excellent') : items,
-    [items, showHero],
-  )
+  // Split items for the hero landing: the spotlight, and every item it does
+  // not show (excellent-tier ones past the spotlight included).
+  const split = useMemo(() => splitSpotlight(items), [items])
+  const topItems = split.spotlight
+  const topRatedCount = split.topRatedCount
+  const otherItems = showHero ? split.rest : items
 
   return {
     items, total, allTotal, collections, featuredCollections, regularCollections,
@@ -181,6 +195,6 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
     debouncedSearch,
     refresh, handleLoadMore, hasMore,
     activeCollection, clearFilters, hasActiveFilters, showHero,
-    topItems, otherItems,
+    topItems, topRatedCount, otherItems,
   }
 }

@@ -45,14 +45,22 @@ def _auth(user_id="user1"):
 
 @pytest.fixture
 async def client():
-    with patch("app.main.init_db", new_callable=AsyncMock):
-        from app.main import app
+    # POST /optimize is limited to 5/minute and the limiter is process-wide,
+    # so this file's start-path tests would trip it on one another.
+    from app.rate_limit import limiter
+    prev = limiter.enabled
+    limiter.enabled = False
+    try:
+        with patch("app.main.init_db", new_callable=AsyncMock):
+            from app.main import app
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as ac:
-            yield ac
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+            ) as ac:
+                yield ac
+    finally:
+        limiter.enabled = prev
 
 
 def _stub_kb(uuid="kb-1"):
@@ -121,6 +129,7 @@ class TestStartOptimization:
             # The start path sweeps orphaned runs before its active check (#835);
             # the sweep is its own unit, not under test here.
             patch("app.services.kb_optimizer.reap_stale_runs", new=AsyncMock()),
+            patch("app.services.kb_optimizer.resolve_model_plan", new=AsyncMock(return_value={})),
             patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
             patch("app.tasks.kb_validation_tasks.optimize_kb_task", fake_task),
         ):
@@ -203,6 +212,7 @@ class TestStartOptimization:
             # The start path sweeps orphaned runs before its active check (#835);
             # the sweep is its own unit, not under test here.
             patch("app.services.kb_optimizer.reap_stale_runs", new=AsyncMock()),
+            patch("app.services.kb_optimizer.resolve_model_plan", new=AsyncMock(return_value={})),
             patch("app.tasks.kb_validation_tasks.optimize_kb_task", fake_task),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
@@ -214,6 +224,72 @@ class TestStartOptimization:
             )
         assert resp.status_code == 409
         assert "opt-active" in resp.json()["detail"]
+        fake_task.delay.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_forwards_judge_and_challengers_into_run_options(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        kb = _stub_kb()
+        fake_task = MagicMock(); fake_task.delay = MagicMock()
+        plan = AsyncMock(return_value={})
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+            patch("app.services.kb_optimizer.reap_stale_runs", new=AsyncMock()),
+            patch("app.services.kb_optimizer.resolve_model_plan", new=plan),
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
+            patch("app.tasks.kb_validation_tasks.optimize_kb_task", fake_task),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=None)
+            instance = _stub_run(uuid="opt-new")
+            instance.insert = AsyncMock()
+            MockRun.return_value = instance
+            resp = await client.post(
+                "/api/knowledge/kb-1/optimize",
+                json={
+                    "token_budget": 500_000,
+                    "judge_model": "claude-x",
+                    "challenger_models": ["gpt-oss", "glm-4"],
+                },
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 200
+        assert plan.await_args.kwargs == {
+            "judge_model": "claude-x", "challenger_models": ["gpt-oss", "glm-4"],
+        }
+        options = MockRun.call_args.kwargs["options"]
+        assert options["judge_model"] == "claude-x"
+        assert options["challenger_models"] == ["gpt-oss", "glm-4"]
+
+    @pytest.mark.asyncio
+    async def test_rejects_ineligible_challenger_before_queueing(self, client):
+        from app.services.kb_optimizer import ModelPlanError
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        kb = _stub_kb()
+        fake_task = MagicMock(); fake_task.delay = MagicMock()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.services.kb_optimizer.resolve_model_plan",
+                  new=AsyncMock(side_effect=ModelPlanError("gpt-5: It is the judge."))),
+            patch("app.tasks.kb_validation_tasks.optimize_kb_task", fake_task),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/knowledge/kb-1/optimize",
+                json={"token_budget": 500_000, "judge_model": "gpt-5", "challenger_models": ["gpt-5"]},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 400
+        assert "It is the judge" in resp.json()["detail"]
         fake_task.delay.assert_not_called()
 
     @pytest.mark.asyncio

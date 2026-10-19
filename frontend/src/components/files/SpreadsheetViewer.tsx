@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, Search, AlertCircle, RefreshCw, Download } from 'lucide-react'
 import { downloadFileUrl, fetchSheetJson, type SheetJsonResponse } from '../../api/files'
+import { pollStatus, retryExtraction } from '../../api/documents'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 
 type ServerSheet = SheetJsonResponse['sheets'][number]
@@ -22,6 +23,14 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [serverSheets, setServerSheets] = useState<ServerSheet[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Text extraction is separate from the preview: a workbook can render here
+  // and still have failed extraction (so chat can't read it), or fail both.
+  // Spreadsheets never reach DocumentViewer's error panel, so this viewer has
+  // to say so itself, with Retry only when a retry can help.
+  const [extractionFailure, setExtractionFailure] = useState<{ message: string; retryable: boolean } | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Find-in-document state
   const rootRef = useRef<HTMLDivElement>(null)
@@ -124,7 +133,68 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       })
 
     return () => { cancelled = true }
+  }, [docUuid, reloadKey])
+
+  useEffect(() => {
+    if (processing) return
+    let cancelled = false
+    pollStatus(docUuid)
+      .then((res) => {
+        if (cancelled) return
+        setExtractionFailure(
+          res.status === 'error'
+            ? {
+                message: res.error_message || "We couldn't extract any text from this spreadsheet.",
+                retryable: res.error_retryable !== false,
+              }
+            : null,
+        )
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [docUuid, processing, reloadKey])
+
+  const handleRetryExtraction = useCallback(async () => {
+    setRetrying(true)
+    try {
+      await retryExtraction(docUuid)
+      const interval = window.setInterval(async () => {
+        try {
+          const res = await pollStatus(docUuid)
+          if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
+            window.clearInterval(interval)
+            setRetrying(false)
+            setReloadKey(k => k + 1)
+          }
+        } catch {
+          window.clearInterval(interval)
+          setRetrying(false)
+          setReloadKey(k => k + 1)
+        }
+      }, 3000)
+    } catch (err) {
+      setExtractionFailure({ message: err instanceof Error ? err.message : 'Retry failed.', retryable: true })
+      setRetrying(false)
+    }
   }, [docUuid])
+
+  const retryButton = (
+    <button
+      type="button"
+      onClick={handleRetryExtraction}
+      disabled={retrying}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+        padding: '6px 12px', fontSize: 13, fontWeight: 500,
+        backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
+        color: '#fff', border: 'none', borderRadius: 6,
+        cursor: retrying ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <RefreshCw style={{ width: 13, height: 13, animation: retrying ? 'spin 1s linear infinite' : undefined }} />
+      {retrying ? 'Retrying...' : 'Retry extraction'}
+    </button>
+  )
 
   const handleSheetChange = (index: number) => {
     if (serverSheets) showServerSheet(serverSheets, index)
@@ -146,9 +216,49 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   }
 
   if (error) {
+    // The server's 404 text says nothing a user can act on; a 422 carries the
+    // reason (a damaged workbook, a binary named .csv) and is shown as is.
+    const previewReason = error === 'Sheet rendering not available' ? null : error
+    // A damaged workbook fails the preview and extraction with one message.
+    const showPreviewReason = previewReason && previewReason !== extractionFailure?.message
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="alert" style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>
+        <div role="alert" style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+          maxWidth: 480, padding: 32, textAlign: 'center',
+        }}>
+          <AlertCircle style={{ width: 36, height: 36, color: '#dc2626' }} aria-hidden="true" />
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+            {extractionFailure ? "This spreadsheet couldn't be read" : "This spreadsheet can't be previewed"}
+          </div>
+          {showPreviewReason && (
+            <div style={{ fontSize: 14, color: '#555', lineHeight: 1.5 }}>{previewReason}</div>
+          )}
+          {extractionFailure && (
+            <div style={{ fontSize: 14, color: '#555', lineHeight: 1.5 }}>{extractionFailure.message}</div>
+          )}
+          {!previewReason && !extractionFailure && (
+            <div style={{ fontSize: 14, color: '#555', lineHeight: 1.5 }}>
+              Download it to open it in Excel.
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            {extractionFailure?.retryable && retryButton}
+            <a
+              href={url}
+              download
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', fontSize: 13, fontWeight: 500,
+                color: '#374151', border: '1px solid #d1d5db', borderRadius: 6,
+                backgroundColor: '#fff', textDecoration: 'none',
+              }}
+            >
+              <Download style={{ width: 13, height: 13 }} aria-hidden="true" />
+              Download
+            </a>
+          </div>
+        </div>
       </div>
     )
   }
@@ -174,6 +284,20 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {extractionFailure && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+          padding: '10px 12px', fontSize: 13, lineHeight: 1.4, color: '#991b1b',
+          backgroundColor: '#fef2f2', borderBottom: '1px solid #fecaca',
+        }}>
+          <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} aria-hidden="true" />
+          <span style={{ flex: 1 }}>
+            <strong>Text extraction failed</strong> &mdash; chat and extraction can&rsquo;t read this spreadsheet. {extractionFailure.message}
+          </span>
+          {extractionFailure.retryable && retryButton}
         </div>
       )}
 

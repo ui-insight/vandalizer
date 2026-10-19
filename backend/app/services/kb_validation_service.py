@@ -1515,6 +1515,7 @@ async def judge_baselines_only(
     model_name: str,
     *,
     concurrency: int = 4,
+    judge_model: str | None = None,
 ) -> dict:
     """Generate no-KB baseline answers and judge them — KB path is skipped.
 
@@ -1522,10 +1523,13 @@ async def judge_baselines_only(
     running trials, so they can see what the KB needs to beat. Returns the same
     ``avg_baseline_score`` / ``tokens_used`` / ``details`` shape as the baseline
     portion of ``judge_test_queries(mode="judge+baseline")``.
+
+    ``model_name`` answers; ``judge_model`` grades (default ``model_name``).
     """
     await _ensure_system_config_loaded()
     judgeable = [tq for tq in test_queries if getattr(tq, "expected_answer", None)]
     sem = asyncio.Semaphore(max(1, concurrency))
+    effective_judge = judge_model or model_name
 
     async def one(tq) -> dict:
         async with sem:
@@ -1540,7 +1544,7 @@ async def judge_baselines_only(
                     query=tq.query,
                     expected_answer=tq.expected_answer,
                     actual_answer=baseline_answer,
-                    model_name=model_name,
+                    model_name=effective_judge,
                     retrieved_context=None,
                 )
                 stored_baseline, baseline_cut = _store_answer(baseline_answer)

@@ -1201,6 +1201,8 @@ async def get_workflow_history(
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     from app.models.activity import ActivityEvent
+    from app.services.metering import run_model_fields
+
     events = (
         await ActivityEvent.find(
             ActivityEvent.workflow == wf.id,
@@ -1231,6 +1233,10 @@ async def get_workflow_history(
                 # history row say "awaiting approval" and link to the review
                 # instead of showing a run that has been "running" for days.
                 "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
+                # What actually ran, from the metered calls (support ticket:
+                # History couldn't say which model a run used). Empty for runs
+                # recorded before models were.
+                **run_model_fields(ev.model_usage),
             }
             for ev in events
         ],

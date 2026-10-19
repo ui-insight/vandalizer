@@ -15,6 +15,7 @@ import { ReproducibilityPanel } from '../shared/ReproducibilityPanel'
 import { CrossJudgeNote } from '../shared/CrossJudgeNote'
 import { TermDef } from '../shared/TermDef'
 import { DOMAIN_LABELS } from '../shared/labels'
+import { TuningModelsLine } from './TuningModels'
 
 interface Props {
   run: KBOptimizationRun
@@ -101,6 +102,10 @@ export function OptimizationResults({
     { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
   ]
 
+  // Older runs carry no ``winner``; for them the tie gate was the only rule.
+  const winner: 'current' | 'challenger' =
+    run.winner ?? (run.tied_with_baseline || !run.best_config ? 'current' : 'challenger')
+
   const winningPerQuery: PerQueryResult[] | undefined = winningTrial?.per_query_results
   const defaultPerQuery: PerQueryResult[] | undefined = run.default_per_query_results
   const noKbPerQuery: PerQueryResult[] | undefined = run.no_kb_per_query_results
@@ -159,6 +164,8 @@ export function OptimizationResults({
         }
       />
 
+      <TuningModelsLine run={run} />
+
       {/* Cross-judge sanity check — only shown when a second judge actually
           ran (gated by token budget in the backend). */}
       {run.cross_judge && (
@@ -200,8 +207,11 @@ export function OptimizationResults({
           run is the one currently live on the KB. We trust applied_at /
           reverted_at when present (post-Phase-1) and fall back to the legacy
           ``apply_on_finish`` flag for runs that pre-date the snapshot. */}
-      {run.best_config && (
+      {(run.best_config || winner === 'current') && (
         <BestConfigCard
+          winner={winner}
+          belowCurrent={winner === 'current' && !run.tied_with_baseline && !!run.best_config}
+          currentModel={run.current_model ?? null}
           config={run.best_config}
           defaultConfig={run.default_config ?? null}
           isAlreadyApplied={
@@ -209,7 +219,7 @@ export function OptimizationResults({
             || (!run.applied_at && !!run.options?.apply_on_finish)
           }
           canRevert={!!(run.applied_at && !run.reverted_at && onRevert)}
-          canManage={canManage && !run.tied_with_baseline}
+          canManage={canManage && winner === 'challenger'}
           onApply={onApply}
           applying={applying}
           onRevert={onRevert}
@@ -293,13 +303,21 @@ export function OptimizationResults({
   )
 }
 
-/** Renders the winning config as a default→winner diff. Rows whose value
- * matches the default config are collapsed into an "unchanged" expander so
- * users can see at a glance what the optimizer actually changed. */
+/** States who won. When the current settings won there is nothing to apply;
+ * otherwise the winner is rendered as a current→winner diff — exactly what
+ * Apply would change. Rows whose value matches the current config are
+ * collapsed into an "unchanged" expander. */
 function BestConfigCard({
+  winner, belowCurrent, currentModel,
   config, defaultConfig, isAlreadyApplied, canRevert, canManage, onApply, applying, onRevert, reverting,
 }: {
-  config: OptimizationTrial['config']
+  winner: 'current' | 'challenger'
+  /** The current settings won because every trial scored below them, not
+   * because the best trial was within the noise. */
+  belowCurrent: boolean
+  /** The model that answers today; shown wherever a config leaves model unset. */
+  currentModel: string | null
+  config: OptimizationTrial['config'] | null
   defaultConfig: OptimizationTrial['config'] | null
   isAlreadyApplied: boolean
   canRevert: boolean
@@ -311,7 +329,7 @@ function BestConfigCard({
 }) {
   const [showUnchanged, setShowUnchanged] = useState(false)
   const fmt = (key: keyof OptimizationTrial['config'], v: unknown): string => {
-    if (key === 'model') return (v as string | null) || 'default'
+    if (key === 'model') return (v as string | null) || currentModel || 'default'
     if (key === 'query_rewriting') return v ? 'on' : 'off'
     if (key === 'source_label_visibility') return v ? 'visible' : 'hidden'
     return String(v)
@@ -323,6 +341,31 @@ function BestConfigCard({
     { key: 'query_rewriting', label: 'Query rewriting', hint: "Whether to expand the user's question into multiple phrasings before searching." },
     { key: 'source_label_visibility', label: 'Source labels in context', hint: 'Whether the model sees document titles when answering.' },
   ]
+  if (winner === 'current' || !config) {
+    return (
+      <div style={{
+        padding: 14, backgroundColor: '#1f1f1f',
+        border: '1px solid #2e2e2e', borderRadius: 8,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Sparkles size={14} style={{ color: '#a78bfa' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Winner: current settings</span>
+        </div>
+        <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
+          {belowCurrent
+            ? 'Every setup we tried scored below your current settings.'
+            : 'No setup we tried beat your current settings by more than the judge\'s noise.'}
+          {' '}Nothing to apply{currentModel ? <> — {currentModel} keeps answering with your current settings</> : null}.
+        </div>
+        {canRevert && onRevert && (
+          <div style={{ marginTop: 12 }}>
+            <RevertButton canManage={canManage} reverting={reverting} onRevert={onRevert} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const rows = fields.map(f => {
     const winner = fmt(f.key, (config as Record<string, unknown>)[f.key])
     const def = defaultConfig
@@ -341,15 +384,17 @@ function BestConfigCard({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <Sparkles size={14} style={{ color: '#a78bfa' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Best configuration</span>
-        {hasDefault && (
-          <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>
-            {changed.length === 0
-              ? 'identical to default — no knobs changed'
-              : `${changed.length} knob${changed.length === 1 ? '' : 's'} changed vs default`}
-          </span>
-        )}
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+          Winner: {fmt('model', config.model)} + tuned settings
+        </span>
       </div>
+      {hasDefault && (
+        <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>
+          {changed.length === 0
+            ? 'Apply would change nothing — this is the same as your current settings.'
+            : `Apply would change ${changed.length} setting${changed.length === 1 ? '' : 's'}:`}
+        </div>
+      )}
 
       {/* If we don't have a default snapshot (legacy run), fall back to the
           flat grid; otherwise show diff rows only. */}
@@ -426,24 +471,34 @@ function BestConfigCard({
           isAlreadyApplied={isAlreadyApplied}
         />
         {canRevert && onRevert && (
-          <button
-            onClick={onRevert}
-            disabled={!canManage || reverting}
-            style={{
-              padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-              color: canManage && !reverting ? '#bbb' : '#555',
-              background: 'transparent',
-              border: '1px solid #3a3a3a',
-              borderRadius: 6,
-              cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
-            }}
-            title="Restore your previous KB configuration"
-          >
-            {reverting ? 'Reverting…' : 'Revert'}
-          </button>
+          <RevertButton canManage={canManage} reverting={reverting} onRevert={onRevert} />
         )}
       </div>
     </div>
+  )
+}
+
+function RevertButton({ canManage, reverting, onRevert }: {
+  canManage: boolean
+  reverting: boolean
+  onRevert: () => void
+}) {
+  return (
+    <button
+      onClick={onRevert}
+      disabled={!canManage || reverting}
+      style={{
+        padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+        color: canManage && !reverting ? '#bbb' : '#555',
+        background: 'transparent',
+        border: '1px solid #3a3a3a',
+        borderRadius: 6,
+        cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
+      }}
+      title="Restore your previous KB configuration"
+    >
+      {reverting ? 'Reverting…' : 'Revert'}
+    </button>
   )
 }
 

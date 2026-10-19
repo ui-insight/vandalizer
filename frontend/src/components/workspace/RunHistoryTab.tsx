@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck, Cpu } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
@@ -24,6 +24,28 @@ export interface HistoryRun {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
+  /** Models the run's calls used, most tokens first; empty for runs recorded
+   * before models were. */
+  models?: string[]
+  /** Workflow runs: each step's models, in step order. */
+  step_models?: { index: number; name: string | null; models: string[] }[]
+}
+
+/** The History tab as a CSV: one row per run, with its model(s) and, for a
+ * workflow, which step used which — for comparing models across runs. */
+export function buildHistoryCSV(runs: HistoryRun[], type: 'workflow' | 'extraction'): string {
+  const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const header = ['Started', 'Finished', 'Status', 'Duration (ms)', 'Input tokens', 'Output tokens', 'Documents', 'Models',
+    ...(type === 'workflow' ? ['Models by step'] : []), 'Error']
+  const rows = runs.map(run => [
+    run.started_at, run.finished_at, run.status, run.duration_ms, run.tokens_input, run.tokens_output,
+    run.documents_touched, (run.models ?? []).join('; '),
+    ...(type === 'workflow'
+      ? [(run.step_models ?? []).map(s => `${s.name ?? `Step ${s.index + 1}`}: ${s.models.join(', ')}`).join('; ')]
+      : []),
+    run.error,
+  ].map(escape).join(','))
+  return [header.map(escape).join(','), ...rows].join('\n') + '\n'
 }
 
 function formatDuration(ms: number): string {
@@ -222,7 +244,13 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
   // Workflow runs don't snapshot their output into the history payload — the
   // full result is fetched by session_id on expand instead.
   const canFetchOutput = type === 'workflow' && run.status === 'completed' && !!run.session_id
-  const hasResults = hasSnapshot || canFetchOutput
+  const models = run.models ?? []
+  // Shown when the steps differ — a per-step override, or a fallback model.
+  // One model throughout is already said on the row.
+  const stepModels = (run.step_models ?? []).filter(s => s.models.length > 0)
+  const showStepModels = type === 'workflow' && stepModels.length > 0 && models.length > 1
+  // A failed run's step models are the thing to look at when a model misbehaves.
+  const hasResults = hasSnapshot || canFetchOutput || showStepModels
 
   return (
     <div style={{
@@ -287,6 +315,12 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
                 {(run.tokens_input + run.tokens_output).toLocaleString()} tokens
               </span>
             )}
+            {models.length > 0 && (
+              <span title={models.length > 1 ? `Models used: ${models.join(', ')}` : 'Model used'} style={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 0 }}>
+                <Cpu aria-hidden="true" style={{ width: 11, height: 11, flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{models.join(', ')}</span>
+              </span>
+            )}
           </div>
 
           {run.error && (
@@ -320,9 +354,21 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
 
       {expanded && hasResults && (
         <div style={{ padding: '0 24px 12px 48px' }}>
+          {showStepModels && (
+            <table aria-label="Models by step" style={{ marginTop: 4, fontSize: 12, color: '#374151', borderCollapse: 'collapse' }}>
+              <tbody>
+                {stepModels.map(s => (
+                  <tr key={s.index}>
+                    <td style={{ padding: '2px 12px 2px 0', color: '#6b7280', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{s.name ?? `Step ${s.index + 1}`}</td>
+                    <td style={{ padding: '2px 0', wordBreak: 'break-word' }}>{s.models.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
           {canFetchOutput
             ? <WorkflowRunOutput sessionId={run.session_id!} />
-            : <ResultPreview snapshot={run.result_snapshot} type={type} />}
+            : hasSnapshot && <ResultPreview snapshot={run.result_snapshot} type={type} />}
         </div>
       )}
     </div>
@@ -371,8 +417,29 @@ export function RunHistoryTab({
 
   return (
     <div>
-      <div role="status" aria-live="polite" style={{ padding: '12px 24px 8px', fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
-        {runs.length} run{runs.length !== 1 ? 's' : ''}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px 8px' }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+          {runs.length} run{runs.length !== 1 ? 's' : ''}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const url = URL.createObjectURL(new Blob([buildHistoryCSV(runs, type)], { type: 'text/csv' }))
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${type}-run-history-${new Date().toISOString().slice(0, 10)}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 12, fontWeight: 500,
+            fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+            color: '#374151', cursor: 'pointer',
+          }}
+        >
+          <Download aria-hidden="true" style={{ width: 12, height: 12 }} />
+          Export CSV
+        </button>
       </div>
       {runs.map(run => (
         <RunRow key={run.id} run={run} type={type} />

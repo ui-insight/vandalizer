@@ -17,6 +17,9 @@ export interface SettledReprocess {
   keptPrevious: boolean
   /** The re-fetched page matched what was indexed, so nothing was rebuilt. */
   unchanged: boolean
+  /** The page has hidden or AI-addressed text not yet reviewed, so it was
+   *  held instead of indexed (see ``review_findings``). */
+  held: boolean
 }
 
 const inFlight = (s: KnowledgeBaseSource) => s.status === 'pending' || s.status === 'processing'
@@ -53,6 +56,7 @@ export function settleReprocesses(
       ).replace(/[.\s]+$/, ''),
       keptPrevious: refetchFailed,
       unchanged: ok && outcome === 'unchanged',
+      held: (s.review_findings?.length ?? 0) > 0,
     })
   }
   return { remaining, settled }
