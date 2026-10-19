@@ -110,4 +110,21 @@ describe('KBGridView clone action', () => {
     fireEvent.click(screen.getByText('Clone'))
     expect(onClone).not.toHaveBeenCalled()
   })
+
+  // FCOI/NSF ticket: a stuck source refresh held the KB at "building" and
+  // turned Chat off, though every previous chunk was still in the index.
+  it('keeps Chat on for a building KB that already has indexed text', () => {
+    kbs.current = [makeKB({ status: 'building', total_chunks: 208 })]
+    const onChat = vi.fn()
+    render(<KBGridView {...baseProps} onChat={onChat} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Chat' }))
+    expect(onChat).toHaveBeenCalled()
+  })
+
+  it('keeps Chat off for a KB with nothing indexed yet', () => {
+    kbs.current = [makeKB({ status: 'building', total_chunks: 0 })]
+    const onChat = vi.fn()
+    render(<KBGridView {...baseProps} onChat={onChat} />)
+    expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull()
+  })
 })

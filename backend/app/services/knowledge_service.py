@@ -572,7 +572,10 @@ async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
             "source_uuid": s.uuid,
             "document_uuid": s.document_uuid,
             "source_type": s.source_type,
-            "status": s.status,
+            # A source being refreshed still has its previous chunks in the
+            # index and answers from them, so chat must not call it
+            # "still indexing" (which tells the model it can't be searched).
+            "status": "ready" if s.status in ("pending", "processing") and s.chunk_count else s.status,
         })
     return manifest
 
@@ -803,7 +806,11 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
     kb.total_sources = len(sources)
     kb.sources_ready = sum(1 for s in sources if s.status == "ready")
     kb.sources_failed = sum(1 for s in sources if s.status == "error")
-    kb.total_chunks = sum(s.chunk_count for s in sources if s.status == "ready")
+    # A source being refreshed keeps its chunks in the index until the new
+    # ones replace them, so they still answer and still count.
+    kb.total_chunks = sum(
+        s.chunk_count for s in sources if s.status in ("ready", "pending", "processing")
+    )
     if kb.total_sources == 0:
         kb.status = "empty"
     elif kb.sources_ready + kb.sources_failed >= kb.total_sources:
@@ -1984,7 +1991,13 @@ async def refresh_url_source(
     if source.source_type != "url" or not source.url:
         return "Only URL sources can be refreshed"
 
-    previous_status = source.status
+    # Whether the source answers from indexed text right now. Not its status:
+    # every caller marks the source "pending" before queueing this (the
+    # per-source Refresh, Reprocess, Refresh all, the schedule), so the status
+    # read here was never "ready", and a failed refresh of a working source
+    # turned it into an error while its chunks kept answering (and the
+    # unchanged-page shortcut below never fired).
+    had_content = bool(source.chunk_count)
     source.last_refresh_attempted_at = currency.utcnow()
     source.status = "processing"
     await source.save()
@@ -2016,7 +2029,7 @@ async def refresh_url_source(
         reason = reason or "Fetch returned no result"
         source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
         source.last_refresh_error = reason[:2000]
-        if previous_status == "ready":
+        if had_content:
             source.status = "ready"
             source.error_message = f"Refresh failed — previous content kept: {reason}"[:2000]
         else:
@@ -2029,8 +2042,7 @@ async def refresh_url_source(
     source.last_retrieved_at = currency.utcnow()
     new_hash = currency.content_fingerprint(raw_text)
     if (
-        previous_status == "ready"
-        and source.chunk_count
+        had_content
         and getattr(source, "content_hash", None) == new_hash
     ):
         # Same text as what is indexed: nothing to re-embed. Still a
@@ -2059,7 +2071,7 @@ async def refresh_url_source(
         reason = f"Refresh failed while re-indexing: {e}"[:2000]
         source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
         source.last_refresh_error = reason
-        if previous_status == "ready":
+        if had_content:
             source.status = "ready"
             source.error_message = f"Refresh failed while re-indexing — previous content kept: {e}"[:2000]
         else:

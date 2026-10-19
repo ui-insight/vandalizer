@@ -106,6 +106,9 @@ class KBSourceResponse(BaseModel):
     # incomplete" shape as ``truncated``, read live from the document.
     ingestion_warnings: list[str] = []
     ingestion_warning_text: Optional[str] = None
+    # Pending or processing past the stale window: its worker is gone and
+    # nothing will finish it. The UI offers a retry instead of a spinner.
+    stalled: bool = False
     created_at: Optional[str] = None
     # When the source's text was last fetched/ingested. Surfaced on the list
     # so a user can tell how stale a URL snapshot is before refreshing it.

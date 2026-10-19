@@ -12,7 +12,7 @@ import { listOrganizationsFlat } from '../../api/organizations'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
-import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
+import { inFlightText, isInFlight, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
@@ -207,9 +207,7 @@ export function KnowledgePanel() {
   // Sources still being chunked and embedded by a worker. Tracked separately
   // from kb.status because a KB can report "ready" from an earlier build while
   // newly added sources are still pending.
-  const inFlightSources = (selectedKB?.sources ?? []).filter(
-    s => s.status === 'pending' || s.status === 'processing'
-  )
+  const inFlightSources = (selectedKB?.sources ?? []).filter(isInFlight)
   const inFlightCount = inFlightSources.length
 
   // Sources the user reprocessed (or refreshed) here, followed until they
@@ -779,7 +777,10 @@ export function KnowledgePanel() {
     const noManageReason = "You don't have permission to manage this knowledge base."
     // A ready KB with zero indexed chunks has nothing to retrieve — chatting
     // with it only produces a misleading "still indexing" reply.
-    const canChatKB = selectedKB.status === 'ready' && selectedKB.total_chunks > 0
+    // Indexed text answers whatever else is going on: a source being
+    // refreshed (or whose refresh failed) keeps its previous chunks, so a
+    // "building" KB with chunks is still worth asking.
+    const canChatKB = selectedKB.total_chunks > 0 && selectedKB.status !== 'empty'
     // Export serializes the KB's sources. With none it downloads a file nobody
     // can use — the backend refuses it now, so say why before the click.
     const hasSources = selectedKB.total_sources > 0
@@ -1106,9 +1107,13 @@ export function KnowledgePanel() {
               <button
                 onClick={handleChat}
                 disabled={!canChatKB}
-                title={!canChatKB && selectedKB.status === 'ready'
-                  ? 'This knowledge base has no indexed content yet'
-                  : undefined}
+                title={!canChatKB
+                  ? (selectedKB.status === 'ready' || selectedKB.status === 'building'
+                      ? 'This knowledge base has no indexed content yet'
+                      : undefined)
+                  : selectedKB.status === 'building'
+                    ? 'Some sources are still being indexed or refreshed; answers use the text indexed so far'
+                    : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -1354,7 +1359,7 @@ export function KnowledgePanel() {
                     : isPartial
                       ? `Incomplete — ${source.ingestion_warning_text}; answers from this source cover only part of it.`
                       : null
-                  const st = incompleteReason
+                  const st = incompleteReason || source.stalled
                     ? { icon: AlertTriangle, color: '#d97706' }
                     : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
@@ -1558,9 +1563,33 @@ export function KnowledgePanel() {
                             </div>
                           )
                         })()}
-                        {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
+                        {!isRenaming && isInFlight(source) && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
-                            {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
+                            {inFlightText(source.status, reprocessing[source.uuid]?.mode, source.source_type)}
+                          </div>
+                        )}
+                        {!isRenaming && source.stalled && (
+                          <div role="alert" style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                            {source.chunk_count > 0
+                              ? 'This refresh stopped without finishing. The source still answers from its previous text.'
+                              : 'Fetching this page stopped without finishing.'}
+                            {canManageKB && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (source.source_type === 'url') handleRefreshSource(source)
+                                  else handleReprocessSource(source)
+                                }}
+                                style={{
+                                  marginLeft: 8, padding: 0, background: 'transparent', border: 'none',
+                                  fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                                  color: '#7aa2f7', textDecoration: 'underline', cursor: 'pointer',
+                                }}
+                              >
+                                Try again
+                              </button>
+                            )}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
@@ -1599,7 +1628,7 @@ export function KnowledgePanel() {
                             aria-label={isTruncated ? 'Source text was truncated' : isPartial ? 'Source document was only partly converted' : undefined}
                             style={{
                               color: st.color, flexShrink: 0,
-                              ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
+                              ...(isInFlight(source) ? { animation: 'spin 1s linear infinite' } : {}),
                             }}
                           >
                             {incompleteReason && <title>{incompleteReason}</title>}
@@ -1620,7 +1649,7 @@ export function KnowledgePanel() {
                                   type="button"
                                   aria-label="Refresh source"
                                   onClick={(e) => { e.stopPropagation(); handleRefreshSource(source) }}
-                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  disabled={isInFlight(source)}
                                   title={
                                     source.processed_at
                                       ? `Re-fetch this page (last fetched ${new Date(source.processed_at).toLocaleDateString()})`
@@ -1636,7 +1665,7 @@ export function KnowledgePanel() {
                                   type="button"
                                   aria-label="Reprocess source"
                                   onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
-                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  disabled={isInFlight(source)}
                                   title={
                                     'Reprocess: re-chunk and re-embed this document (it is read again first if it has no readable text)'
                                     + (source.processed_at ? `. Last indexed ${new Date(source.processed_at).toLocaleString()}` : '')

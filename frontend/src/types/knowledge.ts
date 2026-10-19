@@ -119,6 +119,10 @@ export interface KnowledgeBaseSource {
   // document could be converted".
   ingestion_warnings?: string[]
   ingestion_warning_text?: string | null
+  // Pending or processing past the stale window: the worker that would
+  // finish it is gone. Shown with a retry, not a spinner. The hourly sweep
+  // settles it server-side as well.
+  stalled?: boolean
   created_at: string
   // When the text was last fetched/ingested (null while pending).
   processed_at?: string | null
