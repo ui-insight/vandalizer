@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import {
   formatBudgetEstimate,
@@ -29,6 +29,7 @@ import { WizardLoadingStep } from '../shared/WizardLoadingStep'
 import { recommendLevel, recommendationReason } from '../shared/baselineRecommendation'
 import { TermDef } from '../shared/TermDef'
 import { useConfirm } from '../shared/useConfirm'
+import { TuningModelsPicker } from './TuningModels'
 
 interface Props {
   kbUuid: string
@@ -55,6 +56,10 @@ interface KBWizardOptions {
   noKbScore: number | null
   /** Computed in BaselineStep from ``noKbScore``. Null until the probe completes. */
   recommendedTier: Tier | null
+  /** Null = the admin's Validation grader judges. */
+  judgeModel: string | null
+  /** Null = every eligible model competes. */
+  challengerModels: string[] | null
 }
 
 const INITIAL_OPTIONS: KBWizardOptions = {
@@ -68,6 +73,17 @@ const INITIAL_OPTIONS: KBWizardOptions = {
   sampleQueryIds: [],
   noKbScore: null,
   recommendedTier: null,
+  judgeModel: null,
+  challengerModels: null,
+}
+
+// Mirrors the backend's pacing estimate (kb_optimizer.DEFAULT_TRIAL_TOKEN_ESTIMATE,
+// MAX_TRIAL_COUNT); the run can stop sooner when it converges.
+const TRIAL_TOKEN_ESTIMATE = 100_000
+const MAX_TRIALS = 100
+function trialsLabelFor(tokens: number): string {
+  const n = Math.min(MAX_TRIALS, Math.floor(tokens / TRIAL_TOKEN_ESTIMATE))
+  return `up to ${n}`
 }
 
 export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQueries }: Props) {
@@ -177,7 +193,7 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
     },
     {
       id: 'advanced',
-      label: 'Advanced',
+      label: 'Review',
       render: (opts, set) => {
         const tokens = tokensFor(opts)
         const { tokens_label, cost_label } = formatBudgetEstimate(tokens, userModel)
@@ -187,6 +203,17 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
             onApplyOnFinish={(b) => set(o => ({ ...o, applyOnFinish: b }))}
             tokensLabel={tokens_label}
             costLabel={cost_label}
+            models={
+              <TuningModelsPicker
+                kbUuid={kbUuid}
+                judgeModel={opts.judgeModel}
+                challengerModels={opts.challengerModels}
+                onChange={(judgeModel, challengerModels) =>
+                  set(o => ({ ...o, judgeModel, challengerModels }))}
+                questionCount={opts.sampleQueryIds.length}
+                trialsLabel={trialsLabelFor(tokens)}
+              />
+            }
           />
         )
       },
@@ -203,6 +230,8 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
       // The exact set the user reviewed in Preview — makes the run grade against
       // precisely these questions regardless of what else is saved on the KB.
       test_query_uuids: opts.sampleQueryIds,
+      ...(opts.judgeModel ? { judge_model: opts.judgeModel } : {}),
+      ...(opts.challengerModels ? { challenger_models: opts.challengerModels } : {}),
     })
   }
 
@@ -238,7 +267,9 @@ function ConceptStep() {
         settings, prompts, and models — and keep whichever combination answers
         your test questions best. Another AI — the{' '}
         <TermDef term="judge">judge</TermDef> — grades each answer against the{' '}
-        <TermDef term="expected-answer">expected answer</TermDef> you provided.
+        <TermDef term="expected-answer">expected answer</TermDef> you provided. The
+        judge is your admin's Validation grader unless you pick another one on
+        the last step.
       </p>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>What it changes</h4>
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>
@@ -844,12 +875,14 @@ function recommendTier(noKbScore: number | null): Tier {
 }
 
 function AdvancedStep({
-  applyOnFinish, onApplyOnFinish, tokensLabel, costLabel,
+  applyOnFinish, onApplyOnFinish, tokensLabel, costLabel, models,
 }: {
   applyOnFinish: boolean
   onApplyOnFinish: (b: boolean) => void
   tokensLabel: string
   costLabel: string | null
+  /** Judge / current / challengers summary with its Advanced pickers. */
+  models: ReactNode
 }) {
   return (
     <div style={{ fontSize: 13, color: '#ccc' }}>
@@ -880,9 +913,10 @@ function AdvancedStep({
         <div style={{ fontSize: 11, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Ready to start
         </div>
-        <div style={{ fontSize: 13, color: '#e5e5e5' }}>
+        <div style={{ fontSize: 13, color: '#e5e5e5', marginBottom: 8 }}>
           Budget: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
         </div>
+        {models}
       </div>
     </div>
   )

@@ -188,6 +188,20 @@ class KBOptimizationRun(Document):
     # out and why.
     judge_family_excluded_models: list[str] = Field(default_factory=list)
 
+    # Who judged, who answered, who competed (see kb_optimizer.resolve_model_plan).
+    # ``judge_source``: "validation_grader" (the admin's setting) or "selected"
+    # (picked in the wizard). ``current_model`` answered the default-KB
+    # baseline; ``challenger_models`` were swept on the model axis.
+    judge_source: Optional[str] = None
+    judge_model_fallback: Optional[dict] = None
+    current_model: Optional[str] = None
+    challenger_models: list[str] = Field(default_factory=list)
+    current_shares_judge_family: bool = False
+    # "current" when no trial beat the current settings by more than the
+    # noise (or the best trial scored below them); "challenger" otherwise.
+    # None on runs that predate the field.
+    winner: Optional[str] = None
+
     data_source_suggestions: list[dict] = Field(default_factory=list)
     # [{kind: "coverage_gap|redundant_source|retrieval_bottleneck",
     #   severity: "info|warning|critical", source_uuid?, message}]
