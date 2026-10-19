@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FocusTrap } from 'focus-trap-react'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload, Users, Eye } from 'lucide-react'
@@ -68,11 +68,29 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [intendedUseTags, setIntendedUseTags] = useState('')
   const skipValidation = intent === 'help'
 
+  // Anything typed beyond the prefilled title. Closing then asks first: an
+  // accidental Esc after filling in Basics and Details used to throw it all away.
+  const hasTyped =
+    summary.trim() !== (itemTitle ?? '').trim() ||
+    [description, category, submitterOrg, runInstructions, evaluationNotes, knownLimitations,
+      exampleInputs, expectedOutputs, dependencies, intendedUseTags].some(v => v.trim() !== '')
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+
+  const requestClose = useCallback(() => {
+    if (hasTyped) setConfirmingDiscard(true)
+    else onClose()
+  }, [hasTyped, onClose])
+
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // Esc while asking means "keep editing", so a second stray Esc is safe too.
+      if (confirmingDiscard) setConfirmingDiscard(false)
+      else requestClose()
+    }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [confirmingDiscard, requestClose])
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
@@ -144,7 +162,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
             <ShieldCheck className="h-5 w-5 text-green-600" aria-hidden="true" />
             <h3 className="text-base font-semibold text-gray-900">{shareLabel}</h3>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button type="button" onClick={requestClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -452,6 +470,28 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
         </div>
 
         {/* Footer */}
+        {confirmingDiscard ? (
+        <div role="alertdialog" aria-label="Discard your changes?" className="flex items-center justify-between gap-3 px-5 py-4 border-t border-gray-200 bg-amber-50">
+          <span className="text-sm font-medium text-gray-900">Discard your changes?</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setConfirmingDiscard(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Keep editing
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+        ) : (
         <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200">
           <div>
             {canGoBack && (
@@ -466,7 +506,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
@@ -492,6 +532,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
             )}
           </div>
         </div>
+        )}
       </div>
       </FocusTrap>
     </div>,

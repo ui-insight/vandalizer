@@ -63,4 +63,48 @@ describe('VerificationSubmitModal', () => {
     await waitFor(() => expect(onSubmitted).toHaveBeenCalled())
     expect(vi.mocked(submitForVerification).mock.calls[0][0]).toMatchObject({ skip_validation: false })
   })
+
+  describe('closing after typing', () => {
+    function typeDescription() {
+      const result = open()
+      fireEvent.click(screen.getByText('Share with everyone — it works for me'))
+      fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Checks F&A rates' } })
+      return result
+    }
+
+    it('Esc with nothing typed closes at once', () => {
+      const { onClose } = open()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('Esc after typing asks first and keeps what was typed', () => {
+      const { onClose } = typeDescription()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByText('Discard your changes?')).toBeTruthy()
+      fireEvent.click(screen.getByText('Keep editing'))
+      expect(screen.queryByText('Discard your changes?')).toBeNull()
+      expect((screen.getByLabelText('Description') as HTMLTextAreaElement).value).toBe('Checks F&A rates')
+    })
+
+    it('a second Esc while asking keeps editing instead of closing', () => {
+      const { onClose } = typeDescription()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.queryByText('Discard your changes?')).toBeNull()
+    })
+
+    it('Cancel and the close button ask too; Discard closes', () => {
+      const { onClose } = typeDescription()
+      fireEvent.click(screen.getByText('Cancel'))
+      expect(screen.getByText('Discard your changes?')).toBeTruthy()
+      fireEvent.click(screen.getByText('Keep editing'))
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByText('Discard'))
+      expect(onClose).toHaveBeenCalled()
+    })
+  })
 })
