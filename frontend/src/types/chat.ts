@@ -7,6 +7,9 @@ export interface ChatMessage {
   /** KB answers only: dollar amounts / percentages in the answer that no
    *  retrieved snippet states — likely recalled from the model's memory. */
   unsupported_figures?: string[]
+  /** KB answers only: sources the answer cites for text they don't contain —
+   *  e.g. a scraped page holding only its title. */
+  unsupported_citations?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -151,6 +154,8 @@ export interface StreamChunk {
   used_refs?: number[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
+  // grounding_warning only: cited sources that don't contain the cited text.
+  unsupported_citations?: string[]
 }
 
 export interface SuggestedModel {

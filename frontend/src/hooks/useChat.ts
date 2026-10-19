@@ -43,6 +43,7 @@ export function useChat() {
   const thinkingDurationRef = useRef<number | null>(null)
   const citationsRef = useRef<Citation[]>([])
   const unsupportedFiguresRef = useRef<string[]>([])
+  const unsupportedCitationsRef = useRef<string[]>([])
   // Bumped whenever the panel moves to another conversation (open or new).
   // A stream from an earlier generation keeps running server-side and is
   // saved to its own conversation, but must not write into this one.
@@ -71,6 +72,7 @@ export function useChat() {
       thinkingDurationRef.current = null
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      unsupportedCitationsRef.current = []
       const generation = viewGeneration.current
       const ownsView = () => viewGeneration.current === generation
 
@@ -116,6 +118,7 @@ export function useChat() {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,
@@ -169,6 +172,9 @@ export function useChat() {
           }
           if (unsupportedFiguresRef.current.length) {
             assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+          }
+          if (unsupportedCitationsRef.current.length) {
+            assistantMsg.unsupported_citations = unsupportedCitationsRef.current
           }
           setMessages((prev) => [...prev, assistantMsg])
         }

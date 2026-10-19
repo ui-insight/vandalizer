@@ -387,6 +387,24 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
             </div>
           )}
 
+          {message.unsupported_citations && message.unsupported_citations.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                The retrieved text from <strong>{message.unsupported_citations.join(', ')}</strong> doesn't
+                contain what this answer cites it for. That part likely comes from the model's general
+                knowledge, not the knowledge base. Open the source to check it, and if it holds only a
+                title or page navigation, re-add it with the full text.
+              </span>
+            </div>
+          )}
+
           {message.citations && message.citations.length > 0 && (() => {
             const citations = message.citations
             const open = openCitation !== null ? citations[openCitation] : null
