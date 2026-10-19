@@ -8,6 +8,7 @@ import { formatPageLocator } from '../../utils/pageLocator'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { citationAnchor } from '../../utils/textMatch'
+import { isUsedCitation } from '../../utils/snippetRefs'
 import type { ChatMessage as ChatMessageType, Citation } from '../../types/chat'
 
 const ACTION_RE = /\[ACTION:([\w-]+)\](.*?)\[\/ACTION\]/g
@@ -126,6 +127,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
   const [commentSent, setCommentSent] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [openCitation, setOpenCitation] = useState<number | null>(null)
+  const [showUnusedSources, setShowUnusedSources] = useState(false)
   // Citation whose Preview/Open chooser is showing (null = none).
   const [citationMenu, setCitationMenu] = useState<number | null>(null)
   // The menu is absolutely positioned inside the chat scroller, which clips
@@ -386,15 +388,17 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
           )}
 
           {message.citations && message.citations.length > 0 && (() => {
-            const open = openCitation !== null ? message.citations[openCitation] : null
+            const citations = message.citations
+            const open = openCitation !== null ? citations[openCitation] : null
             const openPreview = open?.content_preview?.trim() || ''
-            return (
-              <div style={{ marginTop: 8 }} ref={citationsRef}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
-                    Sources:
-                  </span>
-                  {message.citations.map((c, i) => {
+            // Only the snippets the answer cited are its sources. The rest
+            // were retrieved and searched but not used — listing them as
+            // sources made "the KB doesn't cover this" look sourced (support
+            // ticket). They stay one click away for anyone checking.
+            const indexed = citations.map((c, i) => ({ c, i }))
+            const used = indexed.filter(({ c }) => isUsedCitation(c))
+            const unused = indexed.filter(({ c }) => !isUsedCitation(c))
+            const renderChip = (c: Citation, i: number, muted: boolean) => {
                     const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
                     const base = locator ? `${c.document_title} · ${locator}` : c.document_title
                     // With several knowledge bases attached, the filename
@@ -424,9 +428,9 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                             padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                            backgroundColor: active ? '#e0e7ff' : '#f3f4f6',
-                            color: active ? '#3730a3' : '#374151',
-                            border: `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
+                            backgroundColor: active ? '#e0e7ff' : muted ? '#ffffff' : '#f3f4f6',
+                            color: active ? '#3730a3' : muted ? '#6b7280' : '#374151',
+                            border: `1px ${muted && !active ? 'dashed' : 'solid'} ${active ? '#c7d2fe' : muted ? '#d1d5db' : '#e5e7eb'}`,
                             borderRadius: 999,
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
@@ -460,8 +464,38 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                         )}
                       </span>
                     )
-                  })}
-                </div>
+            }
+            return (
+              <div style={{ marginTop: 8 }} ref={citationsRef}>
+                {used.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+                      Sources:
+                    </span>
+                    {used.map(({ c, i }) => renderChip(c, i, false))}
+                  </div>
+                )}
+                {unused.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: used.length ? 6 : 0 }}>
+                    <button
+                      type="button"
+                      aria-expanded={showUnusedSources}
+                      onClick={() => setShowUnusedSources(v => !v)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        padding: 0, fontSize: 11, color: '#6b7280',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      <ChevronRight
+                        size={12}
+                        style={{ transform: showUnusedSources ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s' }}
+                      />
+                      Searched but not used ({unused.length})
+                    </button>
+                    {showUnusedSources && unused.map(({ c, i }) => renderChip(c, i, true))}
+                  </div>
+                )}
                 {open && (
                   <div style={{
                     marginTop: 6, padding: '8px 10px', fontSize: 12, lineHeight: 1.5,

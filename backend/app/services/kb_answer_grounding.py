@@ -92,3 +92,87 @@ def unsupported_figures(answer: str, snippets: str) -> list[str]:
     ]
     order = {label: answer.find(label) for label in missing}
     return sorted(missing, key=lambda label: order[label])
+
+
+# --- Which retrieved snippets an answer used --------------------------------
+#
+# Support ticket: a KB answer saying "QA Smoke doesn't contain the DOE travel
+# rules" was shown with 7–10 PAPPG.pdf source chips under it, because every
+# snippet retrieval returned was listed as a source whether or not the answer
+# drew on it. Retrieval ranks by similarity, so a question the KB doesn't
+# cover still returns its nearest passages, and listing them all made an
+# honest "not found" look sourced. A filename alone can't settle which chunk
+# was used either — one PAPPG.pdf contributes many — so each snippet is
+# numbered in the prompt and the model cites the numbers it drew on. Only
+# those are the answer's sources; the rest were searched but not used.
+
+# "[S3]", "[S1, S3]", "[S1; S3]" or "[S1, 3]". Adjacent "[S1][S3]" are two
+# matches.
+_SNIPPET_REF_RE = re.compile(r"\[\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\]")
+_DIGITS_RE = re.compile(r"\d+")
+# The filename form the prompt asked for before snippets were numbered, which
+# a model can still fall back on, e.g. after seeing it in earlier turns.
+_FILENAME_CITATION_RE = re.compile(r"\[Source:\s*([^\]]+)\]", re.IGNORECASE)
+_CITED_PAGE_RE = re.compile(r"\bp(?:age|p)?\.?\s*~?\s*(\d+)", re.IGNORECASE)
+
+
+def _by_ref(sources: list[dict]) -> dict[int, dict]:
+    return {
+        s["ref"]: s
+        for s in sources
+        if isinstance(s.get("ref"), int) and not isinstance(s.get("ref"), bool)
+    }
+
+
+def _covers_page(source: dict, pages: set[int]) -> bool:
+    start = source.get("page")
+    if not isinstance(start, int):
+        # A sheet or a web page has no page to disagree with.
+        return True
+    end = source.get("page_end") if isinstance(source.get("page_end"), int) else start
+    return any(start <= p <= end for p in pages)
+
+
+def used_snippet_refs(answer: str, sources: list[dict]) -> list[int]:
+    """The numbers of the snippets ``answer`` cites, in order.
+
+    A number no snippet carries is ignored. A citation by filename counts for
+    that file's snippets on the page it names, or all of them when it names
+    none: less precise than a number, but it is still the model saying it
+    used the file. An answer that cites nothing used nothing — which is what
+    "the sources don't cover this" should look like.
+    """
+    by_ref = _by_ref(sources)
+    used: set[int] = set()
+    for m in _SNIPPET_REF_RE.finditer(answer):
+        used.update(n for n in map(int, _DIGITS_RE.findall(m.group(0))) if n in by_ref)
+    for m in _FILENAME_CITATION_RE.finditer(answer):
+        cited = m.group(1).lower()
+        pages = {int(p) for p in _CITED_PAGE_RE.findall(cited)}
+        for ref, s in by_ref.items():
+            title = (s.get("document_title") or "").lower()
+            if title and title in cited and (not pages or _covers_page(s, pages)):
+                used.add(ref)
+    return sorted(used)
+
+
+def expand_snippet_refs(answer: str, sources: list[dict]) -> str:
+    """Replace ``[S3]`` with the readable ``[Source: PAPPG.pdf, p. 54]``.
+
+    The numbers mean something only within the turn that showed them, so the
+    stored answer must not keep them: the next turn numbers its own snippets
+    from 1 and reads this one back as history. A reference to a number no
+    snippet carries is left as written rather than silently erased.
+    """
+    by_ref = _by_ref(sources)
+
+    def expand(m: re.Match) -> str:
+        labels: list[str] = []
+        for n in map(int, _DIGITS_RE.findall(m.group(0))):
+            s = by_ref.get(n)
+            if s is None:
+                return m.group(0)
+            labels.append(s.get("cite_label") or s.get("document_title") or f"S{n}")
+        return f"[Source: {'; '.join(dict.fromkeys(labels))}]"
+
+    return _SNIPPET_REF_RE.sub(expand, answer)

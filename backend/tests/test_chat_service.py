@@ -179,6 +179,14 @@ class TestBuildInterruptedBody:
         assert "internal monologue" not in body
         assert "visible answer" in body
 
+    def test_kb_snippet_numbers_are_expanded_in_a_cut_off_answer(self):
+        from app.services.chat_service import _build_interrupted_body
+
+        sources = [{"ref": 2, "cite_label": "PAPPG.pdf, p. 54"}]
+        body = _build_interrupted_body(["The cap is 12 months [S2] and"], "client disconnected", sources)
+        assert "[S2]" not in body
+        assert "[Source: PAPPG.pdf, p. 54]" in body
+
     def test_whitespace_only_partial_treated_as_empty(self):
         from app.services.chat_service import _build_interrupted_body
 
