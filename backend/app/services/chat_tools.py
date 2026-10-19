@@ -902,7 +902,7 @@ def _kb_entry(kb: KnowledgeBase, group: str, **extra) -> dict:
 
 
 async def _add_source_health(entries: list[dict]) -> None:
-    """Name each listed KB's failed sources and give its last validation.
+    """Name each listed KB's failed and held sources and give its last validation.
 
     A KB's status is "ready" once it can be searched, even with a source that
     failed. Given only that and total_sources, chat told a user who asked to
@@ -914,22 +914,34 @@ async def _add_source_health(entries: list[dict]) -> None:
     from app.routers.knowledge import _latest_runs_by_kb
     from app.services.knowledge_service import get_kb_manifest
 
+    def _row(m: dict) -> dict:
+        return {"name": m["name"], "reason": " ".join((m.get("error") or "").split())[:160]}
+
+    def _unaccounted(e: dict) -> bool:
+        # Neither ready nor failed: in flight, or held for review. A held page
+        # (hidden or AI-addressed text) leaves its KB "ready" with no failure
+        # counted, which read as "ready with N sources" all over again.
+        return (e.get("total_sources") or 0) > (e.get("sources_ready") or 0) + (e.get("sources_failed") or 0)
+
     uuids = list(dict.fromkeys(e["uuid"] for e in entries))
-    failing = list(dict.fromkeys(e["uuid"] for e in entries if e.get("sources_failed")))
+    checking = list(dict.fromkeys(
+        e["uuid"] for e in entries if e.get("sources_failed") or _unaccounted(e)
+    ))
     failed: dict[str, list[dict]] = {}
-    for uuid, manifest in zip(failing, await asyncio.gather(*(get_kb_manifest(u) for u in failing))):
-        failed[uuid] = [
-            {"name": m["name"], "reason": " ".join((m.get("error") or "").split())[:160]}
-            for m in manifest if m.get("status") in ("error", "skipped")
-        ]
+    held: dict[str, list[dict]] = {}
+    for uuid, manifest in zip(checking, await asyncio.gather(*(get_kb_manifest(u) for u in checking))):
+        failed[uuid] = [_row(m) for m in manifest if m.get("status") in ("error", "skipped")]
+        held[uuid] = [_row(m) for m in manifest if m.get("status") == "held"]
     try:
         trust = await _latest_runs_by_kb(uuids)
     except Exception as e:  # context, never a reason to fail the listing
         logger.warning("KB validation lookup failed: %s", e)
         trust = {}
     for entry in entries:
-        if entry["uuid"] in failed:
+        if failed.get(entry["uuid"]):
             entry["failed_sources"] = failed[entry["uuid"]]
+        if held.get(entry["uuid"]):
+            entry["held_sources"] = held[entry["uuid"]]
         run = trust.get(entry["uuid"])
         entry["last_validated"] = run.at.date().isoformat() if run else None
 
@@ -1033,6 +1045,9 @@ async def list_knowledge_bases(
         'status "ready" means a KB can be searched, not that every source indexed. '
         "Give a KB's sources as sources_ready of total_sources and name each of "
         "failed_sources with its reason; never call a failed source indexed. "
+        "held_sources were fetched but not added because the page carries hidden "
+        "or AI-addressed text: they are not searchable until the user reviews "
+        "them in the Knowledge panel and adds or removes them. "
         "last_validated null means the KB was never validated."
     )
     return {

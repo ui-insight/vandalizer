@@ -593,7 +593,7 @@ async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
             # index and answers from them, so chat must not call it
             # "still indexing" (which tells the model it can't be searched).
             "status": "ready" if s.status in ("pending", "processing") and s.chunk_count else s.status,
-            "error": (s.error_message or "") if s.status in ("error", "skipped") else "",
+            "error": (s.error_message or "") if s.status in ("error", "skipped", "held") else "",
         })
     return manifest
 

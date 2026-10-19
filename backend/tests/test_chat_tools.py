@@ -339,6 +339,33 @@ class TestListKnowledgeBases:
         assert "failed_sources" not in entries[2]
         assert entries[2]["last_validated"] == "2026-10-02"
 
+    @pytest.mark.asyncio
+    async def test_a_ready_kb_with_a_held_page_names_it(self):
+        """#1025 holds a fetched page with hidden or AI-addressed text instead
+        of embedding it. Its KB settles "ready" with no failure counted, so
+        chat described it as healthy and never mentioned the page waiting on
+        the user."""
+        from types import SimpleNamespace
+
+        from app.services.chat_tools import _add_source_health, _kb_entry
+
+        kb = SimpleNamespace(
+            uuid="kb-fcoi", title="FCOI", description="", status="ready",
+            total_sources=3, sources_ready=2, sources_failed=0, total_chunks=90,
+        )
+        entries = [_kb_entry(kb, "mine")]
+        reason = "This page has text hidden from readers that addresses an AI system."
+        manifest = [
+            {"name": "42 CFR 50.604", "status": "ready", "error": ""},
+            {"name": "FCOI FAQ", "status": "held", "error": reason},
+        ]
+        with patch("app.services.knowledge_service.get_kb_manifest", AsyncMock(return_value=manifest)), \
+             patch("app.routers.knowledge._latest_runs_by_kb", AsyncMock(return_value={})):
+            await _add_source_health(entries)
+
+        assert entries[0]["held_sources"] == [{"name": "FCOI FAQ", "reason": reason}]
+        assert "failed_sources" not in entries[0]
+
 
 # ---------------------------------------------------------------------------
 # get_document_text

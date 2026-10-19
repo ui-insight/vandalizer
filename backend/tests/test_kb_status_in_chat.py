@@ -190,3 +190,21 @@ async def test_the_manifest_carries_a_failed_sources_reason():
         manifest = await knowledge_service.get_kb_manifest("kb-1")
     assert manifest[0]["error"] == "HTTP 403 Forbidden"
     assert manifest[1]["error"] == ""
+
+
+@pytest.mark.asyncio
+async def test_the_manifest_carries_a_held_pages_reason():
+    # #1025: a held page waits on the user; its reason is why it wasn't added.
+    from app.services import knowledge_service
+
+    reason = "This page has text hidden from readers that addresses an AI system."
+    sources = [
+        SimpleNamespace(uuid="s1", custom_name=None, source_type="url", url_title="FCOI FAQ",
+                        url="https://example.edu/fcoi", document_uuid=None, status="held",
+                        error_message=reason, chunk_count=0),
+    ]
+    with patch.object(knowledge_service, "get_kb_sources", new=AsyncMock(return_value=sources)), \
+         patch.object(knowledge_service, "resolve_document_titles", new=AsyncMock(return_value={})):
+        manifest = await knowledge_service.get_kb_manifest("kb-1")
+    assert manifest[0]["status"] == "held"
+    assert manifest[0]["error"] == reason
