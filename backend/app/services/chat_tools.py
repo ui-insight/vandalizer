@@ -654,7 +654,13 @@ async def search_knowledge_base(
     if not (kb.verified or _kb_access_ok(kb, user_id, team_id)):
         return [{"error": "You do not have access to this knowledge base."}]
 
-    if kb.status and kb.status != "ready":
+    # Indexed text answers while sources are added or refreshed: a refresh
+    # keeps a source's chunks until the new text replaces them, so a KB reads
+    # "building" while it is fully searchable (same rule as the KB panel's
+    # chat button). Only a KB with nothing indexed can't be searched yet.
+    if kb.status and kb.status != "ready" and not (
+        (kb.total_chunks or 0) > 0 and kb.status not in ("empty", "unavailable")
+    ):
         return [{"error": f"Knowledge base \"{kb.title}\" is currently {kb.status}. Try again in a few minutes once indexing completes."}]
 
     # Go through the shared tuned retrieval pipeline — the same seam the
