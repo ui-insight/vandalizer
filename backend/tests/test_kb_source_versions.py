@@ -144,3 +144,30 @@ async def test_failed_refresh_records_no_version():
 
     assert reason
     assert "recorded_content" not in seen
+
+
+# --- the listing leaves the text in the database --------------------------
+
+@pytest.mark.asyncio
+async def test_listing_projects_away_the_text():
+    # A page that changes on every refresh adds a version per pass, each up
+    # to the KB text cap; opening the inspector must not load all of them.
+    query = MagicMock()
+    query.sort.return_value = query
+    query.project.return_value = query
+    query.to_list = AsyncMock(return_value=[])
+    with patch.object(kb_source_versions.KnowledgeBaseSourceVersion, "find", return_value=query):
+        await kb_source_versions.list_version_summaries("src-1")
+    (model,), _ = query.project.call_args
+    assert "content" not in model.model_fields
+
+
+def test_version_response_builds_from_a_summary():
+    from app.routers.knowledge import _version_response
+
+    summary = kb_source_versions.VersionSummary(
+        uuid="v1", number=1, origin="refresh", content_hash="abc",
+        in_effect_from=JUN.replace(tzinfo=None),
+    )
+    out = _version_response(summary, is_current=True)
+    assert out["uuid"] == "v1" and out["in_effect_from"] == "2026-06-01T00:00:00+00:00"

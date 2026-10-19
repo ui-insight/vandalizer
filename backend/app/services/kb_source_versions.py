@@ -23,6 +23,8 @@ import difflib
 import logging
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from app.models.knowledge import KnowledgeBaseSource, KnowledgeBaseSourceVersion
 from app.utils import kb_source_currency as currency
 
@@ -141,6 +143,32 @@ async def list_versions(source_uuid: str) -> list[KnowledgeBaseSourceVersion]:
     return await KnowledgeBaseSourceVersion.find(
         {"source_uuid": source_uuid},
     ).sort("-number").to_list()
+
+
+class VersionSummary(BaseModel):
+    """A version without its text, for listings. A page that changes on
+    every refresh accrues a version per pass, each up to the KB text cap, so
+    a listing must not pull every version's full text into memory."""
+
+    uuid: str
+    number: int
+    origin: str = ORIGIN_INGEST
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content_hash: str
+    char_count: int = 0
+    truncated: bool = False
+    captured_at: Optional[datetime.datetime] = None
+    in_effect_from: Optional[datetime.datetime] = None
+    superseded_at: Optional[datetime.datetime] = None
+    last_confirmed_at: Optional[datetime.datetime] = None
+
+
+async def list_version_summaries(source_uuid: str) -> list[VersionSummary]:
+    """Every version of a source without its text, newest first."""
+    return await KnowledgeBaseSourceVersion.find(
+        {"source_uuid": source_uuid},
+    ).sort("-number").project(VersionSummary).to_list()
 
 
 async def get_version(source_uuid: str, version_uuid: str) -> Optional[KnowledgeBaseSourceVersion]:

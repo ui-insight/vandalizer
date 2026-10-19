@@ -1091,7 +1091,9 @@ async def list_source_versions(
     from app.services import kb_source_versions
 
     source = await _viewable_source(uuid, source_uuid, user)
-    versions = await kb_source_versions.list_versions(source.uuid)
+    # Summaries: the listing never needs the text, and one version can be
+    # megabytes.
+    versions = await kb_source_versions.list_version_summaries(source.uuid)
     in_effect = kb_source_versions.version_in_effect_at(versions, at) if at else None
     return KBSourceVersionListResponse(
         versions=[
