@@ -109,8 +109,11 @@ def validate_chunk(
     logger.info("Validating chunk %d/%d of %s", index, total, document_path)
     try:
         agent = _get_secure_agent()
+        # The prompt carries only the document's own text. ``document_path`` is
+        # the storage path, which starts with the uploader's email: put it in
+        # the prompt and the model flags that email as PII "in the document".
         prompt = (
-            f"Validate chunk {index}/{total} of document {document_path}.\n"
+            f"Validate chunk {index}/{total} of the document.\n"
             f"Compliance Requirements:\n{compliance}\n"
             f"Document Text Chunk:\n{chunk_text}"
         )

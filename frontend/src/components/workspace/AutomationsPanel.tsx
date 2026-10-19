@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
@@ -10,6 +10,11 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
 import { formatRunTime } from '../../utils/schedule'
+import { KBSearchBar } from '../knowledge/KBSearchBar'
+import {
+  AUTOMATION_SORT_OPTIONS, AUTOMATION_STATUS, automationStatus, loadAutomationSort,
+  saveAutomationSort, sortAutomations, type AutomationSort,
+} from './automationList'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: string }> = {
   folder_watch: { label: 'Folder Watch', color: '#1d4ed8', bg: '#dbeafe' },
@@ -29,6 +34,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<AutomationSort>(loadAutomationSort)
   const [showWizard, setShowWizard] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [m365Enabled, setM365Enabled] = useState(false)
@@ -71,8 +77,8 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         (a.description || '').toLowerCase().includes(q),
       )
     }
-    return list
-  }, [base, filter, search])
+    return sortAutomations(list, sort, activeIds)
+  }, [base, filter, search, sort, activeIds])
 
   const counts = useMemo(() => ({
     all: base.length,
@@ -181,7 +187,12 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         </div>
       )}
 
-      {/* Filter bar */}
+      {/* Search — the same bar, placement and wording as Knowledge Bases */}
+      {base.length > 0 && (
+        <KBSearchBar value={search} onChange={setSearch} placeholder="Search..." />
+      )}
+
+      {/* Type filter + sort */}
       {base.length > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
@@ -196,34 +207,22 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           {counts.schedule > 0 && <FilterPill label="Schedule" count={counts.schedule} active={filter === 'schedule'} onClick={() => setFilter('schedule')} icon={<CalendarClock size={10} />} />}
           {m365Enabled && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
           <div style={{ flex: 1 }} />
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '0 8px', height: 26,
-            backgroundColor: 'var(--color-panel-dark)', border: '1px solid #3a3a3a', borderRadius: 5,
-            maxWidth: 160,
-          }}>
-            <Search size={11} style={{ color: '#555', flexShrink: 0 }} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Filter..."
-              aria-label="Filter automations"
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <ArrowUpDown size={12} style={{ color: '#666' }} aria-hidden="true" />
+            <select
+              aria-label="Sort automations"
+              value={sort}
+              onChange={e => { const v = e.target.value as AutomationSort; setSort(v); saveAutomationSort(v) }}
               style={{
-                flex: 1, width: 60, padding: 0, fontSize: 11, fontFamily: 'inherit',
-                color: '#ccc', backgroundColor: 'transparent',
-                border: 'none', outline: 'none',
+                padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
+                color: '#ccc', backgroundColor: 'var(--color-panel-dark)',
+                border: '1px solid #3a3a3a', borderRadius: 5, cursor: 'pointer',
               }}
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label="Clear filter"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
-              >
-                <X size={10} style={{ color: '#555' }} />
-              </button>
-            )}
+            >
+              {AUTOMATION_SORT_OPTIONS.map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
           </div>
         </div>
       )}
@@ -261,12 +260,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             {filtered.map(auto => {
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
               const isRunning = activeIds.has(auto.id)
+              const status = AUTOMATION_STATUS[automationStatus(auto, isRunning)]
               return (
                 <div
                   key={auto.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Open automation: ${auto.name}`}
+                  aria-label={`Open automation: ${auto.name} (${status.label})`}
                   onClick={() => openAutomation(auto.id)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -292,6 +292,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <span
+                      aria-hidden="true"
                       style={{
                         width: 8,
                         height: 8,
@@ -327,6 +328,15 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <span
+                      title={status.title}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                        color: status.color, backgroundColor: status.bg,
+                      }}
+                    >
+                      {status.label}
+                    </span>
+                    <span
                       style={{
                         fontSize: 11,
                         fontWeight: 600,
@@ -350,11 +360,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
-                  {auto.trigger_type === 'schedule' && auto.next_run_at && !isRunning && (
+                  {/* Paused is on the status pill for every trigger type now. */}
+                  {auto.trigger_type === 'schedule' && auto.next_run_at && auto.enabled && !isRunning && (
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                      {auto.enabled
-                        ? `Next run ${formatRunTime(auto.next_run_at, String(auto.trigger_config?.timezone || 'UTC'))}`
-                        : 'Paused'}
+                      {`Next run ${formatRunTime(auto.next_run_at, String(auto.trigger_config?.timezone || 'UTC'))}`}
                     </div>
                   )}
                 </div>

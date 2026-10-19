@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory } from '../api/chat'
+import { streamChat, getHistory, type ChatHistory } from '../api/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, SuggestedModel } from '../types/chat'
 
@@ -43,6 +43,18 @@ export function useChat() {
   const thinkingDurationRef = useRef<number | null>(null)
   const citationsRef = useRef<Citation[]>([])
   const unsupportedFiguresRef = useRef<string[]>([])
+  // Bumped whenever the panel moves to another conversation (open or new).
+  // A stream from an earlier generation keeps running server-side and is
+  // saved to its own conversation, but must not write into this one.
+  const viewGeneration = useRef(0)
+
+  /** Drop the in-flight turn's live display. */
+  const clearLiveTurn = useCallback(() => {
+    setIsStreaming(false)
+    setStreamingContent('')
+    setThinkingContent('')
+    setThinkingDuration(null)
+  }, [])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, projectUuid?: string) => {
@@ -59,6 +71,8 @@ export function useChat() {
       thinkingDurationRef.current = null
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      const generation = viewGeneration.current
+      const ownsView = () => viewGeneration.current === generation
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -69,6 +83,7 @@ export function useChat() {
           documentUuids,
           activityId,
           (chunk: StreamChunk) => {
+            if (!ownsView()) return
             if (chunk.kind === 'text') {
               streamingRef.current += chunk.content
               // Strip any residual think tags the backend parser missed
@@ -127,6 +142,7 @@ export function useChat() {
           isFirstSession,
           projectUuid,
         )
+        if (!ownsView()) return
 
         setConversationUuid(result.conversationUuid)
         setActivityId(result.activityId)
@@ -157,35 +173,48 @@ export function useChat() {
           setMessages((prev) => [...prev, assistantMsg])
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Chat failed')
+        if (ownsView()) setError(e instanceof Error ? e.message : 'Chat failed')
       } finally {
-        setIsStreaming(false)
-        setStreamingContent('')
-        setThinkingContent('')
-        setThinkingDuration(null)
+        if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId],
+    [activityId, clearLiveTurn],
   )
 
-  const loadHistory = useCallback(async (uuid: string) => {
+  // Resolves to the loaded history so the caller can restore what the
+  // conversation was attached to; null on failure, or when another chat was
+  // opened before this one's history arrived.
+  const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
+    const generation = ++viewGeneration.current
+    clearLiveTurn()
+    setMessages([])
+    setError(null)
+    setErrorDetails(null)
+    // Until history says which activity this chat belongs to, a send must not
+    // reuse the previous chat's activity.
+    setActivityId(null)
+    setConversationUuid(uuid)
     try {
       const data = await getHistory(uuid)
+      if (generation !== viewGeneration.current) return null
       setMessages(data.messages)
-      setConversationUuid(uuid)
+      // Without it the next question would start a new conversation.
+      setActivityId(data.activity_id ?? null)
       if (data.context_mode) setContextMode(data.context_mode)
       if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      return data
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load history')
+      if (generation === viewGeneration.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load history')
+      }
+      return null
     }
-  }, [])
+  }, [clearLiveTurn])
 
   const reset = useCallback(() => {
+    viewGeneration.current += 1
+    clearLiveTurn()
     setMessages([])
-    setStreamingContent('')
-    setThinkingContent('')
-    setThinkingDuration(null)
-    setIsStreaming(false)
     setConversationUuid(null)
     setActivityId(null)
     setError(null)
@@ -195,7 +224,7 @@ export function useChat() {
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
-  }, [])
+  }, [clearLiveTurn])
 
   const clearError = useCallback(() => {
     setError(null)
