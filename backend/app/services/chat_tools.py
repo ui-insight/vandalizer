@@ -1941,7 +1941,10 @@ async def _execute_extraction(
             ),
         )
 
+    from fastapi import HTTPException
+
     from app.services.extraction_engine import ExtractionError
+    from app.services.extraction_errors import describe_extraction_failure
 
     try:
         run = await asyncio.wait_for(
@@ -1960,16 +1963,36 @@ async def _execute_extraction(
         )
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out after 2 minutes. Try with fewer documents or a smaller extraction set."}
-    except ExtractionError as e:
+    except (ExtractionError, HTTPException) as e:
         # The engine raises on provider/parse failure (never returns silent
         # empties); translate to the tool-error envelope so the agent loop
         # survives and the model reports a FAILED run — not an empty one.
+        # The editor's run turns an engine failure into an HTTPException
+        # carrying describe_extraction_failure's reason; relay that reason,
+        # since "retry" is the wrong advice when the model server rejected
+        # the request or the documents don't fit the model.
+        if isinstance(e, HTTPException):
+            if e.status_code < 500 and e.status_code != 422:
+                raise  # not a failed run: trial limits, access, a bad request
+            status_code, reason = e.status_code, str(e.detail)
+        else:
+            status_code, reason = describe_extraction_failure(e)
+        if status_code == 503:
+            advice = "suggest running it again in a moment"
+        elif status_code == 500:
+            advice = "quote the reason so they can report it"
+        else:
+            advice = (
+                "pass on what the reason says to do (a different model, fewer "
+                "documents). Do not suggest simply retrying: the same request "
+                "on the same model fails the same way"
+            )
         return _err(
-            f"Extraction FAILED — the model call did not complete: {e}",
+            f"Extraction FAILED — no values were extracted. {reason}",
             hint=(
-                "This was an infrastructure/model failure, not an empty "
-                "document. Tell the user the run failed and suggest retrying; "
-                "do not describe any field as 'not found'."
+                "This was a model or infrastructure failure, not an empty "
+                f"document. Tell the user the run failed and {advice}. Do not "
+                "describe any field as 'not found'."
             ),
         )
     if run.get("error"):

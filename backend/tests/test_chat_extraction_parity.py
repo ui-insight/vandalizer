@@ -238,3 +238,76 @@ class TestWorkflowUnscored:
 
         assert quality["tier"] == "unscored"
         assert quality["score"] is None
+
+
+class TestAFailedRunSaysWhy:
+    """#1035: the editor's run turns an engine failure into an HTTPException
+    carrying a reason the user can act on. Chat's run_extraction only caught
+    ExtractionError, which no longer reaches it, and told the model to
+    "suggest retrying" — wrong for a structured-output rejection, where the
+    same request on the same model fails the same way."""
+
+    async def _chat_with_failure(self, exc):
+        from app.services.chat_tools import run_extraction
+
+        ctx = _make_context(model_name="kimi-k3")
+        ctx.deps.conversation.uuid = "conv-1"
+        with (
+            patch("app.services.chat_tools.SearchSet") as MockSS,
+            patch("app.services.chat_tools.SmartDocument") as MockDoc,
+            patch("app.routers.extractions.run_recorded_extraction", AsyncMock(side_effect=exc)),
+        ):
+            MockSS.find_one = AsyncMock(return_value=_search_set())
+            MockDoc.find_one = AsyncMock(return_value=_make_doc(uuid="doc-1", title="award.pdf"))
+            return await run_extraction(ctx, "ss-1", ["doc-1"])
+
+    @pytest.mark.asyncio
+    async def test_a_rejected_request_relays_the_reason_and_no_retry(self):
+        from fastapi import HTTPException
+
+        reason = "The model server (kimi-k3) rejected this extraction's structured-output request"
+        out = await self._chat_with_failure(HTTPException(status_code=502, detail=reason))
+        assert reason in out["error"]
+        assert "Do not suggest simply retrying" in out["hint"]
+
+    @pytest.mark.asyncio
+    async def test_an_outage_suggests_running_again(self):
+        from fastapi import HTTPException
+
+        out = await self._chat_with_failure(HTTPException(status_code=503, detail="couldn't be reached"))
+        assert "running it again in a moment" in out["hint"]
+
+    @pytest.mark.asyncio
+    async def test_a_raw_engine_error_is_described_too(self):
+        from app.services.extraction_engine import ExtractionError
+
+        out = await self._chat_with_failure(ExtractionError("maximum context length is 8192 tokens"))
+        assert "too long for the selected model" in out["error"]
+        assert "Do not suggest simply retrying" in out["hint"]
+
+
+@pytest.mark.asyncio
+async def test_an_unrecognized_failure_is_logged_with_its_set_and_reported():
+    # The merge brought #1035's logging into v5's shared run, where it named
+    # a ``req`` that doesn't exist there: an unrecognized failure raised
+    # NameError instead of the reason.
+    from fastapi import HTTPException
+
+    from app.routers.extractions import run_recorded_extraction
+
+    svc = MagicMock()
+    svc.run_extraction_sync = AsyncMock(side_effect=RuntimeError("parser exploded"))
+    activity = MagicMock()
+    activity.activity_start = AsyncMock(return_value=MagicMock(id="activity-1"))
+    activity.activity_finish = AsyncMock()
+    with (
+        patch("app.routers.extractions.svc", svc),
+        patch("app.routers.extractions.activity_service", activity),
+        patch("app.routers.extractions.logger") as logger,
+        pytest.raises(HTTPException) as raised,
+    ):
+        await run_recorded_extraction(_search_set(), ["doc-1"], user_id="user1", team_id=None)
+
+    assert raised.value.status_code == 500
+    assert "parser exploded" in raised.value.detail
+    assert logger.exception.call_args.args[1] == "ss-1"
