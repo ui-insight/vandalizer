@@ -112,4 +112,39 @@ describe('LibraryItemRow', () => {
     expect(screen.getByText('c')).toBeTruthy()
     expect(screen.getByText('+2')).toBeTruthy()
   })
+
+  describe('sharing menu', () => {
+    function openMenu(item: LibraryItem, scope: 'mine' | 'team' = 'mine') {
+      const { container } = render(<LibraryItemRow item={item} {...defaultProps} scope={scope} />)
+      // Row actions render on hover.
+      fireEvent.mouseEnter(container.firstChild as Element)
+      fireEvent.click(screen.getByLabelText('More actions'))
+    }
+
+    it('has one neutral "Share…" entry and no separate "Send to team…"', () => {
+      openMenu(makeItem())
+      expect(screen.getByText('Share…')).toBeTruthy()
+      expect(screen.queryByText('Send to team…')).toBeNull()
+      expect(screen.queryByText('Share with everyone')).toBeNull()
+    })
+
+    it('opens the wizard, titled for the item kind, with the team option', () => {
+      openMenu(makeItem())
+      fireEvent.click(screen.getByText('Share…'))
+      expect(screen.getByRole('heading', { name: 'Share this workflow' })).toBeTruthy()
+      expect(screen.getByText('Share with a team')).toBeTruthy()
+    })
+
+    it('a verified item of mine still shares with a team, straight away', () => {
+      openMenu(makeItem({ verified: true }))
+      fireEvent.click(screen.getByText('Share…'))
+      expect(defaultProps.onShare).toHaveBeenCalledWith('item-1')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('a verified item that is not mine offers no share entry', () => {
+      openMenu(makeItem({ verified: true }), 'team')
+      expect(screen.queryByText('Share…')).toBeNull()
+    })
+  })
 })
