@@ -12,7 +12,7 @@ version: 0.1.0
 # as VANDALIZER_VERSION). Override per-image via image.*.tag. The first
 # release to publish vandalizer-frontend-unprivileged is the one that ships
 # this chart; scripts/cut_release.sh warns when this lags the tag being cut.
-appVersion: "v4.14.0"
+appVersion: "v4.14.1"
 kubeVersion: ">=1.25.0-0"
 home: https://github.com/ui-insight/vandalizer
 sources:
