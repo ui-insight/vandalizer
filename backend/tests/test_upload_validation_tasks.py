@@ -123,6 +123,27 @@ class TestValidateChunk:
         assert result["index"] == 1
 
     @patch("app.tasks.upload_validation_tasks._get_secure_agent")
+    def test_prompt_excludes_storage_path(self, mock_get_agent):
+        """The storage path starts with the uploader's email; sending it made
+        the model report that email as PII found in a clean document."""
+        from app.tasks.upload_validation_tasks import validate_chunk
+
+        mock_result = MagicMock()
+        mock_result.output = '{"valid": true, "feedback": "ok"}'
+        mock_agent = MagicMock()
+        mock_agent.run_sync.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        validate_chunk(
+            "uploader@uidaho.edu/3f2a9c.pdf", "rules", "Budget line items", 1, 1,
+        )
+
+        prompt = mock_agent.run_sync.call_args.args[0]
+        assert "uploader@uidaho.edu" not in prompt
+        assert "3f2a9c" not in prompt
+        assert "Budget line items" in prompt
+
+    @patch("app.tasks.upload_validation_tasks._get_secure_agent")
     def test_agent_error_triggers_retry(self, mock_get_agent):
         from app.tasks.upload_validation_tasks import validate_chunk
 
