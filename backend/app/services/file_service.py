@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import io
 import logging
 import tempfile
 import uuid
@@ -114,6 +116,15 @@ async def upload_document(
 
     if not is_valid_file_content(file_data, extension):
         raise ValueError("File content does not match its extension.")
+    if extension.lower() == "xlsx":
+        # The container check above only looks for an xl/ folder; a truncated
+        # or corrupted workbook passes it and then fails extraction for good.
+        # Refuse it here, with the reason, instead of storing a dead document.
+        from app.services.document_readers import describe_damaged_workbook
+
+        damaged = await asyncio.to_thread(describe_damaged_workbook, io.BytesIO(file_data))
+        if damaged:
+            raise ValueError(damaged)
 
     # Save file via storage backend
     from app.services.storage import get_storage

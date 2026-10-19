@@ -8,6 +8,7 @@ Uses pymongo (sync) for DB access.
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -54,6 +55,11 @@ def _attachment_rejection(filename: str, content_bytes: bytes) -> str | None:
         return "empty file"
     if not is_valid_file_content(content_bytes, ext):
         return f"content does not match .{ext}"
+    if ext == "xlsx":
+        from app.services.document_readers import describe_damaged_workbook
+
+        if describe_damaged_workbook(io.BytesIO(content_bytes)):
+            return "damaged workbook"
     return None
 
 

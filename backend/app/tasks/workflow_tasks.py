@@ -1085,8 +1085,9 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 error_msg = (
                     "This workflow's input document(s) have no readable text: "
                     f"{_titles(failed)}. Text extraction may have failed (image-only, "
-                    "encrypted, or a temporary OCR outage). Open the document to retry "
-                    "extraction, or re-upload it, then run the workflow again."
+                    "encrypted, damaged, or a temporary OCR outage). Open the document to "
+                    "see why — it offers Retry extraction when a retry can help — or "
+                    "re-upload it, then run the workflow again."
                 )
             # Warning, not error: this is a handled, user-actionable outcome —
             # the run is marked failed with instructions and the bell fires —
