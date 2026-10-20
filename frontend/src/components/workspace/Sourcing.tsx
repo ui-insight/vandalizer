@@ -7,7 +7,7 @@ import {
   CAPTION_STYLE, FloatingCard, MarkedText, PASSAGE_BOX_STYLE, SOURCING_CSS, floatAnchorOf,
   type CitedSourcing, type FloatAnchor,
 } from './CitedMarkdown'
-import { codePointIndex, sourceLabel, statementAttrs, viewerTerm } from './sourcingSpans'
+import { codePointIndex, sourceLabel, statementAttrs, stripFormatting, viewerTerm } from './sourcingSpans'
 
 /**
  * Sourcing in the run view, a step's "Last run output" and Test Step.
@@ -35,9 +35,13 @@ function SourcePopover({ link, anchor, onClose }: { link: SourcingLink; anchor: 
 
   const isDoc = link.kind === 'document'
   const locator = formatPageLocator(link.page, link.page_approximate, link.page_end)
+  // The excerpt as the page reads, without the marks a text extractor
+  // wrote into it (`## <u>Title</u>`, `**`); the quote's offsets, counted
+  // in the stored text, are carried over so the same words stay marked.
   const at = codePointIndex(link.excerpt || '')
-  const range: [number, number] | null = link.excerpt
-    ? [at(link.quote_start), at(link.quote_end)]
+  const excerpt = link.excerpt ? stripFormatting(link.excerpt) : null
+  const range: [number, number] | null = excerpt
+    ? [excerpt.at(at(link.quote_start)), excerpt.at(at(link.quote_end))]
     : null
   const title = isDoc ? (link.document_title || 'Document') : (link.document_title || link.label || 'Passage')
   const kicker = isDoc ? 'Uploaded document' : (link.kb_title || 'Knowledge base')
@@ -83,9 +87,9 @@ function SourcePopover({ link, anchor, onClose }: { link: SourcingLink; anchor: 
         </div>
         <div style={CAPTION_STYLE}>Highlighted: the words this statement rests on, found here as written</div>
         <div ref={boxRef} style={PASSAGE_BOX_STYLE}>
-          {link.excerpt
-            ? <MarkedText text={link.excerpt} ranges={range ? [range] : []} markRef={markRef} />
-            : link.quote}
+          {excerpt
+            ? <MarkedText text={excerpt.text} ranges={range ? [range] : []} markRef={markRef} />
+            : stripFormatting(link.quote || '').text}
         </div>
         {open && (
           <button

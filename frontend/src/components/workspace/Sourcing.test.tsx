@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SourcedStatement, SourcingLink, WorkflowSourcing } from '../../types/workflow'
 import { CitedMarkdown, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
 import { SourcedJson, SourcingSummary, structuredLeafSpan, textLeafSpan, useSourcing } from './Sourcing'
-import { codePointIndex, stripMarks, viewerTerm, withSentinels } from './sourcingSpans'
+import { codePointIndex, stripFormatting, stripMarks, viewerTerm, withSentinels } from './sourcingSpans'
 
 // The workspace a source opens documents through; null outside a workspace.
 const workspace = vi.hoisted(() => ({
@@ -41,6 +41,19 @@ describe('marks', () => {
     expect(viewerTerm('P.I. Biosketch</u>: three-page limit')).toBe('P.I. Biosketch: three-page limit')
     expect(viewerTerm('Due:\nMarch 9, 2022 *(see note)*')).toBe('Due: March 9, 2022 (see note)')
     expect(viewerTerm('file_name stays')).toBe('file_name stays')
+    expect(viewerTerm('## <u>Eligibility</u>')).toBe('Eligibility')
+  })
+
+  it('take an extractor\'s formatting marks out of an excerpt and carry offsets over to what is left', () => {
+    const text = '## <u>Title</u>\n**Bold** and snake_case _x_\n#1 stays'
+    const { text: clean, at } = stripFormatting(text)
+    expect(clean).toBe('Title\nBold and snake_case x\n#1 stays')
+    const words = (start: number, end: number) => clean.slice(at(start), at(end))
+    // A span that takes in the marks around its words keeps just the words.
+    expect(words(0, text.indexOf('</u>') + 4)).toBe('Title')
+    expect(words(text.indexOf('**Bold'), text.indexOf('Bold**') + 6)).toBe('Bold')
+    expect(words(text.indexOf('Bold'), text.indexOf('snake') + 10)).toBe('Bold and snake_case')
+    expect(at(text.length)).toBe(clean.length)
   })
 
   it('wrap each span and nothing else; overlapping spans are dropped, not nested', () => {
@@ -132,6 +145,40 @@ describe('the source popover', () => {
     expect(container.querySelector('.show-untraced')).toBeNull()
     fireEvent.click(screen.getByLabelText('Highlight untraced'))
     expect(container.querySelector('.show-untraced .src-x')?.textContent).toBe('Costs are reasonable.')
+  })
+
+  it('shows a Docling excerpt without its formatting marks, the supporting words still marked', () => {
+    const excerpt = [
+      '## <u>Foundation for Food & Agriculture Research</u>',
+      '',
+      '***NOTE: Late applications are not accepted. ***',
+      '',
+      'Details are on the <u>website</u>. All grants require the FFAR** **funding request.',
+    ].join('\n')
+    const quote = 'All grants require the FFAR** **funding request.'
+    const RFA: SourcingLink = {
+      kind: 'document', document_uuid: 'rfa', document_title: 'RFA.pdf', page: 4,
+      quote, excerpt, quote_start: excerpt.indexOf(quote), quote_end: excerpt.indexOf(quote) + quote.length,
+    }
+    render(<Harness sourcing={{ ...sourcing, sources: [RFA] }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Southern Utah University/ }))
+    const mark = screen.getByRole('dialog').querySelector('mark')
+    expect(mark?.textContent).toBe('All grants require the FFAR funding request.')
+    expect(mark?.parentElement?.textContent).toBe([
+      'Foundation for Food & Agriculture Research',
+      '',
+      'NOTE: Late applications are not accepted. ',
+      '',
+      'Details are on the website. All grants require the FFAR funding request.',
+    ].join('\n'))
+  })
+
+  it('marks a heading quoted with its marks as just the heading', () => {
+    const excerpt = '## <u>Foundation for Food & Agriculture Research</u>\nFFAR funds research.'
+    const quote = '## <u>Foundation for Food & Agriculture Research</u>'
+    render(<Harness sourcing={{ ...sourcing, sources: [{ ...NOA, quote, excerpt, quote_start: 0, quote_end: quote.length }] }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Southern Utah University/ }))
+    expect(screen.getByRole('dialog').querySelector('mark')?.textContent).toBe('Foundation for Food & Agriculture Research')
   })
 
   it('a knowledge-base source shows its passage and no document to open', () => {

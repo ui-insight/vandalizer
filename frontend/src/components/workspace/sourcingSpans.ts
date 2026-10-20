@@ -59,17 +59,55 @@ export function withSentinels(text: string, rows: SourcedStatement[]): string {
   return out + text.slice(last)
 }
 
+// The formatting marks a text extractor (Docling) writes around words, taken
+// out one after another: tags such as <u>, runs of `*` and backticks, an
+// underscore at a word's edge, a heading's leading `#`s. Group 1, when a
+// pattern has one, is the character it looked at, and stays.
+const FORMAT_MARKS: RegExp[] = [
+  /<\/?[A-Za-z][A-Za-z0-9]{0,10}\s*\/?>/g,
+  /[*`]+/g,
+  /(^|[^A-Za-z0-9])_+/g,
+  /_+(?=[^A-Za-z0-9]|$)/g,
+  /^#{1,6}[ \t]+/gm,
+]
+
+/** `text` without its formatting marks, line breaks kept, and where each
+ *  UTF-16 index of `text` lands in what is left — an index inside a mark
+ *  lands where the mark was. */
+export function stripFormatting(text: string): { text: string; at: (i: number) => number } {
+  let cur = text
+  // from[j]: the index in `text` of character j of `cur`.
+  let from = Array.from({ length: text.length }, (_, i) => i)
+  for (const re of FORMAT_MARKS) {
+    let out = ''
+    const kept: number[] = []
+    let last = 0
+    for (const m of cur.matchAll(re)) {
+      const a = (m.index ?? 0) + (m[1]?.length ?? 0)
+      out += cur.slice(last, a)
+      for (let j = last; j < a; j++) kept.push(from[j])
+      last = (m.index ?? 0) + m[0].length
+    }
+    out += cur.slice(last)
+    for (let j = last; j < cur.length; j++) kept.push(from[j])
+    cur = out
+    from = kept
+  }
+  // before[i]: how many kept characters come before index i of `text`.
+  const before: number[] = []
+  let k = 0
+  for (let i = 0; i <= text.length; i++) {
+    while (k < from.length && from[k] < i) k++
+    before.push(k)
+  }
+  return { text: cur, at: i => before[Math.max(0, Math.min(i, text.length))] }
+}
+
 /** A quote as the page itself shows it, for the document viewer to find:
  *  the formatting marks a text extractor writes around words (`**`, `<u>`)
  *  are in the stored text but not in the PDF's text layer. */
 export function viewerTerm(quote: string): string {
-  return quote
-    .replace(/<\/?[A-Za-z][A-Za-z0-9]{0,10}\s*\/?>/g, '')
-    .replace(/[*`]+/g, '')
-    .replace(/(^|[^A-Za-z0-9])_+/g, '$1')
-    .replace(/_+(?=[^A-Za-z0-9]|$)/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return stripFormatting(quote).text.replace(/\s+/g, ' ').trim()
 }
 
 /** "NoA.pdf · p. 2", or the knowledge-base passage's source line. */
