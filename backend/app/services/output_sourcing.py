@@ -21,7 +21,10 @@ run. A statement is linked only when all of these hold:
    for a statement with values, a shared word sits on a value's own line or
    the line before it with no other figure of the same kind in between —
    a form that lists labels in one block and figures in another cannot say
-   which figure is the "Total Direct Costs", and is refused;
+   which figure is the "Total Direct Costs", and is refused; and an excerpt
+   that only says a thing may or should be done does not source a
+   statement that it must (nor "must" an "optional"; see
+   ``obligation_differs``);
 5. the page is the engine's: the document's ``text_markers`` at the
    excerpt's offset, keeping the estimated-page flag for scans;
 6. for a statement of a few words whose label says what it is in words of
@@ -401,6 +404,67 @@ _GENERIC_LABEL_WORDS = frozenset(stem(w) for w in (
 
 
 # ---------------------------------------------------------------------------
+# How strongly something is asked: must, may, must not
+# ---------------------------------------------------------------------------
+
+# "Need not" and "not required" first: they say a thing is optional.
+_NOT_REQUIRED_RE = re.compile(r"\bnot\s+(?:be\s+)?(?:required|mandatory|necessary)\b|\bneed\s+not\b", re.I)
+_FORBIDDEN_RE = re.compile(
+    r"\b(?:must|shall|may|can|will|should)\s+not\b|\bcannot\b|\bcan[’']t\b|\bprohibit(?:s|ed|ing)?\b"
+    r"|\bnot\s+(?:be\s+)?(?:permitted|allowed|authorized)\b",
+    re.I,
+)
+# Not "obligated": funds are obligated, which is not a duty.
+_REQUIRED_RE = re.compile(r"\b(?:must|shall|required|requires?|mandatory)\b", re.I)
+# "May" before a day or after a preposition is the month.
+_PERMITTED_RE = re.compile(
+    r"(?<!\bin )(?<!\bof )(?<!\bby )(?<!\bon )(?<!\bto )\bmay\b(?!\s*\d)|\bcan\b|\boptional(?:ly)?\b|\b(?:is|are) free to\b",
+    re.I,
+)
+# Lower-case "should" only: a sentence that opens "Should a subaward be
+# issued, …" is a condition, not advice.
+_ADVISED_RE = re.compile(r"\bshould\b|\bSHOULD\b|\b(?i:encourag(?:e|es|ed|ing)|recommend(?:s|ed)?)\b")
+# A cap is often written as leave ("a maximum of 10% may be used"): the
+# same rule as "must not exceed 10%".
+_LIMIT_RE = re.compile(
+    r"\b(?:maximum|minimum|up to|no more than|no less than|at most|at least|not (?:to )?exceed|exceed(?:s|ing)?"
+    r"|limit(?:s|ed)?|cap(?:s|ped)?|only)\b",
+    re.I,
+)
+
+
+def obligation(text: str) -> tuple[bool, bool, bool]:
+    """``(required, forbidden, optional)``: whether ``text`` says something
+    must be done, must not be, or may be (or should be)."""
+    t = text or ""
+    optional = bool(_NOT_REQUIRED_RE.search(t))
+    t = _NOT_REQUIRED_RE.sub(" ", t)
+    forbidden = bool(_FORBIDDEN_RE.search(t))
+    t = _FORBIDDEN_RE.sub(" ", t)
+    required = bool(_REQUIRED_RE.search(t))
+    optional = optional or bool(_PERMITTED_RE.search(t) or _ADVISED_RE.search(t))
+    return required, forbidden, optional
+
+
+def obligation_differs(statement: str, quote: str) -> bool:
+    """Whether the excerpt asks less, or more, than the statement says: a
+    statement that something must (or must not) be done, sourced to an
+    excerpt that only says it may or should be, or the reverse. Only a
+    statement and an excerpt that each speak one way are compared; an
+    excerpt that says both, or states a limit, is left to the judge."""
+    s_req, s_forbid, s_opt = obligation(statement)
+    q_req, q_forbid, q_opt = obligation(quote)
+    if _LIMIT_RE.search(quote) or _LIMIT_RE.search(statement):
+        return False
+    s_strong, q_strong = s_req or s_forbid, q_req or q_forbid
+    if s_strong and not s_opt:
+        return q_opt and not q_strong
+    if s_opt and not s_strong:
+        return q_req and not q_opt and not q_forbid
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Sources and their candidate windows
 # ---------------------------------------------------------------------------
 
@@ -725,6 +789,12 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     label_only = stems(st.label) - text_words - _GENERIC_LABEL_WORDS
     if len(text_words) <= 2 and label_only and not (label_only & stems(corpus.window_text(wi))):
         return Verdict(None, "label_not_in_passage")
+    # Every word of "subawards over $50,000 must include this clause" is in
+    # "The recipient may include the substance of this clause … in subawards
+    # … over $50,000", and the judge said so. "Must" is not "may" or
+    # "should"; only the statement's own words count, not its label's.
+    if obligation_differs(st.text, exact):
+        return Verdict(None, "obligation_differs")
     if st_values and not _bound(st_values, shared, exact, q_values):
         return Verdict(None, "value_not_bound_to_label")
 

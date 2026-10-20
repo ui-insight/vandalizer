@@ -16,6 +16,7 @@ from app.services.output_sourcing import (
     ROLE_INSTRUCTIONS,
     ROLE_VOTES,
     Corpus,
+    obligation_differs,
     stems,
     trace_sources,
     values_in,
@@ -432,6 +433,48 @@ def test_a_short_statement_needs_a_passage_about_what_its_label_names(value, jud
     result = _trace({"final": value}, Judge(judge_rule), docs=[noa_usd, expense], passages=passages)
     assert _links(result, "final") == []
     assert result["reasons"].get("label_not_in_passage") == 1
+
+
+CLAUSE = {"uuid": "noa2", "title": "NoA.pdf", "text_markers": [], "raw_text": (
+    "Prohibition on Providing Funds to the Enemy.\n2. The recipient may include the substance of this clause "
+    "in subawards that have an estimated value over $50,000 and will be performed outside the United States.\n"
+)}
+CLAUSE_QUOTE = ("The recipient may include the substance of this clause in subawards that have an estimated "
+                "value over $50,000 and will be performed outside the United States.")
+
+
+@pytest.mark.parametrize("statement, linked", [
+    ("Subawards over $50,000 performed outside the United States may include this clause.", True),
+    # Seen in a real run: the judge said this was stated.
+    ("Subawards over $50,000 performed outside the United States must include this clause.", False),
+])
+def test_an_excerpt_must_ask_as_strongly_as_the_statement_says(statement, linked):
+    result = _trace({"final": statement}, Judge(("Subawards", "may include", CLAUSE_QUOTE)), docs=[CLAUSE])
+    assert bool(_links(result, "final")) is linked
+    assert result["reasons"] == ({"ok": 1} if linked else {"obligation_differs": 1})
+
+
+@pytest.mark.parametrize("statement, quote, differs", [
+    ("must include this clause", "The recipient may include the substance of this clause", True),
+    ("Press releases must be coordinated with NIH", "the grantee should notify NIH Communications in advance", True),
+    ("Letters of support are optional", "Applicants must include letters of support", True),
+    ("Funds may not be moved to other categories", "Funds may be moved to other categories", True),
+    # As strong, in other words.
+    ("Recipients must maintain SAM registration", "Recipients shall maintain current registration with SAM", False),
+    ("Cost sharing is not required", "Applicants may offer cost sharing", False),
+    # An excerpt that says both, or nothing either way, is the judge's call.
+    ("must be approved by the Communications Director",
+     "activities, which may include BLM funding, must be approved by the Communications Director", False),
+    ("BLM approval required", "Review and approval by the BLM of modifications or subawards", False),
+    # A cap written as leave is the same rule.
+    ("Indirect costs must not exceed 10% of the award", "A maximum of 10% of the total award may be used for indirect costs.", False),
+    # Not obligation words: the month, funds "obligated", a condition.
+    ("The pre-application is required", "Full Application Invitation: May 11, 2022", False),
+    ("Unspent funds may be carried forward", "Funds obligated but not expended may be carried forward", False),
+    ("A UEI must be included", "Should a subaward be issued under this award, include the UEI.", False),
+])
+def test_obligation_words_compare_by_strength(statement, quote, differs):
+    assert obligation_differs(statement, quote) is differs
 
 
 # Every word of each statement below is in its excerpt, and in a real run the
