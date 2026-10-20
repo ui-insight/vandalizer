@@ -12,7 +12,15 @@ import re
 
 import pytest
 
-from app.services.output_sourcing import Corpus, stems, trace_sources, values_in, verify
+from app.services.output_sourcing import (
+    ROLE_INSTRUCTIONS,
+    ROLE_VOTES,
+    Corpus,
+    stems,
+    trace_sources,
+    values_in,
+    verify,
+)
 from app.services.output_statements import split_output
 
 
@@ -75,21 +83,36 @@ class Judge:
     """``rules``: (statement substring, passage substring, quote). For each
     statement whose text contains the first, answer supported with the
     first offered passage containing the second and the given quote. Every
-    other statement is unsupported. Records the statements it was asked."""
+    other statement is unsupported. Records the statements it was asked.
 
-    def __init__(self, *rules, raises=None, reply=None):
+    A role check is answered by ``role(item, n)`` — the item it was shown,
+    and how many role items it was shown before — yes unless told
+    otherwise; ``role_asked`` records them."""
+
+    def __init__(self, *rules, raises=None, reply=None, role=None, role_raises=None):
         self.rules = rules
         self.raises = raises
         self.reply = reply
+        self.role = role or (lambda item, n: True)
+        self.role_raises = role_raises
         self.asked: list[dict] = []
+        self.role_asked: list[dict] = []
 
     def __call__(self, instructions, prompt):
         if self.raises:
             raise self.raises
         if self.reply is not None:
             return self.reply
-        passages = dict(_PASSAGE_RE.findall(prompt))
         items = [json.loads(line) for line in prompt.split("STATEMENTS", 1)[1].splitlines() if line.strip()]
+        if instructions == ROLE_INSTRUCTIONS:
+            if self.role_raises:
+                raise self.role_raises
+            out = []
+            for it in items:
+                out.append({"id": it["id"], "passage_says": "", "shown": self.role(it, len(self.role_asked))})
+                self.role_asked.append(it)
+            return json.dumps({"items": out})
+        passages = dict(_PASSAGE_RE.findall(prompt))
         self.asked.extend(items)
         out = []
         for it in items:
@@ -411,6 +434,74 @@ def test_a_short_statement_needs_a_passage_about_what_its_label_names(value, jud
     assert result["reasons"].get("label_not_in_passage") == 1
 
 
+# Every word of each statement below is in its excerpt, and in a real run the
+# judge said each was stated. What is wrong is the role its label gives it.
+AGREEMENT = _doc("agr", "Agreement.pdf", [
+    "This cooperative agreement is made and entered into by the Bureau of Land Management (BLM), "
+    "and Southern Utah University, the recipient, for the purpose of conducting surveys.\n" + FILLER,
+])
+UG_FACTORS = {
+    "chunk_id": "e3", "label": "UG — Subpart E · part 3", "kb_title": "UG", "document_title": "Subpart E",
+    "content": ("§ 200.403 Factors affecting allowability of costs.\n(d) Be accorded consistent treatment. "
+                "A cost must not be assigned to a Federal award as a direct cost if any other cost incurred "
+                "for the same purpose in like circumstances has been allocated as an indirect cost."),
+}
+
+
+@pytest.mark.parametrize("target, asked, rule, docs, passages", [
+    # The university is the recipient, not a sponsor.
+    ({"sponsor": "BLM, Southern Utah University"}, ("sponsor", "BLM, Southern Utah University"),
+     ("Southern Utah", "Bureau of Land", "Bureau of Land Management (BLM), and Southern Utah University"),
+     [AGREEMENT], []),
+    # The report named its own check after the rule; the rule names no check.
+    ([{"check_name": "Consistent Cost Treatment", "result": "Pass"}], ("check name", "Consistent Cost Treatment"),
+     ("Consistent", "consistent treatment", "Be accorded consistent treatment."), [], [UG_FACTORS]),
+])
+def test_a_label_s_role_must_be_what_the_passage_gives_it(target, asked, rule, docs, passages):
+    judge = Judge(rule, role=lambda item, n: False)
+    result = _trace({"final": target}, judge, docs=docs, passages=passages)
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"role_not_shown": 1}
+    # Asked apart from the judge, more than once, with the excerpt and the
+    # passage around it.
+    assert len(judge.role_asked) == ROLE_VOTES
+    for item in judge.role_asked:
+        assert (item["label"], item["statement"]) == asked
+        assert item["excerpt"] == rule[2] and rule[2] in item["passage"]
+
+
+def test_a_role_link_needs_every_check_to_say_yes():
+    """The model says yes one time and no the next on a statement it finds
+    arguable; one no refuses the link."""
+    rule = ("Bureau", "Bureau of Land", "Bureau of Land Management (BLM)")
+    result = _trace({"final": {"sponsor": "Bureau of Land Management"}}, Judge(rule), docs=[AGREEMENT])
+    assert len(_links(result, "final")) == 1
+    result = _trace({"final": {"sponsor": "Bureau of Land Management"}},
+                    Judge(rule, role=lambda item, n: n == 0), docs=[AGREEMENT])
+    assert _links(result, "final") == [] and result["reasons"] == {"role_not_shown": 1}
+
+
+def test_only_a_short_statement_whose_label_says_what_it_is_gets_a_role_check():
+    judge = Judge(
+        ("The record shows", "Vendor:",
+         "Vendor: Forestry Suppliers Inc.\nDate: 2025-03-14\nDescription: GPS receivers (2) for field plant surveys"),
+        ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."),
+        ("GPS", "Description:", "Description: GPS receivers (2) for field plant surveys"),
+    )
+    result = _trace({
+        # Its label names what it is: checked.
+        "step:Read": {"vendor": "Forestry Suppliers Inc.",
+                      # A slot word ("description") says nothing about its role.
+                      "description": "GPS receivers (2) for field plant surveys",
+                      # A sentence says what it means itself.
+                      "rationale": "The record shows GPS receivers for field plant surveys bought from Forestry Suppliers Inc."},
+        # No label at all.
+        "final": "Bought from Forestry Suppliers Inc.",
+    }, judge, docs=[EXPENSE])
+    assert len(_links(result, "step:Read")) == 3 and len(_links(result, "final")) == 1
+    assert {item["statement"] for item in judge.role_asked} == {"Forestry Suppliers Inc."}
+
+
 def test_an_excerpt_needs_a_word_in_common_with_the_statement():
     # "vendor total" finds the record (it says "Vendor"), but the excerpt
     # the judge picked shares no word with the statement or its label.
@@ -517,6 +608,27 @@ def test_a_deadline_that_has_passed_checks_nothing():
         workers=1, deadline=0.0, clock=lambda: 10.0,
     )
     assert _links(result, "final") == [] and result["unchecked"] >= 1
+
+
+def test_a_role_check_that_fails_links_nothing():
+    judge = Judge(("Southern Utah", "Recipient:", "Recipient: Southern Utah University"),
+                  role_raises=RuntimeError("timeout"))
+    result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"role_unchecked": 1}
+    assert result["errors"] == ROLE_VOTES and result["unchecked"] == 1
+
+
+def test_a_deadline_that_passes_before_the_role_check_links_nothing():
+    judge = Judge(("Southern Utah", "Recipient:", "Recipient: Southern Utah University"))
+    times = iter([0.0, 0.0])   # the judge starts in time; the role check does not
+    result = trace_sources(
+        {"final": {"recipient": "Southern Utah University"}}, [NOA], [], ask=judge,
+        workers=1, deadline=5.0, clock=lambda: next(times, 10.0),
+    )
+    assert judge.asked and not judge.role_asked
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"role_unchecked": 1} and result["unchecked"] == 1
 
 
 # ---------------------------------------------------------------------------

@@ -23,13 +23,20 @@ run. A statement is linked only when all of these hold:
    a form that lists labels in one block and figures in another cannot say
    which figure is the "Total Direct Costs", and is refused;
 5. the page is the engine's: the document's ``text_markers`` at the
-   excerpt's offset, keeping the estimated-page flag for scans.
+   excerpt's offset, keeping the estimated-page flag for scans;
+6. for a statement of a few words whose label says what it is in words of
+   its own ("sponsor" over "Bureau of Land Management", "check name" over
+   "Consistent Cost Treatment"), separate temperature-0 calls, asked only
+   that, each confirm the passage gives it as what the label names. Every
+   word of "sponsor: BLM, Southern Utah University" is in "…Bureau of Land
+   Management (BLM), and Southern Utah University", and the judge said so;
+   the university is the recipient, which no word count can see.
 
 Anything else — no candidate passage, a judge error, a check that fails —
 leaves the statement plain. Nothing here changes an output: the result is a
 separate sidecar (``sourcing``) the UI draws underlines from.
 
-Pure logic plus one injected model call (``ask``); no database access.
+Pure logic plus injected model calls (``ask``); no database access.
 """
 
 from __future__ import annotations
@@ -65,6 +72,9 @@ KB_WHOLE_CHARS = 1400      # a knowledge-base passage this short is one window
 CANDIDATES = 3             # passages per statement
 BATCH_STATEMENTS = 8       # statements per judge call
 BATCH_CHARS = 12000        # passage text per judge call
+ROLE_BATCH = 8             # statements per role check
+ROLE_MAX_WORDS = 6         # a statement this short takes its meaning from its label
+ROLE_VOTES = 2             # role checks per statement; every one must say yes
 MAX_JUDGED = 300           # statements judged per run; the rest stay plain
 MIN_QUOTE_CHARS = 12
 MAX_QUOTE_CHARS = 600
@@ -102,6 +112,35 @@ JUDGE_INSTRUCTIONS = (
     "Reply with JSON only: "
     '{"items": [{"id": 1, "supported": true, "passage": "P2", "quote": "..."}, '
     '{"id": 2, "supported": false}]}'
+)
+
+# Asked apart from the judge, and only this: a judge that has just found
+# every word of a statement in a passage reads it as stated. Saying first
+# what the passage makes each item keeps a batch of easy yeses from
+# carrying a wrong one along.
+ROLE_INSTRUCTIONS = (
+    "You check links between statements in an AI-written report and the passages they were traced to. "
+    "Each statement is a few words — a name, a date, an amount, a short phrase — and its label, the field, "
+    "table row or heading it sits under in the report, says what it is: a sponsor, a due date, a budget "
+    "category. The statement's words are already known to be in the excerpt. Decide only whether the "
+    "passage gives the statement as what its label names.\n\n"
+    "For each statement, first say in passage_says, in a few words, what the passage makes each name, date "
+    "or amount in the statement: its role, or the item it belongs to. Then answer shown.\n\n"
+    "shown: true when the passage ties the statement to what its label names: by the label's words or its "
+    "own words for the same thing, by a form field or heading the statement sits under, or by what a "
+    "sentence says about it (\"X announces the program\" makes X its sponsor; \"applications are welcome "
+    "from X\" makes X eligible).\n\n"
+    "shown: false when\n"
+    "- the passage gives a name, date or amount in the statement a different role, or puts it with a "
+    "different item, than the label names (a party the passage names as the recipient is not the sponsor; "
+    "the date of one event is not the date of another);\n"
+    "- the statement lists several items and the passage gives any one of them a different role;\n"
+    "- the statement is the name the report gives one of its own parts — a check, step or section it "
+    "carries out — even when the passage is what that part is about: the report named it, the passage "
+    "did not;\n"
+    "- the passage does not let you tell.\n\n"
+    "Reply with JSON only: "
+    '{"items": [{"id": 1, "passage_says": "...", "shown": true}, {"id": 2, "passage_says": "...", "shown": false}]}'
 )
 
 
@@ -851,6 +890,72 @@ def _batches(jobs: list[tuple[str, Statement, list[int]]], corpus: Corpus) -> li
     return out
 
 
+def label_names_role(st: Statement) -> bool:
+    """Whether a statement of a few words takes what it is from its label,
+    in words it does not have itself ("sponsor" over a name, "due date"
+    over a date): then the passage must give it that role, not just its
+    words. A longer statement says what it means itself; its label is only
+    where it sits ("Consistent Cost Treatment — rationale")."""
+    words = stems(st.text)
+    return len(words) <= ROLE_MAX_WORDS and bool(stems(st.label) - words - _GENERIC_LABEL_WORDS)
+
+
+def _role_prompt(items: list[tuple[int, Statement, dict]]) -> str:
+    parts = ["STATEMENTS"]
+    for n, st, link in items:
+        parts.append(json.dumps({
+            "id": n, "label": st.label, "statement": st.text,
+            "source": link.get("document_title") or link.get("label") or "",
+            "excerpt": link.get("quote"), "passage": link.get("excerpt"),
+        }, ensure_ascii=False))
+    return "\n\n".join(parts)
+
+
+def _role_vote(
+    batch: list[tuple[str, Statement, Verdict]], vote: int, ask: Callable[[str, str], str],
+) -> dict[tuple[str, int], bool]:
+    """One reading of a batch: whether each statement's passage gives it
+    the role its label names. Later votes read the batch in reverse, so no
+    two see the same order."""
+    items = batch if vote % 2 == 0 else batch[::-1]
+    answers = _parse(ask(ROLE_INSTRUCTIONS, _role_prompt([(n, st, v.link) for n, (_, st, v) in enumerate(items, 1)])))
+    return {(key, vote): (answers.get(n) or {}).get("shown") is True for n, (key, _, _) in enumerate(items, 1)}
+
+
+def _in_pool(
+    jobs: list, run: Callable[[object], dict], *,
+    workers: int, deadline: float | None, clock: Callable[[], float],
+) -> tuple[dict, list, int]:
+    """``run`` on every job, a few at once, until ``deadline``: the merged
+    results of the jobs that finished, the jobs that did not (out of time
+    or failed), and how many failed."""
+    if not jobs:
+        return {}, [], 0
+    if deadline is not None and clock() >= deadline:
+        return {}, list(jobs), 0
+    results: dict = {}
+    missed: list = []
+    errors = 0
+    pool = ThreadPoolExecutor(max_workers=max(1, workers))
+    try:
+        futures = {pool.submit(contextvars.copy_context().run, run, j): j for j in jobs}
+        remaining = None if deadline is None else max(0.0, deadline - clock())
+        done, pending = wait(futures, timeout=remaining)
+        for f in pending:
+            f.cancel()
+            missed.append(futures[f])
+        for f in done:
+            try:
+                results.update(f.result())
+            except Exception as e:  # noqa: BLE001 — a failed call links nothing
+                logger.warning("Source judge call failed: %s", e)
+                errors += 1
+                missed.append(futures[f])
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    return results, missed, errors
+
+
 # ---------------------------------------------------------------------------
 # A run's sourcing
 # ---------------------------------------------------------------------------
@@ -920,33 +1025,32 @@ def trace_sources(
     unchecked = max(0, len(jobs) - max_judged)
     jobs = jobs[:max_judged]
 
-    verdicts: dict[str, Verdict] = {}
-    errors = 0
     batches = _batches(jobs, corpus)
-    if batches and deadline is not None and clock() >= deadline:
-        unchecked += len(jobs)
-        batches = []
-    if batches:
-        pool = ThreadPoolExecutor(max_workers=max(1, workers))
-        try:
-            futures = {
-                pool.submit(contextvars.copy_context().run, _judge_batch, b, corpus, ask): b
-                for b in batches
-            }
-            remaining = None if deadline is None else max(0.0, deadline - clock())
-            done, pending = wait(futures, timeout=remaining)
-            for f in pending:
-                f.cancel()
-                unchecked += len(futures[f])
-            for f in done:
-                try:
-                    verdicts.update(f.result())
-                except Exception as e:  # noqa: BLE001 — a failed call links nothing
-                    logger.warning("Source judge call failed: %s", e)
-                    errors += 1
-                    unchecked += len(futures[f])
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+    verdicts, missed, errors = _in_pool(
+        batches, lambda b: _judge_batch(b, corpus, ask), workers=workers, deadline=deadline, clock=clock,
+    )
+    unchecked += sum(len(b) for b in missed)
+
+    # The judge's links whose label names a role, in the judge's order so a
+    # check reads neighbouring statements together. Each is asked more than
+    # once, apart, and kept only when every answer is yes: on a statement
+    # it finds arguable the model says yes one time and no the next.
+    role_jobs = [
+        (key, st, verdicts[key]) for b in batches for key, st, _ in b
+        if key in verdicts and verdicts[key].link is not None and label_names_role(st)
+    ]
+    votes, _, role_errors = _in_pool(
+        [(role_jobs[i:i + ROLE_BATCH], vote) for i in range(0, len(role_jobs), ROLE_BATCH) for vote in range(ROLE_VOTES)],
+        lambda job: _role_vote(job[0], job[1], ask), workers=workers, deadline=deadline, clock=clock,
+    )
+    for key, _, _ in role_jobs:
+        said =[votes.get((key, vote)) for vote in range(ROLE_VOTES)]
+        if False in said:
+            verdicts[key] = Verdict(None, "role_not_shown")
+        elif None in said:
+            verdicts[key] = Verdict(None, "role_unchecked")
+            unchecked += 1
+    errors += role_errors
 
     run = _Run()
     out_targets: dict[str, dict] = {}
