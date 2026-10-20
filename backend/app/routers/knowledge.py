@@ -926,6 +926,8 @@ async def get_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get
         "crawl_enabled": preview.crawl_enabled,
         "stalled": stall_message is not None,
         "stall_message": stall_message,
+        # Retry can't help: nothing is consuming the preview's queue.
+        "workers_down": stall_message == kb_url_preview.NO_WORKERS_MESSAGE,
         "pages": [kb_url_preview.page_summary(p) for p in pages],
     }
 

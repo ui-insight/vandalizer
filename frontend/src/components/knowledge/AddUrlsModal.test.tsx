@@ -161,6 +161,22 @@ describe('AddUrlsModal', () => {
     expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeInTheDocument()
   })
 
+  // Dev outage 2026-10-20: the worker container was down for a day, and Retry
+  // just queued another preview nothing would run.
+  it('offers no Retry when no worker is running to pick the preview up', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue({
+      ...stalled(),
+      stall_message: "The server's background workers aren't running, so the preview can't start.",
+      workers_down: true,
+    })
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    expect(screen.getByText(/background workers aren't running/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeInTheDocument()
+  })
+
   it('Retry stops the stuck preview and starts a new one with the same URLs', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(stalled())
     render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
