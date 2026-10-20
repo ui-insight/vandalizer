@@ -99,8 +99,8 @@ SECTION_FETCH_POOL = 100
 # derives a token budget for the passages.
 PROMPT_SCAFFOLD_TOKENS = 400
 # How much of a passage's text a citation carries into the run record. It
-# must hold a whole section passage: the citation check and the popover read
-# this text, and it has to be exactly what the model saw.
+# must hold a whole section passage: sourcing and the popover read this
+# text, and it has to be exactly what the model saw.
 CITATION_CONTENT_CHARS = SECTION_MAX_CHARS + 1000
 
 
@@ -113,55 +113,6 @@ KB_GROUNDING_HEADER = (
     "irrelevant ones. Each passage starts with its tag, e.g. [KB2], and the "
     "source it comes from."
 )
-
-# Appended to the INSTRUCTION of a task whose context carries its own
-# knowledge-base passages. It cannot live in the passages header: the
-# engine's grounded prompt tells the model that CONTEXT is data, never
-# instructions, so a rule placed there is (correctly) ignored. The model
-# cites a short tag ([KB2]) — copying a long source line is what models skip
-# or abbreviate, and a bare number would mean a different passage in every
-# task — and the engine replaces each tag with the passage's source line as
-# soon as the reply arrives (resolve_passage_tags). The JSON clause is what
-# lets a citation survive a task that emits a fragment for a later
-# consolidation step to render.
-CITATION_RULE = (
-    "CITATIONS (required): the CONTEXT includes knowledge-base passages, each "
-    "introduced by a tag in square brackets such as [KB2] followed by its "
-    "source. Whenever a statement you write draws on a passage, follow that "
-    "statement immediately with the passage's tag in square brackets — right "
-    "after the sentence or value it supports, never gathered in a list at "
-    "the end; cite two passages as [KB1][KB3]. Statements in the CONTEXT that "
-    "already carry a citation in square brackets keep it, exactly as written, "
-    "when you restate or reorganize them. If your output is JSON, this rule "
-    "still applies and overrides any instruction to emit only the listed "
-    "fields' bare values: end every string value that states a rule, "
-    "requirement, threshold, or rationale drawn from a passage with the tag, "
-    "inside the string — e.g. \"rationale\": \"Prior written approval is "
-    "required for equipment purchases [KB2]\". Add no new fields. Never "
-    "invent a tag, never attach one to a claim the passage does not support, "
-    "and cite nothing for statements that come only from the document under "
-    "review."
-)
-
-# The same rule for a task with no passages of its own that reads cited text
-# (or a Knowledge Base Query step's passages) from the previous step. The
-# engine shows those citations as tags too (the full source line is what a
-# model abbreviates when it restates a statement) and turns them back after.
-CARRY_CITATION_RULE = (
-    "CITATIONS (required): statements in the CONTEXT carry knowledge-base "
-    "citation tags in square brackets, such as [KB3], and knowledge-base "
-    "passages may appear under such a tag. When you restate, reorganize or "
-    "summarize a cited statement, keep its tag with it — right after the "
-    "sentence or value it supports, never gathered in a list at the end — "
-    "and never move a tag onto a different statement. When you draw on a "
-    "passage shown under a tag, follow your statement with that tag. If "
-    "your output is JSON, this rule still applies and overrides any "
-    "instruction to emit only the listed fields' bare values: keep each tag "
-    "inside the string value it supports. Add no new fields. Never invent a "
-    "tag, and cite nothing for statements that come only from the document "
-    "under review."
-)
-
 
 class GroundingConfigError(ValueError):
     """The task's grounding block cannot be used as configured.
@@ -1122,18 +1073,6 @@ def cites_any(text: str, sources: list[dict], *, sections: bool = True) -> bool:
 # "200.407". Mirrors the run UI's SECTION_RE (CitedMarkdown.tsx).
 _SECTION_REF_RE = re.compile(
     r"(?:§\s*|\b\d{1,2}\s*CFR\s*(?:part\s*)?)?\b(\d{2,4}\.\d{1,4})\b", re.IGNORECASE,
-)
-
-
-CITATION_RETRY_NUDGE = (
-    "Your previous reply cited no knowledge-base passage. Reply again with "
-    "the same content and, after every statement or value whose rule, "
-    "requirement or definition a passage actually states, that passage's tag "
-    "in square brackets (e.g. [KB2]) — inside the string value when the "
-    "output is JSON. Do not cite a passage that is only on a related topic, "
-    "and leave statements that come only from the document under review "
-    "uncited; if no statement rests on a passage, return the same reply "
-    "unchanged."
 )
 
 

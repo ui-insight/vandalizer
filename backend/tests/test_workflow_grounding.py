@@ -7,11 +7,7 @@ These tests cover the wiring — the retrieval pipeline itself is covered in
 test_kb_grounding.py.
 """
 
-import json
-import re
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from app.services.workflow_engine import (
     ExtractionNode,
@@ -21,38 +17,6 @@ from app.services.workflow_engine import (
     PromptNode,
     apply_step_input_config,
 )
-
-
-def _passages_in(prompt: str) -> dict[str, str]:
-    return dict(re.findall(r'<passage id="(P\d+)">\n(.*?)\n</passage>', prompt, re.S))
-
-
-def _items_in(prompt: str) -> list[dict]:
-    return [json.loads(line) for line in prompt.splitlines() if line.startswith('{"id"')]
-
-
-def _approve_all(node, instructions, prompt):
-    """A citation checker that finds every citation supported, quoting the
-    start of its passage verbatim."""
-    passages = _passages_in(prompt)
-    return json.dumps({"items": [
-        {"id": it["id"], "supported": True, "quote": passages[it["passage"]][:40]}
-        for it in _items_in(prompt)
-    ]})
-
-
-@pytest.fixture(autouse=True)
-def _citation_check(monkeypatch):
-    """Citations are checked by a model call; these tests approve them unless
-    a test installs its own checker."""
-    calls: list[str] = []
-
-    def fake(node, instructions, prompt):
-        calls.append(prompt)
-        return _approve_all(node, instructions, prompt)
-
-    monkeypatch.setattr("app.services.workflow_engine._ask_citation_check", fake)
-    return calls
 
 
 def _grounding_chunk(content="Cost sharing means the portion of project costs not paid by Federal funds."):
@@ -374,44 +338,91 @@ UPSTREAM_SOURCES = [{
 }]
 
 
-class TestInlineCitations:
-    """The citation rule lives in the INSTRUCTION (the grounded prompt tells
-    the model CONTEXT is data, so a rule inside the passages is ignored), and
-    a later step that reads cited text keeps the citations and the passages."""
+class TestPromptsRunAsWritten:
+    """A grounded task gets its passages and nothing else: no citation rule
+    appended to its instruction, no re-ask when a reply cites nothing, and no
+    citation removed from its reply. Where each statement came from is traced
+    after the run (output_sourcing.py), so the author's prompt runs exactly
+    as written and the output is exactly what the model said."""
 
     @patch("app.services.workflow_engine.llm_chat_model")
     @patch("app.services.document_manager.get_document_manager")
-    def test_grounded_prompt_carries_the_citation_rule_in_its_instruction(self, mock_dm_cls, mock_llm):
+    def test_a_grounded_prompt_is_sent_exactly_as_written(self, mock_dm_cls, mock_llm):
         mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
         mock_llm.return_value = "ok"
         PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        sent = mock_llm.call_args.kwargs["prompt"]
-        assert sent.startswith(GROUNDED_PROMPT["prompt"])
-        assert "CITATIONS (required)" in sent
-        assert "If your output is JSON" in sent
+        sent = mock_llm.call_args.kwargs
+        assert sent["prompt"] == GROUNDED_PROMPT["prompt"]
+        assert "CITATIONS" not in sent["prompt"]
+        # The passages still reach the task, after the document.
+        assert "[KB1] OMB Uniform Guidance — Subpart C · p. 12" in sent["data"]
+
+    @patch("app.services.workflow_engine.format_model")
+    @patch("app.services.document_manager.get_document_manager")
+    def test_a_grounded_formatter_is_sent_exactly_as_written(self, mock_dm_cls, mock_format):
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_format.return_value = ("prompt", "formatted")
+        node = FormatNode({
+            "format_template": "Render as a checklist", "model": "m", "input_sources": ["step_input"],
+            "kb_grounding": {"knowledge_bases": [{"kb_uuid": "ug", "queries": ["cost sharing"]}]},
+        })
+        node.process({"output": "fragments", "step_name": "Extraction"})
+        assert mock_format.call_args.args[1] == "Render as a checklist"
+        assert mock_format.call_count == 1
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    def test_an_ungrounded_prompt_is_left_alone(self, mock_llm):
-        mock_llm.return_value = "ok"
+    @patch("app.services.document_manager.get_document_manager")
+    def test_an_uncited_reply_is_not_asked_again(self, mock_dm_cls, mock_llm):
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.return_value = "Cost share is 20%."
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert mock_llm.call_count == 1
+        assert result["output"] == "Cost share is 20%."
+        assert "warning" not in result
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.get_document_manager")
+    def test_a_reply_is_never_edited_beyond_naming_a_cited_passage(self, mock_dm_cls, mock_llm):
+        """A citation the passage may not support stays: nothing is removed
+        from an output. Only a passage tag the model wrote is replaced by
+        that passage's source line, so the run UI can link it."""
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.return_value = (
+            '{"summary": "The date is within the period [KB1].", '
+            '"rationale": "Cost sharing is the share not paid by Federal funds [KB1]."}'
+        )
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        label = "[OMB Uniform Guidance — Subpart C · p. 12]"
+        assert result["output"] == mock_llm.return_value.replace("[KB1]", label)
+        assert "warning" not in result
+        assert mock_llm.call_count == 1
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.get_document_manager")
+    def test_an_ungrounded_reply_is_returned_untouched(self, mock_dm_cls, mock_llm):
+        mock_llm.return_value = "Rate [KB1] and [Section II.B]."
         data = {**GROUNDED_PROMPT}
         data.pop("kb_grounding")
-        PromptNode(data).process({"output": ["u"], "step_name": "Document"})
-        assert "CITATIONS" not in mock_llm.call_args.kwargs["prompt"]
+        result = PromptNode(data).process({"output": ["u"], "step_name": "Document"})
+        assert result["output"] == "Rate [KB1] and [Section II.B]."
+        assert mock_llm.call_args.kwargs["prompt"] == data["prompt"]
+        mock_dm_cls.assert_not_called()
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    def test_a_later_step_keeps_citations_and_carries_the_passages(self, mock_llm):
-        """The RFA consolidation: reads cited fragments, must keep the
-        citations with the statements, and its own result must resolve them."""
+    def test_a_later_step_reads_the_previous_output_exactly_as_written(self, mock_llm):
+        """The previous step's citations are not rewritten into tags, and no
+        rule tells the model to keep them; the passages behind them still
+        ride along while the output cites them."""
         mock_llm.return_value = "- Cost share: 20% [OMB Uniform Guidance — Subpart C · p. 12]"
+        previous = '{"cost_share": "20% [OMB Uniform Guidance — Subpart C · p. 12]"}'
         node = PromptNode({"prompt": "Render as markdown", "model": "m", "input_sources": ["step_input"]})
-        result = node.process({
-            "output": '{"cost_share": "20% [OMB Uniform Guidance — Subpart C · p. 12]"}',
-            "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES,
-        })
-        assert "CITATIONS (required)" in mock_llm.call_args.kwargs["prompt"]
+        result = node.process({"output": previous, "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES})
+        sent = mock_llm.call_args.kwargs
+        assert sent["prompt"] == "Render as markdown"
+        assert sent["data"] == previous
         assert mock_llm.call_count == 1
+        assert result["output"] == mock_llm.return_value
         assert [s["chunk_id"] for s in result["retrieved_sources"]] == ["c1"]
-        assert result["retrieved_sources"][0]["quotes"][0]["quote"] == UPSTREAM_SOURCES[0]["content"][:40]
         assert "warning" not in result
 
     @patch("app.services.workflow_engine.llm_chat_model")
@@ -422,7 +433,18 @@ class TestInlineCitations:
             "input_sources": ["workflow_documents"], "doc_texts": ["doc"],
         })
         result = node.process({"output": "cited text", "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES})
-        assert "CITATIONS" not in mock_llm.call_args.kwargs["prompt"]
+        assert mock_llm.call_args.kwargs["prompt"] == "Summarize"
+        assert "retrieved_sources" not in result
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_a_later_step_that_drops_the_citations_does_not_carry_the_passages(self, mock_llm):
+        mock_llm.return_value = '{"total": 20}'
+        node = PromptNode({"prompt": "Emit JSON", "model": "m", "input_sources": ["step_input"]})
+        result = node.process({
+            "output": "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]",
+            "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES,
+        })
+        assert mock_llm.call_count == 1
         assert "retrieved_sources" not in result
 
     @patch("app.services.workflow_engine.llm_chat_model")
@@ -431,6 +453,7 @@ class TestInlineCitations:
         mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
         mock_llm.return_value = "The cap is 10% [NIH Grants Policy Statement — Section 7 · p. 3]."
         result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert result["output"] == mock_llm.return_value
         assert "not among the retrieved passages" in result["warning"]
         assert "NIH Grants Policy Statement" in result["warning"]
         assert "error" not in result
@@ -448,151 +471,11 @@ class TestInlineCitations:
 
     @patch("app.services.workflow_engine.llm_chat_model")
     @patch("app.services.document_manager.get_document_manager")
-    def test_an_uncited_reply_is_asked_once_more(self, mock_dm_cls, mock_llm):
-        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
-        mock_llm.side_effect = [
-            "Cost share is 20%.",
-            "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12].",
-        ]
-        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert mock_llm.call_count == 2
-        assert "cited no passage" not in str(result.get("warning"))
-        assert "cited no knowledge-base passage" in mock_llm.call_args_list[1].kwargs["prompt"]
-        assert result["output"].endswith("· p. 12].")
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
-    def test_the_model_cites_a_tag_and_the_output_carries_the_source_line(self, mock_dm_cls, mock_llm):
-        """Passages are shown as [KB1] …; the reply's tag is swapped for the
-        exact source line before anything downstream (or the UI) sees it."""
-        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
-        mock_llm.return_value = '{"rationale": "Cost share must be documented [KB1]."}'
-        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert "[KB1] OMB Uniform Guidance — Subpart C · p. 12" in str(mock_llm.call_args.kwargs["data"])
-        assert "[KB2]" in mock_llm.call_args.kwargs["prompt"]  # the rule's example tag
-        assert mock_llm.call_count == 1
-        assert result["output"] == (
-            '{"rationale": "Cost share must be documented [OMB Uniform Guidance — Subpart C · p. 12]."}'
-        )
-        assert result["retrieved_sources"][0]["label"] == "OMB Uniform Guidance — Subpart C · p. 12"
-        assert "warning" not in result
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    def test_a_later_step_sees_earlier_citations_as_tags_and_keeps_them_exactly(self, mock_llm):
-        """A model restating a statement abbreviates a long source line, which
-        then links to nothing; shown a tag, it copies the tag."""
-        mock_llm.return_value = "- Cost share: 20% [KB1]"
-        node = PromptNode({"prompt": "Render as markdown", "model": "m", "input_sources": ["step_input"]})
-        result = node.process({
-            "output": "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]",
-            "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES,
-        })
-        sent = mock_llm.call_args.kwargs
-        assert "keep its tag with it" in sent["prompt"]
-        assert "Cost share is 20% [KB1]" in str(sent["data"])
-        assert "Subpart C · p. 12]" not in str(sent["data"])
-        assert result["output"] == "- Cost share: 20% [OMB Uniform Guidance — Subpart C · p. 12]"
-        assert "warning" not in result
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
-    def test_a_citation_its_passage_does_not_support_is_removed(self, mock_dm_cls, mock_llm, _citation_check, monkeypatch):
-        """Told to cite, a model attaches a passage to a finding that comes from
-        the award document; the check removes that citation and says so."""
-        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
-        mock_llm.return_value = (
-            '{"summary": "The date is within the period [KB1].", '
-            '"rationale": "Cost sharing is the share not paid by Federal funds [KB1]."}'
-        )
-
-        def judge(node, instructions, prompt):
-            items = _items_in(prompt)
-            return json.dumps({"items": [
-                {"id": it["id"], "supported": "Cost sharing" in it["statement"],
-                 "quote": "Cost sharing means the portion of project costs not paid by Federal funds."}
-                for it in items
-            ]})
-
-        monkeypatch.setattr("app.services.workflow_engine._ask_citation_check", judge)
-        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        out = json.loads(result["output"])
-        assert out["summary"] == "The date is within the period."
-        assert out["rationale"].endswith("Federal funds [OMB Uniform Guidance — Subpart C · p. 12].")
-        assert "Removed the citation from 1 statement" in result["warning"]
-        assert result["retrieved_sources"][0]["quotes"] == [{
-            "claim": "Cost sharing is the share not paid by Federal funds",
-            "quote": "Cost sharing means the portion of project costs not paid by Federal funds.",
-        }]
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
-    def test_a_check_that_cannot_run_removes_the_citations(self, mock_dm_cls, mock_llm, monkeypatch):
-        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
-        mock_llm.return_value = "Cost sharing is required [KB1]."
-
-        def broken(node, instructions, prompt):
-            raise RuntimeError("model down")
-
-        monkeypatch.setattr("app.services.workflow_engine._ask_citation_check", broken)
-        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert result["output"] == "Cost sharing is required."
-        assert "could not be checked" in result["warning"]
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
-    def test_a_cited_reply_is_not_retried(self, mock_dm_cls, mock_llm):
-        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
-        mock_llm.return_value = "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]."
-        PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert mock_llm.call_count == 1
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
-    def test_a_section_number_alone_still_earns_the_retry(self, mock_dm_cls, mock_llm):
-        """An output template can fix a section anchor whether or not a
-        passage was used, so only a cited passage tag skips the retry."""
-        chunk = _grounding_chunk("§ 200.306 Cost sharing or matching. (a) Under Federal research proposals…")
-        mock_dm_cls.return_value = _grounding_dm([chunk])
-        mock_llm.side_effect = [
-            '{"regulation_anchor": "2 CFR 200.306", "rationale": "Not expected."}',
-            '{"regulation_anchor": "2 CFR 200.306", "rationale": "Not expected [KB1]."}',
-        ]
-        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
-        assert mock_llm.call_count == 2
-        assert "[OMB Uniform Guidance — Subpart C · p. 12]" in result["output"]
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.get_document_manager")
     def test_native_citation_marks_are_resolved_or_dropped(self, mock_dm_cls, mock_llm):
         mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
         mock_llm.return_value = "Cost share applies【KB1】. Period is fine【】."
         result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
         assert result["output"] == "Cost share applies[OMB Uniform Guidance — Subpart C · p. 12]. Period is fine."
-
-    @patch("app.services.workflow_engine.format_model")
-    def test_formatter_keeps_citations_from_its_input(self, mock_format):
-        mock_format.return_value = ("prompt", "| x | [OMB Uniform Guidance — Subpart C · p. 12] |")
-        node = FormatNode({"format_template": "As a table", "model": "m", "input_sources": ["step_input"]})
-        result = node.process({"output": "x [OMB Uniform Guidance — Subpart C · p. 12]", "step_name": "B", "retrieved_sources": UPSTREAM_SOURCES})
-        assert "CITATIONS (required)" in mock_format.call_args.args[1]
-        assert mock_format.call_count == 1
-        assert [s["chunk_id"] for s in result["retrieved_sources"]] == ["c1"]
-        assert result["retrieved_sources"][0]["quotes"]
-
-    @patch("app.services.workflow_engine.llm_chat_model")
-    def test_a_later_step_that_drops_the_citations_is_not_retried(self, mock_llm):
-        """Only a task's own passages earn the retry: a step that merely reads
-        cited text (e.g. a JSON formatter after a lookup) is asked once, and
-        passages its output no longer cites are not carried forward."""
-        mock_llm.return_value = '{"total": 20}'
-        node = PromptNode({"prompt": "Emit JSON", "model": "m", "input_sources": ["step_input"]})
-        result = node.process({
-            "output": "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]",
-            "step_name": "Budget", "retrieved_sources": UPSTREAM_SOURCES,
-        })
-        assert mock_llm.call_count == 1
-        assert "CITATIONS (required)" in mock_llm.call_args.kwargs["prompt"]
-        assert "retrieved_sources" not in result
 
     @patch("app.services.workflow_engine.llm_chat_model")
     def test_an_invented_citation_in_a_later_step_is_still_flagged(self, mock_llm):

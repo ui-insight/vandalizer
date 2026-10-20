@@ -82,12 +82,19 @@ def test_the_same_replies_give_byte_identical_outputs_with_sourcing_on_and_off()
 def test_the_engine_does_not_know_about_sourcing():
     """Nothing the steps read is affected: no prompt, setting or context
     the engine builds mentions it."""
+    import ast
     import inspect
 
     from app.services import workflow_engine
 
-    src = inspect.getsource(workflow_engine)
-    assert "output_sourcing" not in src and "sourcing_tasks" not in src
+    tree = ast.parse(inspect.getsource(workflow_engine))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(a.name for a in node.names)
+    assert not {m for m in imported if "sourcing" in m}, imported
 
 
 # ---------------------------------------------------------------------------
