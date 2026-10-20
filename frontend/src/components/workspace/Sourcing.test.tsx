@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { SourcedStatement, SourcingLink, WorkflowSourcing } from '../../types/workflow'
 import { CitedMarkdown, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
@@ -140,6 +140,55 @@ describe('the source popover', () => {
     fireEvent.click(screen.getByRole('button', { name: /Southern Utah University/ }))
     expect(screen.getByText('OMB Uniform Guidance')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Open/ })).toBeNull()
+  })
+
+  describe('stays inside the window, so "Open at p. N" can be reached', () => {
+    const CARD = 393 // a source card's height in the app, measured
+    let restore: Array<() => void> = []
+    function stub(obj: object, key: string, desc: PropertyDescriptor) {
+      const prev = Object.getOwnPropertyDescriptor(obj, key)
+      Object.defineProperty(obj, key, { configurable: true, ...desc })
+      restore.push(() => (prev ? Object.defineProperty(obj, key, prev) : delete (obj as Record<string, unknown>)[key]))
+    }
+    function openAt(top: number, viewHeight: number): CSSStyleDeclaration {
+      stub(window, 'innerHeight', { value: viewHeight })
+      stub(HTMLElement.prototype, 'scrollHeight', {
+        get(this: HTMLElement) { return this.getAttribute('role') === 'dialog' ? CARD : 0 },
+      })
+      const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+        { top, bottom: top + 20, left: 40, right: 200, x: 40, y: top, width: 160, height: 20, toJSON: () => ({}) } as DOMRect,
+      )
+      restore.push(() => rect.mockRestore())
+      render(<Harness sourcing={sourcing} />)
+      fireEvent.click(screen.getByRole('button', { name: /Southern Utah University/ }))
+      return screen.getByRole('dialog').style
+    }
+    afterEach(() => {
+      restore.forEach(undo => undo())
+      restore = []
+    })
+
+    it('below the statement when it fits', () => {
+      const style = openAt(100, 900)
+      expect(style.top).toBe('126px')
+      expect(style.bottom).toBe('')
+      expect(style.maxHeight).toBe('')
+    })
+
+    it('above a statement too low for the card to fit under it', () => {
+      // Under it the card would end at 1009px, past a 900px window.
+      const style = openAt(590, 900)
+      expect(style.top).toBe('')
+      expect(style.bottom).toBe('316px')
+      expect(style.maxHeight).toBe('')
+    })
+
+    it('on the roomier side, scrolling, when it fits neither', () => {
+      const style = openAt(250, 500)
+      expect(style.bottom).toBe('256px')
+      expect(style.maxHeight).toBe('236px')
+      expect(style.overflowY).toBe('auto')
+    })
   })
 })
 

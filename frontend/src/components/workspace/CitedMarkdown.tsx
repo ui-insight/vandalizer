@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -412,10 +412,30 @@ export function FloatingCard({ anchor, label, onClose, children }: {
   const width = Math.min(POPOVER_WIDTH, vw - 16)
   const left = Math.max(8, Math.min(anchor.rect.left, vw - width - 8))
   const below = anchor.rect.bottom + 6
-  const openAbove = below + 260 > vh && anchor.rect.top > vh / 2
+  const roomBelow = vh - below - 8
+  const roomAbove = anchor.rect.top - 6 - 8
+
+  // Placed by the card's real height, measured before it is painted: below
+  // the chip when it fits, else above, else on the roomier side scrolling
+  // within it. A guessed height let a source card (taller, with its "Open
+  // at p. N" button last) run past the window's edge, where nothing could
+  // reach it — scrolling the page closes the card.
+  const [fit, setFit] = useState<{ above: boolean; maxHeight?: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const height = el.scrollHeight + (el.offsetHeight - el.clientHeight)
+    if (height <= roomBelow) setFit({ above: false })
+    else if (height <= roomAbove) setFit({ above: true })
+    else if (roomAbove > roomBelow) setFit({ above: true, maxHeight: roomAbove })
+    else setFit({ above: false, maxHeight: Math.max(roomBelow, 120) })
+  }, [roomBelow, roomAbove])
+
+  const openAbove = fit ? fit.above : below + 260 > vh && anchor.rect.top > vh / 2
   const style: CSSProperties = {
-    position: 'fixed', left, width, zIndex: 3000,
+    position: 'fixed', left, width, zIndex: 3000, boxSizing: 'border-box',
     ...(openAbove ? { bottom: vh - anchor.rect.top + 6 } : { top: below }),
+    ...(fit?.maxHeight ? { maxHeight: fit.maxHeight, overflowY: 'auto' } : {}),
     backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: 8,
     boxShadow: '0 10px 30px rgba(0,0,0,0.14)', padding: '10px 12px 12px',
     fontFamily: 'inherit', color: '#374151', outline: 'none',
