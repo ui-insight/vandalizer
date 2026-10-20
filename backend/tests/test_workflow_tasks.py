@@ -611,9 +611,10 @@ class TestExecuteTaskStepTest:
         assert result["step_test_warning"].startswith("1 field not found in the input")
 
     @patch("app.tasks.workflow_tasks._get_db")
-    def test_step_without_warning_returns_bare_output(self, mock_get_db):
+    def test_step_without_warning_returns_bare_output(self, mock_get_db, monkeypatch):
         from app.tasks.workflow_tasks import execute_task_step_test
 
+        monkeypatch.setenv("WORKFLOW_SOURCING", "off")
         db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "test doc text"}])
         mock_get_db.return_value = db
 
@@ -625,6 +626,28 @@ class TestExecuteTaskStepTest:
                 doc_uuids=["uuid1"],
             )
         assert result == "LLM response"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    def test_step_test_queues_sourcing_beside_an_unchanged_output(self, mock_get_db, monkeypatch):
+        """Sources are traced by a separate task the editor polls; the test's
+        output comes back as it was, with only the task id beside it."""
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        monkeypatch.setenv("WORKFLOW_SOURCING", "on")
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "test doc text"}])
+        mock_get_db.return_value = db
+
+        with patch("app.services.workflow_engine.llm_chat_model") as mock_llm, \
+             patch("app.tasks.sourcing_tasks.trace_test_sources.delay") as delay:
+            mock_llm.return_value = "LLM response"
+            delay.return_value = MagicMock(id="trace-1")
+            result = execute_task_step_test(
+                task_name="Prompt",
+                task_data={"prompt": "Summarize", "model": "gpt-4o", "user_id": "u1"},
+                doc_uuids=["uuid1"],
+            )
+        assert result == {"output": "LLM response", "sourcing_task_id": "trace-1"}
+        assert delay.call_args[0][:2] == ("LLM response", ["uuid1"])
 
     @patch("app.tasks.workflow_tasks._get_db")
     def test_form_filler_test_carries_where_each_value_came_from(self, mock_get_db):

@@ -551,6 +551,10 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             }},
         )
 
+        from app.tasks.sourcing_tasks import queue_run_sourcing, run_document_uuids
+
+        queue_run_sourcing(db, result_id, run_document_uuids(workflow, trigger_step_data, steps_data))
+
         # Update event
         started_at = event.get("started_at") or now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000)

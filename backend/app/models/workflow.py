@@ -169,6 +169,11 @@ class WorkflowResult(Document):
     # entry: {document_id, document_title, page, sheet, chunk_id, score,
     # content_preview}. The frontend renders these as citation chips.
     retrieved_sources: list[dict] = []
+    # Where each statement in the outputs came from: written after the run
+    # completes by tasks/sourcing_tasks.py, never part of the output itself.
+    # {"status": "pending"|"running"|"done"|"failed", "sources": [...],
+    #  "targets": {"final"|"step:<key>": {"format", "statements", "summary"}}}
+    sourcing: Optional[dict] = None
 
     class Settings:
         name = "workflow_result"

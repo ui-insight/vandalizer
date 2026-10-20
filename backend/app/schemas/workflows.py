@@ -117,6 +117,7 @@ class WorkflowStatusResponse(BaseModel):
     error: Optional[str] = None
     error_payload: Optional[dict] = None
     retrieved_sources: list[dict] = []
+    sourcing: Optional[dict] = None
 
 
 class BatchStatusItem(BaseModel):

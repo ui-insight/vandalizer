@@ -22,6 +22,7 @@ from app.tasks import extraction_tasks  # noqa: F401  — tasks.extraction.*
 from app.tasks import knowledge_base_tasks  # noqa: F401  — tasks.documents.*
 from app.tasks import activity_tasks  # noqa: F401  — tasks.activity.*
 from app.tasks import workflow_tasks  # noqa: F401  — tasks.workflow_next.*
+from app.tasks import sourcing_tasks  # noqa: F401  — tasks.workflow_next.trace_*
 from app.tasks import workflow_optimization_tasks  # noqa: F401  — tasks.workflow.optimize
 from app.tasks import quality_tasks  # noqa: F401  — tasks.workflow_next.quality_*
 from app.tasks import kb_validation_tasks  # noqa: F401  — tasks.kb.*

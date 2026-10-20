@@ -1474,6 +1474,14 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         }},
     )
 
+    # Where each statement came from is traced afterwards, from the saved
+    # output, into its own field: it never delays or touches the result.
+    from app.tasks.sourcing_tasks import queue_run_sourcing, run_document_uuids
+
+    queue_run_sourcing(
+        db, workflow_result_id, run_document_uuids(workflow_doc, trigger_step_data, steps_data),
+    )
+
     # Everything below runs *after* execute() returned, and sits outside the
     # try — so an AutoReconnect on the $inc, or a Redis blip on the
     # auto-validate dispatch further down, retries the whole task. The resume
@@ -1754,12 +1762,23 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         # The values the sources are index-aligned with: the test's output
         # is the formatted display text ("### Result 1 …").
         traced["field_values"] = tested.get("output")
-    if warnings or sources or traced:
+    # Where each statement in the output came from is traced by a separate
+    # task the editor polls, so the test result is never held up by it.
+    from app.tasks.sourcing_tasks import queue_test_sourcing
+
+    selected = task_data.get("selected_document_uuid") if _wants_selected_document(task_data) else None
+    sourcing_task_id = queue_test_sourcing(
+        final_output, list(doc_uuids or []) + ([selected] if selected else []), sources,
+        task_data.get("model"), task_data.get("user_id"),
+    )
+    if warnings or sources or traced or sourcing_task_id:
         payload: dict = {"output": final_output, **traced}
         if warnings:
             payload["step_test_warning"] = " | ".join(warnings)
         if sources:
             payload["retrieved_sources"] = sources
+        if sourcing_task_id:
+            payload["sourcing_task_id"] = sourcing_task_id
         return payload
     return final_output
 
@@ -2016,6 +2035,12 @@ def resume_workflow_after_approval(self, approval_uuid):
             "final_output": {"output": final_output, "data": data},
             "retrieved_sources": retrieved_sources,
         }},
+    )
+
+    from app.tasks.sourcing_tasks import queue_run_sourcing, run_document_uuids
+
+    queue_run_sourcing(
+        db, workflow_result_id, run_document_uuids(workflow_doc, trigger_data, steps_data),
     )
 
     # Same claim the non-approval path makes, for the same reason: this task

@@ -683,6 +683,9 @@ async def get_workflow_status(
         # "completed" for a run whose deliverable never left the building.
         "delivery_failures": getattr(result, "delivery_failures", None) or [],
         "retrieved_sources": result.retrieved_sources,
+        # Where each statement came from, traced after the run completed
+        # (see tasks/sourcing_tasks.py); absent until it has been queued.
+        "sourcing": getattr(result, "sourcing", None),
         "workflow_name": workflow_name,
         "document_title": result.document_title,
         "start_time": result.start_time,
@@ -1149,7 +1152,10 @@ def get_test_status(task_id: str) -> dict:
                 "error": payload.get("error") or "Test failed",
                 "output": payload.get("output"),
             }
-        wrapped = ("step_test_warning", "retrieved_sources", "fill_report", "field_sources", "field_values")
+        wrapped = (
+            "step_test_warning", "retrieved_sources", "fill_report", "field_sources", "field_values",
+            "sourcing_task_id",
+        )
         if isinstance(payload, dict) and "output" in payload and any(k in payload for k in wrapped):
             out = {"status": "completed", "result": payload.get("output")}
             if payload.get("step_test_warning"):
