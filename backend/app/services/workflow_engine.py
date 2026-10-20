@@ -21,6 +21,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from app.services.citation_check import check_citations
 from app.services.extraction_engine import ExtractionEngine
 from app.services.extraction_sources import SOURCE_KEY
 from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re-exported)
@@ -436,9 +437,11 @@ def _upstream_sources(inputs: dict, sources: list[str]) -> list[dict]:
         return []
     carried = inputs.get("retrieved_sources")
     carried = [s for s in carried if isinstance(s, dict)] if isinstance(carried, list) else []
-    # Only text that actually cites earns the "keep the citations" rule; told
-    # to keep citations that are not there, a model invents empty ones.
-    if carried and not cites_any(_stringify_context(inputs.get("output")), carried):
+    # Only text that actually cites a passage earns the "keep the citations"
+    # rule; told to keep citations that are not there, a model invents them.
+    # A section number alone ("regulation_anchor": "2 CFR 200.404") does not
+    # count — the run UI links it on its own.
+    if carried and not cites_any(_stringify_context(inputs.get("output")), carried, sections=False):
         return []
     return carried
 
@@ -446,41 +449,115 @@ def _upstream_sources(inputs: dict, sources: list[str]) -> list[dict]:
 class _GroundedContext:
     """A task's context with its knowledge-base passages, and what it may cite.
 
-    ``own`` are the passages this task retrieved; ``upstream`` the passages
-    behind cited text it reads from the previous step. Either earns the
-    citation rule. Only ``own`` earns the retry: a task that passes earlier
-    citations along is not re-asked when it drops them.
+    ``own`` are the passages this task retrieved, shown as [KB1]…[KBm];
+    ``upstream`` the passages behind cited text it reads from the previous
+    step, whose citations are shown as [KBm+1]… so a restated statement keeps
+    its citation exactly (a model abbreviates a long source line). Either
+    earns the citation rule. Only ``own`` earns the retry: a task that passes
+    earlier citations along is not re-asked when it drops them.
     """
 
-    __slots__ = ("context", "grounding", "upstream")
+    __slots__ = ("context", "grounding", "upstream", "node")
 
-    def __init__(self, context, grounding: GroundingResult | None, upstream: list[dict]) -> None:
+    def __init__(self, context, grounding: GroundingResult | None, upstream: list[dict], node=None) -> None:
         self.context = context
         self.grounding = grounding
         self.upstream = upstream
+        self.node = node
 
     @property
     def own(self) -> list[dict]:
         return self.grounding.sources if self.grounding is not None else []
 
+    @property
+    def citable(self) -> list[dict]:
+        """Every passage a tag in this task's context can name, in tag order."""
+        return self.own + self.upstream
+
     def instruction(self, text: str) -> str:
-        approximate = any(s.get("page_approximate") for s in self.own + self.upstream)
+        approximate = any(s.get("page_approximate") for s in self.citable)
         return _cited_instruction(
             text, own=bool(self.grounding is not None and self.grounding.text),
             upstream=bool(self.upstream), approximate=approximate,
         )
 
+    def resolve(self, text):
+        return resolve_passage_tags(text, self.citable)
+
     def attach(self, result: dict) -> dict:
-        return _attach_grounding(result, self.grounding, upstream=self.upstream)
+        """Check each citation against its passage, then carry the passages,
+        the verified excerpts and any warnings on the result."""
+        own, upstream = self.own, self.upstream
+        output = result.get("output")
+        notes: list[str] = []
+        if isinstance(output, str) and self.citable and self.node is not None:
+            check = check_citations(
+                output, self.citable, ask=lambda i, p: _ask_citation_check(self.node, i, p),
+            )
+            if check.removed or check.kept:
+                self.node.report_progress(
+                    f"Checked citations: {check.kept} kept, {len(check.removed)} removed"
+                )
+            result["output"] = check.text
+            own, upstream = check.sources[:len(own)], check.sources[len(own):]
+            if check.failed:
+                notes.append(
+                    "The citations could not be checked against their passages, "
+                    "so they were removed rather than shown unverified."
+                )
+            elif check.removed:
+                shown = "; ".join(f"\u201c{c[:90]}\u201d" for c in check.removed[:3])
+                more = " …" if len(check.removed) > 3 else ""
+                plural = "s" if len(check.removed) != 1 else ""
+                notes.append(
+                    f"Removed the citation from {len(check.removed)} statement{plural} "
+                    f"whose passage does not state what it relies on: {shown}{more}"
+                )
+        return _attach_grounding(result, self.grounding, upstream=upstream, own=own, notes=notes)
+
+
+def _ask_citation_check(node, instructions: str, prompt: str) -> str:
+    """The citation check's model call: the task's own model, temperature 0."""
+    return _run_form_filler_model(
+        getattr(node, "model", None) or (getattr(node, "data", None) or {}).get("model"),
+        instructions, prompt,
+        system_config_doc=getattr(node, "_sys_cfg", None),
+        usage_acc=getattr(node, "_usage_acc", None),
+    )
+
+
+def _tag_citations(value, upstream: list[dict], offset: int):
+    """``value`` with each upstream citation ``[source line]`` replaced by the
+    tag it has in this task's context (``[KB{offset + i + 1}]``)."""
+    pairs = sorted(
+        ((f"[{s['label']}]", f"[KB{offset + i + 1}]") for i, s in enumerate(upstream) if s.get("label")),
+        key=lambda p: -len(p[0]),
+    )
+
+    def walk(v):
+        if isinstance(v, str):
+            for label, tag in pairs:
+                v = v.replace(label, tag)
+            return v
+        if isinstance(v, list):
+            return [walk(x) for x in v]
+        if isinstance(v, dict):
+            return {k: walk(x) for k, x in v.items()}
+        return v
+
+    return walk(value)
 
 
 def _grounded_context(
-    node, inputs: dict, sources: list[str], instruction: str,
+    node, inputs: dict, sources: list[str], instruction: str, *, tag_upstream: bool = True,
 ) -> tuple[_GroundedContext | None, str | None]:
-    """Build a task's context with its knowledge-base passages appended.
+    """Build a task's context with its knowledge-base passages appended and
+    the previous step's citations shown as tags.
 
     Returns ``(context, error)``; on a grounding failure the caller fails the
-    step with ``error``.
+    step with ``error``. ``tag_upstream=False`` leaves the previous step's
+    citations as written, for a task that copies text out verbatim and never
+    resolves tags (Form Filler).
     """
     base_context = _build_combined_context(node.data, inputs, sources)
     grounding, error = _resolve_grounding(
@@ -488,12 +565,19 @@ def _grounded_context(
     )
     if error:
         return None, error
+    upstream = _upstream_sources(inputs, sources) if tag_upstream else []
+    has_passages = grounding is not None and bool(grounding.text)
     context = base_context
-    if grounding is not None and grounding.text:
+    if upstream or has_passages:
+        ctx_inputs = inputs
+        if upstream:
+            offset = len(grounding.sources) if has_passages else 0
+            ctx_inputs = {**inputs, "output": _tag_citations(inputs.get("output"), upstream, offset)}
         context = _build_combined_context(
-            node.data, inputs, sources, grounding_text=grounding.text,
+            node.data, ctx_inputs, sources,
+            grounding_text=grounding.text if has_passages else None,
         )
-    return _GroundedContext(context, grounding, _upstream_sources(inputs, sources)), None
+    return _GroundedContext(context, grounding, upstream, node), None
 
 
 def _cited_instruction(
@@ -512,7 +596,7 @@ def _cited_instruction(
     return f"{instruction}\n\n{rule}"
 
 
-def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> str:
+def _cited_call(call, instruction: str, sources: list[dict], *, own=None, report=None) -> str:
     """Run an LLM call that is expected to cite, once more if it did not.
 
     ``call(instruction)`` returns the model's text. Whether a reply carries a
@@ -522,11 +606,14 @@ def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> 
     cited nothing at all. The retry's reply is kept even if it still does
     not cite — the unmatched/uncited warning then says so.
 
-    ``sources`` are the task's own passages in tag order: each reply's
-    passage tags ([KB2]) are replaced with their source lines on arrival.
+    ``sources`` are every passage the task's tags name, in tag order: each
+    reply's tags ([KB2]) are replaced with their source lines on arrival.
+    ``own`` (default: all of them) are the task's own passages, the only ones
+    whose absence earns the retry.
     """
+    own = sources if own is None else own
     text = resolve_passage_tags(call(instruction), sources)
-    if sources and isinstance(text, str) and text.strip() and not cites_any(text, sources, sections=False):
+    if own and isinstance(text, str) and text.strip() and not cites_any(text, own, sections=False):
         if report:
             report("Reply cited no passage — asking once more for citations…")
         again = resolve_passage_tags(call(f"{instruction}\n\n{CITATION_RETRY_NUDGE}"), sources)
@@ -537,6 +624,7 @@ def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> 
 
 def _attach_grounding(
     result: dict, grounding: GroundingResult | None, upstream: list[dict] | None = None,
+    *, own: list[dict] | None = None, notes: list[str] | None = None,
 ) -> dict:
     """Carry citations and warnings on the task result, where ``MultiTaskNode``
     merges them into the step and the run's Sources panel.
@@ -546,17 +634,18 @@ def _attach_grounding(
     along, so those citations resolve to passages downstream too. An output
     that cites a source no passage matches is flagged — the run UI leaves
     such a citation unlinked, and a reader must not take it for a verified one.
+    ``own`` replaces the grounding's passages (the citation check returns
+    them with their verified excerpts); ``notes`` are further warnings.
     """
     output = result.get("output")
     carried = upstream if upstream and isinstance(output, str) and cites_any(output, upstream) else None
-    sources = merge_sources(
-        result.get("retrieved_sources"),
-        grounding.sources if grounding is not None else None,
-        carried,
-    )
+    if own is None:
+        own = grounding.sources if grounding is not None else None
+    sources = merge_sources(result.get("retrieved_sources"), own, carried)
     if sources:
         result["retrieved_sources"] = sources
     warnings = list(grounding.warnings) if grounding is not None else []
+    warnings.extend(notes or [])
     known = merge_sources(sources, upstream)
     if known and isinstance(output, str):
         bad = unmatched_citations(output, known)
@@ -1104,7 +1193,7 @@ class PromptNode(Node):
                 include_next_step=False, system_config_doc=self._sys_cfg,
                 usage_acc=self._usage_acc,
             ),
-            g.instruction(prompt), g.own,
+            g.instruction(prompt), g.citable, own=g.own,
             report=self.report_progress,
         )
 
@@ -1135,7 +1224,7 @@ class FormatNode(Node):
                 self.model, instruction, g.context,
                 system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
             )[1],
-            g.instruction(formatting_prompt), g.own,
+            g.instruction(formatting_prompt), g.citable, own=g.own,
             report=self.report_progress,
         )
         return g.attach({"output": output, "input": formatting_prompt, "step_name": self.name})
@@ -1642,7 +1731,7 @@ class ResearchNode(Node):
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
-        report = resolve_passage_tags(report, g.own)
+        report = g.resolve(report)
         return g.attach({"output": report, "input": inputs.get("output"), "step_name": self.name})
 
 
@@ -2202,6 +2291,7 @@ class FormFillerNode(Node):
         sources = _resolve_input_sources(self.data, prev_step_name)
         g, grounding_error = _grounded_context(
             self, inputs, sources, self.data.get("template", "") or "",
+            tag_upstream=False,
         )
         if grounding_error:
             return {

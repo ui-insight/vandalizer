@@ -493,11 +493,16 @@ class TestCitationHelpers:
         out = resolve_passage_tags('{"rationale": "Required [KB2]", "pages": [1]}', self.SOURCES)
         assert json.loads(out) == {"rationale": f"Required [{b}]", "pages": [1]}
 
-    def test_a_tag_past_the_last_passage_is_left_and_reported(self):
-        out = resolve_passage_tags("x [KB9]", self.SOURCES)
-        assert out == "x [KB9]"
-        assert unmatched_citations(out, self.SOURCES) == ["KB9"]
-        assert resolve_passage_tags("x [KB1]", []) == "x [KB1]"
+    def test_a_tag_that_names_no_passage_is_removed(self):
+        """Tags exist only between the engine and the model; one that names
+        no passage is an invented citation and must not reach a reader."""
+        assert resolve_passage_tags("x [KB9].", self.SOURCES) == "x."
+        assert resolve_passage_tags("Pass [KB1] and done [KB1].", []) == "Pass and done."
+        assert looks_like_citation("KB9")
+
+    def test_a_tag_written_with_a_non_breaking_hyphen_resolves(self):
+        a = self.SOURCES[0]["label"]
+        assert resolve_passage_tags("x [KB‑1] y 【KB‑1】", self.SOURCES) == f"x [{a}] y [{a}]"
 
     def test_a_named_section_cites_but_a_bare_figure_does_not(self):
         sources = [

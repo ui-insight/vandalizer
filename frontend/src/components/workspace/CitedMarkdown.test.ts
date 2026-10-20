@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SECTION_RE, citationLabel, injectCitationChips, matchCitation, matchSectionReference, normalizeCitation, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
+import { SECTION_RE, citationLabel, citationLocator, findHighlights, injectCitationChips, matchCitation, matchSectionReference, normalizeCitation, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
 import type { WorkflowCitation } from '../../types/workflow'
 
 const UG: WorkflowCitation = {
@@ -181,6 +181,37 @@ describe('renderCitedMarkdown', () => {
     const out = renderCitedMarkdown(`<img src=x onerror="alert(1)"> Cost share [${OSP.label}].`, SOURCES)
     expect(out).toContain('data-cite="1"')
     expect(out).not.toContain('onerror')
+  })
+})
+
+describe('findHighlights / citationLocator', () => {
+  const passage = 'based on §§ 200.402 through 200.411.\n\n§ 200.404 Reasonable costs.\n\nA cost is reasonable if it does not exceed an amount that a prudent person would incur.'
+
+  it('finds a verified excerpt across line breaks, dash and quote styles', () => {
+    const [[a, b]] = findHighlights(passage, ['A cost is reasonable if it does not   exceed an amount'])
+    expect(passage.slice(a, b)).toBe('A cost is reasonable if it does not exceed an amount')
+    expect(findHighlights('the pre‑award costs “as approved”', ['pre-award costs "as approved"'])).toEqual([[4, 33]])
+  })
+
+  it('highlights each piece of an excerpt joined by an ellipsis', () => {
+    const r = findHighlights(passage, ['§ 200.404 Reasonable costs. … a prudent person would incur'])
+    expect(r.map(([a, b]) => passage.slice(a, b))).toEqual(['§ 200.404 Reasonable costs.', 'a prudent person would incur'])
+  })
+
+  it('merges overlapping excerpts and ignores ones not in the passage', () => {
+    expect(findHighlights(passage, ['Reasonable costs.', '§ 200.404 Reasonable', 'not in here'])).toEqual([[38, 65]])
+  })
+
+  it('names a pageless passage by its part', () => {
+    expect(citationLocator({ document_title: 'Subpart E', label: 'OMB UG — Subpart E · part 46' })).toBe('part 46')
+    expect(citationLocator({ document_title: 'x.pdf', page: 4, label: 'x.pdf · p. 4' })).toBe('p. 4')
+    expect(citationLocator({ document_title: 'x' })).toBeNull()
+  })
+
+  it('marks a section chip with the section it names', () => {
+    const SEC: WorkflowCitation = { document_title: 'Subpart E', label: 'Subpart E · part 46', content: '§ 200.421 Advertising and public relations.' }
+    const out = injectCitationChips('<p>See 2 CFR 200.421.</p>', [SEC])
+    expect(out).toContain('data-section="200.421"')
   })
 })
 

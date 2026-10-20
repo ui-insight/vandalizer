@@ -128,21 +128,22 @@ CITATION_RULE = (
 )
 
 # The same rule for a task with no passages of its own that reads cited text
-# (or a Knowledge Base Query step's passages) from the previous step: the
-# citations there are already source lines, so they are kept as written.
+# (or a Knowledge Base Query step's passages) from the previous step. The
+# engine shows those citations as tags too (the full source line is what a
+# model abbreviates when it restates a statement) and turns them back after.
 CARRY_CITATION_RULE = (
     "CITATIONS (required): statements in the CONTEXT carry knowledge-base "
-    "citations in square brackets, such as [OMB Uniform Guidance (2 CFR 200) "
-    "— Subpart E—Cost Principles · part 12], and knowledge-base passages may "
-    "appear under such a citation. When you restate, reorganize or summarize "
-    "a cited statement, keep its citation with it, copied exactly — right "
-    "after the sentence or value it supports, never gathered in a list at "
-    "the end. When you draw on a passage shown under a citation, follow your "
-    "statement with that citation, copied exactly. If your output is JSON, "
-    "this rule still applies and overrides any instruction to emit only the "
-    "listed fields' bare values: keep each citation inside the string value "
-    "it supports. Add no new fields. Never invent a citation, and cite "
-    "nothing for statements that come only from the document under review."
+    "citation tags in square brackets, such as [KB3], and knowledge-base "
+    "passages may appear under such a tag. When you restate, reorganize or "
+    "summarize a cited statement, keep its tag with it — right after the "
+    "sentence or value it supports, never gathered in a list at the end — "
+    "and never move a tag onto a different statement. When you draw on a "
+    "passage shown under a tag, follow your statement with that tag. If "
+    "your output is JSON, this rule still applies and overrides any "
+    "instruction to emit only the listed fields' bare values: keep each tag "
+    "inside the string value it supports. Add no new fields. Never invent a "
+    "tag, and cite nothing for statements that come only from the document "
+    "under review."
 )
 
 
@@ -697,7 +698,7 @@ def merge_sources(*groups) -> list[dict]:
     chips would count it several times.
     """
     out: list[dict] = []
-    seen: set = set()
+    seen: dict = {}
     for group in groups:
         if not isinstance(group, list):
             continue
@@ -708,10 +709,49 @@ def merge_sources(*groups) -> list[dict]:
                 s.get("document_id"), s.get("page"), (s.get("content_preview") or "")[:80],
             )
             if key in seen:
+                # The same passage verified for another statement elsewhere in
+                # the run: keep every verified quote, so the popover can show
+                # the exact place each claim rests on.
+                extra = [q for q in (s.get("quotes") or []) if q not in (out[seen[key]].get("quotes") or [])]
+                if extra:
+                    kept = dict(out[seen[key]])
+                    kept["quotes"] = list(kept.get("quotes") or []) + extra
+                    out[seen[key]] = kept
                 continue
-            seen.add(key)
+            seen[key] = len(out)
             out.append(s)
     return out
+
+
+def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
+    """The index of the passage a bracketed citation names, or None — the
+    same loose match the run UI uses to place a chip: the source line as
+    shown, else the document named with the page or part the passage is."""
+    n = _norm_citation(citation)
+    if len(n) < 3:
+        return None
+    for i, s in enumerate(sources):
+        if isinstance(s, dict) and s.get("label") and _norm_citation(str(s["label"])) == n:
+            return i
+    page = re.search(r"\bp\. (\d+)", n)
+    part = re.search(r"\bpart (\d+)\s*$", n)
+    title_only = re.sub(r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$", "", n).strip()
+    for i, s in enumerate(sources):
+        if not isinstance(s, dict):
+            continue
+        title = _norm_citation(str(s.get("document_title") or ""))
+        if len(title) < 4 or not (title in n or (len(title_only) >= 4 and title_only in title)):
+            continue
+        if page and s.get("page") is not None:
+            lo, hi = s["page"], s.get("page_end") or s["page"]
+            if not lo <= int(page.group(1)) <= hi:
+                continue
+        elif page:
+            continue
+        if part and not _norm_citation(str(s.get("label") or "")).endswith(f"part {part.group(1)}"):
+            continue
+        return i
+    return None
 
 
 _CITATION_RE = re.compile(r"\[([^\[\]\n]{3,300})\]")
@@ -722,7 +762,7 @@ _PAGE_WORD_RE = re.compile(r"\bpage\s+\d")
 def _norm_citation(text: str) -> str:
     """Loose form of a citation for comparison; mirrors the run UI's matcher."""
     t = (text or "").lower()
-    t = re.sub(r"[‒–—―]", "-", t)
+    t = re.sub(r"[‐‑‒–—―]", "-", t)
     t = re.sub(r"\s*--+\s*", " - ", t)
     t = re.sub(r"[·•|,]", "·", t)
     t = re.sub(r"\bpages?\s+", "p. ", t)
@@ -746,10 +786,10 @@ def looks_like_citation(text: str) -> bool:
 # A passage tag as the model cites it: [KB2], [KB1, KB3], [KB1; 3], and the
 # (KB2) a model sometimes writes instead.
 _PASSAGE_TAG_RE = re.compile(
-    r"[\[(【]\s*(?:†\s*)?KB\s*(\d{1,3})((?:\s*[,;†]\s*(?:KB\s*)?\d{1,3})*)[^\])】\n]{0,40}?[\])】]",
+    r"[\[(【]\s*(?:†\s*)?KB\s*[-‐‑‒–—]?\s*(\d{1,3})((?:\s*[,;†]\s*(?:KB\s*[-‐‑‒–—]?\s*)?\d{1,3})*)[^\])】\n]{0,40}?[\])】]",
     re.IGNORECASE,
 )
-_TAG_ONLY_RE = re.compile(r"KB\s*\d{1,3}", re.IGNORECASE)
+_TAG_ONLY_RE = re.compile(r"KB\s*[-‐‑‒–—]?\s*\d{1,3}", re.IGNORECASE)
 _EMPTY_NATIVE_CITE_RE = re.compile(r"\s*【[\s†]*】")
 
 
@@ -760,8 +800,9 @@ def resolve_passage_tags(text: str, sources: list[dict]) -> str:
     ([KB1] is ``sources[0]``). Run right after the model replies, so the
     output, every later step that reads it, and the run UI see the exact
     source line rather than a number that means a different passage in each
-    task. A tag past the last passage is left as written (and reported as
-    an unmatched citation).
+    task. A tag that names no passage — past the last one, or in a task
+    with none — is removed: tags exist only between the engine and the
+    model, and an unresolved one is an invented citation.
     """
     if not text or not isinstance(text, str):
         return text
@@ -769,21 +810,19 @@ def resolve_passage_tags(text: str, sources: list[dict]) -> str:
     # when there was nothing to cite: an empty one is dropped, a 【KB2】 is
     # resolved below like [KB2].
     text = _EMPTY_NATIVE_CITE_RE.sub("", text)
-    if not sources:
-        return text
+    sources = sources or []
 
     def sub(m: re.Match) -> str:
         nums = [int(m.group(1))] + [int(n) for n in re.findall(r"\d{1,3}", m.group(2) or "")]
         labels: list[str] = []
         for n in nums:
             label = sources[n - 1].get("label") if 1 <= n <= len(sources) else None
-            if not label:
-                return m.group(0)
-            if label not in labels:
+            if label and label not in labels:
                 labels.append(label)
-        return "".join(f"[{label}]" for label in labels)
+        # "\0" marks a removed tag, so the space before it goes too.
+        return "".join(f"[{label}]" for label in labels) or "\0"
 
-    return _PASSAGE_TAG_RE.sub(sub, text)
+    return re.sub(r"[ \t]*\0", "", _PASSAGE_TAG_RE.sub(sub, text))
 
 
 def cites_any(text: str, sources: list[dict], *, sections: bool = True) -> bool:
@@ -820,10 +859,14 @@ _SECTION_REF_RE = re.compile(
 
 
 CITATION_RETRY_NUDGE = (
-    "Your previous reply used the knowledge-base passages but did not cite "
-    "them. Reply again with the same content and, after every statement or "
-    "value that rests on a passage, that passage's tag in square brackets "
-    "(e.g. [KB2]) — inside the string value when the output is JSON."
+    "Your previous reply cited no knowledge-base passage. Reply again with "
+    "the same content and, after every statement or value whose rule, "
+    "requirement or definition a passage actually states, that passage's tag "
+    "in square brackets (e.g. [KB2]) — inside the string value when the "
+    "output is JSON. Do not cite a passage that is only on a related topic, "
+    "and leave statements that come only from the document under review "
+    "uncited; if no statement rests on a passage, return the same reply "
+    "unchanged."
 )
 
 

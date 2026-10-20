@@ -134,9 +134,53 @@ export function matchSectionReference(
 /** Skip code, links and anything already a chip. */
 const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'BUTTON', 'SCRIPT', 'STYLE'])
 
+/** Where in its source a passage sits: its page(s) or sheet, or — for a
+ *  source without pages (a web page, an eCFR subpart) — its "part N". */
+export function citationLocator(c: WorkflowCitation): string | null {
+  const page = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
+  if (page) return page
+  return /·\s*(part \d+)\s*$/.exec(c.label || '')?.[1] ?? null
+}
+
 function shortLabel(c: WorkflowCitation): string {
-  const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
+  const locator = citationLocator(c)
   return locator ? `${c.document_title} · ${locator}` : c.document_title
+}
+
+/** Character ranges in `text` where each of `needles` occurs, matched the way
+ *  the backend verified them: case, whitespace, dashes and quotes aside. */
+export function findHighlights(text: string, needles: string[]): Array<[number, number]> {
+  const ranges: Array<[number, number]> = []
+  // A verified excerpt may be several pieces joined by "…"; each is verbatim.
+  const pieces = needles.flatMap(n => n.split(/\s*(?:\.\.\.|…)\s*/))
+  for (const needle of pieces) {
+    const n = needle.trim().replace(/^[;,:]+|[;,:]+$/g, '').trim()
+    if (n.length < 3) continue
+    const pattern = n
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+')
+      .replace(/[-‐‑‒–—―]/g, '[-‐‑‒–—―]')
+      .replace(/["“”„]/g, '["“”„]')
+      .replace(/['‘’]/g, "['‘’]")
+    const m = new RegExp(pattern, 'i').exec(text)
+    if (m) ranges.push([m.index, m.index + m[0].length])
+  }
+  ranges.sort((a, b) => a[0] - b[0])
+  const merged: Array<[number, number]> = []
+  for (const r of ranges) {
+    const last = merged[merged.length - 1]
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1])
+    else merged.push([r[0], r[1]])
+  }
+  return merged
+}
+
+/** The heading line of a section inside a passage ("§ 200.421 Advertising
+ *  and public relations."), for a section chip to point at. */
+function sectionHeading(text: string, section: string): string | null {
+  const escaped = section.replace('.', '\\.')
+  const m = new RegExp(`§\\s*${escaped}(?![\\d])[^\\n]{0,120}`).exec(text)
+  return m ? m[0] : null
 }
 
 /**
@@ -162,12 +206,14 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
     if (!skip && n.nodeValue && /[[§]|\d\.\d/.test(n.nodeValue)) textNodes.push(n as Text)
   }
 
-  const makeChip = (idx: number, compact: boolean): HTMLElement => {
+  const makeChip = (idx: number, compact: boolean, section?: string): HTMLElement => {
     const c = sources[idx]
     const chip = doc.createElement('button')
     chip.setAttribute('type', 'button')
     chip.className = compact ? 'kb-cite kb-cite-ref' : 'kb-cite'
     chip.setAttribute('data-cite', String(idx))
+    // A section chip points at that section's heading inside the passage.
+    if (section) chip.setAttribute('data-section', section)
     chip.setAttribute('title', `${citationLabel(c)} — click to see the passage`)
     chip.setAttribute('aria-label', `Citation: ${citationLabel(c)}`)
     chip.setAttribute('aria-haspopup', 'dialog')
@@ -212,7 +258,7 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
       // Named with "§" or "CFR" it is a section; bare, it may be a figure.
       const idx = sectionMatch(m[1], m[0].indexOf(m[1]) === 0)
       if (idx === null) continue
-      spans.push({ start, end, chips: [makeChip(idx, true)], keep: true })
+      spans.push({ start, end, chips: [makeChip(idx, true, m[1])], keep: true })
     }
     if (spans.length === 0) continue
 
@@ -264,6 +310,9 @@ interface CitationAnchor {
   index: number
   /** The chip that opened the popover; focus returns to it on Escape. */
   el: Element
+  /** Set when a section chip ("2 CFR 200.421") opened it: the heading of that
+   *  section in the passage is what gets highlighted. */
+  section: string | null
   rect: { top: number; bottom: number; left: number; right: number }
 }
 
@@ -276,6 +325,8 @@ function CitationPopover({ citation, anchor, onClose }: {
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const markRef = useRef<HTMLElement>(null)
 
   // Escape and the close button hand focus back to the chip; a click or
   // scroll elsewhere leaves focus wherever the reader put it.
@@ -308,6 +359,13 @@ function CitationPopover({ citation, anchor, onClose }: {
 
   useEffect(() => { ref.current?.focus() }, [])
 
+  // Bring the highlighted text into view inside the passage box — scrolling
+  // the box, never the page (a page scroll closes the popover).
+  useEffect(() => {
+    const box = boxRef.current, mark = markRef.current
+    if (box && mark) box.scrollTop = Math.max(0, mark.offsetTop - 24)
+  }, [anchor.index, anchor.section])
+
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768
   const width = Math.min(POPOVER_WIDTH, vw - 16)
@@ -321,9 +379,28 @@ function CitationPopover({ citation, anchor, onClose }: {
     boxShadow: '0 10px 30px rgba(0,0,0,0.14)', padding: '10px 12px 12px',
     fontFamily: 'inherit', color: '#374151', outline: 'none',
   }
-  const locator = formatPageLocator(citation.page, citation.page_approximate, citation.page_end) ?? (citation.sheet || null)
+  const locator = citationLocator(citation)
   const relevance = typeof citation.similarity === 'number' ? `${Math.round(citation.similarity * 100)}% match` : null
   const passage = (citation.content || citation.content_preview || '').trim()
+  // What to highlight: a section chip points at that section's heading; a
+  // citation chip at the excerpts the check verified for this passage.
+  const heading = anchor.section ? sectionHeading(passage, anchor.section) : null
+  const quotes = (citation.quotes || []).map(q => q.quote).filter(Boolean)
+  const ranges = findHighlights(passage, heading ? [heading] : quotes)
+  const caption = heading
+    ? `§ ${anchor.section} in this passage`
+    : ranges.length > 0
+      ? 'Highlighted: the text the statement rests on, checked against this passage'
+      : 'Passage the claim rests on'
+  const segments: Array<{ text: string; mark: boolean }> = []
+  let at = 0
+  for (const [a, b] of ranges) {
+    if (a > at) segments.push({ text: passage.slice(at, a), mark: false })
+    segments.push({ text: passage.slice(a, b), mark: true })
+    at = b
+  }
+  if (at < passage.length) segments.push({ text: passage.slice(at), mark: false })
+  const firstMark = segments.findIndex(seg => seg.mark)
 
   return createPortal(
     <div ref={ref} role="dialog" aria-label={`Passage: ${citationLabel(citation)}`} tabIndex={-1} style={style}>
@@ -353,14 +430,24 @@ function CitationPopover({ citation, anchor, onClose }: {
         </button>
       </div>
       <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 4 }}>
-        Passage the claim rests on
+        {caption}
       </div>
-      <div style={{
+      <div ref={boxRef} style={{
+        position: 'relative',
         fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         maxHeight: 260, overflowY: 'auto', backgroundColor: '#f9fafb',
         border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px',
       }}>
-        {passage || 'The passage text was not stored with this run.'}
+        {passage
+          ? segments.map((seg, i) => {
+              if (!seg.mark) return <span key={i}>{seg.text}</span>
+              return (
+                <mark key={i} ref={i === firstMark ? markRef : undefined} style={{ backgroundColor: '#fef08a', color: '#111827', padding: '0 1px', borderRadius: 2 }}>
+                  {seg.text}
+                </mark>
+              )
+            })
+          : 'The passage text was not stored with this run.'}
       </div>
     </div>,
     document.body,
@@ -374,7 +461,10 @@ export function useCitationPopover(sources: WorkflowCitation[]) {
   const openAt = useCallback((index: number, el: Element) => {
     const r = el.getBoundingClientRect()
     setAnchor(prev => (
-      prev && prev.el === el ? null : { index, el, rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+      prev && prev.el === el ? null : {
+        index, el, section: el.getAttribute('data-section'),
+        rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right },
+      }
     ))
   }, [])
   const citation = anchor ? sources[anchor.index] : undefined

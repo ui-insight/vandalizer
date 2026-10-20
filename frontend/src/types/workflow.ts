@@ -135,6 +135,11 @@ export interface WorkflowCitation {
   /** The passage text itself (the chunk the claim rests on), for the
    *  citation popover. Older runs only carry `content_preview`. */
   content?: string | null;
+  /** Statements in the output this passage was checked to support, each with
+   *  the excerpt (verbatim from `content`) that supports it; the popover
+   *  highlights the excerpts. Absent on runs from before citations were
+   *  checked. */
+  quotes?: { claim: string; quote: string }[] | null;
 }
 
 /** One knowledge base a grounded task reads, with the retrieval queries it is

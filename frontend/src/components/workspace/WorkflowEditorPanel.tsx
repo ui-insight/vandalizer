@@ -56,7 +56,7 @@ import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
 import { FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
 import { StepInputSources } from './StepInputSources'
-import { CitedMarkdown, useCitationPopover } from './CitedMarkdown'
+import { CitedMarkdown, citationLocator, useCitationPopover } from './CitedMarkdown'
 import {
   DEFAULT_STEP_INPUT, deriveStepInput, INPUT_SOURCE_LABELS, inputValuePatch,
   readInputValue, taskOverridesStepInput, TASK_INPUT_OVERRIDE_KEY,
@@ -6446,7 +6446,7 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
       {expanded && (
         <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {sources.map((c, i) => {
-            const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
+            const locator = citationLocator(c)
             const base = locator ? `${c.document_title} · ${locator}` : c.document_title
             // Several knowledge bases in one run: say which one a passage came from.
             const label = c.kb_title ? `${base} — ${c.kb_title}` : base
