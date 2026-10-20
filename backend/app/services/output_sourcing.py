@@ -16,7 +16,8 @@ run. A statement is linked only when all of these hold:
    the same value (``extraction_sources.value_supported_by_quote`` plus the
    date/time/percent forms it does not cover);
 4. the excerpt shares a content word with the statement or its label, says
-   most of a statement of several words (not just its subject's name), and
+   most of a statement of several words (not just its subject's name), the
+   passage is about what a one- or two-word statement's label names, and
    for a statement with values, a shared word sits on a value's own line or
    the line before it with no other figure of the same kind in between —
    a form that lists labels in one block and figures in another cannot say
@@ -70,7 +71,9 @@ MAX_QUOTE_CHARS = 600
 BIND_MAX_CHARS = 160       # how far a label word may sit from its value
 COVERAGE_MIN_WORDS = 4     # statements this long must be mostly in the excerpt:
 COVERAGE_TEXT = 0.3        # share of the statement's own content words, or
-COVERAGE_WITH_LABEL = 0.35  # share of its and its label's words together
+COVERAGE_WITH_LABEL = 0.35  # share of its and its label's words together;
+COVERAGE_TEXT_VALUES = 0.2  # less for a statement its values already anchor
+COVERAGE_WITH_LABEL_VALUES = 0.25
 EXCERPT_CONTEXT = 320      # document text kept either side of a quote for display
 
 JUDGE_INSTRUCTIONS = (
@@ -342,6 +345,14 @@ def word_positions(text: str) -> list[tuple[str, int, int]]:
 
 def stems(text: str) -> set[str]:
     return {s for s, _, _ in word_positions(text)}
+
+
+# Label words that name a slot rather than a subject ("item", "name").
+_GENERIC_LABEL_WORDS = frozenset(stem(w) for w in (
+    "item", "items", "name", "type", "detail", "details", "description", "value", "category",
+    "categories", "field", "note", "notes", "summary", "text", "label", "title", "list", "entry",
+    "kind", "data", "info", "information", "other", "general", "specific", "source", "document",
+))
 
 
 # ---------------------------------------------------------------------------
@@ -644,17 +655,31 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     shared = words & quote_words
     if not shared:
         return Verdict(None, "no_shared_word")
-    # A statement of several words, and no value to anchor it, needs an
-    # excerpt that says most of it, not one that only names its subject:
-    # "acquire matching-fund letters early to avoid delays" is not stated by
-    # "Matching Fund Verification Letter(s)". The label counts too, for a
-    # statement the model paraphrased. (A statement with values is anchored
-    # by them and by the label word beside each, below.)
-    if not st_values and len(text_words) >= COVERAGE_MIN_WORDS and (
-        len(text_words & quote_words) / len(text_words) < COVERAGE_TEXT
-        and len(shared) / len(words) < COVERAGE_WITH_LABEL
-    ):
-        return Verdict(None, "quote_covers_too_little")
+    # A statement of several words needs an excerpt that says most of it,
+    # not one that only names its subject: "acquire matching-fund letters
+    # early to avoid delays" is not stated by "Matching Fund Verification
+    # Letter(s)", nor "documentation confirming the purchase is authorized
+    # under award L24AC00293-00" by "Award: L24AC00293-00". The label counts
+    # too, for a statement the model paraphrased. A statement with values is
+    # also anchored by them, so it needs less of its wording.
+    if len(text_words) >= COVERAGE_MIN_WORDS:
+        need_text, need_all = (
+            (COVERAGE_TEXT_VALUES, COVERAGE_WITH_LABEL_VALUES) if st_values
+            else (COVERAGE_TEXT, COVERAGE_WITH_LABEL)
+        )
+        if (
+            len(text_words & quote_words) / len(text_words) < need_text
+            and len(shared) / len(words) < need_all
+        ):
+            return Verdict(None, "quote_covers_too_little")
+    # A one- or two-word statement ("USD", "Travel") says little on its own;
+    # its label says what it is about ("Expense Record — currency",
+    # "approved budget categories"). The passage the judge read must be
+    # about that too, or "ALL AMOUNTS ARE SHOWN IN USD" on the award would
+    # source the expense's currency.
+    label_only = stems(st.label) - text_words - _GENERIC_LABEL_WORDS
+    if len(text_words) <= 2 and label_only and not (label_only & stems(corpus.window_text(wi))):
+        return Verdict(None, "label_not_in_passage")
     if st_values and not _bound(st_values, shared, exact, q_values):
         return Verdict(None, "value_not_bound_to_label")
 

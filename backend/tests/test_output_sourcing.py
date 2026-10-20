@@ -366,6 +366,38 @@ def test_an_excerpt_must_say_most_of_a_longer_statement():
     assert result["reasons"] == {"quote_covers_too_little": 1}
 
 
+def test_a_value_does_not_carry_a_statement_the_excerpt_does_not_make():
+    """Seen in a real run: a request for documentation of the award was
+    linked to the expense record's award line because the award number
+    matched. The value is there; the statement is not."""
+    judge = Judge(("Documentation", "EXPENSE RECORD", "Award: L24AC00293-00 (BLM, Southern Utah University)"))
+    result = _trace({"final": "Documentation confirming the purchase is authorized under award L24AC00293-00 "
+                              "and a reasonable allocation method is still needed."}, judge, docs=[EXPENSE])
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"quote_covers_too_little": 1}
+
+
+@pytest.mark.parametrize("value, judge_rule, passages", [
+    # The expense's currency, sourced to the award's "amounts are in USD".
+    ({"source_document": "Expense Record", "currency": "USD"},
+     ("USD", "ALL AMOUNTS", "ALL AMOUNTS ARE SHOWN IN USD"), []),
+    # An award budget category, sourced to a rule about trustees' travel.
+    ({"approved_budget_categories": [{"category": "Travel"}]},
+     ("Travel", "trustees", "Travel and subsistence costs of trustees (or directors) at IHEs are allowable."),
+     [{"chunk_id": "e1", "label": "UG — Subpart E · part 30", "kb_title": "UG", "document_title": "Subpart E",
+       "content": "§ 200.475 Travel costs. Travel and subsistence costs of trustees (or directors) at IHEs are allowable."}]),
+])
+def test_a_short_statement_needs_a_passage_about_what_its_label_names(value, judge_rule, passages):
+    """Seen in a real run. "USD" or "Travel" alone matches many passages;
+    the label says which record or list it belongs to, and the passage the
+    judge read must be about that."""
+    noa_usd = {"uuid": "noa", "title": "NoA.pdf", "text_markers": [],
+               "raw_text": "NOTICE OF AWARD\nTotal Federal Share\nALL AMOUNTS ARE SHOWN IN USD\n"}
+    result = _trace({"final": value}, Judge(judge_rule), docs=[noa_usd], passages=passages)
+    assert _links(result, "final") == []
+    assert result["reasons"].get("label_not_in_passage") == 1
+
+
 def test_an_excerpt_needs_a_word_in_common_with_the_statement():
     # "vendor total" finds the record (it says "Vendor"), but the excerpt
     # the judge picked shares no word with the statement or its label.
