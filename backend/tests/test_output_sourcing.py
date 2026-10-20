@@ -381,6 +381,10 @@ def test_a_value_does_not_carry_a_statement_the_excerpt_does_not_make():
     # The expense's currency, sourced to the award's "amounts are in USD".
     ({"source_document": "Expense Record", "currency": "USD"},
      ("USD", "ALL AMOUNTS", "ALL AMOUNTS ARE SHOWN IN USD"), []),
+    # An award budget category, sourced to the expense record's own
+    # category; the record's "Approved by" is not about a budget.
+    ({"approved_budget_categories": [{"category": "Supplies"}]},
+     ("Supplies", "Charged to", "Charged to: Supplies"), []),
     # An award budget category, sourced to a rule about trustees' travel.
     ({"approved_budget_categories": [{"category": "Travel"}]},
      ("Travel", "trustees", "Travel and subsistence costs of trustees (or directors) at IHEs are allowable."),
@@ -393,7 +397,8 @@ def test_a_short_statement_needs_a_passage_about_what_its_label_names(value, jud
     judge read must be about that."""
     noa_usd = {"uuid": "noa", "title": "NoA.pdf", "text_markers": [],
                "raw_text": "NOTICE OF AWARD\nTotal Federal Share\nALL AMOUNTS ARE SHOWN IN USD\n"}
-    result = _trace({"final": value}, Judge(judge_rule), docs=[noa_usd], passages=passages)
+    expense = {**EXPENSE, "raw_text": EXPENSE["raw_text"] + "Charged to: Supplies\nApproved by: PI, 2025-03-16\n"}
+    result = _trace({"final": value}, Judge(judge_rule), docs=[noa_usd, expense], passages=passages)
     assert _links(result, "final") == []
     assert result["reasons"].get("label_not_in_passage") == 1
 

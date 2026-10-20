@@ -347,11 +347,17 @@ def stems(text: str) -> set[str]:
     return {s for s, _, _ in word_positions(text)}
 
 
-# Label words that name a slot rather than a subject ("item", "name").
+# Label words that name a slot ("item", "name") or qualify one ("approved",
+# "required") rather than name a subject. In a real run "approved budget
+# categories — Supplies" passed on the expense record's "Approved by: PI";
+# the subject, "budget", is what the passage has to be about.
 _GENERIC_LABEL_WORDS = frozenset(stem(w) for w in (
     "item", "items", "name", "type", "detail", "details", "description", "value", "category",
     "categories", "field", "note", "notes", "summary", "text", "label", "title", "list", "entry",
     "kind", "data", "info", "information", "other", "general", "specific", "source", "document",
+    "approved", "total", "required", "optional", "anticipated", "applicable", "maximum",
+    "minimum", "estimated", "proposed", "current", "expected", "allowable", "special",
+    "requirement", "requirements",
 ))
 
 
