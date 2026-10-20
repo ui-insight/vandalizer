@@ -8,14 +8,16 @@ run. A statement is linked only when all of these hold:
 1. a temperature-0 judge, shown the statement and a few candidate passages,
    says one passage itself states it, and copies the excerpt that does;
 2. that excerpt is in the passage the judge named, contiguous and verbatim
-   (after folding case, whitespace, dashes and quotes) — checked here, not
-   taken on the model's word, and an excerpt found twice there on different
-   pages is refused, since it cannot say which page it means;
+   (after folding case, whitespace, dashes and quotes, and ignoring the
+   ``**``/``<u>`` formatting marks a text extractor writes) — checked here,
+   not taken on the model's word, and an excerpt found twice there on
+   different pages is refused, since it cannot say which page it means;
 3. every number, date and identifier in the statement is in the excerpt as
    the same value (``extraction_sources.value_supported_by_quote`` plus the
    date/time/percent forms it does not cover);
-4. the excerpt shares a content word with the statement or its label, and
-   for a statement with values, such a word sits on a value's own line or
+4. the excerpt shares a content word with the statement or its label, says
+   most of a statement of several words (not just its subject's name), and
+   for a statement with values, a shared word sits on a value's own line or
    the line before it with no other figure of the same kind in between —
    a form that lists labels in one block and figures in another cannot say
    which figure is the "Total Direct Costs", and is refused;
@@ -66,6 +68,9 @@ MAX_JUDGED = 300           # statements judged per run; the rest stay plain
 MIN_QUOTE_CHARS = 12
 MAX_QUOTE_CHARS = 600
 BIND_MAX_CHARS = 160       # how far a label word may sit from its value
+COVERAGE_MIN_WORDS = 4     # statements this long must be mostly in the excerpt:
+COVERAGE_TEXT = 0.3        # share of the statement's own content words, or
+COVERAGE_WITH_LABEL = 0.35  # share of its and its label's words together
 EXCERPT_CONTEXT = 320      # document text kept either side of a quote for display
 
 JUDGE_INSTRUCTIONS = (
@@ -343,6 +348,30 @@ def stems(text: str) -> set[str]:
 # Sources and their candidate windows
 # ---------------------------------------------------------------------------
 
+# Formatting marks a text extractor writes around words (Docling's
+# "**All grants require …**", "*(up to 500 words)*", "<u>Budget Form</u>"):
+# not text, and a judge copying the words drops or moves them.
+_MARKUP_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9]{0,10}\s*/?>|[*`]+|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])")
+
+
+def fold(text: str) -> tuple[str, list[int]]:
+    """``normalize_with_map`` after dropping formatting marks: the text the
+    words are compared in, and each character's offset in ``text``. Words,
+    their order and everything between them must still match — an ellipsis
+    or a skipped word does not."""
+    kept: list[str] = []
+    where: list[int] = []
+    last = 0
+    for m in _MARKUP_RE.finditer(text or ""):
+        kept.append(text[last:m.start()])
+        where.extend(range(last, m.start()))
+        last = m.end()
+    kept.append((text or "")[last:])
+    where.extend(range(last, len(text or "")))
+    norm, nmap = normalize_with_map("".join(kept))
+    return norm, [where[i] for i in nmap]
+
+
 @dataclass
 class _Source:
     kind: str              # document | kb
@@ -353,7 +382,7 @@ class _Source:
 
     def normalized(self) -> tuple[str, list[int]]:
         if self.norm is None:
-            self.norm = normalize_with_map(self.text)
+            self.norm = fold(self.text)
         return self.norm
 
 
@@ -519,7 +548,7 @@ def _find_all(src: _Source, quote: str, start: int, end: int) -> list[tuple[int,
     """Raw ``[start, end)`` of each place ``quote`` occurs inside
     ``src.text[start:end]``, compared after normalization."""
     norm_text, index_map = src.normalized()
-    nq, _ = normalize_with_map(quote)
+    nq, _ = fold(quote)
     if not nq:
         return []
     lo = bisect.bisect_left(index_map, start)
@@ -596,7 +625,7 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     quote = (quote or "").strip()
     if len(quote) > MAX_QUOTE_CHARS:
         return Verdict(None, "quote_too_long")
-    nq, _ = normalize_with_map(quote)
+    nq, _ = fold(quote)
     if len(nq) < MIN_QUOTE_CHARS or len(nq.split()) < 2:
         return Verdict(None, "quote_too_short")
     w = corpus.windows[wi]
@@ -610,9 +639,22 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     q_values = values_in(exact)
     if not _values_supported(st_values, exact, q_values):
         return Verdict(None, "value_not_in_quote")
-    shared = (stems(st.text) | stems(st.label)) & stems(exact)
+    text_words, quote_words = stems(st.text), stems(exact)
+    words = text_words | stems(st.label)
+    shared = words & quote_words
     if not shared:
         return Verdict(None, "no_shared_word")
+    # A statement of several words, and no value to anchor it, needs an
+    # excerpt that says most of it, not one that only names its subject:
+    # "acquire matching-fund letters early to avoid delays" is not stated by
+    # "Matching Fund Verification Letter(s)". The label counts too, for a
+    # statement the model paraphrased. (A statement with values is anchored
+    # by them and by the label word beside each, below.)
+    if not st_values and len(text_words) >= COVERAGE_MIN_WORDS and (
+        len(text_words & quote_words) / len(text_words) < COVERAGE_TEXT
+        and len(shared) / len(words) < COVERAGE_WITH_LABEL
+    ):
+        return Verdict(None, "quote_covers_too_little")
     if st_values and not _bound(st_values, shared, exact, q_values):
         return Verdict(None, "value_not_bound_to_label")
 

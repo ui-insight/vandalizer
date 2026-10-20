@@ -325,6 +325,47 @@ def test_a_label_beside_its_figure_is_linked():
     assert (src["page"], src["quote"]) == (3, "Total Direct Costs: $82,275.30")
 
 
+def test_formatting_marks_do_not_count_but_words_still_must_match():
+    """Docling writes "**All grants require …** **funding request.**"; a
+    judge copying the words drops or moves the marks. The words, their
+    order and everything between them must still match."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "Budget\n- **All grants require matching contributions equal to or greater than the FFAR** "
+        "**funding request.** Matching funds must come from a non-U.S. Federal entity.\n"
+        "<u>P.I. and Key Personnel Biosketch</u>: three-page limit per individual listed as key personnel\n"
+    )}
+    judge = Judge(
+        ("matching contributions", "All grants", "All grants require matching contributions equal to or greater than the FFAR funding request."),
+        ("page limit", "Biosketch", "P.I. and Key Personnel Biosketch: three-page limit per individual"),
+    )
+    result = _trace({"final": {
+        "cost_sharing": "All grants require matching contributions equal to or greater than the FFAR funding request.",
+        "biosketch": "Three-page limit per individual",
+    }}, judge, docs=[doc])
+    quotes = [src["quote"] for _, src in _links(result, "final")]
+    assert quotes == [
+        "All grants require matching contributions equal to or greater than the FFAR** **funding request.",
+        "P.I. and Key Personnel Biosketch</u>: three-page limit per individual",
+    ]
+    spliced = Judge(("matching contributions", "All grants", "All grants require matching contributions ... funding request."))
+    result = _trace({"final": {"cost_sharing": "All grants require matching contributions."}}, spliced, docs=[doc])
+    assert _links(result, "final") == []
+
+
+def test_an_excerpt_must_say_most_of_a_longer_statement():
+    """Seen in a real run: advice about matching-fund letters was linked to a
+    component's bare name. The excerpt names the subject and nothing else."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "Required attachments\nMatching Fund Verification Letter(s)\nProject timeline (by year)\n"
+    )}
+    judge = Judge(("acquire letters", "Matching Fund", "Matching Fund Verification Letter(s)"))
+    advice = "Obtain matching-fund verification letters before full submission"
+    result = _trace({"final": {advice: "The budget component requires documented match evidence; acquire letters from partners early to avoid delays."}},
+                    judge, docs=[doc])
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"quote_covers_too_little": 1}
+
+
 def test_an_excerpt_needs_a_word_in_common_with_the_statement():
     # "vendor total" finds the record (it says "Vendor"), but the excerpt
     # the judge picked shares no word with the statement or its label.

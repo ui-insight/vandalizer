@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SourcedStatement, SourcingLink, WorkflowSourcing } from '../../types/workflow'
 import { CitedMarkdown, renderCitedMarkdown, renderCitedText } from './CitedMarkdown'
 import { SourcedJson, SourcingSummary, structuredLeafSpan, textLeafSpan, useSourcing } from './Sourcing'
-import { codePointIndex, stripMarks, withSentinels } from './sourcingSpans'
+import { codePointIndex, stripMarks, viewerTerm, withSentinels } from './sourcingSpans'
 
 // The workspace a source opens documents through; null outside a workspace.
 const workspace = vi.hoisted(() => ({
@@ -34,6 +34,13 @@ describe('marks', () => {
     const at = codePointIndex('🤖 ok')
     expect([at(0), at(1), at(2)]).toEqual([0, 2, 3])
     expect(codePointIndex('plain')(3)).toBe(3)
+  })
+
+  it('hand the viewer the words the page shows, without an extractor\'s formatting marks', () => {
+    expect(viewerTerm('All grants require the FFAR** **funding request.')).toBe('All grants require the FFAR funding request.')
+    expect(viewerTerm('P.I. Biosketch</u>: three-page limit')).toBe('P.I. Biosketch: three-page limit')
+    expect(viewerTerm('Due:\nMarch 9, 2022 *(see note)*')).toBe('Due: March 9, 2022 (see note)')
+    expect(viewerTerm('file_name stays')).toBe('file_name stays')
   })
 
   it('wrap each span and nothing else; overlapping spans are dropped, not nested', () => {

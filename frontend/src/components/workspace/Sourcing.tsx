@@ -7,7 +7,7 @@ import {
   CAPTION_STYLE, FloatingCard, MarkedText, PASSAGE_BOX_STYLE, SOURCING_CSS, floatAnchorOf,
   type CitedSourcing, type FloatAnchor,
 } from './CitedMarkdown'
-import { codePointIndex, sourceLabel, statementAttrs } from './sourcingSpans'
+import { codePointIndex, sourceLabel, statementAttrs, viewerTerm } from './sourcingSpans'
 
 /**
  * Sourcing in the run view, a step's "Last run output" and Test Step.
@@ -48,7 +48,7 @@ function SourcePopover({ link, anchor, onClose }: { link: SourcingLink; anchor: 
     // shows; the workflow stays open on the right.
     ws.setWorkspaceMode('files')
     ws.viewDocument(link.document_uuid as string, link.document_title || 'Document', {
-      terms: [link.quote],
+      terms: [viewerTerm(link.quote)],
       page: typeof link.page === 'number' ? link.page : null,
       pageApproximate: link.page_approximate === true,
     })

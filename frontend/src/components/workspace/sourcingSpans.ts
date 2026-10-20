@@ -59,6 +59,19 @@ export function withSentinels(text: string, rows: SourcedStatement[]): string {
   return out + text.slice(last)
 }
 
+/** A quote as the page itself shows it, for the document viewer to find:
+ *  the formatting marks a text extractor writes around words (`**`, `<u>`)
+ *  are in the stored text but not in the PDF's text layer. */
+export function viewerTerm(quote: string): string {
+  return quote
+    .replace(/<\/?[A-Za-z][A-Za-z0-9]{0,10}\s*\/?>/g, '')
+    .replace(/[*`]+/g, '')
+    .replace(/(^|[^A-Za-z0-9])_+/g, '$1')
+    .replace(/_+(?=[^A-Za-z0-9]|$)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** "NoA.pdf · p. 2", or the knowledge-base passage's source line. */
 export function sourceLabel(link: SourcingLink): string {
   const locator = formatPageLocator(link.page, link.page_approximate, link.page_end)
