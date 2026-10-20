@@ -5,12 +5,13 @@ import type { UrlPreview, UrlPreviewPage } from '../../api/knowledge'
 
 vi.mock('../../api/knowledge', () => ({
   previewUrlsForKB: vi.fn(),
+  cancelUrlPreview: vi.fn(),
   getUrlPreview: vi.fn(),
   getUrlPreviewPageText: vi.fn(),
   commitUrlPreview: vi.fn(),
 }))
 
-import { commitUrlPreview, getUrlPreview, getUrlPreviewPageText, previewUrlsForKB } from '../../api/knowledge'
+import { cancelUrlPreview, commitUrlPreview, getUrlPreview, getUrlPreviewPageText, previewUrlsForKB } from '../../api/knowledge'
 
 function page(overrides: Partial<UrlPreviewPage>): UrlPreviewPage {
   return {
@@ -53,6 +54,7 @@ describe('AddUrlsModal', () => {
     vi.mocked(getUrlPreview).mockReset().mockResolvedValue(preview('ready'))
     vi.mocked(getUrlPreviewPageText).mockReset()
     vi.mocked(commitUrlPreview).mockReset().mockResolvedValue({ ok: true, queued: 2 })
+    vi.mocked(cancelUrlPreview).mockReset().mockResolvedValue({ ok: true, canceled: true })
   })
   afterEach(() => { vi.useRealTimers() })
 
@@ -136,5 +138,71 @@ describe('AddUrlsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect((screen.getByLabelText('URLs to add, one per line') as HTMLTextAreaElement).value)
       .toBe('https://example.gov/policy\nhttps://example.gov/short')
+  })
+  // Support ticket: "Fetching pages…" spun for 10+ minutes with no pages and
+  // no error. A stuck preview now says so and offers Retry and Cancel.
+  const stalled = (): UrlPreview => ({
+    ...preview('running', []),
+    stalled: true,
+    stall_message: "This is taking longer than expected. The server hasn't started fetching yet.",
+  })
+
+  it('says a stuck preview is taking longer than expected, with Retry and Cancel', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    expect(screen.queryByText(/taking longer than expected/)).not.toBeInTheDocument()
+
+    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
+    await poll()
+    expect(screen.getByText(/taking longer than expected/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeInTheDocument()
+  })
+
+  it('Retry stops the stuck preview and starts a new one with the same URLs', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    vi.mocked(previewUrlsForKB).mockResolvedValue({ preview_uuid: 'pv-2', status: 'running' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
+
+    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+    expect(previewUrlsForKB).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(previewUrlsForKB).mock.calls[1][1]).toEqual(
+      ['https://example.gov/policy', 'https://example.gov/short'],
+    )
+  })
+
+  it('Cancel stops the preview and returns to the URLs as typed', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel preview' })) })
+
+    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+    expect(screen.getByLabelText('URLs to add, one per line')).toHaveValue(
+      'https://example.gov/policy\nhttps://example.gov/short',
+    )
+  })
+
+  it('closing the dialog stops a preview that is still fetching', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
+    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    unmount()
+    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+  })
+
+  it('closing after the preview finished cancels nothing', async () => {
+    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    unmount()
+    expect(cancelUrlPreview).not.toHaveBeenCalled()
   })
 })

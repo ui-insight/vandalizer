@@ -916,14 +916,28 @@ async def get_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get
     from app.services import kb_url_preview
 
     _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    # Before the pages: a preview found dead is settled as failed here.
+    stall_message = await kb_url_preview.check_progress(preview)
     pages = await kb_url_preview.list_pages(preview)
     return {
         "preview_uuid": preview.uuid,
         "status": preview.status,
         "error_message": preview.error_message,
         "crawl_enabled": preview.crawl_enabled,
+        "stalled": stall_message is not None,
+        "stall_message": stall_message,
         "pages": [kb_url_preview.page_summary(p) for p in pages],
     }
+
+
+@router.post("/{uuid}/add_urls/preview/{preview_uuid}/cancel")
+async def cancel_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get_current_user)):
+    """Stop a preview that is still fetching. Nothing it fetched is added."""
+    from app.services import kb_url_preview
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    canceled = await kb_url_preview.cancel_preview(preview)
+    return {"ok": True, "canceled": canceled}
 
 
 @router.get("/{uuid}/add_urls/preview/{preview_uuid}/pages/{page_id}")

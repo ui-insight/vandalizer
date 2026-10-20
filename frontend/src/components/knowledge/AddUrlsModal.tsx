@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
 import {
+  cancelUrlPreview,
   commitUrlPreview,
   getUrlPreview,
   getUrlPreviewPageText,
@@ -72,6 +73,15 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
     })
   }, [])
 
+  // Closing the dialog however it closes (Escape, backdrop, Cancel) stops a
+  // preview that is still fetching.
+  const previewRef = useRef(preview)
+  previewRef.current = preview
+  useEffect(() => () => {
+    const open = previewRef.current
+    if (open?.status === 'running') cancelUrlPreview(kbUuid, open.preview_uuid).catch(() => {})
+  }, [kbUuid])
+
   // Poll while the worker is still fetching.
   const previewUuid = preview?.preview_uuid
   const running = preview?.status === 'running'
@@ -88,6 +98,26 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
     }, POLL_MS)
     return () => { cancelled = true; window.clearInterval(timer) }
   }, [kbUuid, previewUuid, running, absorb])
+
+  // Stop the worker fetching for a preview the user has walked away from.
+  // Best effort: a preview that already finished has nothing to stop.
+  const stopPreview = () => {
+    if (preview?.status === 'running') {
+      cancelUrlPreview(kbUuid, preview.preview_uuid).catch(() => {})
+    }
+  }
+
+  const handleBack = () => {
+    stopPreview()
+    setStep('enter')
+    setPreview(null)
+    setRequestError(null)
+  }
+
+  const handleRetry = () => {
+    stopPreview()
+    void handlePreview()
+  }
 
   const handlePreview = async () => {
     if (busyRef.current) return
@@ -198,6 +228,9 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
             preview={preview}
             kept={kept}
             onToggle={toggle}
+            onRetry={handleRetry}
+            onCancel={handleBack}
+            busy={busy}
           />
         )}
 
@@ -215,7 +248,7 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
             {step === 'review' && (
               <button
                 type="button"
-                onClick={() => { setStep('enter'); setPreview(null); setRequestError(null) }}
+                onClick={handleBack}
                 disabled={busy}
                 style={secondaryButton}
               >
@@ -340,11 +373,14 @@ function EnterStep(props: {
   )
 }
 
-function ReviewStep({ kbUuid, preview, kept, onToggle }: {
+function ReviewStep({ kbUuid, preview, kept, onToggle, onRetry, onCancel, busy }: {
   kbUuid: string
   preview: UrlPreview
   kept: Set<string>
   onToggle: (pageId: string) => void
+  onRetry: () => void
+  onCancel: () => void
+  busy: boolean
 }) {
   const running = preview.status === 'running'
   const pages = preview.pages
@@ -357,8 +393,24 @@ function ReviewStep({ kbUuid, preview, kept, onToggle }: {
             <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
             Fetching pages… {pages.length > 0 && `${plural(pages.length, 'page')} so far`}
           </span>
-        ) : preview.status === 'error' ? (
+        ) : null}
+        {running && preview.stalled ? (
+          <div
+            role="alert"
+            style={{
+              marginTop: 8, padding: '10px 12px', borderRadius: 8,
+              border: '1px solid rgba(251,191,36,0.4)', backgroundColor: 'rgba(251,191,36,0.08)',
+              color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 200 }}>{preview.stall_message}</span>
+            <button type="button" onClick={onRetry} disabled={busy} style={secondaryButton}>Retry</button>
+            <button type="button" onClick={onCancel} disabled={busy} style={secondaryButton}>Cancel preview</button>
+          </div>
+        ) : running ? null : preview.status === 'error' ? (
           <span role="alert" style={{ color: '#f87171' }}>{preview.error_message || 'The preview failed.'}</span>
+        ) : preview.status === 'canceled' ? (
+          <span>The preview was canceled.</span>
         ) : (
           <>
             Untick anything you don&rsquo;t want. Low-quality pages start unticked.
