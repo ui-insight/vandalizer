@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v4.15.0] - 2026-10-20
+
 ### Added
 - **A workflow run's status says which model actually answered and with what settings, so API runs can be logged and reproduced.** Evaluation work running workflows through the API had to log the model each run used (the configured model name, not a tag like "strong" or "fast") and every Vandalizer setting needed to reproduce the result. The status endpoint returned neither. The run's default model was stored, but a step's own model, an optimizer override, a pinned extraction model or a fallback retry can each replace it. `GET /api/workflows/status` (and the `/status/stream` events) now carry `run_metadata`, which holds:
   - `models_used`: the models whose calls were metered, most tokens first.
@@ -70,6 +72,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 - **A web page with hidden text, or text written to an AI, is held for review before it is added to a knowledge base.** A page added to a knowledge base could carry text a reader never sees, such as white-on-white text, zero-size text, transparent text, or a paragraph moved off-screen, and that text then changed the answers the knowledge base gave everyone who used it. Only an inline `display:none` was dropped before; every other technique was indexed. Each fetched page, whether added by hand, found by a crawl or refetched by a refresh, is now checked for text the page does not show and for wording addressed to an AI ("Note to the AI…", "ignore all previous instructions", chat-template tokens). A page with either is **held**: it is not indexed, and the source shows what was found, quoting the text, with **Add anyway** and **Remove**. A refresh that turns up new hidden text is held the same way, and the source keeps answering from its previous text until someone accepts the new version. Text the user has already accepted does not hold the page again; new hidden text does. Collapsed FAQ answers and menus (`display:none`, `hidden`), short screen-reader labels, and hidden text that repeats what the page shows are not flagged. The AI-addressed check is a heuristic that looks only for wording that names an AI as the reader, so a payload worded like an ordinary correction notice is not caught by it; the hidden-text check does not depend on wording. Styles from external stylesheets are not read.
+
+### Operator Notes
+- **Repair eCFR knowledge-base sources after upgrading.** A web source for an eCFR regulation could hold eCFR's 434-character search help instead of the regulation (the FCOI knowledge base on one production server did). The repair script now detects this and rebuilds the source from the catalog's bundled text. Inside the api container (`docker compose exec api …`), run `python -m scripts.repair_gov_kb_sources --dry-run` to see what it would change, then run it without `--dry-run`. Answers from an affected knowledge base since its source was stored did not come from the regulation.
+- **`/api/health` now reports the Celery workers.** A new `workers` section lists the queues with a live worker and the ones with none (`ok`, `down` or `unknown`). It does not change the endpoint's status code, so probes and `upgrade.sh` behave as before. After upgrading, check that it reads `"status": "ok"` with nothing under `missing_queues`. A `down` there means queued uploads, workflows, KB refreshes and URL previews will wait indefinitely.
+- **Stopping the `celery` container now takes up to 60 seconds.** It shuts its workers down cleanly (`stop_grace_period: 60s`) instead of being SIGKILLed after 10 seconds with exit code 137. `./setup.sh` install and redeploy also wait for the workers to report healthy, and report an error if they don't.
+- **Knowledge-base validation scores may drop once.** An answer that contradicts the expected answer no longer gets partial credit (0.6) because a retrieved excerpt agrees with it. It now scores no credit and is flagged for review. Re-run validation on knowledge bases whose scores are compared over time.
+- **Some web pages are now held for review instead of added.** A page with hidden text, or wording addressed to an AI, gets the status **held** whether it is added, crawled or refreshed. A refreshed source keeps answering from its previous text until someone accepts the new version. Expect a few held sources on the first scheduled refresh after upgrading.
 
 ## [v4.14.0] - 2026-09-30
 

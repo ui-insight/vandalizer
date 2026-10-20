@@ -42,6 +42,8 @@ docker compose logs --tail=100 api
 docker compose logs --tail=100 celery
 ```
 
+If uploads stay at "extracting", workflows at "Preparing" or a URL preview never starts, check the workers first: `curl -s http://localhost:8001/api/health` shows `workers.status` and any `missing_queues`, and `docker compose ps -a celery` shows whether the container is running. Docker restarts a `celery` container that crashed, but one that was stopped (`docker stop`, `docker compose stop`) stays down until it is started again (`restart: unless-stopped`). Bring it back with `docker compose up -d celery`.
+
 `status.sh` does not exercise the OCR service. The setup checklist on **Admin → System Config** does: it live-probes OCR after it loads and marks the row "Not working" in red when a real conversion fails. **Test Connection** on the OCR settings runs the same one-page conversion with a step-by-step breakdown. A dead OCR service does not stop uploads (they fall back to basic text extraction), so check that row after any OCR-side change.
 
 ## Backup Procedure
