@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -155,6 +155,17 @@ function shortLabel(c: WorkflowCitation): string {
   return locator ? `${c.document_title} · ${locator}` : c.document_title
 }
 
+/** A regex source for `needle` compared the way the backend compares text:
+ *  case (with the `i` flag), whitespace runs, dash and quote styles aside. */
+export function loosePattern(needle: string): string {
+  return needle
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\s+/g, '\\s+')
+    .replace(/[-‐‑‒–—―]/g, '[-‐‑‒–—―]')
+    .replace(/["“”„]/g, '["“”„]')
+    .replace(/['‘’]/g, "['‘’]")
+}
+
 /** Character ranges in `text` where each of `needles` occurs, matched the way
  *  the backend verified them: case, whitespace, dashes and quotes aside. */
 export function findHighlights(text: string, needles: string[]): Array<[number, number]> {
@@ -164,13 +175,7 @@ export function findHighlights(text: string, needles: string[]): Array<[number, 
   for (const needle of pieces) {
     const n = needle.trim().replace(/^[;,:]+|[;,:]+$/g, '').trim()
     if (n.length < 3) continue
-    const pattern = n
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\s+/g, '\\s+')
-      .replace(/[-‐‑‒–—―]/g, '[-‐‑‒–—―]')
-      .replace(/["“”„]/g, '["“”„]')
-      .replace(/['‘’]/g, "['‘’]")
-    const m = new RegExp(pattern, 'i').exec(text)
+    const m = new RegExp(loosePattern(n), 'i').exec(text)
     if (m) ranges.push([m.index, m.index + m[0].length])
   }
   ranges.sort((a, b) => a[0] - b[0])
@@ -314,27 +319,41 @@ function withChips(html: string, sources: WorkflowCitation[]): string {
 
 // --- Popover ----------------------------------------------------------------
 
-interface CitationAnchor {
-  index: number
-  /** The chip that opened the popover; focus returns to it on Escape. */
+/** Where a floating card sits: the chip that opened it (focus returns to it on
+ *  Escape) and that chip's box on screen. */
+export interface FloatAnchor {
   el: Element
+  rect: { top: number; bottom: number; left: number; right: number }
+}
+
+interface CitationAnchor extends FloatAnchor {
+  index: number
   /** Set when a section chip ("2 CFR 200.421") opened it: the heading of that
    *  section in the passage is what gets highlighted. */
   section: string | null
-  rect: { top: number; bottom: number; left: number; right: number }
 }
 
 const POPOVER_WIDTH = 440
 
-/** The passage a citation rests on, floated beside the chip that was clicked. */
-function CitationPopover({ citation, anchor, onClose }: {
-  citation: WorkflowCitation
-  anchor: CitationAnchor
+/** The anchor for a chip element, read at the moment it is clicked. */
+export function floatAnchorOf(el: Element): FloatAnchor {
+  const r = el.getBoundingClientRect()
+  return { el, rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+}
+
+/**
+ * A card floated beside the chip that opened it — the knowledge-base passage
+ * and the document excerpt both open in one. Escape, and the card's own close
+ * button (handed to `children` as `dismiss`), close it and give focus back to
+ * the chip; a click or a page scroll anywhere else closes it too.
+ */
+export function FloatingCard({ anchor, label, onClose, children }: {
+  anchor: FloatAnchor
+  label: string
   onClose: () => void
+  children: (dismiss: () => void) => ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const boxRef = useRef<HTMLDivElement>(null)
-  const markRef = useRef<HTMLElement>(null)
 
   // Escape and the close button hand focus back to the chip; a click or
   // scroll elsewhere leaves focus wherever the reader put it.
@@ -367,13 +386,6 @@ function CitationPopover({ citation, anchor, onClose }: {
 
   useEffect(() => { ref.current?.focus() }, [])
 
-  // Bring the highlighted text into view inside the passage box — scrolling
-  // the box, never the page (a page scroll closes the popover).
-  useEffect(() => {
-    const box = boxRef.current, mark = markRef.current
-    if (box && mark) box.scrollTop = Math.max(0, mark.offsetTop - 24)
-  }, [anchor.index, anchor.section])
-
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768
   const width = Math.min(POPOVER_WIDTH, vw - 16)
@@ -387,6 +399,73 @@ function CitationPopover({ citation, anchor, onClose }: {
     boxShadow: '0 10px 30px rgba(0,0,0,0.14)', padding: '10px 12px 12px',
     fontFamily: 'inherit', color: '#374151', outline: 'none',
   }
+  return createPortal(
+    <div ref={ref} role="dialog" aria-label={label} tabIndex={-1} style={style}>
+      {children(dismiss)}
+    </div>,
+    document.body,
+  )
+}
+
+/** `text` with each of `ranges` marked; the first mark takes `markRef`, so
+ *  the box around it can scroll it into view. */
+export function MarkedText({ text, ranges, markRef }: {
+  text: string
+  ranges: Array<[number, number]>
+  markRef?: Ref<HTMLElement>
+}) {
+  const segments: Array<{ text: string; mark: boolean }> = []
+  let at = 0
+  for (const [a, b] of ranges) {
+    if (a > at) segments.push({ text: text.slice(at, a), mark: false })
+    segments.push({ text: text.slice(a, b), mark: true })
+    at = b
+  }
+  if (at < text.length) segments.push({ text: text.slice(at), mark: false })
+  const firstMark = segments.findIndex(seg => seg.mark)
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (!seg.mark) return <span key={i}>{seg.text}</span>
+        return (
+          <mark key={i} ref={i === firstMark ? markRef : undefined} style={{ backgroundColor: '#fef08a', color: '#111827', padding: '0 1px', borderRadius: 2 }}>
+            {seg.text}
+          </mark>
+        )
+      })}
+    </>
+  )
+}
+
+/** The scrolling box a passage or excerpt is shown in. */
+export const PASSAGE_BOX_STYLE: CSSProperties = {
+  position: 'relative',
+  fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+  maxHeight: 260, overflowY: 'auto', backgroundColor: '#f9fafb',
+  border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px',
+}
+
+/** The small uppercase line above a passage that says what is highlighted. */
+export const CAPTION_STYLE: CSSProperties = {
+  fontSize: 10.5, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 4,
+}
+
+/** The passage a citation rests on, floated beside the chip that was clicked. */
+function CitationPopover({ citation, anchor, onClose }: {
+  citation: WorkflowCitation
+  anchor: CitationAnchor
+  onClose: () => void
+}) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const markRef = useRef<HTMLElement>(null)
+
+  // Bring the highlighted text into view inside the passage box — scrolling
+  // the box, never the page (a page scroll closes the popover).
+  useEffect(() => {
+    const box = boxRef.current, mark = markRef.current
+    if (box && mark) box.scrollTop = Math.max(0, mark.offsetTop - 24)
+  }, [anchor.index, anchor.section])
+
   const locator = citationLocator(citation)
   const relevance = typeof citation.similarity === 'number' ? `${Math.round(citation.similarity * 100)}% match` : null
   const passage = (citation.content || citation.content_preview || '').trim()
@@ -400,65 +479,45 @@ function CitationPopover({ citation, anchor, onClose }: {
     : ranges.length > 0
       ? 'Highlighted: the text the statement rests on, checked against this passage'
       : 'Passage the claim rests on'
-  const segments: Array<{ text: string; mark: boolean }> = []
-  let at = 0
-  for (const [a, b] of ranges) {
-    if (a > at) segments.push({ text: passage.slice(at, a), mark: false })
-    segments.push({ text: passage.slice(a, b), mark: true })
-    at = b
-  }
-  if (at < passage.length) segments.push({ text: passage.slice(at), mark: false })
-  const firstMark = segments.findIndex(seg => seg.mark)
 
-  return createPortal(
-    <div ref={ref} role="dialog" aria-label={`Passage: ${citationLabel(citation)}`} tabIndex={-1} style={style}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {citation.kb_title && (
-            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#0369a1' }}>
-              {citation.kb_title}
+  return (
+    <FloatingCard anchor={anchor} label={`Passage: ${citationLabel(citation)}`} onClose={onClose}>
+      {dismiss => (<>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {citation.kb_title && (
+              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#0369a1' }}>
+                {citation.kb_title}
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
+              {citation.document_title}{locator ? ` · ${locator}` : ''}
             </div>
-          )}
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
-            {citation.document_title}{locator ? ` · ${locator}` : ''}
+            {(relevance || citation.page_approximate) && (
+              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                {[relevance, citation.page_approximate ? 'page estimated from a scan' : null].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
-          {(relevance || citation.page_approximate) && (
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-              {[relevance, citation.page_approximate ? 'page estimated from a scan' : null].filter(Boolean).join(' · ')}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Close passage"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex', flexShrink: 0 }}
+          >
+            <X style={{ width: 14, height: 14 }} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Close passage"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex', flexShrink: 0 }}
-        >
-          <X style={{ width: 14, height: 14 }} />
-        </button>
-      </div>
-      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 4 }}>
-        {caption}
-      </div>
-      <div ref={boxRef} style={{
-        position: 'relative',
-        fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        maxHeight: 260, overflowY: 'auto', backgroundColor: '#f9fafb',
-        border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px',
-      }}>
-        {passage
-          ? segments.map((seg, i) => {
-              if (!seg.mark) return <span key={i}>{seg.text}</span>
-              return (
-                <mark key={i} ref={i === firstMark ? markRef : undefined} style={{ backgroundColor: '#fef08a', color: '#111827', padding: '0 1px', borderRadius: 2 }}>
-                  {seg.text}
-                </mark>
-              )
-            })
-          : 'The passage text was not stored with this run.'}
-      </div>
-    </div>,
-    document.body,
+        <div style={CAPTION_STYLE}>
+          {caption}
+        </div>
+        <div ref={boxRef} style={PASSAGE_BOX_STYLE}>
+          {passage
+            ? <MarkedText text={passage} ranges={ranges} markRef={markRef} />
+            : 'The passage text was not stored with this run.'}
+        </div>
+      </>)}
+    </FloatingCard>
   )
 }
 
@@ -467,12 +526,8 @@ export function useCitationPopover(sources: WorkflowCitation[]) {
   const [anchor, setAnchor] = useState<CitationAnchor | null>(null)
   const close = useCallback(() => setAnchor(null), [])
   const openAt = useCallback((index: number, el: Element) => {
-    const r = el.getBoundingClientRect()
     setAnchor(prev => (
-      prev && prev.el === el ? null : {
-        index, el, section: el.getAttribute('data-section'),
-        rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right },
-      }
+      prev && prev.el === el ? null : { ...floatAnchorOf(el), index, section: el.getAttribute('data-section') }
     ))
   }, [])
   const citation = anchor ? sources[anchor.index] : undefined

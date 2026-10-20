@@ -1704,8 +1704,17 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     for i in range(1, len(nodes)):
         engine.connect(nodes[i - 1], nodes[i])
 
+    # Each step's full output, as a run writes it to steps_output: the step
+    # summaries execute() returns leave out where values came from.
+    step_outputs: list[dict] = []
+
+    def capture_step_output(update: dict) -> None:
+        step_outputs.extend(
+            v for k, v in update.items() if k.startswith("steps_output.") and isinstance(v, dict)
+        )
+
     try:
-        final_output, steps = engine.execute()
+        final_output, steps = engine.execute(workflow_result_updater=capture_step_output)
     except WorkflowStepError as e:
         # Deterministic config/user error (blocked URL, HTTP failure, bad
         # headers…). Return a structured failure instead of raising: the task
@@ -1733,8 +1742,20 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     from app.services.kb_grounding import merge_sources
 
     sources = merge_sources(*[s.get("retrieved_sources") for s in steps if isinstance(s, dict)])
-    if warnings or sources:
-        payload: dict = {"output": final_output}
+    # Where each value came from in the documents — a Form Filler's per-field
+    # table and an Extraction's traced passages — so the test shows the same
+    # document chips the run view does. The tested task is the last step.
+    tested = step_outputs[-1] if step_outputs else {}
+    traced = {
+        key: tested[key] for key in ("fill_report", "field_sources")
+        if isinstance(tested.get(key), list) and tested[key]
+    }
+    if "field_sources" in traced:
+        # The values the sources are index-aligned with: the test's output
+        # is the formatted display text ("### Result 1 …").
+        traced["field_values"] = tested.get("output")
+    if warnings or sources or traced:
+        payload: dict = {"output": final_output, **traced}
         if warnings:
             payload["step_test_warning"] = " | ".join(warnings)
         if sources:

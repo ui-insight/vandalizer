@@ -303,12 +303,19 @@ export function getTestStepStatus(taskId: string) {
   // Filler could not fill) — show it, the output needs checking.
   // `retrieved_sources`: passages a Knowledge Base Query or a grounded task
   // pulled during the test, for the citation chips under the output.
+  // `fill_report` / `field_sources`: where a Form Filler's or an Extraction's
+  // values came from in the documents, for the document chips;
+  // `field_values` is the raw output the sources are aligned with (`result`
+  // is its display text).
   return apiFetch<{
     status: string
     result?: unknown
     error?: string
     warning?: string
     retrieved_sources?: WorkflowCitation[]
+    fill_report?: unknown[]
+    field_sources?: unknown[]
+    field_values?: unknown
   }>(`/api/workflows/steps/test/${taskId}`)
 }
 

@@ -1149,14 +1149,14 @@ def get_test_status(task_id: str) -> dict:
                 "error": payload.get("error") or "Test failed",
                 "output": payload.get("output"),
             }
-        if isinstance(payload, dict) and (
-            "step_test_warning" in payload or "retrieved_sources" in payload
-        ):
+        wrapped = ("step_test_warning", "retrieved_sources", "fill_report", "field_sources", "field_values")
+        if isinstance(payload, dict) and "output" in payload and any(k in payload for k in wrapped):
             out = {"status": "completed", "result": payload.get("output")}
             if payload.get("step_test_warning"):
                 out["warning"] = payload["step_test_warning"]
-            if payload.get("retrieved_sources"):
-                out["retrieved_sources"] = payload["retrieved_sources"]
+            for key in wrapped[1:]:
+                if payload.get(key):
+                    out[key] = payload[key]
             return out
         return {"status": "completed", "result": payload}
     payload = result.result

@@ -614,7 +614,25 @@ class TestExecuteTaskStepTest:
     def test_step_without_warning_returns_bare_output(self, mock_get_db):
         from app.tasks.workflow_tasks import execute_task_step_test
 
-        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "Rate 47%"}])
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "test doc text"}])
+        mock_get_db.return_value = db
+
+        with patch("app.services.workflow_engine.llm_chat_model") as mock_llm:
+            mock_llm.return_value = "LLM response"
+            result = execute_task_step_test(
+                task_name="Prompt",
+                task_data={"prompt": "Summarize", "model": "gpt-4o"},
+                doc_uuids=["uuid1"],
+            )
+        assert result == "LLM response"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    def test_form_filler_test_carries_where_each_value_came_from(self, mock_get_db):
+        """Test Step shows the same document chips as the run view, so the
+        fill report rides beside the output."""
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "title": "Rate agreement.pdf", "raw_text": "Rate 47%"}])
         mock_get_db.return_value = db
 
         with patch("app.services.workflow_engine._run_form_filler_model") as mock_model:
@@ -624,7 +642,33 @@ class TestExecuteTaskStepTest:
                 task_data={"template": "Rate: {{rate}}", "model": "gpt-4o"},
                 doc_uuids=["uuid1"],
             )
-        assert result == "Rate: 47%"
+        assert result["output"] == "Rate: 47%"
+        assert "step_test_warning" not in result
+        [entry] = result["fill_report"]
+        assert (entry["name"], entry["status"], entry["document_uuid"]) == ("rate", "supported", "uuid1")
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    def test_extraction_test_carries_sources_with_the_values_they_belong_to(self, mock_get_db):
+        """The test's output is display text; the traced sources come with the
+        raw values they are index-aligned with."""
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "Amount: $1,240.00"}])
+        mock_get_db.return_value = db
+        source = {"quote": "Amount: $1,240.00", "document_uuid": "uuid1", "support": "supported"}
+
+        with patch("app.services.workflow_engine.data_extraction_model") as mock_extract:
+            mock_extract.return_value = {
+                "raw": [{"amount": "$1,240.00", "_field_sources": {"amount": source}}],
+                "formatted": "amount: $1,240.00",
+            }
+            result = execute_task_step_test(
+                task_name="Extraction",
+                task_data={"searchphrases": "amount", "model": "gpt-4o"},
+                doc_uuids=["uuid1"],
+            )
+        assert result["field_sources"] == [{"amount": source}]
+        assert result["field_values"] == {"amount": "$1,240.00"}
 
     @patch("app.tasks.workflow_tasks._get_db")
     def test_api_step_tests_with_no_documents(self, mock_get_db):

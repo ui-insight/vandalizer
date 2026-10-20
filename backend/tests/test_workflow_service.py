@@ -1102,6 +1102,42 @@ class TestGetTestStatus:
         assert status["result"] == "Rate: 47%\nCap: [Not provided: cap]"
         assert status["warning"].startswith("1 field not found")
 
+    @patch("app.services.workflow_service.AsyncResult")
+    def test_completed_hands_through_where_values_came_from(self, mock_async_result_cls):
+        from app.services.workflow_service import get_test_status
+
+        report = [{"name": "rate", "status": "supported", "document_uuid": "d1", "page": 2, "quote": "Rate 47%"}]
+        sources = [{"amount": {"quote": "Amount: $1,240.00", "document_uuid": "d2", "support": "supported"}}]
+        mock_result = MagicMock()
+        mock_result.ready.return_value = True
+        mock_result.successful.return_value = True
+        mock_result.result = {
+            "output": "Rate: 47%", "fill_report": report,
+            "field_sources": sources, "field_values": {"amount": "$1,240.00"},
+        }
+        mock_async_result_cls.return_value = mock_result
+
+        status = get_test_status("task-123")
+        assert status == {
+            "status": "completed", "result": "Rate: 47%", "fill_report": report,
+            "field_sources": sources, "field_values": {"amount": "$1,240.00"},
+        }
+
+    @patch("app.services.workflow_service.AsyncResult")
+    def test_an_output_that_is_itself_a_dict_is_not_unwrapped(self, mock_async_result_cls):
+        """Only the test task's wrapper carries "output" beside these keys; an
+        extracted entity with a field_sources-like key stays the result."""
+        from app.services.workflow_service import get_test_status
+
+        mock_result = MagicMock()
+        mock_result.ready.return_value = True
+        mock_result.successful.return_value = True
+        mock_result.result = {"fill_report": "yes", "award": "L24AC00293-00"}
+        mock_async_result_cls.return_value = mock_result
+
+        status = get_test_status("task-123")
+        assert status == {"status": "completed", "result": {"fill_report": "yes", "award": "L24AC00293-00"}}
+
 
 # ---------------------------------------------------------------------------
 # save_expected_output

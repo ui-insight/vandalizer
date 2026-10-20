@@ -57,6 +57,8 @@ import { CollapsibleSection } from '../shared/CollapsibleSection'
 import { FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
 import { StepInputSources } from './StepInputSources'
 import { CitedMarkdown, citationLocator, useCitationPopover } from './CitedMarkdown'
+import { DocumentCitationChip, citationFromFieldSource, citationFromFillReport } from './DocumentCitation'
+import { fieldSupportState, type ExtractionFieldSource } from '../../api/extractions'
 import {
   DEFAULT_STEP_INPUT, deriveStepInput, INPUT_SOURCE_LABELS, inputValuePatch,
   readInputValue, taskOverridesStepInput, TASK_INPUT_OVERRIDE_KEY,
@@ -1953,6 +1955,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
   // see the System Config remedy for an output-cap cut-off.
   const warning = entry && typeof entry.warning === 'string' ? withAdminRemedy(entry.warning as string, isAdmin) : null
   const fillReport = entry && Array.isArray(entry.fill_report) ? (entry.fill_report as FillReportField[]) : null
+  const traced = entry ? tracedValueRows(entry.output, entry.field_sources) : []
   const hasValue = value !== undefined && value !== null && value !== ''
   const taskCount = step.tasks.length
 
@@ -2020,6 +2023,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
             </div>
           )}
           {fillReport && fillReport.length > 0 && <FillReportTable fields={fillReport} />}
+          <TracedValuesTable rows={traced} />
         </div>
       )}
     </div>
@@ -3192,6 +3196,9 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
               const style = FILL_STATUS_STYLE[f.status] ?? FILL_STATUS_STYLE.missing
               const locator = formatPageLocator(f.page, f.page_approximate)
               const source = f.document_title ? (locator ? `${f.document_title} · ${locator}` : f.document_title) : ''
+              // A value found in a document opens there; one found only in
+              // the previous step's output has no document to open.
+              const cite = citationFromFillReport(f)
               const check = f.status === 'not_written' && f.reason ? `${style.label} — ${f.reason}` : style.label
               return (
                 <tr key={f.name} style={{ borderTop: '1px solid #f3f4f6', verticalAlign: 'top' }}>
@@ -3203,8 +3210,8 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
                     {f.status === 'missing' ? <span style={{ color: '#9ca3af' }}>—</span> : fillValueText(f.value)}
                   </td>
                   {hasSource && (
-                    <td style={{ padding: '6px 10px', color: '#374151', whiteSpace: 'nowrap' }} title={f.quote || undefined}>
-                      {source || <span style={{ color: '#9ca3af' }}>—</span>}
+                    <td style={{ padding: '6px 10px', color: '#374151', whiteSpace: 'nowrap' }} title={cite ? undefined : f.quote || undefined}>
+                      {cite ? <DocumentCitationChip citation={cite} /> : source || <span style={{ color: '#9ca3af' }}>—</span>}
                     </td>
                   )}
                   <td style={{ padding: '6px 10px' }}>
@@ -3214,6 +3221,100 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
                     }}>
                       {check}
                     </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Extraction: where each value came from
+// ---------------------------------------------------------------------------
+
+/** One extracted value with the source the engine traced for it. */
+export interface TracedValueRow {
+  /** 1-based position of the record (entity) the value belongs to. */
+  record: number
+  field: string
+  value: unknown
+  source: ExtractionFieldSource
+}
+
+/**
+ * The traced values of a step, from its output and the `field_sources`
+ * sidecar beside it (backend ExtractionNode / MultiTaskNode): index i holds
+ * the sources for output i, and a step with one output stores it unwrapped.
+ */
+export function tracedValueRows(output: unknown, fieldSources: unknown): TracedValueRow[] {
+  if (!Array.isArray(fieldSources)) return []
+  const outputs = Array.isArray(output) ? output : [output]
+  const rows: TracedValueRow[] = []
+  fieldSources.forEach((sources, i) => {
+    if (!sources || typeof sources !== 'object' || Array.isArray(sources)) return
+    const entity = outputs[i]
+    const record = entity && typeof entity === 'object' && !Array.isArray(entity) ? entity as Record<string, unknown> : null
+    for (const [field, source] of Object.entries(sources as Record<string, unknown>)) {
+      if (!source || typeof source !== 'object') continue
+      rows.push({ record: i + 1, field, value: record?.[field], source: source as ExtractionFieldSource })
+    }
+  })
+  return rows
+}
+
+export function tracedValuesSummary(rows: TracedValueRow[]): string {
+  const traced = rows.filter(r => citationFromFieldSource(r.source, r.value) !== null).length
+  return `${traced} of ${rows.length} value${rows.length !== 1 ? 's' : ''} traced to a passage in a document`
+}
+
+/** What a value without a chip shows instead — the extraction panel's states,
+ *  with an unmatched value presented as unconfirmed, as it is there. */
+function UntracedSource({ source }: { source: ExtractionFieldSource }) {
+  const state = fieldSupportState(source) === 'unverified'
+    ? { label: 'No source found', title: "This value couldn't be traced back to the document — double-check it before relying on it", color: '#92400e' }
+    : { label: 'Not confirmed', title: 'A passage was located, but this value could not be automatically confirmed against it', color: '#6b7280' }
+  return <span title={state.title} style={{ fontSize: 11, color: state.color }}>{state.label}</span>
+}
+
+/**
+ * Per-field table for an Extraction step: each value and where in the
+ * documents it came from. A value whose quoted passage was found in a
+ * document and contains it gets a chip that opens the document there.
+ */
+function TracedValuesTable({ rows }: { rows: TracedValueRow[] }) {
+  if (!rows.length) return null
+  const manyRecords = rows.some(r => r.record > 1)
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{tracedValuesSummary(rows)}</div>
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#fff' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+              {manyRecords && <th style={{ padding: '6px 10px', fontWeight: 600 }}>#</th>}
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Field</th>
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Value</th>
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const cite = citationFromFieldSource(r.source, r.value)
+              return (
+                <tr key={`${r.record}:${r.field}`} style={{ borderTop: '1px solid #f3f4f6', verticalAlign: 'top' }}>
+                  {manyRecords && <td style={{ padding: '6px 10px', color: '#6b7280' }}>{r.record}</td>}
+                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' }}>
+                    {r.field}
+                  </td>
+                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', maxWidth: 320 }}>
+                    {fillValueText(r.value) || <span style={{ color: '#9ca3af' }}>—</span>}
+                  </td>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                    {cite ? <DocumentCitationChip citation={cite} /> : <UntracedSource source={r.source} />}
                   </td>
                 </tr>
               )
@@ -3547,6 +3648,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // Passages a Knowledge Base Query or a grounded task retrieved during the
   // test, shown as citation chips under the output.
   const [testSources, setTestSources] = useState<WorkflowCitation[]>([])
+  // Where each value came from in the documents: a Form Filler's fill report
+  // and an Extraction's traced values, shown as in the run view.
+  const [testFillReport, setTestFillReport] = useState<FillReportField[]>([])
+  const [testTraced, setTestTraced] = useState<TracedValueRow[]>([])
   // Set by handleUpdate when a required field is blank; cleared on the next save attempt.
   const [saveError, setSaveError] = useState<string | null>(null)
   const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -3712,6 +3817,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     // Captured now, so the label stays right if the selection changes after.
     setTestedDocTitle(testUsesDocument && testInput.docUuids[0] ? testDocTitle(testInput.docUuids[0]) : null)
     setTestSources([])
+    setTestFillReport([])
+    setTestTraced([])
     setTestMessage(TEST_MESSAGES[0])
 
     // Cycle messages
@@ -3749,6 +3856,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               setTestResult(res.result)
               setTestWarning(res.warning || null)
               setTestSources(Array.isArray(res.retrieved_sources) ? res.retrieved_sources : [])
+              setTestFillReport(Array.isArray(res.fill_report) ? res.fill_report as FillReportField[] : [])
+              setTestTraced(tracedValueRows(res.field_values ?? res.result, res.field_sources))
             } else {
               setTestError(res.error || 'Test failed. Please check your configuration.')
             }
@@ -5686,6 +5795,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </div>
                   )
                 })()}
+                {testFillReport.length > 0 && <FillReportTable fields={testFillReport} />}
+                <TracedValuesTable rows={testTraced} />
                 {testSources.length > 0 && <WorkflowSourcesPanel sources={testSources} />}
               </div>
             )}
@@ -6069,6 +6180,31 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     </div>
   ) : null
 
+  // An Extraction step attaches steps_output[step].field_sources: the passage
+  // each value was traced to, which opens the document there.
+  const tracedValues = Object.entries((status?.steps_output ?? {}) as Record<string, unknown>)
+    .map(([step, val]) => {
+      const entry = val && typeof val === 'object' ? val as Record<string, unknown> : null
+      const rows = entry ? tracedValueRows(entry.output, entry.field_sources) : []
+      return rows.length > 0 ? { step, rows } : null
+    })
+    .filter((x): x is { step: string; rows: TracedValueRow[] } => x !== null)
+
+  const tracedValuesPanel = tracedValues.length > 0 ? (
+    <div style={{ marginTop: 12 }}>
+      {tracedValues.map(({ step, rows }) => (
+        <details key={step} open style={{
+          border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', marginBottom: 8, backgroundColor: '#fff',
+        }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+            Extracted values — {step}
+          </summary>
+          <TracedValuesTable rows={rows} />
+        </details>
+      ))}
+    </div>
+  ) : null
+
   const apiRequestPanel = apiRequests.length > 0 ? (
     <div style={{ marginTop: 12 }}>
       {apiRequests.map(({ step, req }) => (
@@ -6298,6 +6434,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           )}
           {stepWarningsPanel}
           {fillReportPanel}
+          {tracedValuesPanel}
           {apiRequestPanel}
           <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
           {fileSummary ? (
