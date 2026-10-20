@@ -151,6 +151,17 @@ def test_the_completed_result_is_written_identically_with_sourcing_on_and_off(mo
     assert not any("sourcing" in w[1].get("$set", {}) for w in writes_off)
 
 
+def test_sourcing_is_queued_for_a_run_whose_record_holds_a_null_sourcing(monkeypatch):
+    """The API creates a run through Beanie, which writes `sourcing: null`.
+    The queue's once-only guard must match that, not just a missing field
+    (a `$exists: False` guard queued nothing on the first real run)."""
+    _, writes, delay = _execute(monkeypatch, sourcing=True)
+    [queued] = [w for w in writes if "sourcing" in w[1].get("$set", {})]
+    assert queued[0]["sourcing"] is None
+    assert queued[0]["status"] == "completed"
+    delay.assert_called_once()
+
+
 def test_a_sourcing_queue_failure_leaves_the_run_completed(monkeypatch):
     out, writes, _ = _execute(monkeypatch, sourcing=True, delay_error=ConnectionError("broker down"))
     assert out["status"] == "completed"

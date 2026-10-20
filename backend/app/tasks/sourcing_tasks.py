@@ -67,8 +67,10 @@ def queue_run_sourcing(db, workflow_result_id, doc_uuids: list[str] | None) -> N
 
     oid = ObjectId(str(workflow_result_id))
     try:
+        # `None` matches a missing field and the null Beanie writes when it
+        # creates the run; `$exists: False` would miss every API-created run.
         marked = db.workflow_result.update_one(
-            {"_id": oid, "status": "completed", "sourcing": {"$exists": False}},
+            {"_id": oid, "status": "completed", "sourcing": None},
             {"$set": {"sourcing": {"version": 1, "status": "pending", "queued_at": _now()}}},
         )
         if not getattr(marked, "modified_count", 0):
