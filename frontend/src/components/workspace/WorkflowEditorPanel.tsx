@@ -3211,7 +3211,7 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
                   </td>
                   {hasSource && (
                     <td style={{ padding: '6px 10px', color: '#374151', whiteSpace: 'nowrap' }} title={cite ? undefined : f.quote || undefined}>
-                      {cite ? <DocumentCitationChip citation={cite} /> : source || <span style={{ color: '#9ca3af' }}>—</span>}
+                      {cite ? <DocumentCitationChip citation={cite} maxWidth={170} /> : source || <span style={{ color: '#9ca3af' }}>—</span>}
                     </td>
                   )}
                   <td style={{ padding: '6px 10px' }}>
@@ -3310,14 +3310,14 @@ function TracedValuesTable({ rows }: { rows: TracedValueRow[] }) {
                   {/* A saved set's field can be a whole sentence ("Funding
                       Opportunity Number / ID (e.g., …)"): it wraps, so the
                       values keep room to read. */}
-                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-word', minWidth: 120, maxWidth: 220 }}>
+                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-word', minWidth: 100, maxWidth: 220 }}>
                     {r.field}
                   </td>
-                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', minWidth: 120, maxWidth: 320 }}>
+                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', minWidth: 100, maxWidth: 320 }}>
                     {fillValueText(r.value) || <span style={{ color: '#9ca3af' }}>—</span>}
                   </td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
-                    {cite ? <DocumentCitationChip citation={cite} /> : <UntracedSource source={r.source} />}
+                    {cite ? <DocumentCitationChip citation={cite} maxWidth={170} /> : <UntracedSource source={r.source} />}
                   </td>
                 </tr>
               )

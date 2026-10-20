@@ -114,8 +114,11 @@ export function valueRangeIn(excerpt: string, value: string): [number, number] |
   return best
 }
 
+// What was checked, and no more: a short quote ("Bureau of Land Management")
+// can be in the document several times, and the place shown is the first
+// one found — not necessarily the one the model read.
 const CHECK_CAPTION: Record<DocumentCitation['check'], string> = {
-  passage: 'Passage the value was extracted from — found in the document, and it contains the value',
+  passage: 'The passage quoted for this value — found here in the document, and it contains the value',
   search: 'Where this value appears in the document — the first place a search found it',
 }
 
@@ -192,8 +195,10 @@ const CHIP_STYLE: CSSProperties = {
 }
 
 /** A document chip and its popover. Outside the workspace (a test, a shared
- *  page) the popover still shows the excerpt, without the open button. */
-export function DocumentCitationChip({ citation }: { citation: DocumentCitation }) {
+ *  page) the popover still shows the excerpt, without the open button.
+ *  `maxWidth` caps the chip (a table column wants it narrower); the file name
+ *  gives way first. */
+export function DocumentCitationChip({ citation, maxWidth = 220 }: { citation: DocumentCitation; maxWidth?: number }) {
   const ws = useOptionalWorkspace()
   const [anchor, setAnchor] = useState<FloatAnchor | null>(null)
   const close = useCallback(() => setAnchor(null), [])
@@ -226,7 +231,7 @@ export function DocumentCitationChip({ citation }: { citation: DocumentCitation 
           const el = e.currentTarget
           setAnchor(prev => (prev && prev.el === el ? null : floatAnchorOf(el)))
         }}
-        style={CHIP_STYLE}
+        style={{ ...CHIP_STYLE, maxWidth }}
       >
         <FileText aria-hidden="true" style={{ width: 11, height: 11, flexShrink: 0 }} />
         {/* A long file name gives way; the page is the part that matters. */}

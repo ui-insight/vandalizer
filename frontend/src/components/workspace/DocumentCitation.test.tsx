@@ -76,7 +76,7 @@ describe('DocumentCitationChip', () => {
     render(<DocumentCitationChip citation={cite} />)
     fireEvent.click(screen.getByRole('button', { name: 'Document source: Expense_Record.txt · p. 1' }))
     const dialog = screen.getByRole('dialog')
-    expect(dialog.textContent).toContain('Passage the value was extracted from')
+    expect(dialog.textContent).toContain('The passage quoted for this value — found here in the document')
     expect(dialog.querySelector('mark')?.textContent).toBe('$1,240.00')
     expect(screen.queryByRole('button', { name: /Open/ })).toBeNull()
   })
