@@ -200,6 +200,22 @@ def test_a_record_name_labels_its_fields():
     assert [s.label for s in stmts] == ["source document", "Expense Record — currency"]
 
 
+def test_json_text_rows_also_say_where_each_statement_sits_in_its_leaf():
+    """Test Step shows a JSON reply pretty-printed, so a row of a text
+    target that is JSON carries its path and leaf offsets too."""
+    text = '{"note": "The award is \\"final\\". It runs to 2029.", "n": 2}'
+    judge = Judge()
+    result = _trace({"final": text}, judge, docs=[])
+    rows = result["targets"]["final"]["statements"]
+    leaf = json.loads(text)["note"]
+    got = [(r["p"], text[r["s"]:r["e"]], leaf[r["ls"]:r["le"]] if "ls" in r else None) for r in rows]
+    assert got == [
+        (["note"], 'The award is \\"final\\".', 'The award is "final".'),
+        (["note"], "It runs to 2029.", "It runs to 2029."),
+        (["n"], "2", None),
+    ]
+
+
 def test_files_are_not_split():
     assert split_output({"type": "file_download", "filename": "x.pdf"}) == ("none", [])
 

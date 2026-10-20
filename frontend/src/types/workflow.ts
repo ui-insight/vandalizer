@@ -178,6 +178,64 @@ export interface WorkflowStatus {
   error?: string | null;
   error_payload?: WorkflowErrorPayload | null;
   retrieved_sources?: WorkflowCitation[];
+  /** Where each statement in the outputs came from, traced after the run
+   *  completed (backend output_sourcing.py). Absent on older runs. */
+  sourcing?: WorkflowSourcing | null;
+}
+
+/** The place one statement was traced to: an input document, or a
+ *  knowledge-base passage the run retrieved. `excerpt` is the source's text
+ *  around the statement, with the supporting `quote` at
+ *  `excerpt.slice(quote_start, quote_end)`. The page is the engine's, from
+ *  the document's page markers; `page_approximate` marks a scan. */
+export interface SourcingLink {
+  kind: 'document' | 'kb';
+  quote: string;
+  excerpt: string;
+  quote_start: number;
+  quote_end: number;
+  page?: number | null;
+  page_end?: number | null;
+  page_approximate?: boolean;
+  document_uuid?: string | null;
+  document_title?: string | null;
+  kb_title?: string | null;
+  kb_uuid?: string | null;
+  label?: string | null;
+  chunk_id?: string | null;
+}
+
+/** One statement of an output. `s`/`e` are code-point offsets into a text
+ *  output, or into the string leaf at path `p` of a structured one (absent
+ *  for a whole number or boolean leaf). A text output that is JSON also
+ *  gives `p` and the offsets inside that leaf, `ls`/`le`. `src` indexes
+ *  `WorkflowSourcing.sources`; `t` marks a statement no source can show — a
+ *  claim that something is absent, or a judgment. */
+export interface SourcedStatement {
+  s?: number;
+  e?: number;
+  p?: Array<string | number>;
+  ls?: number;
+  le?: number;
+  src?: number;
+  t?: 'absent' | 'verdict';
+}
+
+export interface SourcingTarget {
+  format: 'text' | 'json' | 'none';
+  statements: SourcedStatement[];
+  summary: { statements: number; traced: number };
+}
+
+/** Targets: `final` (the deliverable), `step:<steps_output key>`, or `test`. */
+export interface WorkflowSourcing {
+  status: 'pending' | 'running' | 'done' | 'failed';
+  version?: number;
+  sources?: SourcingLink[];
+  targets?: Record<string, SourcingTarget>;
+  error?: string;
+  unchecked?: number;
+  errors?: number;
 }
 
 export interface ModelInfo {

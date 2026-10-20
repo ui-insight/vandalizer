@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { X } from 'lucide-react'
 import { formatPageLocator } from '../../utils/pageLocator'
-import type { WorkflowCitation } from '../../types/workflow'
+import type { SourcedStatement, SourcingLink, WorkflowCitation } from '../../types/workflow'
+import { applySourcingSpans, stripMarks, withSentinels } from './sourcingSpans'
 
 /**
  * Markdown output with knowledge-base citations rendered inline.
@@ -294,26 +295,46 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
   return root.innerHTML
 }
 
-/** Markdown → sanitized HTML with citation chips. */
-export function renderCitedMarkdown(markdown: string, sources: WorkflowCitation[]): string {
-  return withChips(DOMPurify.sanitize(marked.parse(markdown) as string), sources)
+/** The statements of an output and where each was traced (see
+ *  sourcingSpans.ts): underlined when traced, tinted on request when not. */
+export interface CitedSourcing {
+  rows: SourcedStatement[]
+  sources: SourcingLink[]
+  showUntraced: boolean
+  /** A traced statement was clicked: `src` indexes `sources`. */
+  onOpen: (src: number, el: HTMLElement) => void
+}
+
+/** Markdown → sanitized HTML with citation chips, and the statements
+ *  underlined when `sourcing` is given. */
+export function renderCitedMarkdown(
+  markdown: string, sources: WorkflowCitation[], sourcing?: Pick<CitedSourcing, 'rows' | 'sources' | 'showUntraced'>,
+): string {
+  const md = sourcing ? withSentinels(markdown, sourcing.rows) : markdown
+  return withChips(DOMPurify.sanitize(marked.parse(md) as string), sources, sourcing)
 }
 
 /** Plain text (e.g. a JSON fragment) → escaped HTML with citation chips; the
  *  caller keeps its line breaks with `white-space: pre-wrap`. */
-export function renderCitedText(text: string, sources: WorkflowCitation[]): string {
+export function renderCitedText(
+  text: string, sources: WorkflowCitation[], sourcing?: Pick<CitedSourcing, 'rows' | 'sources' | 'showUntraced'>,
+): string {
   const holder = document.createElement('div')
-  holder.textContent = text
-  return withChips(holder.innerHTML, sources)
+  holder.textContent = sourcing ? withSentinels(text, sourcing.rows) : text
+  return withChips(holder.innerHTML, sources, sourcing)
 }
 
-function withChips(html: string, sources: WorkflowCitation[]): string {
+function withChips(
+  html: string, sources: WorkflowCitation[], sourcing?: Pick<CitedSourcing, 'rows' | 'sources' | 'showUntraced'>,
+): string {
   try {
+    const spanned = sourcing ? applySourcingSpans(html, sourcing.rows, sourcing.sources, sourcing.showUntraced) : html
     // Sanitized again after the parse/serialize round trip, so the HTML React
     // receives is exactly what DOMPurify last approved.
-    return DOMPurify.sanitize(injectCitationChips(html, sources))
+    return DOMPurify.sanitize(injectCitationChips(spanned, sources))
   } catch {
-    return html
+    // Never show a mark: without its spans the text is what was written.
+    return sourcing ? stripMarks(html) : html
   }
 }
 
@@ -539,6 +560,22 @@ export function useCitationPopover(sources: WorkflowCitation[]) {
 
 // --- Component --------------------------------------------------------------
 
+/** A traced statement's underline (amber for a document, blue for a
+ *  knowledge-base passage) and an untraced one's tint, shown only while the
+ *  reviewer toggle is on. Thin and half-transparent: the output stays the
+ *  thing being read. */
+export const SOURCING_CSS = `
+.src-u {
+  text-decoration-line: underline; text-decoration-style: solid; text-decoration-thickness: 1px;
+  text-decoration-color: rgba(217, 119, 6, 0.55); text-underline-offset: 3px;
+  cursor: pointer; border-radius: 2px;
+}
+.src-u.src-kb { text-decoration-color: rgba(2, 132, 199, 0.55); }
+.src-u:hover, .src-u:focus-visible { background-color: rgba(253, 230, 138, 0.5); text-decoration-color: #b45309; outline: none; }
+.src-u.src-kb:hover, .src-u.src-kb:focus-visible { background-color: rgba(186, 230, 253, 0.55); text-decoration-color: #0369a1; }
+.show-untraced .src-x { background-color: rgba(251, 113, 133, 0.16); border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+`
+
 const CITATION_CHIP_CSS = `
 .kb-cite {
   display: inline-flex; align-items: center; gap: 4px; vertical-align: baseline;
@@ -554,6 +591,7 @@ const CITATION_CHIP_CSS = `
   min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px;
   background: #0369a1; color: #fff; font-size: 9.5px; font-weight: 700; line-height: 14px;
 }
+${SOURCING_CSS}
 `
 
 /**
@@ -561,7 +599,7 @@ const CITATION_CHIP_CSS = `
  * popover for whichever chip is open. Click handling is delegated from the
  * container, since the chips live in injected HTML.
  */
-export function CitedMarkdown({ markdown, sources, format = 'markdown', className, style }: {
+export function CitedMarkdown({ markdown, sources, format = 'markdown', className, style, sourcing }: {
   markdown: string
   sources: WorkflowCitation[]
   /** `text` keeps the string as written (a JSON fragment, say) instead of
@@ -569,17 +607,38 @@ export function CitedMarkdown({ markdown, sources, format = 'markdown', classNam
   format?: 'markdown' | 'text'
   className?: string
   style?: CSSProperties
+  /** Where each statement came from: spans of `markdown` as written. */
+  sourcing?: CitedSourcing
 }) {
-  const html = useMemo(
-    () => (format === 'text' ? renderCitedText(markdown, sources) : renderCitedMarkdown(markdown, sources)),
-    [markdown, sources, format],
-  )
+  const rows = sourcing?.rows
+  const traced = sourcing?.sources
+  const showUntraced = sourcing?.showUntraced ?? false
+  const html = useMemo(() => {
+    const spans = rows && traced ? { rows, sources: traced, showUntraced } : undefined
+    return format === 'text' ? renderCitedText(markdown, sources, spans) : renderCitedMarkdown(markdown, sources, spans)
+  }, [markdown, sources, format, rows, traced, showUntraced])
   const { openAt, popover } = useCitationPopover(sources)
+
+  // A source is opened by a traced statement's underline; a citation chip
+  // inside one keeps opening its own passage.
+  const openSource = (target: Element | null): boolean => {
+    const el = target?.closest?.('.src-u') as HTMLElement | null
+    const src = el ? parseInt(el.getAttribute('data-src') || '', 10) : NaN
+    if (!el || !sourcing || !Number.isFinite(src) || !sourcing.sources[src]) return false
+    sourcing.onOpen(src, el)
+    return true
+  }
 
   const onClick = (e: ReactMouseEvent<HTMLDivElement>) => {
     const target = e.target as Element | null
     const chip = target?.closest?.('.kb-cite') as HTMLElement | null
-    if (!chip) return
+    if (!chip) {
+      if (openSource(target)) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      return
+    }
     const idx = parseInt(chip.getAttribute('data-cite') || '', 10)
     if (!Number.isFinite(idx) || !sources[idx]) return
     e.preventDefault()
@@ -587,10 +646,16 @@ export function CitedMarkdown({ markdown, sources, format = 'markdown', classNam
     openAt(idx, chip)
   }
 
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    if (openSource(e.target as Element | null)) e.preventDefault()
+  }
+
+  const classes = [className, showUntraced ? 'show-untraced' : null].filter(Boolean).join(' ') || undefined
   return (
     <>
       <style>{CITATION_CHIP_CSS}</style>
-      <div className={className} style={style} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+      <div className={classes} style={style} onClick={onClick} onKeyDown={onKeyDown} dangerouslySetInnerHTML={{ __html: html }} />
       {popover}
     </>
   )

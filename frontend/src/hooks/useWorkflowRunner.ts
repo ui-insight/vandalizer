@@ -17,6 +17,8 @@ export function useWorkflowRunner() {
   const [running, setRunning] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Polls spent waiting for sources after the run itself finished.
+  const tracePollsRef = useRef(0)
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current) {
@@ -34,7 +36,11 @@ export function useWorkflowRunner() {
       const terminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const paused = s.status === 'pending_approval'
       setRunning(!terminal && !paused)
-      if (terminal) stopPolling()
+      // A completed run's sources are traced afterwards: keep polling until
+      // they arrive (bounded by the trace's ten-minute budget), without
+      // showing the run as running.
+      const tracing = s.status === 'completed' && (s.sourcing?.status === 'pending' || s.sourcing?.status === 'running')
+      if (terminal && (!tracing || tracePollsRef.current++ > 300)) stopPolling()
     } catch {
       // Keep polling on transient errors
     }
@@ -79,6 +85,7 @@ export function useWorkflowRunner() {
       intervalRef.current = setInterval(() => pollBatch(result.batch_id!), 2000)
     } else if (result.session_id) {
       setSessionId(result.session_id)
+      tracePollsRef.current = 0
       poll(result.session_id)
       intervalRef.current = setInterval(() => poll(result.session_id!), 2000)
     } else {
@@ -116,8 +123,10 @@ export function useWorkflowRunner() {
       setStatus(s)
       const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const isPaused = s.status === 'pending_approval'
+      const tracing = s.status === 'completed' && (s.sourcing?.status === 'pending' || s.sourcing?.status === 'running')
       setRunning(!isTerminal && !isPaused)
-      if (!isTerminal) {
+      tracePollsRef.current = 0
+      if (!isTerminal || tracing) {
         intervalRef.current = setInterval(() => poll(sid), 2000)
       }
     } catch {

@@ -824,8 +824,10 @@ def trace_sources(
 
     ``s``/``e`` are offsets into a text output (``format: text``) or into
     the leaf string at path ``p`` (``format: json``; absent for a whole
-    number leaf). ``src`` indexes ``sources``; ``t`` marks an ``absent`` or
-    ``verdict`` statement. The outputs themselves are only read.
+    number leaf). A text output that is JSON also gives each statement's
+    path ``p`` and its offsets inside that leaf, ``ls``/``le``. Offsets
+    count code points. ``src`` indexes ``sources``; ``t`` marks an
+    ``absent`` or ``verdict`` statement. The outputs themselves are only read.
     """
     corpus = Corpus(documents, passages)
     split: dict[str, tuple[str, list[Statement]]] = {}
@@ -880,10 +882,14 @@ def trace_sources(
         traced = 0
         for st in stmts:
             row: dict = {}
-            if st.path is not None and fmt == "json":
+            if st.path is not None:
                 row["p"] = st.path
             if st.start is not None:
                 row["s"], row["e"] = st.start, st.end
+            if fmt == "text" and "leaf" in st.extra:
+                # JSON written as text: also where the statement sits inside
+                # its leaf, for a view that pretty-prints the JSON.
+                row["ls"], row["le"] = st.extra["leaf"]
             if st.kind != "claim":
                 row["t"] = st.kind
             else:

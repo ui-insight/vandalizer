@@ -307,6 +307,9 @@ export function getTestStepStatus(taskId: string) {
   // values came from in the documents, for the document chips;
   // `field_values` is the raw output the sources are aligned with (`result`
   // is its display text).
+  // `sourcing_task_id`: the task tracing where each statement in the output
+  // came from; poll it with this same function — its `result` is the
+  // WorkflowSourcing for target "test".
   return apiFetch<{
     status: string
     result?: unknown
@@ -316,6 +319,7 @@ export function getTestStepStatus(taskId: string) {
     fill_report?: unknown[]
     field_sources?: unknown[]
     field_values?: unknown
+    sourcing_task_id?: string
   }>(`/api/workflows/steps/test/${taskId}`)
 }
 

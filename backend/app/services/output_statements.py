@@ -607,6 +607,9 @@ def _positional_statements(node, label: str, path: list) -> list[Statement]:
     elif kind == "str":
         where = node[4]
         for st in _string_statements(node[1], label):
+            # Where it sits in the leaf's own text, for a view that shows the
+            # JSON re-formatted rather than as written.
+            st.extra["leaf"] = (st.start, st.end)
             st.start, st.end = where[st.start], where[st.end - 1] + _raw_width(node, st.end - 1)
             st.path = path
             out.append(st)

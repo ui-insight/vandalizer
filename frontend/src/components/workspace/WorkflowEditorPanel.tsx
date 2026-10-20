@@ -50,7 +50,7 @@ import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { computeReorderedIds } from '../../utils/reorder'
 import { formatPageLocator } from '../../utils/pageLocator'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem, KbGroundingConfig } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem, KbGroundingConfig, WorkflowSourcing } from '../../types/workflow'
 import { describeUnfinishedSteps, findUnfinishedSteps, promptTaskIsEmpty } from './workflowStepIssues'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
@@ -58,6 +58,7 @@ import { FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from 
 import { StepInputSources } from './StepInputSources'
 import { CitedMarkdown, citationLocator, useCitationPopover } from './CitedMarkdown'
 import { DocumentCitationChip, citationFromFieldSource, citationFromFillReport } from './DocumentCitation'
+import { SourcedJson, structuredLeafSpan, textLeafSpan, useSourcing } from './Sourcing'
 import { fieldSupportState, type ExtractionFieldSource } from '../../api/extractions'
 import {
   DEFAULT_STEP_INPUT, deriveStepInput, INPUT_SOURCE_LABELS, inputValuePatch,
@@ -271,6 +272,7 @@ export function WorkflowEditorPanel() {
   // output is viewable even on a fresh editor open (no run started this session).
   const [lastRunStepsOutput, setLastRunStepsOutput] = useState<Record<string, unknown> | null>(null)
   const [lastRunMeta, setLastRunMeta] = useState<{ finishedAt: string | null; status: string } | null>(null)
+  const [lastRunSourcing, setLastRunSourcing] = useState<WorkflowSourcing | null>(null)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descInputRef = useRef<HTMLTextAreaElement>(null)
@@ -303,6 +305,7 @@ export function WorkflowEditorPanel() {
   const effectiveRunMeta = hasLiveStepsOutput
     ? { finishedAt: null, status: runner.status?.status ?? 'running' }
     : lastRunMeta
+  const effectiveSourcing = hasLiveStepsOutput ? (runner.status?.sourcing ?? null) : lastRunSourcing
 
   // --- data fetching ---
 
@@ -349,26 +352,47 @@ export function WorkflowEditorPanel() {
     if (!openWorkflowId) {
       setLastRunStepsOutput(null)
       setLastRunMeta(null)
+      setLastRunSourcing(null)
       return
     }
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
     ;(async () => {
       try {
         const { runs } = await getWorkflowHistory(openWorkflowId, 1)
         const latest = runs.find(r => r.session_id)
         if (!latest?.session_id) {
-          if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+          if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null); setLastRunSourcing(null) }
           return
         }
         const status = await getWorkflowStatus(latest.session_id)
         if (cancelled) return
         setLastRunStepsOutput((status.steps_output ?? null) as Record<string, unknown> | null)
         setLastRunMeta({ finishedAt: latest.finished_at, status: latest.status })
+        setLastRunSourcing(status.sourcing ?? null)
+        // Sources are traced after the run completes; pick them up when they
+        // arrive (bounded — a trace has a ten-minute budget).
+        let polls = 0
+        const sessionId = latest.session_id
+        const waitForSources = (s: WorkflowSourcing | null | undefined) => {
+          if (cancelled || !s || (s.status !== 'pending' && s.status !== 'running') || polls++ > 150) return
+          timer = setTimeout(async () => {
+            try {
+              const next = await getWorkflowStatus(sessionId)
+              if (cancelled) return
+              setLastRunSourcing(next.sourcing ?? null)
+              waitForSources(next.sourcing)
+            } catch {
+              waitForSources(s)
+            }
+          }, 4000)
+        }
+        waitForSources(status.sourcing)
       } catch {
-        if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+        if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null); setLastRunSourcing(null) }
       }
     })()
-    return () => { cancelled = true }
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [openWorkflowId])
 
   // --- run elapsed timer ---
@@ -1333,6 +1357,7 @@ export function WorkflowEditorPanel() {
           onCloseTaskPicker={() => setShowTaskPicker(false)}
           canManage={canManage}
           stepsOutput={effectiveStepsOutput}
+          sourcing={effectiveSourcing}
           lastRunMeta={effectiveRunMeta}
           workflowId={openWorkflowId}
           workflowInputConfig={workflow?.input_config as Record<string, unknown> | undefined}
@@ -1923,9 +1948,10 @@ function sanitizeStepName(name: string): string {
   return s || 'step'
 }
 
-function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
+function StepLastRunOutput({ step, stepsOutput, sourcing, lastRunMeta }: {
   step: WorkflowStep
   stepsOutput?: Record<string, unknown> | null
+  sourcing?: WorkflowSourcing | null
   lastRunMeta?: { finishedAt: string | null; status: string } | null
 }) {
   const { user } = useAuth()
@@ -1933,20 +1959,27 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
   const [expanded, setExpanded] = useState(true)
 
   // Find this step's entry: match on the original step_name stored in the
-  // payload, falling back to the sanitized key used in steps_output.
+  // payload, falling back to the sanitized key used in steps_output. The key
+  // names the step's sourcing target.
   let entry: Record<string, unknown> | null = null
+  let entryKey: string | null = null
   if (stepsOutput) {
-    for (const val of Object.values(stepsOutput)) {
+    for (const [key, val] of Object.entries(stepsOutput)) {
       if (val && typeof val === 'object' && (val as Record<string, unknown>).step_name === step.name) {
         entry = val as Record<string, unknown>
+        entryKey = key
         break
       }
     }
     if (!entry) {
       const byKey = stepsOutput[sanitizeStepName(step.name)]
-      if (byKey && typeof byKey === 'object') entry = byKey as Record<string, unknown>
+      if (byKey && typeof byKey === 'object') {
+        entry = byKey as Record<string, unknown>
+        entryKey = sanitizeStepName(step.name)
+      }
     }
   }
+  const src = useSourcing(sourcing, `step:${entryKey ?? ''}`)
 
   // The combined/aggregated value across this step's parallel tasks
   // (mirror backend _step_output_value: formatted_output || output).
@@ -1997,6 +2030,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
             </div>
           )}
 
+          {hasValue && !isFileDownloadPayload(value) && src.summary}
           {hasValue ? (
             isFileDownloadPayload(value) ? (
               <FileOutputChip payload={value} />
@@ -2005,13 +2039,20 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
                 markdown={value}
                 sources={entry && Array.isArray(entry.retrieved_sources) ? (entry.retrieved_sources as WorkflowCitation[]) : []}
                 style={{ fontSize: 13, color: '#202124', lineHeight: 1.6, wordBreak: 'break-word' }}
+                sourcing={src.text}
+              />
+            ) : src.target?.format === 'json' ? (
+              <SourcedJson
+                value={value}
+                rows={src.target.statements}
+                sources={src.sources}
+                showUntraced={src.showUntraced}
+                onOpen={src.open}
+                leafSpan={structuredLeafSpan}
+                style={LAST_RUN_JSON_STYLE}
               />
             ) : (
-              <pre style={{
-                margin: 0, fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                color: '#202124', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                maxHeight: 320, overflowY: 'auto',
-              }}>
+              <pre style={LAST_RUN_JSON_STYLE}>
                 {JSON.stringify(value, null, 2)}
               </pre>
             )
@@ -2024,10 +2065,17 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
           )}
           {fillReport && fillReport.length > 0 && <FillReportTable fields={fillReport} />}
           <TracedValuesTable rows={traced} />
+          {src.popover}
         </div>
       )}
     </div>
   )
+}
+
+const LAST_RUN_JSON_STYLE: CSSProperties = {
+  margin: 0, fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  color: '#202124', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+  maxHeight: 320, overflowY: 'auto',
 }
 
 // ---------------------------------------------------------------------------
@@ -2047,7 +2095,7 @@ function EditStepOverlay({
   onStepNameSave, onToggleOutput, onStepInputSave,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
-  canManage, stepsOutput, lastRunMeta,
+  canManage, stepsOutput, sourcing, lastRunMeta,
   workflowId, workflowInputConfig, onRefreshWorkflow,
 }: {
   step: WorkflowStep
@@ -2066,6 +2114,7 @@ function EditStepOverlay({
   onCloseTaskPicker: () => void
   canManage: boolean
   stepsOutput?: Record<string, unknown> | null
+  sourcing?: WorkflowSourcing | null
   lastRunMeta?: { finishedAt: string | null; status: string } | null
   workflowId: string | null
   workflowInputConfig: Record<string, unknown> | undefined
@@ -2391,7 +2440,7 @@ function EditStepOverlay({
             </label>
 
             {/* Read-only output this step produced on the most recent run */}
-            <StepLastRunOutput step={step} stepsOutput={stepsOutput} lastRunMeta={lastRunMeta} />
+            <StepLastRunOutput step={step} stepsOutput={stepsOutput} sourcing={sourcing} lastRunMeta={lastRunMeta} />
           </>
         )}
       </div>
@@ -3655,10 +3704,15 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // and an Extraction's traced values, shown as in the run view.
   const [testFillReport, setTestFillReport] = useState<FillReportField[]>([])
   const [testTraced, setTestTraced] = useState<TracedValueRow[]>([])
+  // Where each statement of the test output came from, traced by a separate
+  // task after the test returns (target "test").
+  const [testSourcing, setTestSourcing] = useState<WorkflowSourcing | null>(null)
+  const testSrc = useSourcing(testSourcing, 'test')
   // Set by handleUpdate when a required field is blank; cleared on the next save attempt.
   const [saveError, setSaveError] = useState<string | null>(null)
   const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const testMsgRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const testTraceRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const color = getTaskColor(task.name)
   const taskIcon = getTaskIcon(task.name)
@@ -3683,8 +3737,31 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     return () => {
       if (testIntervalRef.current) clearInterval(testIntervalRef.current)
       if (testMsgRef.current) clearInterval(testMsgRef.current)
+      if (testTraceRef.current) clearInterval(testTraceRef.current)
     }
   }, [])
+
+  // Poll the task tracing the test output's sources; a trace has a
+  // ten-minute budget, so give up after that.
+  const watchTestSourcing = (taskId: string) => {
+    if (testTraceRef.current) clearInterval(testTraceRef.current)
+    setTestSourcing({ status: 'running' })
+    let polls = 0
+    testTraceRef.current = setInterval(async () => {
+      const stop = (s: WorkflowSourcing) => {
+        if (testTraceRef.current) { clearInterval(testTraceRef.current); testTraceRef.current = null }
+        setTestSourcing(s)
+      }
+      if (polls++ > 220) { stop({ status: 'failed', error: 'Sources could not be traced in time.' }); return }
+      try {
+        const res = await getTestStepStatus(taskId)
+        if (res.status === 'completed' && res.result && typeof res.result === 'object') stop(res.result as WorkflowSourcing)
+        else if (res.status === 'failed' || res.status === 'error') stop({ status: 'failed', error: 'Sources could not be traced for this test.' })
+      } catch {
+        // Keep polling
+      }
+    }, 3000)
+  }
 
   // The same condition that disables Improve. Update, Test Step and Run all
   // used to ignore it, so an empty Prompt step saved without a word and then
@@ -3822,6 +3899,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     setTestSources([])
     setTestFillReport([])
     setTestTraced([])
+    if (testTraceRef.current) { clearInterval(testTraceRef.current); testTraceRef.current = null }
+    setTestSourcing(null)
     setTestMessage(TEST_MESSAGES[0])
 
     // Cycle messages
@@ -3861,6 +3940,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               setTestSources(Array.isArray(res.retrieved_sources) ? res.retrieved_sources : [])
               setTestFillReport(Array.isArray(res.fill_report) ? res.fill_report as FillReportField[] : [])
               setTestTraced(tracedValueRows(res.field_values ?? res.result, res.field_sources))
+              if (res.sourcing_task_id) watchTestSourcing(res.sourcing_task_id)
             } else {
               setTestError(res.error || 'Test failed. Please check your configuration.')
             }
@@ -5754,11 +5834,60 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     <div>{withAdminRemedy(testWarning, user?.is_admin === true)}</div>
                   </div>
                 )}
+                {!summarizeFilePayload(testResult) && testSrc.summary}
                 {(() => {
                   // A file-producing step's test result is the same payload a
                   // run ends with; show the file, not its base64.
                   const file = summarizeFilePayload(testResult)
                   if (file) return <FileOutputCard summary={file} onDownload={handleDownloadTestResult} maxHeight={200} />
+                  const traced = testSrc.target
+                  if (typeof testResult === 'string' && traced?.format === 'text') {
+                    // Sources traced: underline each statement where it is
+                    // shown. A JSON reply is shown pretty-printed, so its
+                    // statements are placed by path; text by its own spans.
+                    if (prettyJson(testResult) !== null) {
+                      return (
+                        <SourcedJson
+                          value={JSON.parse(testResult.trim())}
+                          rows={traced.statements}
+                          sources={testSrc.sources}
+                          showUntraced={testSrc.showUntraced}
+                          onOpen={testSrc.open}
+                          leafSpan={textLeafSpan}
+                          style={{
+                            margin: 0, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                            padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                            maxHeight: 260, overflowY: 'auto', color: '#374151', wordBreak: 'break-word',
+                          }}
+                        />
+                      )
+                    }
+                    return testSources.length > 0 ? (
+                      <CitedMarkdown
+                        markdown={testResult}
+                        sources={testSources}
+                        className="chat-markdown"
+                        style={{
+                          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                          padding: 12, fontSize: 12, lineHeight: 1.6,
+                          maxHeight: 260, overflowY: 'auto', color: '#374151', wordBreak: 'break-word',
+                        }}
+                        sourcing={testSrc.text}
+                      />
+                    ) : (
+                      <CitedMarkdown
+                        markdown={testResult}
+                        sources={[]}
+                        format="text"
+                        style={{
+                          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                          padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                          maxHeight: 200, overflowY: 'auto', color: '#374151',
+                        }}
+                        sourcing={testSrc.text}
+                      />
+                    )
+                  }
                   if (typeof testResult === 'string' && testSources.length > 0) {
                     // Grounded output: render it so its citations become chips
                     // that open the passage — the point of testing the step. A
@@ -5798,6 +5927,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </div>
                   )
                 })()}
+                {testSrc.popover}
                 {testFillReport.length > 0 && <FillReportTable fields={testFillReport} />}
                 <TracedValuesTable rows={testTraced} />
                 {testSources.length > 0 && <WorkflowSourcesPanel sources={testSources} />}
@@ -6098,6 +6228,8 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 
   const finalOutput = status?.final_output as Record<string, unknown> | null
   const output = finalOutput?.output ?? finalOutput
+  // Where each statement of the deliverable came from, once traced.
+  const finalSourcing = useSourcing(status?.sourcing, 'final')
   // A file-producing final step (Document Renderer, Data Export, Package
   // Builder) hands back {type: "file_download", data_b64, …}. Rendered through
   // the generic path that is a JSON block of internal fields and base64 shown
@@ -6407,11 +6539,13 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               ? `Completed with ${stepWarnings.length} warning${stepWarnings.length === 1 ? '' : 's'} — check the output before using it`
               : 'Completed'}
           </div>
+          {!fileSummary && finalSourcing.summary}
           {fileSummary ? (
             <FileOutputCard summary={fileSummary} downloadHref={fileDownloadHref} />
           ) : typeof output === 'string' ? (
             // A citation in the text becomes a chip beside the claim; clicking
-            // it shows the knowledge-base passage the claim rests on.
+            // it shows the knowledge-base passage the claim rests on. A
+            // statement traced to a source is underlined, and opens it.
             <CitedMarkdown
               markdown={output}
               sources={status?.retrieved_sources ?? []}
@@ -6422,6 +6556,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                 maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto',
                 color: '#374151', wordBreak: 'break-word',
               }}
+              sourcing={finalSourcing.text}
             />
           ) : (
             <div
@@ -6435,6 +6570,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
             />
           )}
+          {finalSourcing.popover}
           {stepWarningsPanel}
           {fillReportPanel}
           {tracedValuesPanel}
