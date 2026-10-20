@@ -18,10 +18,12 @@ The pipeline, per task:
    honoured, and a rendered query longer than :data:`CONDENSE_WORD_LIMIT`
    words is condensed into a search prompt rather than silently cut at the
    embedder's 256-token input cap).
-2. For every (knowledge base, query) pair: an over-fetched vector search plus
-   a lexical lookup for any cited section number or identifier in the query
-   (``§ 200.414``, ``NSF-24-117``) that a bi-encoder scores as near-noise,
-   then a per-source diversity cap so one long page cannot fill every slot.
+2. For every (knowledge base, query) pair: each section the query names,
+   found by its heading and handed over whole (heading to next heading,
+   capped — see "Sections" below), then a lexical lookup for any other cited
+   number or identifier (``NSF-24-117``) that a bi-encoder scores as
+   near-noise, then an over-fetched vector search with a per-source
+   diversity cap so one long page cannot fill every slot.
    The knowledge base's Autovalidate-tuned relevance floor applies unless the
    task sets its own.
 3. Round-robin the pools across a base's queries, then across bases, so each
@@ -48,6 +50,7 @@ LLM call per (base, query) pair inside a parallel step is the wrong trade.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -58,6 +61,7 @@ from app.services.page_locator import (
     cited_pages,
     format_page_range,
     locator_for_meta,
+    page_breaks_of,
 )
 
 logger = logging.getLogger(__name__)
@@ -81,11 +85,23 @@ OVERFETCH_MULTIPLIER = 3
 # paragraph — with no warning.
 CONDENSE_WORD_LIMIT = 60
 PIN_LIMIT_PER_TERM = 6
+# A section the query names is handed over as one passage, from its heading
+# to the next heading, at most this long (cut at a line break). Chunks are
+# 1,000 characters, so this is three or four of them: the general rule of a
+# section and its first paragraphs, not a 20,000-character compensation rule.
+SECTION_MAX_CHARS = 4000
+# Chunks read past the one holding the heading, enough to fill the cap.
+SECTION_FOLLOW_CHUNKS = 6
+# Below this, the heading is a table-of-contents line, not a section.
+SECTION_MIN_BODY_CHARS = 40
+SECTION_FETCH_POOL = 100
 # Rough allowance for the prompt scaffolding around CONTEXT when a caller
 # derives a token budget for the passages.
 PROMPT_SCAFFOLD_TOKENS = 400
-# How much of a passage's text a citation carries into the run record.
-CITATION_CONTENT_CHARS = 2000
+# How much of a passage's text a citation carries into the run record. It
+# must hold a whole section passage: the citation check and the popover read
+# this text, and it has to be exactly what the model saw.
+CITATION_CONTENT_CHARS = SECTION_MAX_CHARS + 1000
 
 
 KB_GROUNDING_HEADER = (
@@ -407,19 +423,242 @@ def condense_query(
 # Retrieval
 # ---------------------------------------------------------------------------
 
-def _pinned_hits(dm, kb_uuid: str, query: str) -> list[dict]:
+def _pinned_hits(dm, kb_uuid: str, query: str, *, skip: frozenset = frozenset()) -> list[dict]:
     """Chunks that literally contain a section number or identifier the query
     names (``§ 200.414``), the way chat pins them: exact matches only, so a
-    query about 200.1 does not pin 200.10. A failed lookup pins nothing."""
+    query about 200.1 does not pin 200.10. A failed lookup pins nothing.
+
+    ``skip`` are sections already handed over whole (:func:`_section_passages`);
+    their remaining hits only cross-reference them, so they pin nothing."""
     from app.services.chat_service import _extract_pin_terms, retrieve_pinned_chunks_sync
 
+    terms = [
+        t for t in _extract_pin_terms(query)
+        if not any(s == t or s.startswith(f"{t}-") for s in skip)
+    ]
+    if not terms:
+        return []
     try:
-        return retrieve_pinned_chunks_sync(
-            dm, kb_uuid, _extract_pin_terms(query), limit_per_ref=PIN_LIMIT_PER_TERM,
-        )
+        return retrieve_pinned_chunks_sync(dm, kb_uuid, terms, limit_per_ref=PIN_LIMIT_PER_TERM)
     except Exception as e:  # noqa: BLE001 — vector retrieval still runs
         logger.debug("Lexical pin lookup failed for %r: %s", query, e)
         return []
+
+
+# ---------------------------------------------------------------------------
+# Sections
+# ---------------------------------------------------------------------------
+#
+# A query that names a section ("200.405 allocable costs") wants the section.
+# Its number is literally in two kinds of chunk: the ones that cross-reference
+# it ("see § 200.405(c)") and the one holding its heading — and chunks are cut
+# every 1,000 characters regardless of structure, so that heading often closes
+# its chunk while the rule sits in the next one. Pinning hits by how often they
+# name the number handed the model cross-references and a bare heading, and the
+# citation check rightly refused every citation to them.
+#
+# So a section the query names is found by its heading and handed over as one
+# passage: from the heading line, through the chunks that follow (their
+# repeated overlap removed), to the next heading or SECTION_MAX_CHARS. It is
+# labelled by the section ("Subpart E—Cost Principles · § 200.405") and built
+# the same way whichever task asks for it, so one source line always means one
+# text across a run.
+
+# A section number in a query: "200.405", "§ 200.403(h)", FAR's "31.205-6".
+_QUERY_SECTION_RE = re.compile(r"(?<![\d.])(\d{1,4}\.\d{1,4}(?:-\d{1,3}(?!\d|\.\d))?)(?!\d|\.\d)")
+# A heading line: "§ 200.405 Allocable costs.", "31.205-6 Compensation for
+# personal services.", "## 9904.401 …", a Subpart or Part title.
+_ANY_HEADING_RE = re.compile(
+    r"^[ \t]*(?:#{1,6}[ \t]+)?(?:"
+    r"(?:§[ \t]*)?\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?(?![\d(\-–—]|\.\d)[ \t]+[A-Z\[]"
+    r"|(?:Subpart|SUBPART|Part|PART)[ \t]+[\w.]+[ \t]*(?:[-—–:]|$)"
+    r")[^\n]{0,200}$",
+    re.MULTILINE,
+)
+# A short title line with no number and no closing punctuation, last in a
+# section: eCFR's undesignated centre headings ("Procurement Standards").
+_CENTER_HEADING_TAIL_RE = re.compile(r"\n[ \t]*[A-Z][^\d\n]{0,78}[^\d\s.;:,)\]]\s*$")
+_CHUNK_ID_RE = re.compile(r"^(.*)_chunk_(\d+)$")
+
+
+def section_terms(query: str) -> list[str]:
+    """The section numbers a query names, in order, deduplicated."""
+    return list(dict.fromkeys(m.group(1) for m in _QUERY_SECTION_RE.finditer(query or "")))
+
+
+def _section_heading_re(section: str) -> re.Pattern:
+    return re.compile(
+        rf"^[ \t]*(?:#{{1,6}}[ \t]+)?(?:§[ \t]*)?{re.escape(section)}"
+        r"(?![\d(\-–—]|\.\d)[ \t]+[A-Z\[][^\n]{0,200}$",
+        re.MULTILINE,
+    )
+
+
+def _join_chunk(text: str, nxt: str) -> str:
+    """``text`` followed by the next chunk of its source, without the overlap
+    the splitter repeats at the start of a chunk. Chunks are stripped at
+    ingest, so the overlap is a suffix of one and a prefix of the next."""
+    for n in range(min(len(text), len(nxt), 600), 11, -1):
+        if text.endswith(nxt[:n]):
+            return text + nxt[n:]
+    # No overlap: the splitter broke at a blank line and started after it.
+    return f"{text}\n\n{nxt}"
+
+
+def _page_at(meta: dict, offset: int) -> Optional[int]:
+    page = meta.get("page")
+    if not isinstance(page, int) or isinstance(page, bool):
+        return None
+    for at, next_page in page_breaks_of(meta):
+        if at > offset:
+            break
+        page = next_page
+    return page
+
+
+def _section_meta(pieces: list[tuple[int, dict]], start: int, end: int) -> dict:
+    """Chunk-style metadata for the text ``[start, end)`` of chunks joined at
+    the offsets in ``pieces`` — source, and for a paged source the page the
+    section starts on, the page it ends on and the breaks between, so the
+    page markers and the page range are those of the section itself."""
+    first = pieces[0][1].get("metadata") or {}
+    meta = {k: first[k] for k in ("source_id", "source_name", "chunk_index", "total_chunks") if k in first}
+
+    def page(pos: int) -> Optional[int]:
+        owner = next((p for p in reversed(pieces) if p[0] <= pos), pieces[0])
+        return _page_at(owner[1].get("metadata") or {}, pos - owner[0])
+
+    current = page(start)
+    if current is None:
+        return meta
+    meta["page"] = current
+    if any((p[1].get("metadata") or {}).get("page_approximate") for p in pieces):
+        meta["page_approximate"] = True
+    at: set[int] = set()
+    for offset, chunk in pieces:
+        at.add(offset)
+        at.update(offset + o for o, _ in page_breaks_of(chunk.get("metadata") or {}))
+    breaks: list[list[int]] = []
+    for pos in sorted(p for p in at if start < p < end):
+        here = page(pos)
+        if here is not None and here != current:
+            breaks.append([pos - start, here])
+            current = here
+    if breaks:
+        meta["page_end"] = breaks[-1][1]
+        meta["page_breaks"] = json.dumps(breaks)
+    return meta
+
+
+def _build_section(dm, kb_uuid: str, section: str, chunk: dict, heading: re.Match) -> Optional[dict]:
+    """The passage for ``section``, whose heading ``chunk`` holds at
+    ``heading``: the heading line through the text before the next heading,
+    reading on into the chunks that follow. None for a heading with no body
+    (a table of contents)."""
+    combined = chunk.get("content") or ""
+    pieces: list[tuple[int, dict]] = [(0, chunk)]
+    start = heading.start()
+    body_from = heading.end()
+
+    def section_end() -> Optional[int]:
+        m = _ANY_HEADING_RE.search(combined, body_from)
+        return m.start() if m else None
+
+    end = section_end()
+    m = _CHUNK_ID_RE.match(str(chunk.get("chunk_id") or ""))
+    if end is None and len(combined) - start < SECTION_MAX_CHARS and m and hasattr(dm, "get_kb_chunks_by_ids"):
+        prefix, n = m.group(1), int(m.group(2))
+        wanted = [f"{prefix}_chunk_{n + i}" for i in range(1, SECTION_FOLLOW_CHUNKS + 1)]
+        try:
+            following = dm.get_kb_chunks_by_ids(kb_uuid, wanted)
+        except Exception as e:  # noqa: BLE001 — the section is cut short, not lost
+            logger.debug("Section continuation read failed for %s: %s", section, e)
+            following = []
+        for expected, nxt in zip(wanted, following):
+            if nxt.get("chunk_id") != expected:
+                break   # the source ends (or has a gap) here
+            text = nxt.get("content") or ""
+            combined = _join_chunk(combined, text)
+            pieces.append((len(combined) - len(text), nxt))
+            end = section_end()
+            if end is not None or len(combined) - start >= SECTION_MAX_CHARS:
+                break
+    if end is None or end - start > SECTION_MAX_CHARS:
+        end = min(len(combined), start + SECTION_MAX_CHARS)
+        if end < len(combined):
+            cut = combined.rfind("\n", start + SECTION_MAX_CHARS // 2, end)
+            if cut < 0:
+                cut = combined.rfind(" ", start + SECTION_MAX_CHARS // 2, end)
+            end = cut if cut > 0 else end
+        content = combined[start:end].rstrip()
+    else:
+        content = combined[start:end].rstrip()
+        # The regulation's unnumbered group heading ("Property Standards")
+        # stands just before the next section, not at the end of this one.
+        while (tail := _CENTER_HEADING_TAIL_RE.search(content)) and tail.start() > heading.end() - start:
+            content = content[:tail.start()].rstrip()
+    end = start + len(content)
+    if len(combined[body_from:end].strip()) < SECTION_MIN_BODY_CHARS:
+        return None
+
+    covers = {
+        str(c.get("chunk_id")) for offset, c in pieces
+        if c.get("chunk_id") is not None
+        and start <= offset and offset + len(c.get("content") or "") <= end
+    }
+    base = str(m.group(1)) if m else str(chunk.get("chunk_id") or "")
+    return {
+        "content": content,
+        "metadata": _section_meta(pieces, start, end),
+        "chunk_id": f"{base}_section_{section}",
+        "score": chunk.get("score"),
+        "similarity": chunk.get("similarity"),
+        "_section": section,
+        # Chunks whose whole text the passage holds: never shown beside it.
+        "_covers": covers,
+    }
+
+
+def _section_passages(dm, kb_uuid: str, query: str) -> list[dict]:
+    """One passage per section the query names (per source holding it). Each
+    carries in ``_replaces`` the chunks it stands in for in this query's pool:
+    every chunk holding its heading, and every chunk wholly inside it. A
+    section whose heading is not found is left to the pins and the vector
+    search."""
+    out: list[dict] = []
+    for section in section_terms(query):
+        try:
+            candidates = dm.get_kb_chunks_containing(kb_uuid, section, SECTION_FETCH_POOL)
+        except Exception as e:  # noqa: BLE001 — pins and vector search still run
+            logger.debug("Section lookup failed for %s: %s", section, e)
+            continue
+        heading_re = _section_heading_re(section)
+        by_source: dict[str, list[tuple[int, dict, re.Match]]] = {}
+        for c in candidates:
+            m = _CHUNK_ID_RE.match(str(c.get("chunk_id") or ""))
+            source = m.group(1) if m else str(c.get("chunk_id"))
+            # A contents list names the heading too, often in the same chunk
+            # as the section itself: every occurrence is a candidate.
+            for heading in heading_re.finditer(c.get("content") or ""):
+                by_source.setdefault(source, []).append((int(m.group(2)) if m else 0, c, heading))
+        for holders in by_source.values():
+            holders.sort(key=lambda h: (h[0], h[2].start()))
+            for _, chunk, heading in holders:
+                built = _build_section(dm, kb_uuid, section, chunk, heading)
+                if built is None:
+                    continue
+                replaces = {str(h[1].get("chunk_id")) for h in holders} | built["_covers"]
+                # A corpus holding the regulation whole and by subpart has
+                # the section twice: one passage stands in for both.
+                twin = next((p for p in out if _content_key(p["content"]) == _content_key(built["content"])), None)
+                if twin is not None:
+                    twin["_replaces"] |= replaces
+                    twin["_covers"] |= built["_covers"]
+                else:
+                    built["_replaces"] = replaces
+                    out.append(built)
+                break
+    return out
 
 
 def _diverse(results: list[dict], k: int) -> list[dict]:
@@ -479,8 +718,9 @@ def dedupe_passages(passages: list[dict]) -> list[dict]:
 def _retrieve_pool(
     dm, kb_uuid: str, query: str, *, k: int, floor: float,
 ) -> list[dict]:
-    """One (knowledge base, query) pool: pinned lexical hits, then the
-    over-fetched vector search, diversified and cut to ``k``."""
+    """One (knowledge base, query) pool: the sections the query names, then
+    pinned lexical hits, then the over-fetched vector search, diversified and
+    cut to ``k``."""
     vector = dm.query_kb(kb_uuid, query, k * OVERFETCH_MULTIPLIER, floor)
     if floor > 0:
         # Belt and braces: the store applies the floor too, but a fake or an
@@ -490,12 +730,14 @@ def _retrieve_pool(
             if not isinstance(r.get("similarity"), (int, float)) or r["similarity"] >= floor
         ]
 
-    pinned = _pinned_hits(dm, kb_uuid, query)
-
     half = max(1, -(-k // 2))
+    sections = _section_passages(dm, kb_uuid, query)[:half]
+    pinned = _pinned_hits(dm, kb_uuid, query, skip=frozenset(s["_section"] for s in sections))
+
     final: list[dict] = []
-    seen: set = set()
-    for r in pinned:
+    # A section passage stands in for the chunks it was built from.
+    seen: set = set().union(*(s["_replaces"] for s in sections)) if sections else set()
+    for r in sections + pinned:
         if len(final) >= half:
             break
         cid = r.get("chunk_id")
@@ -514,10 +756,13 @@ def merge_pools(per_kb: list[list[list[dict]]], max_passages: int) -> list[dict]
 
     Round-robin within a base across its queries, then across bases, dedupe,
     and cut to the cap — so every base and every query is represented before
-    any of them contributes a second passage.
+    any of them contributes a second passage. A chunk another query retrieved
+    whose whole text a section passage holds is dropped as a repeat.
     """
     per_kb_merged = [_round_robin(pools) for pools in per_kb if pools]
     merged = _round_robin(per_kb_merged) if len(per_kb_merged) > 1 else (per_kb_merged[0] if per_kb_merged else [])
+    covered: set = set().union(*(r.get("_covers") or () for r in merged)) if merged else set()
+    merged = [r for r in merged if r.get("chunk_id") is None or r.get("chunk_id") not in covered]
     return dedupe_passages(merged)[:max_passages]
 
 
@@ -536,9 +781,18 @@ def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str
     content = r.get("content") or ""
     source_name = meta.get("source_name", "Unknown source")
     sheet = meta.get("sheet")
-    cited = cited_pages(meta, content, query)
-    page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
-    locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
+    section = r.get("_section")
+    if section:
+        # A section passage is named by its section, and its pages are the
+        # whole section's — not narrowed to the query, so it reads the same
+        # in every task that retrieves it.
+        page, page_end = meta.get("page"), meta.get("page_end")
+        approximate = bool(meta.get("page_approximate"))
+        locator = f"§ {section}"
+    else:
+        cited = cited_pages(meta, content, query)
+        page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
+        locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
     if not locator:
         # A web page or eCFR subpart has no pages, so every passage from it
         # would share one source line and a citation could not say which it
@@ -734,8 +988,10 @@ def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
         if isinstance(s, dict) and s.get("label") and _norm_citation(str(s["label"])) == n:
             return i
     page = re.search(r"\bp\. (\d+)", n)
-    part = re.search(r"\bpart (\d+)\s*$", n)
-    title_only = re.sub(r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$", "", n).strip()
+    # "part 12" or "§ 200.405" ends a pageless source line; only the passage
+    # that is that part or that section answers to it.
+    tail = re.search(r"(?:\bpart \d+|§ ?" + _NORM_SECTION + r")\s*$", n)
+    title_only = _strip_locator(n)
     for i, s in enumerate(sources):
         if not isinstance(s, dict):
             continue
@@ -748,10 +1004,21 @@ def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
                 continue
         elif page:
             continue
-        if part and not _norm_citation(str(s.get("label") or "")).endswith(f"part {part.group(1)}"):
+        if tail and not _norm_citation(str(s.get("label") or "")).endswith(re.sub(r"§\s*", "§ ", tail.group(0).strip())):
             continue
         return i
     return None
+
+
+# A section number as _norm_citation leaves it ("31.205-6" → "31.205 - 6").
+_NORM_SECTION = r"\d{1,4}\.\d{1,4}(?: - \d{1,3})?[a-z]?"
+
+
+def _strip_locator(normalized: str) -> str:
+    """A normalized source line without its trailing page, part or section."""
+    return re.sub(
+        r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+|§ ?" + _NORM_SECTION + r")\s*$", "", normalized,
+    ).strip()
 
 
 _CITATION_RE = re.compile(r"\[([^\[\]\n]{3,300})\]")
@@ -898,7 +1165,7 @@ def unmatched_citations(text: str, sources: list[dict]) -> list[str]:
             n = _norm_citation(part)
             if n in labels:
                 continue
-            title_only = re.sub(r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$", "", n).strip()
+            title_only = _strip_locator(n)
             if any(t in n or (len(title_only) >= 4 and title_only in t) for t in titles):
                 continue
             if part not in bad:

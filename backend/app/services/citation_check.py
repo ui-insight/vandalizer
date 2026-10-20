@@ -106,11 +106,37 @@ def quote_fragments(quote: str, passage: str) -> list[str] | None:
     return pieces
 
 
-def _claim_before(text: str, start: int, floor: int) -> str:
-    """The statement a citation at ``start`` supports: the sentence (or JSON
-    string value, or list item) it closes."""
+# After a citation: more citations, a closing mark, then the quote that ends
+# a JSON string value — the citation is the last thing in the value.
+_CLOSES_VALUE_RE = re.compile(r'(?:\s*\[[^\[\]\n]{3,300}\])*\s*[.;:!?]?\s*"')
+
+
+def _opening_quote(s: str) -> int:
+    """Index of the unescaped double quote that opens the string ``s`` ends
+    inside, or -1."""
+    i = s.rfind('"')
+    while i >= 0:
+        slashes = len(s[:i]) - len(s[:i].rstrip("\\"))
+        if slashes % 2 == 0:
+            return i
+        i = s.rfind('"', 0, i)
+    return -1
+
+
+def _claim_before(text: str, start: int, floor: int, *, closes_value: bool = False) -> str:
+    """The statement a citation at ``start`` supports: the sentence (or list
+    item) it closes — or, when it closes a JSON string value, the whole
+    value. The citation rule tells a model emitting JSON to end each value
+    that draws on a passage with the tag, so the tag answers for the value:
+    judged on its last sentence alone ("Without such evidence, allocability
+    cannot be confirmed"), a rationale loses the very rule it states."""
     s = text[floor:start].rstrip()
     s = s[:-1] if s.endswith((".", ":", ";", ",")) else s
+    if closes_value:
+        opened = _opening_quote(s)
+        claim = s[opened + 1:].strip(" \t-*•–—:;") if opened >= 0 else ""
+        if len(claim) >= 15:
+            return claim[-1200:]
     cut = max(s.rfind("\n"), s.rfind('"'), s.rfind(". "), s.rfind("? "), s.rfind("! "))
     claim = s[cut + 1:].strip(" \t-*•–—:;")
     if len(claim) < 15:
@@ -132,7 +158,11 @@ def find_citations(text: str, sources: list[dict]) -> list[_Cite]:
         if idx is None:
             continue
         between = text[prev_end:m.start()]
-        claim = prev_claim if found and not between.strip() else _claim_before(text, m.start(), prev_end)
+        closes_value = bool(_CLOSES_VALUE_RE.match(text, m.end()))
+        claim = (
+            prev_claim if found and not between.strip()
+            else _claim_before(text, m.start(), prev_end, closes_value=closes_value)
+        )
         found.append(_Cite(m.start(), m.end(), idx, claim))
         prev_end, prev_claim = m.end(), claim
     return found

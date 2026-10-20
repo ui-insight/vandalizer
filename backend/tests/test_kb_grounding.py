@@ -395,6 +395,181 @@ class TestRetrieveGrounding:
         assert untagged.text.startswith("HDR\n\n[PAPPG.pdf · p. 234]\n")
 
 
+def _para(label: str, n: int) -> str:
+    """A regulation paragraph of about ``n`` characters, unique by label."""
+    words = []
+    i = 0
+    while len(" ".join(words)) < n:
+        words.append(f"{label}w{i}")
+        i += 1
+    return f"({label}) " + " ".join(words) + "."
+
+
+class SectionStore:
+    """A knowledge base whose sources are chunked by the real splitter, so
+    sections cross chunk boundaries — with the repeated overlap — exactly as
+    ingest leaves them. Answers the lexical, by-id and vector lookups."""
+
+    def __init__(self):
+        self.chunks: list[dict] = []
+        self.vector: dict[str, list[str]] = {}
+
+    def add(self, source_id: str, name: str, text: str, markers=None) -> list[dict]:
+        from app.services.document_manager import CHUNK_OVERLAP, CHUNK_SIZE, _split_text_with_offsets
+        from app.services.page_locator import span_meta
+
+        added = []
+        for i, (chunk, offset) in enumerate(_split_text_with_offsets(text, CHUNK_SIZE, CHUNK_OVERLAP)):
+            meta = {"source_id": source_id, "source_name": name, "chunk_index": i}
+            meta.update(span_meta(offset, len(chunk), sorted(markers or [], key=lambda m: m["char_offset"])))
+            added.append({"content": chunk, "metadata": meta, "chunk_id": f"{source_id}_chunk_{i}",
+                          "score": None, "similarity": None})
+        self.chunks.extend(added)
+        return added
+
+    def query_kb(self, kb_uuid, query, k=8, min_similarity=0.0, **kw):
+        ids = next((v for needle, v in self.vector.items() if needle in query), [])
+        by_id = {c["chunk_id"]: c for c in self.chunks}
+        return [dict(by_id[i], similarity=0.5) for i in ids][:k]
+
+    def get_kb_chunks_containing(self, kb_uuid, substring, limit=20):
+        return [dict(c) for c in self.chunks if substring in c["content"]][:limit]
+
+    def get_kb_chunks_by_ids(self, kb_uuid, ids):
+        by_id = {c["chunk_id"]: c for c in self.chunks}
+        return [dict(by_id[i]) for i in ids if i in by_id]
+
+
+# Subpart E as the eCFR prints it: each section's heading on its own line,
+# its paragraphs after, an unnumbered group heading before some sections.
+SECTION_404 = "§ 200.404 Reasonable costs.\n\n" + "\n".join(_para(c, 300) for c in "abcd")
+SECTION_405 = "§ 200.405 Allocable costs.\n\n" + "\n".join(_para(c, 420) for c in "abcde")
+SUBPART_E = (
+    "Subpart E—Cost Principles\n\n" + SECTION_404 + "\n\n" + SECTION_405
+    + "\n\nGeneral Provisions for Selected Items of Cost\n\n§ 200.406 Applicable credits.\n\n"
+    + "\n".join(_para(c, 300) for c in "ab")
+)
+
+
+class TestSectionPassages:
+    def _store(self):
+        store = SectionStore()
+        store.add("subE", "Subpart E—Cost Principles", SUBPART_E)
+        # Another subpart that only cross-references the section, twice.
+        store.add("subD", "Subpart D—Post Federal Award Requirements",
+                  "§ 200.302 Financial management.\n\nSee § 200.405 and § 200.405(c) for allocation. "
+                  + _para("x", 400))
+        return store
+
+    def _run(self, store, *queries, k=4):
+        cfg = GroundingConfig(targets=_targets(ug=list(queries)), k=k, max_passages=8)
+        return retrieve_grounding(cfg, {}, kb_meta={"ug": {"title": "OMB UG", "exists": True}}, dm=store)
+
+    def test_a_named_section_is_one_passage_from_its_heading_to_the_next(self):
+        store = self._store()
+        holder = next(c for c in store.chunks if c["content"].rstrip().endswith("§ 200.405 Allocable costs."))
+        assert holder, "fixture: the heading must close a chunk, as in the real Subpart E"
+
+        result = self._run(store, "200.405 allocable costs")
+        first, src = result.passages[0], result.sources[0]
+        # The section exactly as written: no overlap repeated, nothing of
+        # § 200.404 before it, not the group heading or § 200.406 after it.
+        assert first["content"] == SECTION_405
+        assert src["label"] == "OMB UG — Subpart E—Cost Principles · § 200.405"
+        assert src["content"] == SECTION_405
+        assert "[KB1] OMB UG — Subpart E—Cost Principles · § 200.405\n§ 200.405 Allocable costs." in result.text
+        # The chunks it was built from are not shown beside it, and neither
+        # are the pins that merely cite it.
+        ids = [p["chunk_id"] for p in result.passages]
+        assert holder["chunk_id"] not in ids
+        assert not any(i.startswith("subD") for i in ids)
+
+    def test_a_section_reads_the_same_in_every_task(self):
+        store = self._store()
+        a = self._run(store, "200.405 allocable costs").sources[0]
+        b = self._run(store, "allocation basis § 200.405(c)", "200.404 reasonable").sources
+        same = next(s for s in b if s["label"] == a["label"])
+        assert (same["chunk_id"], same["content"]) == (a["chunk_id"], a["content"])
+
+    def test_a_chunk_inside_the_section_found_by_another_query_is_dropped(self):
+        store = self._store()
+        inside = next(c for c in store.chunks if c["content"] in SECTION_405 and "§" not in c["content"])
+        store.vector["benefit"] = [inside["chunk_id"]]
+        result = self._run(store, "200.405 allocable costs", "relative benefit received")
+        ids = [p["chunk_id"] for p in result.passages]
+        assert ids[0].endswith("_section_200.405")
+        assert inside["chunk_id"] not in ids
+
+    def test_a_table_of_contents_line_is_not_the_section(self):
+        store = SectionStore()
+        store.add("toc", "Subpart E—Cost Principles",
+                  "§ 200.404 Reasonable costs.\n§ 200.405 Allocable costs.\n§ 200.406 Applicable credits.\n\n"
+                  + SECTION_404 + "\n\n" + SECTION_405)
+        result = self._run(store, "200.405")
+        assert result.passages[0]["content"] == SECTION_405
+
+    def test_a_long_section_is_cut_at_a_line_under_the_cap(self):
+        long = "§ 200.430 Compensation—personal services.\n\n" + "\n".join(_para(f"p{i}", 500) for i in range(14))
+        store = SectionStore()
+        store.add("subE", "Subpart E—Cost Principles", long + "\n\n§ 200.431 Compensation—fringe benefits.\n\n" + _para("f", 300))
+        content = self._run(store, "200.430").passages[0]["content"]
+        assert len(content) <= kg.SECTION_MAX_CHARS
+        assert long.startswith(content) and long[len(content)] == "\n"
+
+    def test_a_far_style_heading_without_the_section_sign(self):
+        text = (
+            "31.205-5 [Reserved]\n\n31.205-6 Compensation for personal services.\n\n"
+            + "\n".join(_para(c, 500) for c in "abc")
+            + "\n\n31.205-7 [Reserved]\n\n31.205-8 Contributions or donations.\n\n" + _para("z", 200)
+        )
+        store = SectionStore()
+        store.add("far31", "Part 31 - Contract Cost Principles", text)
+        result = self._run(store, "31.205-6 compensation")
+        assert result.sources[0]["label"] == "OMB UG — Part 31 - Contract Cost Principles · § 31.205-6"
+        assert result.passages[0]["content"].endswith(_para("c", 500))
+
+    def test_a_paged_section_keeps_its_own_pages(self):
+        text = SUBPART_E
+        at_405 = text.index("§ 200.405")
+        page_break = text.index("(c) c", at_405)
+        markers = [
+            {"kind": "page", "value": 7, "char_offset": 0},
+            {"kind": "page", "value": 8, "char_offset": page_break},
+        ]
+        store = SectionStore()
+        store.add("ug", "UG.pdf", text, markers=markers)
+        result = self._run(store, "200.405")
+        src = result.sources[0]
+        assert (src["page"], src["page_end"]) == (7, 8)
+        assert src["label"] == "OMB UG — UG.pdf · § 200.405"
+        # The model sees where the page turns inside the section.
+        assert "\n[p. 8]\n(c) c" in result.text
+
+    def test_without_a_continuation_the_plain_pin_stands(self):
+        """A store that cannot read neighbours (or a heading with no body in
+        reach) leaves the lexical pin as it was."""
+        dm = FakeDM(lexical={("ug", "200.414"): [_chunk("lex", "§ 200.414 Indirect (F&A) costs.")]})
+        result = retrieve_grounding(GroundingConfig(targets=_targets(ug=["200.414"]), k=2), {}, dm=dm)
+        assert [p["chunk_id"] for p in result.passages] == ["lex"]
+
+    def test_section_terms(self):
+        assert kg.section_terms("200.403(h) 200.309 costs; § 200.403") == ["200.403", "200.309"]
+        assert kg.section_terms("FAR 31.205-6(b) and 200.403-200.405") == ["31.205-6", "200.403", "200.405"]
+        assert kg.section_terms("v1.2.3 and 12") == []
+
+    def test_a_section_citation_matches_only_that_section(self):
+        sources = [
+            {"document_title": "Subpart E—Cost Principles", "chunk_id": "c10",
+             "label": "OMB UG — Subpart E—Cost Principles · part 11"},
+            {"document_title": "Subpart E—Cost Principles", "chunk_id": "s405",
+             "label": "OMB UG — Subpart E—Cost Principles · § 200.405"},
+        ]
+        assert kg.match_source_index("OMB UG — Subpart E—Cost Principles · § 200.405", sources) == 1
+        assert kg.match_source_index("Subpart E—Cost Principles · §200.405", sources) == 1
+        assert kg.match_source_index("Subpart E—Cost Principles · § 200.406", sources) is None
+        assert unmatched_citations("[Subpart E—Cost Principles · § 200.405]", sources) == []
+
+
 class TestTrimToBudget:
     def test_drops_lowest_ranked_first_and_says_so(self, monkeypatch):
         monkeypatch.setattr(

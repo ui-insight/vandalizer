@@ -620,6 +620,33 @@ class DocumentManager:
             })
         return output
 
+    def get_kb_chunks_by_ids(self, kb_uuid: str, ids: list[str]) -> list[dict[str, Any]]:
+        """KB chunks by id, in the order asked for; ids not in the store are
+        skipped. Chunk ids are ``{source}_chunk_{n}``, so this is how a caller
+        reads the chunks that follow one it retrieved — the rest of a section
+        whose heading closed that chunk. Same shape as :meth:`query_kb`, with
+        no score. A failed read returns ``[]``."""
+        collection = self.get_kb_collection_readonly(kb_uuid)
+        if collection is None or not ids:
+            return []
+        try:
+            results = collection.get(ids=list(ids), include=["documents", "metadatas"])
+        except Exception as e:
+            logger.debug("KB chunk read failed for kb=%s ids=%s: %s", kb_uuid, ids[:3], e)
+            return []
+        docs = results.get("documents") or []
+        metas = results.get("metadatas") or []
+        found: dict[str, dict[str, Any]] = {}
+        for i, cid in enumerate(results.get("ids") or []):
+            found[cid] = {
+                "content": docs[i] if i < len(docs) else "",
+                "metadata": metas[i] if i < len(metas) else {},
+                "chunk_id": cid,
+                "score": None,
+                "similarity": None,
+            }
+        return [found[cid] for cid in ids if cid in found]
+
     def delete_kb_collection(self, kb_uuid: str) -> None:
         """Drop an entire KB collection. No-op if the collection never existed."""
         collection_name = f"kb_{kb_uuid}"

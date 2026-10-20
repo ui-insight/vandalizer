@@ -73,6 +73,23 @@ describe('matchCitation', () => {
     expect(matchCitation('Subpart E—Cost Principles · part 45', parts)).toBe(1)
     expect(matchCitation('Subpart E—Cost Principles · part 7', parts)).toBeNull()
   })
+
+  it('tells a whole-section passage apart by its section', () => {
+    const chunk: WorkflowCitation = {
+      document_title: 'Subpart E—Cost Principles', kb_title: 'OMB UG', chunk_id: 'e10',
+      label: 'OMB UG — Subpart E—Cost Principles · part 11', content: '… § 200.405 Allocable costs.',
+    }
+    const section = (n: string): WorkflowCitation => ({
+      document_title: 'Subpart E—Cost Principles', kb_title: 'OMB UG', chunk_id: `s${n}`,
+      label: `OMB UG — Subpart E—Cost Principles · § ${n}`, content: `§ ${n} …`,
+    })
+    const sources = [chunk, section('200.404'), section('200.405')]
+    expect(matchCitation('OMB UG — Subpart E—Cost Principles · § 200.405', sources)).toBe(2)
+    expect(matchCitation('Subpart E—Cost Principles · §200.405', sources)).toBe(2)
+    expect(matchCitation('Subpart E—Cost Principles · § 200.406', sources)).toBeNull()
+    const far: WorkflowCitation = { document_title: 'Part 31', chunk_id: 'f', label: 'FAR — Part 31 · § 31.205-6' }
+    expect(matchCitation('Part 31 · § 31.205-6', [far])).toBe(0)
+  })
 })
 
 describe('injectCitationChips', () => {
@@ -206,6 +223,12 @@ describe('findHighlights / citationLocator', () => {
     expect(citationLocator({ document_title: 'Subpart E', label: 'OMB UG — Subpart E · part 46' })).toBe('part 46')
     expect(citationLocator({ document_title: 'x.pdf', page: 4, label: 'x.pdf · p. 4' })).toBe('p. 4')
     expect(citationLocator({ document_title: 'x' })).toBeNull()
+  })
+
+  it('names a whole-section passage by its section, with its pages when it has them', () => {
+    expect(citationLocator({ document_title: 'Subpart E', label: 'OMB UG — Subpart E · § 200.405' })).toBe('§ 200.405')
+    expect(citationLocator({ document_title: 'UG.pdf', page: 7, page_end: 8, label: 'UG.pdf · § 200.405' })).toBe('§ 200.405 · p. 7–8')
+    expect(citationLocator({ document_title: 'Part 31', label: 'Part 31 · § 31.205-6' })).toBe('§ 31.205-6')
   })
 
   it('marks a section chip with the section it names', () => {

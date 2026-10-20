@@ -16,6 +16,8 @@ import type { WorkflowCitation } from '../../types/workflow'
  * apart by its position, `· part 12`. Here each bracketed citation that matches a retrieved passage
  * becomes a chip beside the claim; clicking it opens a popover with the
  * passage text, so a reader can check the claim against what it rests on.
+ * A section the task's query named is retrieved whole and cited as such,
+ * `· § 200.405`.
  * Bracketed text that matches no passage is left exactly as written — a
  * chip must never point at the wrong passage.
  */
@@ -50,6 +52,9 @@ export function normalizeCitation(text: string): string {
     .trim()
 }
 
+// A section number as normalizeCitation leaves it ("31.205-6" → "31.205 - 6").
+const NORM_SECTION = '\\d{1,4}\\.\\d{1,4}(?: - \\d{1,3})?[a-z]?'
+
 function citedPage(normalized: string): number | null {
   const m = /p\. (\d+)/.exec(normalized)
   return m ? parseInt(m[1], 10) : null
@@ -70,11 +75,11 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
     if (normalizeCitation(citationLabel(sources[i])) === t) return i
   }
   // 2. The document named (title contained either way) and, when the citation
-  //    names a page — or, for a source without pages, its "part N" — the
-  //    passage that is there.
+  //    names a page — or its "part N", or the section it is ("§ 200.405") —
+  //    the passage that is there.
   const page = citedPage(t)
-  const part = /\bpart (\d+)\s*$/.exec(t)?.[1] ?? null
-  const titleOnly = t.replace(/\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+)\s*$/, '').trim()
+  const tail = new RegExp(`(?:\\bpart \\d+|§ ?${NORM_SECTION})\\s*$`).exec(t)?.[0].trim().replace(/^§\s*/, '§ ') ?? null
+  const titleOnly = t.replace(new RegExp(`\\s*·?\\s*(?:p\\. \\d+(\\s*-\\s*\\d+)?|part \\d+|§ ?${NORM_SECTION})\\s*$`), '').trim()
   let candidates: number[] = []
   for (let i = 0; i < sources.length; i++) {
     const title = normalizeCitation(sources[i].document_title || '')
@@ -85,8 +90,8 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
     if (named) candidates.push(i)
   }
   if (page != null) candidates = candidates.filter(i => coversPage(sources[i], page))
-  if (part != null) {
-    candidates = candidates.filter(i => normalizeCitation(citationLabel(sources[i])).endsWith(`part ${part}`))
+  if (tail != null) {
+    candidates = candidates.filter(i => normalizeCitation(citationLabel(sources[i])).endsWith(tail))
   }
   if (candidates.length === 0) return null
   // Several tasks can retrieve the same passage; any of them is the same text.
@@ -134,10 +139,13 @@ export function matchSectionReference(
 /** Skip code, links and anything already a chip. */
 const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'BUTTON', 'SCRIPT', 'STYLE'])
 
-/** Where in its source a passage sits: its page(s) or sheet, or — for a
+/** Where in its source a passage sits: the section it is ("§ 200.405", for a
+ *  passage retrieved as a whole section), its page(s) or sheet, or — for a
  *  source without pages (a web page, an eCFR subpart) — its "part N". */
 export function citationLocator(c: WorkflowCitation): string | null {
   const page = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
+  const section = /·\s*(§\s*\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?)\s*$/.exec(c.label || '')?.[1] ?? null
+  if (section) return page ? `${section} · ${page}` : section
   if (page) return page
   return /·\s*(part \d+)\s*$/.exec(c.label || '')?.[1] ?? null
 }

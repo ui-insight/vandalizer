@@ -49,6 +49,27 @@ def test_finds_each_citation_with_the_statement_it_closes():
     ]
 
 
+def test_a_citation_that_ends_a_json_value_answers_for_the_whole_value():
+    """The rule tells a model emitting JSON to end each value that draws on a
+    passage with the tag. Judged on the last sentence alone, a rationale
+    whose rule sits in its first sentence would lose its citation."""
+    cite = "[OMB UG — Subpart E—Cost Principles · part 10]"
+    text = (
+        '{"rationale": "No quote or market price shows a prudent person would pay this. '
+        f'Without such evidence, reasonableness cannot be confirmed {cite}.", '
+        f'"summary": "Needs a \\"comparable\\" quote. Prices unknown {cite}", '
+        f'"note": "First sentence. A mid-value citation {cite} then more text."}}'
+    )
+    claims = [c.claim for c in find_citations(text, SOURCES)]
+    assert claims == [
+        "No quote or market price shows a prudent person would pay this. "
+        "Without such evidence, reasonableness cannot be confirmed",
+        'Needs a \\"comparable\\" quote. Prices unknown',
+        # Inside a value it still answers for its own sentence.
+        "A mid-value citation",
+    ]
+
+
 def test_a_supported_citation_is_kept_with_its_verified_excerpt():
     text = "Market prices are needed to judge reasonableness [OMB UG — Subpart E—Cost Principles · part 10]."
     ask, asked = _ask({1: (True, "(c) Market prices for comparable costs for the geographic area")})
