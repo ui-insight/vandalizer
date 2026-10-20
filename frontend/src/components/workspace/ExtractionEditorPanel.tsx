@@ -123,6 +123,8 @@ export function ExtractionEditorPanel() {
   // Per-field source info, index-aligned with resultSets.
   const [resultSourceSets, setResultSourceSets] = useState<ExtractionSourceMap[]>([])
   const [resultDocNames, setResultDocNames] = useState<string[]>([])
+  // The models the shown run used — the CSV export's Model column.
+  const [resultModels, setResultModels] = useState<string[]>([])
   const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
   // Cross-field rule outcomes for the last run. null = the set defines no
@@ -191,6 +193,7 @@ export function ExtractionEditorPanel() {
     setResultSets(pending ? [pending.values] : [])
     setResultSourceSets(pending ? [pending.sources ?? {}] : [])
     setResultDocNames([])
+    setResultModels([])
     setActiveResultIdx(0)
     // A previous run's rule outcomes must not sit under a new run's values —
     // the run path already resets this; the open path (rail click, or a
@@ -331,6 +334,7 @@ export function ExtractionEditorPanel() {
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setCrossFieldSets(resp.cross_field_sets ?? (resp.cross_field ? [resp.cross_field] : []))
       setDocumentWarnings(resp.document_warnings ?? [])
+      setResultModels(resp.models ?? [])
       setActiveResultIdx(0)
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
@@ -352,6 +356,7 @@ export function ExtractionEditorPanel() {
           // The history snapshot merges all documents into one value map, so
           // a multi-doc run recovers as a single combined result set.
           setResultDocNames([docUuids.length > 1 ? `Combined (${docUuids.length} docs)` : runDocNames[0] ?? 'Result 1'])
+          setResultModels(run.models ?? [])
           setActiveResultIdx(0)
         } else if (run) {
           toast(`Extraction failed: ${run.error || 'unknown error'}`, 'error')
@@ -476,11 +481,13 @@ export function ExtractionEditorPanel() {
         if (!seen.has(k)) { seen.add(k); keys.push(k) }
       }
     }
-    // One row per document, fields as columns, with a leading Document column.
-    const header = [escape('Document'), ...keys.map(escape)].join(',')
+    // One row per document, fields as columns, with a leading Document column
+    // and, when the run recorded it, the model that produced the values.
+    const model = resultModels.join('; ')
+    const header = [escape('Document'), ...(model ? [escape('Model')] : []), ...keys.map(escape)].join(',')
     const rows = allSets.map((set, i) => {
       const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
-      return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
+      return [escape(docName), ...(model ? [escape(model)] : []), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
     })
     return header + '\n' + rows.join('\n') + '\n'
   }

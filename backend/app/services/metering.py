@@ -19,9 +19,11 @@ propagates (see workflow_engine.process).
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
+import threading
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Iterator, Optional
 
 # Sentinel feature for calls that fire with no scope set (see record_usage).
@@ -114,6 +116,103 @@ class MeterScope:
     tokens_out: int = 0
     requests: int = 0
     estimated: bool = False
+    # Every model the scope's calls used, by workflow step: (step index, step
+    # name, model) -> [tokens in, tokens out, requests]. ``model`` above keeps
+    # only the first, which is all the ledger row has room for; a run whose
+    # steps override the model, or that falls back to another, used several
+    # (support ticket: History couldn't say which model ran). Step is
+    # (None, None) outside a workflow step.
+    usage: dict = field(default_factory=dict)
+    # The distinct request settings each ``usage`` key's calls were sent with
+    # (temperature, output cap, thinking, structured-output mode, provider),
+    # keyed like ``usage`` and deduplicated by their JSON form. A run's model
+    # name alone does not reproduce it: an evaluation logging runs through the
+    # API needs what each call was actually sent, and two-pass extraction or a
+    # fallback retry sends the same model different settings.
+    settings: dict = field(default_factory=dict)
+    # A multi-task workflow step makes its calls from several threads at once.
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+
+# The workflow step whose calls are being made: (index, name). Set by the
+# workflow engine around each step; the step's worker threads copy it.
+_current_step: ContextVar[Optional[tuple[int, str]]] = ContextVar(
+    "llm_meter_step", default=None
+)
+
+
+@contextlib.contextmanager
+def metered_step(index: int, name: str) -> Iterator[None]:
+    """Attribute the LLM calls made inside to workflow step ``index``."""
+    token = _current_step.set((index, name))
+    try:
+        yield
+    finally:
+        _current_step.reset(token)
+
+
+def model_usage_rows(scope: Optional["MeterScope"]) -> list[dict]:
+    """The scope's per-step, per-model usage, as stored on an ActivityEvent."""
+    if scope is None:
+        return []
+    with scope._lock:
+        items = list(scope.usage.items())
+        settings = {key: list(seen.values()) for key, seen in scope.settings.items()}
+    rows = []
+    for key, (tin, tout, requests) in items:
+        step_index, step_name, model = key
+        row = {
+            "step_index": step_index, "step": step_name, "model": model,
+            "tokens_input": tin, "tokens_output": tout, "requests": requests,
+        }
+        if settings.get(key):
+            row["settings"] = settings[key]
+        rows.append(row)
+    return rows
+
+
+def step_models(scope: Optional["MeterScope"], step_index: int) -> list[str]:
+    """Models used by workflow step ``step_index`` so far, most tokens first."""
+    rows = [r for r in model_usage_rows(scope) if r["step_index"] == step_index]
+    rows.sort(key=lambda r: -(r["tokens_input"] + r["tokens_output"]))
+    return list(dict.fromkeys(r["model"] for r in rows))
+
+
+def summarize_model_usage(rows: list[dict] | None) -> dict:
+    """Fold stored usage rows (possibly from several passes of one run: a
+    retry, an approval resume) into what History shows: the run's models,
+    most tokens first, and each workflow step's."""
+    totals: dict[str, int] = {}
+    steps: dict[int, dict] = {}
+    for row in rows or []:
+        model = row.get("model") or UNKNOWN_MODEL
+        tokens = (row.get("tokens_input") or 0) + (row.get("tokens_output") or 0)
+        totals[model] = totals.get(model, 0) + tokens
+        index = row.get("step_index")
+        if index is not None:
+            step = steps.setdefault(index, {"index": index, "name": row.get("step"), "tokens": {}})
+            step["tokens"][model] = step["tokens"].get(model, 0) + tokens
+
+    def ordered(tokens: dict[str, int]) -> list[str]:
+        return [m for m, _ in sorted(tokens.items(), key=lambda kv: -kv[1])]
+
+    return {
+        "models": ordered(totals),
+        "steps": [
+            {"index": s["index"], "name": s["name"], "models": ordered(s["tokens"])}
+            for s in sorted(steps.values(), key=lambda s: s["index"])
+        ],
+    }
+
+
+def run_model_fields(rows: list[dict] | None) -> dict:
+    """``models`` and ``step_models`` for a run's API payload (History)."""
+    summary = summarize_model_usage(rows)
+    return {"models": summary["models"], "step_models": summary["steps"]}
+
+
+# A call whose model the wrapper could not name.
+UNKNOWN_MODEL = "unknown"
 
 
 _current_scope: ContextVar[Optional[MeterScope]] = ContextVar(
@@ -131,13 +230,15 @@ def record_usage(
     output_tokens: int,
     *,
     estimated: bool = False,
+    settings: Optional[dict] = None,
 ) -> None:
     """Add one model request's usage to the active scope.
 
-    Called by MeteredModel after every request. If no scope is set (a call site
-    we haven't wired for attribution), the usage is still recorded under the
-    `unattributed` feature so nothing is lost, and a warning is logged so the
-    site can be found and wrapped.
+    Called by MeteredModel after every request, with ``settings`` describing
+    what the request was sent with (see ``MeterScope.settings``). If no scope
+    is set (a call site we haven't wired for attribution), the usage is still
+    recorded under the `unattributed` feature so nothing is lost, and a
+    warning is logged so the site can be found and wrapped.
     """
     scope = _current_scope.get()
     if scope is None:
@@ -155,13 +256,24 @@ def record_usage(
         )
         flush_sync(backstop)
         return
-    scope.tokens_in += input_tokens or 0
-    scope.tokens_out += output_tokens or 0
-    scope.requests += 1
-    if estimated:
-        scope.estimated = True
-    if model_name and not scope.model:
-        scope.model = model_name
+    step_index, step_name = _current_step.get() or (None, None)
+    key = (step_index, step_name, model_name or UNKNOWN_MODEL)
+    with scope._lock:
+        scope.tokens_in += input_tokens or 0
+        scope.tokens_out += output_tokens or 0
+        scope.requests += 1
+        if estimated:
+            scope.estimated = True
+        if model_name and not scope.model:
+            scope.model = model_name
+        entry = scope.usage.setdefault(key, [0, 0, 0])
+        entry[0] += input_tokens or 0
+        entry[1] += output_tokens or 0
+        entry[2] += 1
+        if settings:
+            seen = scope.settings.setdefault(key, {})
+            fingerprint = json.dumps(settings, sort_keys=True, default=str)
+            seen.setdefault(fingerprint, settings)
 
 
 # ---------------------------------------------------------------------------
@@ -265,11 +377,15 @@ def flush_sync(scope: MeterScope) -> None:
         if scope.activity_id:
             db.activity_event.update_one(
                 {"_id": ObjectId(scope.activity_id)},
-                {"$set": {
-                    "tokens_input": scope.tokens_in,
-                    "tokens_output": scope.tokens_out,
-                    "total_tokens": scope.tokens_in + scope.tokens_out,
-                }},
+                {
+                    "$set": {
+                        "tokens_input": scope.tokens_in,
+                        "tokens_output": scope.tokens_out,
+                        "total_tokens": scope.tokens_in + scope.tokens_out,
+                    },
+                    # Appended: a resumed or retried run flushes once per pass.
+                    "$push": {"model_usage": {"$each": model_usage_rows(scope)}},
+                },
             )
     except Exception as e:  # never let metering break the request
         logger.error("Failed to flush LLM usage (sync, feature=%s): %s", scope.feature, e)
@@ -291,6 +407,7 @@ async def flush_async(scope: MeterScope) -> None:
                 ev.tokens_input = scope.tokens_in
                 ev.tokens_output = scope.tokens_out
                 ev.total_tokens = scope.tokens_in + scope.tokens_out
+                ev.model_usage = list(ev.model_usage or []) + model_usage_rows(scope)
                 await ev.save()
     except Exception as e:
         logger.error("Failed to flush LLM usage (async, feature=%s): %s", scope.feature, e)

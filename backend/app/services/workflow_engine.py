@@ -28,6 +28,7 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
     form_value_is_missing,
 )
 from app.services.llm_service import create_chat_agent
+from app.services.metering import current_scope, metered_step, step_models
 from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 
 logger = logging.getLogger(__name__)
@@ -2501,28 +2502,36 @@ class WorkflowEngine:
                     "current_step_detail": f"Starting {node.name}",
                 })
 
-            if idx == 0 and latest_output is None:
-                output = node.process({})
-            else:
-                if isinstance(node, MultiTaskNode):
-                    for task in node.tasks:
-                        task.progress_reporter = (
-                            lambda detail=None, preview=None, step=node.name:
-                                workflow_result_updater({
-                                    "current_step_name": step,
-                                    "current_step_detail": detail,
-                                    "current_step_preview": preview,
-                                }) if workflow_result_updater else None
-                        )
-                output = node.process(latest_output or {})
+            # Every LLM call the step makes — its tasks' worker threads and a
+            # fallback retry included — is metered against this step, so the
+            # run records which model each step actually used.
+            with metered_step(idx, node.name):
+                if idx == 0 and latest_output is None:
+                    output = node.process({})
+                else:
+                    if isinstance(node, MultiTaskNode):
+                        for task in node.tasks:
+                            task.progress_reporter = (
+                                lambda detail=None, preview=None, step=node.name:
+                                    workflow_result_updater({
+                                        "current_step_name": step,
+                                        "current_step_detail": detail,
+                                        "current_step_preview": preview,
+                                    }) if workflow_result_updater else None
+                            )
+                    output = node.process(latest_output or {})
 
-            # Retry-on-empty / fallback-model. Optimizer-set hook: if the
-            # node's first task has ``_fallback_model`` and the output looks
-            # empty or error-shaped, re-run once with the fallback. Catches
-            # transient model failures (rate limits, partial outages) that
-            # would otherwise silently degrade the trial.
-            if _should_retry_with_fallback(node, output):
-                output = _retry_node_with_fallback(node, latest_output or {})
+                # Retry-on-empty / fallback-model. Optimizer-set hook: if the
+                # node's first task has ``_fallback_model`` and the output looks
+                # empty or error-shaped, re-run once with the fallback. Catches
+                # transient model failures (rate limits, partial outages) that
+                # would otherwise silently degrade the trial.
+                if _should_retry_with_fallback(node, output):
+                    output = _retry_node_with_fallback(node, latest_output or {})
+
+            models = step_models(current_scope(), idx)
+            if models and isinstance(output, dict):
+                output["models"] = models
 
             latest_output = output
 
@@ -2559,6 +2568,8 @@ class WorkflowEngine:
             warning = latest_output.get("warning")
             if isinstance(warning, str) and warning:
                 entry["warning"] = warning
+            if models:
+                entry["models"] = models
             data.append(entry)
 
         if latest_output is None:
@@ -2826,15 +2837,12 @@ def build_workflow_engine(
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Prompt":
                     n = PromptNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Formatter":
                     n = FormatNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "AddWebsite":
                     n = WebsiteNode(data=task_data)
@@ -2844,7 +2852,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "DescribeImage":
                     n = DescribeImageNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "CodeNode":
                     if not allow_code_execution:
@@ -2866,7 +2873,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "ResearchNode":
                     n = ResearchNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "APINode":
                     n = APICallNode(data=task_data)
@@ -2876,7 +2882,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "FormFiller":
                     n = FormFillerNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "DataExport":
                     n = DataExportNode(data=task_data)
@@ -2895,7 +2900,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "KnowledgeBaseQuery":
                     n = KnowledgeBaseQueryNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Approval":
                     n = ApprovalNode(data=task_data)
@@ -2915,8 +2919,13 @@ def build_workflow_engine(
                         "the task.",
                     )
 
-            # Propagate usage accumulator to all task nodes
+            # Every task gets the config snapshot and usage accumulator. The
+            # snapshot was once set per task type, and APINode/CrawlerNode were
+            # missed: their outbound URL check never saw the admin's allowed
+            # private hosts, so Test Step reached an allowed host while the
+            # full run blocked it.
             for t in tasks:
+                t._sys_cfg = system_config_doc
                 t._usage_acc = engine.usage
 
             node = MultiTaskNode(step_name)

@@ -546,7 +546,10 @@ async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
             "source_uuid": s.uuid,
             "document_uuid": s.document_uuid,
             "source_type": s.source_type,
-            "status": s.status,
+            # A source being refreshed still has its previous chunks in the
+            # index and answers from them, so chat must not call it
+            # "still indexing" (which tells the model it can't be searched).
+            "status": "ready" if s.status in ("pending", "processing") and s.chunk_count else s.status,
         })
     return manifest
 
@@ -777,7 +780,11 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
     kb.total_sources = len(sources)
     kb.sources_ready = sum(1 for s in sources if s.status == "ready")
     kb.sources_failed = sum(1 for s in sources if s.status == "error")
-    kb.total_chunks = sum(s.chunk_count for s in sources if s.status == "ready")
+    # A source being refreshed keeps its chunks in the index until the new
+    # ones replace them, so they still answer and still count.
+    kb.total_chunks = sum(
+        s.chunk_count for s in sources if s.status in ("ready", "pending", "processing")
+    )
     if kb.total_sources == 0:
         kb.status = "empty"
     elif kb.sources_ready + kb.sources_failed >= kb.total_sources:
@@ -1810,6 +1817,29 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         await source.save()
 
 
+async def fetch_source_page(url: str) -> WebFetchResult:
+    """The page a URL source indexes: the catalog's bundled text when it
+    ships one for this URL, else a live fetch.
+
+    ecfr.gov answers an automated fetch with a page shell, so the catalog
+    bundles its regulations (``bundled_sources``). Adding or refreshing such
+    a URL used to go to the live page anyway and index the shell.
+    """
+    from app.services.bundled_sources import bundled_source
+    from app.services.web_fetcher import WebFetchResult as _Result, fetch_url
+
+    bundled = bundled_source(url)
+    if bundled is None:
+        return await fetch_url(url, max_chars=_kb_text_cap())
+    text, title = bundled
+    cap = _kb_text_cap()
+    return _Result(
+        url=url, title=title or "", text=text[:cap], raw_html=None,
+        used_browser=False, status_code=200, final_url=url,
+        truncated=len(text) > cap,
+    )
+
+
 def _reject_fetched_page(result: WebFetchResult) -> str | None:
     """Why a fetched page must not be embedded, or None if it's real content.
 
@@ -1952,7 +1982,13 @@ async def refresh_url_source(
     if source.source_type != "url" or not source.url:
         return "Only URL sources can be refreshed"
 
-    previous_status = source.status
+    # Whether the source answers from indexed text right now. Not its status:
+    # every caller marks the source "pending" before queueing this (the
+    # per-source Refresh, Reprocess, Refresh all, the schedule), so the status
+    # read here was never "ready", and a failed refresh of a working source
+    # turned it into an error while its chunks kept answering (and the
+    # unchanged-page shortcut below never fired).
+    had_content = bool(source.chunk_count)
     source.last_refresh_attempted_at = currency.utcnow()
     source.status = "processing"
     await source.save()
@@ -1960,9 +1996,7 @@ async def refresh_url_source(
     reason: str | None
     result: WebFetchResult | None = None
     try:
-        from app.services.web_fetcher import fetch_url
-
-        result = await fetch_url(source.url, max_chars=_kb_text_cap())
+        result = await fetch_source_page(source.url)
         reason = _reject_fetched_page(result)
         if reason is None:
             reason = _reject_collapsed_refresh(
@@ -1984,7 +2018,7 @@ async def refresh_url_source(
         reason = reason or "Fetch returned no result"
         source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
         source.last_refresh_error = reason[:2000]
-        if previous_status == "ready":
+        if had_content:
             source.status = "ready"
             source.error_message = f"Refresh failed — previous content kept: {reason}"[:2000]
         else:
@@ -1997,8 +2031,7 @@ async def refresh_url_source(
     source.last_retrieved_at = currency.utcnow()
     new_hash = currency.content_fingerprint(raw_text)
     if (
-        previous_status == "ready"
-        and source.chunk_count
+        had_content
         and getattr(source, "content_hash", None) == new_hash
     ):
         # Same text as what is indexed: nothing to re-embed. Still a
@@ -2027,7 +2060,7 @@ async def refresh_url_source(
         reason = f"Refresh failed while re-indexing: {e}"[:2000]
         source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
         source.last_refresh_error = reason
-        if previous_status == "ready":
+        if had_content:
             source.status = "ready"
             source.error_message = f"Refresh failed while re-indexing — previous content kept: {e}"[:2000]
         else:
@@ -2065,9 +2098,7 @@ async def _ingest_url_source(
     source.status = "processing"
     await source.save()
     try:
-        from app.services.web_fetcher import fetch_url
-
-        result = await fetch_url(source.url, max_chars=_kb_text_cap())
+        result = await fetch_source_page(source.url)
         raw_text = result.text
 
         reject_reason = _reject_fetched_page(result)

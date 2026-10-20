@@ -33,6 +33,7 @@ from app.services.access_control import (
 )
 from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
+from app.services.run_metadata import describe_run
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -683,6 +684,9 @@ async def get_workflow_status(
         "workflow_name": workflow_name,
         "document_title": result.document_title,
         "start_time": result.start_time,
+        # Which models actually answered and with what settings, plus the
+        # configuration to reproduce the run (services/run_metadata.py).
+        "run_metadata": describe_run(result),
     }
 
 

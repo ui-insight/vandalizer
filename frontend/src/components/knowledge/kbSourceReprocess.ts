@@ -19,7 +19,10 @@ export interface SettledReprocess {
   unchanged: boolean
 }
 
-const inFlight = (s: KnowledgeBaseSource) => s.status === 'pending' || s.status === 'processing'
+/** Still being worked on. A stalled source is not: nothing will finish it. */
+export const isInFlight = (s: KnowledgeBaseSource) =>
+  (s.status === 'pending' || s.status === 'processing') && !s.stalled
+const inFlight = isInFlight
 
 /** Split tracked reprocesses into those still running and those that
  *  finished (ready or error) in ``sources``. A source no longer listed was
@@ -40,6 +43,13 @@ export function settleReprocesses(
     const outcome = t.mode === 'refetch' ? s.currency?.last_refresh_outcome : null
     const refetchFailed = s.status === 'ready'
       && (outcome === 'retrieval_failed' || outcome === 'ingestion_failed')
+    if (s.stalled) {
+      settled.push({
+        uuid, name: t.name, ok: false, chunkCount: s.chunk_count,
+        error: 'It stopped without finishing', keptPrevious: s.chunk_count > 0, unchanged: false,
+      })
+      continue
+    }
     const ok = s.status === 'ready' && !refetchFailed
     settled.push({
       uuid,
@@ -60,7 +70,16 @@ export function settleReprocesses(
 
 /** The live line under an in-flight source. ``mode`` is known only for a
  *  reprocess started in this session; otherwise the status alone speaks. */
-export function inFlightText(status: KnowledgeBaseSource['status'], mode?: KBSourceReprocessMode): string {
+export function inFlightText(
+  status: KnowledgeBaseSource['status'], mode?: KBSourceReprocessMode,
+  sourceType: KnowledgeBaseSource['source_type'] = 'document',
+): string {
+  // A web source never waits on document extraction; that line used to
+  // show under a stuck page refresh and sent users looking for a document.
+  if (sourceType === 'url') {
+    if (status === 'processing') return 'Fetching and indexing the page… it keeps answering from its previous text meanwhile'
+    return 'Queued to fetch the page…'
+  }
   if (status === 'processing') return 'Indexing… large documents can take a few minutes'
   if (mode === 'reextract') return 'Reprocessing — re-reading the document’s text first…'
   if (mode === 'reindex' || mode === 'refetch') return 'Reprocessing — queued…'
