@@ -141,6 +141,15 @@ class WorkflowResult(Document):
     # so the resume task reads it back from here to keep steps after the gate on
     # the same model. None for runs created before this field existed.
     model: Optional[str] = None
+    # Reproducibility record (services/run_metadata.py), returned by the
+    # status endpoint as ``run_metadata``. ``run_config`` is the configuration
+    # the first execution pass was built from; ``model_usage`` and
+    # ``model_configs`` are appended by every pass with the models its calls
+    # used, the settings each was sent with, and those models' System Config
+    # entries. None / empty for runs created before these fields existed.
+    run_config: Optional[dict] = None
+    model_usage: list[dict] = []
+    model_configs: list[dict] = []
     # Celery task id of the execution job, captured at enqueue time so a user
     # can cancel an in-flight run (revoke + terminate). None for runs created
     # before this field existed or for runs that never enqueued a task.

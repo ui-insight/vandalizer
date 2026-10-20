@@ -523,12 +523,26 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         wf_user_doc = db.user.find_one({"user_id": wf_user_id}) if wf_user_id else None
         wf_is_admin = bool(wf_user_doc and wf_user_doc.get("is_admin"))
 
+        # The optimizer's applied override (per-step model and prompt variant)
+        # holds for every run of the workflow. This path left it out, so a
+        # tuned workflow ran its tuned configuration when someone clicked Run
+        # and the untuned one when the schedule fired.
         engine = build_workflow_engine(
             steps_data=steps_data,
             model=model,
             user_id=wf_user_id,
             system_config_doc=sys_config,
             allow_code_execution=wf_is_admin,
+            config_override=workflow.get("config_override"),
+        )
+
+        from app.services.run_metadata import record_pass_usage, snapshot_run_config
+
+        snapshot_run_config(
+            db, result_id,
+            workflow_doc=workflow, steps_data=steps_data,
+            trigger_step_data=trigger_step_data, model=model, sys_config=sys_config,
+            config_override=workflow.get("config_override"),
         )
 
         def _check_budget() -> None:
@@ -538,8 +552,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             check_sync(wf_user_id)
 
         from app.services.metering import metered
-        with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
-            final_output, data = engine.execute(check_budget=_check_budget)
+        with metered(
+            "workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id"),
+        ) as meter_scope:
+            try:
+                final_output, data = engine.execute(check_budget=_check_budget)
+            finally:
+                record_pass_usage(db, result_id, meter_scope, sys_config)
 
         # Update result
         completed_at = datetime.now(timezone.utc)
