@@ -2826,15 +2826,12 @@ def build_workflow_engine(
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Prompt":
                     n = PromptNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Formatter":
                     n = FormatNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "AddWebsite":
                     n = WebsiteNode(data=task_data)
@@ -2844,7 +2841,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "DescribeImage":
                     n = DescribeImageNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "CodeNode":
                     if not allow_code_execution:
@@ -2866,7 +2862,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "ResearchNode":
                     n = ResearchNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "APINode":
                     n = APICallNode(data=task_data)
@@ -2876,7 +2871,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "FormFiller":
                     n = FormFillerNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "DataExport":
                     n = DataExportNode(data=task_data)
@@ -2895,7 +2889,6 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "KnowledgeBaseQuery":
                     n = KnowledgeBaseQueryNode(data=task_data)
-                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Approval":
                     n = ApprovalNode(data=task_data)
@@ -2915,8 +2908,13 @@ def build_workflow_engine(
                         "the task.",
                     )
 
-            # Propagate usage accumulator to all task nodes
+            # Every task gets the config snapshot and usage accumulator. The
+            # snapshot was once set per task type, and APINode/CrawlerNode were
+            # missed: their outbound URL check never saw the admin's allowed
+            # private hosts, so Test Step reached an allowed host while the
+            # full run blocked it.
             for t in tasks:
+                t._sys_cfg = system_config_doc
                 t._usage_acc = engine.usage
 
             node = MultiTaskNode(step_name)
