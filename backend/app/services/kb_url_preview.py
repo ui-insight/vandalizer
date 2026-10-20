@@ -54,7 +54,14 @@ NO_PROGRESS_MESSAGE = (
     "This is taking longer than expected. The server hasn't fetched another "
     "page for a while — a site may be slow to respond."
 )
+NO_WORKERS_MESSAGE = (
+    "The server's background workers aren't running, so the preview can't "
+    "start. Retrying won't help — ask your administrator to restart them."
+)
 DEAD_MESSAGE = "The preview stopped before it finished. Try again."
+
+#: The task run_preview runs in; its queue is the one that must have a worker.
+PREVIEW_TASK = "tasks.kb.preview_urls"
 
 
 class PreviewCanceled(Exception):
@@ -332,7 +339,14 @@ async def check_progress(preview: KBUrlPreview, now: datetime.datetime | None = 
             preview.error_message = DEAD_MESSAGE
         return None
     if preview.started_at is None:
-        return NOT_STARTED_MESSAGE if now - last > NOT_STARTED_AFTER else None
+        if now - last <= NOT_STARTED_AFTER:
+            return None
+        # Busy and down look the same from here; only down makes Retry useless.
+        from app.services.worker_status import queue_for, queue_has_worker
+
+        if await queue_has_worker(queue_for(PREVIEW_TASK)) is False:
+            return NO_WORKERS_MESSAGE
+        return NOT_STARTED_MESSAGE
     return NO_PROGRESS_MESSAGE if now - last > NO_PROGRESS_AFTER else None
 
 

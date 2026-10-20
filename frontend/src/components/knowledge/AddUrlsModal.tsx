@@ -404,7 +404,9 @@ function ReviewStep({ kbUuid, preview, kept, onToggle, onRetry, onCancel, busy }
             }}
           >
             <span style={{ flex: 1, minWidth: 200 }}>{preview.stall_message}</span>
-            <button type="button" onClick={onRetry} disabled={busy} style={secondaryButton}>Retry</button>
+            {!preview.workers_down && (
+              <button type="button" onClick={onRetry} disabled={busy} style={secondaryButton}>Retry</button>
+            )}
             <button type="button" onClick={onCancel} disabled={busy} style={secondaryButton}>Cancel preview</button>
           </div>
         ) : running ? null : preview.status === 'error' ? (

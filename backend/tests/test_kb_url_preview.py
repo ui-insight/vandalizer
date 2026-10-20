@@ -197,8 +197,30 @@ class TestStallDetection:
     @pytest.mark.asyncio
     async def test_a_preview_no_worker_has_picked_up_is_reported_after_a_minute(self):
         coll = _FakeCollection()
-        with patch.object(kb_url_preview, "_collection", return_value=coll):
+        with patch.object(kb_url_preview, "_collection", return_value=coll), \
+             patch("app.services.worker_status.queue_has_worker", AsyncMock(return_value=True)):
             assert await kb_url_preview.check_progress(_running(30), now=NOW) is None
+            msg = await kb_url_preview.check_progress(_running(61), now=NOW)
+        assert msg == kb_url_preview.NOT_STARTED_MESSAGE
+
+    @pytest.mark.asyncio
+    async def test_a_queue_with_no_worker_says_so_instead_of_busy(self):
+        coll = _FakeCollection()
+        has_worker = AsyncMock(return_value=False)
+        with patch.object(kb_url_preview, "_collection", return_value=coll), \
+             patch("app.services.worker_status.queue_has_worker", has_worker):
+            assert await kb_url_preview.check_progress(_running(30), now=NOW) is None
+            msg = await kb_url_preview.check_progress(_running(61), now=NOW)
+        assert msg == kb_url_preview.NO_WORKERS_MESSAGE
+        # Asked about the queue the preview task is routed to, and only once
+        # the minute was up.
+        has_worker.assert_awaited_once_with("workflows")
+
+    @pytest.mark.asyncio
+    async def test_an_unanswerable_worker_check_falls_back_to_busy(self):
+        coll = _FakeCollection()
+        with patch.object(kb_url_preview, "_collection", return_value=coll), \
+             patch("app.services.worker_status.queue_has_worker", AsyncMock(return_value=None)):
             msg = await kb_url_preview.check_progress(_running(61), now=NOW)
         assert msg == kb_url_preview.NOT_STARTED_MESSAGE
 
@@ -299,6 +321,24 @@ class TestStallRoutes:
         body = resp.json()
         assert body["stalled"] is True
         assert body["stall_message"] == kb_url_preview.NOT_STARTED_MESSAGE
+        assert body["workers_down"] is False
+
+    @pytest.mark.asyncio
+    async def test_poll_says_when_no_worker_can_run_it(self, client):
+        cookies, headers = _auth()
+        _, patches = _routes()
+        preview = SimpleNamespace(uuid="pv-1", status="running", error_message=None, crawl_enabled=False)
+        with patches[0], patches[1], patches[2], patches[3], \
+             patch.object(kb_url_preview, "get_preview", AsyncMock(return_value=preview)), \
+             patch.object(kb_url_preview, "check_progress",
+                          AsyncMock(return_value=kb_url_preview.NO_WORKERS_MESSAGE)), \
+             patch.object(kb_url_preview, "list_pages", AsyncMock(return_value=[])):
+            resp = await client.get(
+                "/api/knowledge/kb-uuid-1/add_urls/preview/pv-1", cookies=cookies, headers=headers,
+            )
+        body = resp.json()
+        assert body["stalled"] is True
+        assert body["workers_down"] is True
 
     @pytest.mark.asyncio
     async def test_cancel_route_cancels_the_callers_preview(self, client):

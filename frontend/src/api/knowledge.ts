@@ -118,6 +118,8 @@ export interface UrlPreview {
   /** Still running, but the worker hasn't started or hasn't fetched a page in a while. */
   stalled?: boolean
   stall_message?: string | null
+  /** No worker is consuming the preview's queue, so Retry would stall the same way. */
+  workers_down?: boolean
   pages: UrlPreviewPage[]
 }
 

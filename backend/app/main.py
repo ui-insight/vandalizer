@@ -339,11 +339,22 @@ async def health() -> JSONResponse:
 
     all_ok = all(v == "ok" for v in checks.values())
     status_code = 200 if all_ok else 503
+
+    # Reported, but not part of the status: this endpoint is the API's own
+    # liveness/readiness probe, and a dead worker is no reason to restart or
+    # unroute a working API. Without it, a day-long worker outage read "ok".
+    from app.services.worker_status import worker_summary
+
+    workers = (
+        await worker_summary() if checks["redis"] == "ok"
+        else {"status": "unknown", "queues": [], "missing_queues": []}
+    )
     return JSONResponse(
         status_code=status_code,
         content={
             "status": "ok" if all_ok else "degraded",
             "checks": checks,
+            "workers": workers,
             "resources": _fd_usage(),
         },
     )
