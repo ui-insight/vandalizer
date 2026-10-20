@@ -185,10 +185,10 @@ function DocumentCitationPopover({ citation, anchor, onClose, onOpen }: {
 }
 
 const CHIP_STYLE: CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 260, height: 20,
+  display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 220, height: 20,
   padding: '0 8px 0 5px', fontFamily: 'inherit', fontSize: 11, fontWeight: 500, lineHeight: '18px',
   color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: 999,
-  cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden',
 }
 
 /** A document chip and its popover. Outside the workspace (a test, a shared
@@ -198,6 +198,7 @@ export function DocumentCitationChip({ citation }: { citation: DocumentCitation 
   const [anchor, setAnchor] = useState<FloatAnchor | null>(null)
   const close = useCallback(() => setAnchor(null), [])
   const label = documentCitationLabel(citation)
+  const locator = formatPageLocator(citation.page, citation.pageApproximate)
 
   const open = ws ? () => {
     setAnchor(null)
@@ -228,7 +229,9 @@ export function DocumentCitationChip({ citation }: { citation: DocumentCitation 
         style={CHIP_STYLE}
       >
         <FileText aria-hidden="true" style={{ width: 11, height: 11, flexShrink: 0 }} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        {/* A long file name gives way; the page is the part that matters. */}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{citation.documentTitle}</span>
+        {locator && <span style={{ flexShrink: 0 }}>· {locator}</span>}
       </button>
       {anchor && <DocumentCitationPopover citation={citation} anchor={anchor} onClose={close} onOpen={open} />}
     </>

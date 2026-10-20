@@ -3307,10 +3307,13 @@ function TracedValuesTable({ rows }: { rows: TracedValueRow[] }) {
               return (
                 <tr key={`${r.record}:${r.field}`} style={{ borderTop: '1px solid #f3f4f6', verticalAlign: 'top' }}>
                   {manyRecords && <td style={{ padding: '6px 10px', color: '#6b7280' }}>{r.record}</td>}
-                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' }}>
+                  {/* A saved set's field can be a whole sentence ("Funding
+                      Opportunity Number / ID (e.g., …)"): it wraps, so the
+                      values keep room to read. */}
+                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-word', minWidth: 120, maxWidth: 220 }}>
                     {r.field}
                   </td>
-                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', maxWidth: 320 }}>
+                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', minWidth: 120, maxWidth: 320 }}>
                     {fillValueText(r.value) || <span style={{ color: '#9ca3af' }}>—</span>}
                   </td>
                   <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
