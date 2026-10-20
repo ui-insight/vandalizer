@@ -216,6 +216,14 @@ def test_json_text_rows_also_say_where_each_statement_sits_in_its_leaf():
     ]
 
 
+def test_a_bold_line_without_a_sentence_is_a_heading():
+    """Seen in a real run: "**Allocability of the cost**" heads a section;
+    linked to a passage on allocability, it read as a sourced claim."""
+    md = "**Allocability of the cost**\n\n- The cost is allocable.\n\n**The award ends in 2029.**\n"
+    _, stmts = split_output(md)
+    assert [md[s.start:s.end] for s in stmts] == ["The cost is allocable.", "The award ends in 2029."]
+
+
 def test_files_are_not_split():
     assert split_output({"type": "file_download", "filename": "x.pdf"}) == ("none", [])
 

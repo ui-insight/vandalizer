@@ -197,6 +197,9 @@ def sentence_spans(s: str, start: int = 0, end: int | None = None) -> list[tuple
 _FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
 _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 _HR_RE = re.compile(r"^\s{0,3}([-*_])(?:\s*\1){2,}\s*$")
+# A line that is one bold phrase and no sentence ("**Allocability of the
+# cost**") is a heading written without "#".
+_BOLD_HEADING_RE = re.compile(r"^\s{0,3}(\*\*|__)[^*_\n]{1,100}?[^.!?*_\s]\1:?\s*$")
 _TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _LIST_RE = re.compile(r"^\s*(?:[-*+•]|\d{1,3}[.)])\s+(?:\[[ xX]\]\s+)?")
 _QUOTE_RE = re.compile(r"^\s{0,3}(?:>\s?)+")
@@ -291,7 +294,7 @@ def markdown_statements(text: str, base: int = 0, label: str = "") -> list[State
             _json_line(out, text, off, line, label, base)
             i += 1
             continue
-        if not line.strip() or _HR_RE.match(line) or _HEADING_RE.match(line):
+        if not line.strip() or _HR_RE.match(line) or _HEADING_RE.match(line) or _BOLD_HEADING_RE.match(line):
             i += 1
             continue
         # A table: a header row, then a separator row, then body rows.
