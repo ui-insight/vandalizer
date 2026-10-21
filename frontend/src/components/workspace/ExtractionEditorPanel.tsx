@@ -1016,6 +1016,7 @@ export function ExtractionEditorPanel() {
         {openExtractionId && (
           <RunHistoryTab
             fetchHistory={() => getExtractionHistory(openExtractionId)}
+            historyKey={openExtractionId}
             type="extraction"
           />
         )}

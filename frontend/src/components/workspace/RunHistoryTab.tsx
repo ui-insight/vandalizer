@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck, Cpu } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -416,27 +416,37 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
 
 export function RunHistoryTab({
   fetchHistory,
+  historyKey,
   type,
 }: {
   fetchHistory: () => Promise<{ runs: HistoryRun[] }>
+  /** What the history is of (a workflow or extraction id). The list is
+   *  fetched again only when this changes: callers pass a new
+   *  `fetchHistory` closure on every render, and refetching on each one
+   *  blanked the list and collapsed the run a user had just opened. */
+  historyKey?: string
   type: 'workflow' | 'extraction'
 }) {
   const [runs, setRuns] = useState<HistoryRun[]>([])
   const [loading, setLoading] = useState(true)
+  const fetchRef = useRef(fetchHistory)
+  // Before the load below: effects run in order.
+  useEffect(() => { fetchRef.current = fetchHistory })
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const data = await fetchHistory()
+      const data = await fetchRef.current()
       setRuns(data.runs)
     } catch {
       // silent
     } finally {
       setLoading(false)
     }
-  }, [fetchHistory])
+  }, [])
 
-  useEffect(() => { load() }, [load])
+  // Keyed on what the history is of; without a key, on the fetcher itself.
+  const reloadOn = historyKey ?? fetchHistory
+  useEffect(() => { load() }, [load, reloadOn])
 
   if (loading) {
     return (

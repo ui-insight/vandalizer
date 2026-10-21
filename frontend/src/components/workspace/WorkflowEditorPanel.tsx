@@ -1140,6 +1140,7 @@ export function WorkflowEditorPanel() {
         {activeTab === 'history' && openWorkflowId && (
           <RunHistoryTab
             fetchHistory={() => getWorkflowHistory(openWorkflowId)}
+            historyKey={openWorkflowId}
             type="workflow"
           />
         )}

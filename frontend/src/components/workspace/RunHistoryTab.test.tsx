@@ -98,6 +98,25 @@ describe('RunHistoryTab — workflow run output', () => {
     expect(screen.getByRole('dialog', { name: 'Source: NoA.pdf · p. 4' })).toBeTruthy()
   })
 
+  it('keeps an opened run open when the editor re-renders with a new fetcher', async () => {
+    mockGetWorkflowStatus.mockResolvedValue({ final_output: { output: 'Summary of the **grant proposal**' } } as never)
+    const fetchHistory = vi.fn(() => Promise.resolve({ runs: [makeRun()] }))
+    const { rerender } = render(
+      <RunHistoryTab fetchHistory={() => fetchHistory()} historyKey="wf-1" type="workflow" />,
+    )
+    fireEvent.click(await screen.findByRole('button', { expanded: false }))
+    await waitFor(() => expect(screen.getByText(/Summary of the/)).toBeTruthy())
+
+    // The editor passes a fresh closure on every render (a run poll, say).
+    rerender(<RunHistoryTab fetchHistory={() => fetchHistory()} historyKey="wf-1" type="workflow" />)
+    rerender(<RunHistoryTab fetchHistory={() => fetchHistory()} historyKey="wf-1" type="workflow" />)
+    expect(screen.getByText(/Summary of the/)).toBeTruthy()
+    expect(fetchHistory).toHaveBeenCalledTimes(1)
+
+    rerender(<RunHistoryTab fetchHistory={() => fetchHistory()} historyKey="wf-2" type="workflow" />)
+    await waitFor(() => expect(fetchHistory).toHaveBeenCalledTimes(2))
+  })
+
   it('offers download formats for the expanded run', async () => {
     mockGetWorkflowStatus.mockResolvedValue({
       status: 'completed',
