@@ -18,7 +18,7 @@ export function OptimizationProgress({ run, onCancel, cancelling }: Props) {
       cancelling={cancelling}
       scoreFloorLabel="Default settings: composite quality"
       scoreFloorDescription="Retrieval and answer quality on the same test questions used for the trials."
-      liftLabel="vs default settings"
+      baselineName="your default settings"
     />
   )
 }

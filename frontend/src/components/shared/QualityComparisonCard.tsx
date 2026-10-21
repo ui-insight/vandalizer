@@ -107,9 +107,11 @@ export function QualityComparisonCard({
   const liftVsDefault = optimizedBaseline?.score != null && defaultBaseline?.score != null
     ? (optimizedBaseline.score - defaultBaseline.score) * 100
     : null
-  const liftVsSecondary = optimizedBaseline?.score != null && secondaryBaseline?.score != null
-    ? (optimizedBaseline.score - secondaryBaseline.score) * 100
-    : null
+  // The differences the text states are between the whole percents the bars
+  // show: 94.6% vs 93.4% reads "95%" and "93%", so the text says +2, never +1.
+  // The unrounded lift above still drives the significance calls.
+  const shownLiftVsDefault = shownDifference(optimizedBaseline?.score, defaultBaseline?.score)
+  const shownLiftVsSecondary = shownDifference(optimizedBaseline?.score, secondaryBaseline?.score)
 
   // Preferred path: paired-bootstrap test. Significant when the CI excludes 0
   // AND the permutation p-value is below 0.05.
@@ -255,7 +257,7 @@ export function QualityComparisonCard({
                   ? `Only n=${liftCI.n_queries} paired ${liftCI.n_queries === 1 ? 'query was' : 'queries were'} available for the statistical test — at least ${MIN_N_FOR_SIGNIFICANCE} are needed for a reliable call. The bars are real measurements, but we can't yet tell how much of the difference would repeat on new questions. Add more test queries and re-run for a trustworthy verdict.`
                   : liftCI && ciSpansZero
                     ? `The 95% CI on the per-query lift spans zero (${fmtSignedPts(liftCI.lower * 100)} to ${fmtSignedPts(liftCI.upper * 100)}, n=${liftCI.n_queries}, p=${liftCI.p_value < 0.001 ? '<0.001' : liftCI.p_value.toFixed(3)}). On answer quality, treat the optimized run as equivalent to default.`
-                    : `The ${liftVsDefault > 0 ? '+' : ''}${liftVsDefault.toFixed(0)}pts difference is inside the judge's measurement noise${legacyCi > 0 ? ` (±${(legacyCi * 100).toFixed(1)}pts)` : ''} — treat the optimized run as equivalent to default.`}
+                    : `The ${fmtSignedWholePts(shownLiftVsDefault ?? 0)} difference is inside the judge's measurement noise${legacyCi > 0 ? ` (±${(legacyCi * 100).toFixed(1)}pts)` : ''} — treat the optimized run as equivalent to default.`}
                 {liftCI && statsCoverageGap && judgeLiftPts != null && (
                   ` The test covers the per-query answer-quality scores (${fmtSignedPts(judgeLiftPts)} there); the rest of the bar difference comes from score components measured once per configuration, which can't be significance-tested.`
                 )}
@@ -267,14 +269,14 @@ export function QualityComparisonCard({
                 fontSize: 'var(--workspace-font-section-title)', fontWeight: 700,
                 color: liftVsDefault > 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)',
               }}>
-                {liftVsDefault > 0 ? '+' : ''}{liftVsDefault.toFixed(0)}pts
+                {fmtSignedWholePts(shownLiftVsDefault ?? 0)}
               </span>
               <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>over {defaultBaseline?.label ?? 'default'}</span>
-              {liftVsSecondary != null && secondaryBaseline && (
+              {shownLiftVsSecondary != null && secondaryBaseline && (
                 <>
                   <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>·</span>
                   <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
-                    +{liftVsSecondary.toFixed(0)}pts over {secondaryBaseline.label}
+                    {fmtSignedWholePts(shownLiftVsSecondary)} vs {secondaryBaseline.label}
                   </span>
                 </>
               )}
@@ -340,4 +342,15 @@ function SignificanceBadge({
 
 function fmtSignedPts(p: number): string {
   return `${p >= 0 ? '+' : ''}${p.toFixed(1)}pts`
+}
+
+
+/** Difference in whole percentage points between two 0..1 scores as displayed. */
+export function shownDifference(score: number | null | undefined, against: number | null | undefined): number | null {
+  if (score == null || against == null) return null
+  return Number((score * 100).toFixed(0)) - Number((against * 100).toFixed(0))
+}
+
+function fmtSignedWholePts(pts: number): string {
+  return `${pts > 0 ? '+' : ''}${pts}pts`
 }

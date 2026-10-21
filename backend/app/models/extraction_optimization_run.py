@@ -78,6 +78,10 @@ class ExtractionOptimizationRun(Document):
     # is set and the in-sample score is the headline.
     optimized_score_train: Optional[float] = None
     holdout_default_score: Optional[float] = None
+    # The winner's held-out re-score, set only when it succeeded: the headline
+    # is held-out exactly when this is set, and only then may it be paired
+    # with ``holdout_default_score``. Same field as KBOptimizationRun.
+    holdout_optimized_score: Optional[float] = None
     # Sample-size discount applied to the headline scores above so the optimizer
     # lives on the same scale as the certified ValidationRun / quality tile
     # (Option A — see run_optimization). Shape: {sample_size_factor,

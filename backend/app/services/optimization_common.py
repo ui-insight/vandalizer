@@ -42,6 +42,26 @@ def tie_band(
 MIN_N_FOR_LIFT_CI = 5
 
 
+def reported_baseline_score(
+    *,
+    holdout_optimized_score: float | None,
+    holdout_default_score: float | None,
+    baseline_default_score: float | None,
+) -> float | None:
+    """The current-settings score a run's headline is compared against.
+
+    When the winner was re-scored on held-out cases, the headline is that
+    held-out score, so the current settings must be the held-out score too.
+    Paired with the training-case baseline instead, the editor showed
+    Optimized 95% against Current 93% (a gap measured on different cases)
+    and chat, the gate and the card each read the gap differently. Falls
+    back to the training baseline when the held-out pair is incomplete.
+    """
+    if holdout_optimized_score is not None and holdout_default_score is not None:
+        return holdout_default_score
+    return baseline_default_score
+
+
 def tied_on_reported_scores(
     *,
     tied: bool,

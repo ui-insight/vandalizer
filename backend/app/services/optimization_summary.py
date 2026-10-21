@@ -14,6 +14,7 @@ from typing import Optional
 from app.models.extraction_optimization_run import ExtractionOptimizationRun
 from app.models.kb_optimization_run import KBOptimizationRun
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
+from app.services.optimization_common import reported_baseline_score
 
 # Inbox window: shadow runs older than this are considered stale and dropped
 # from the inbox response (they're still in the per-surface history view).
@@ -28,7 +29,11 @@ def summarize_kb_run(run: KBOptimizationRun) -> dict:
         "status": run.status,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "score": run.optimized_score,
-        "baseline_score": run.baseline_default_score,
+        "baseline_score": _reported_baseline(run),
+        "compared_on_held_out_cases": (
+            _held_out_headline(run) is not None
+            and getattr(run, "holdout_default_score", None) is not None
+        ),
         "trigger": (run.options or {}).get("shadow_trigger"),
         "trigger_detail": (run.options or {}).get("shadow_trigger_detail") or {},
         "tied_with_baseline": run.tied_with_baseline,
@@ -38,6 +43,70 @@ def summarize_kb_run(run: KBOptimizationRun) -> dict:
         # Direct link target for the UI to deep-link the autovalidate panel.
         "link": f"/?mode=knowledge&kb={run.kb_uuid}&run={run.uuid}",
     }
+
+
+def _held_out_headline(run) -> Optional[float]:
+    """The run's headline score when it was measured on held-out cases.
+
+    Runs from before ``holdout_optimized_score`` existed are recognised as the
+    KB comparison card recognises them: a headline that differs from the
+    training score can only be the held-out re-score.
+    """
+    held_out = getattr(run, "holdout_optimized_score", None)
+    if held_out is not None:
+        return held_out
+    train = getattr(run, "optimized_score_train", None)
+    if (
+        getattr(run, "holdout_default_score", None) is not None
+        and run.optimized_score is not None
+        and train is not None
+        and run.optimized_score != train
+    ):
+        return run.optimized_score
+    return None
+
+
+def _reported_baseline(run) -> Optional[float]:
+    """Current settings' score, on the same cases as the run's headline."""
+    return reported_baseline_score(
+        holdout_optimized_score=_held_out_headline(run),
+        holdout_default_score=getattr(run, "holdout_default_score", None),
+        baseline_default_score=run.baseline_default_score,
+    )
+
+
+# What each winner_selection_reason means, in the editor's words.
+_WINNER_REASON_TEXT = {
+    "highest_score": "The best setup beat the runner-up by more than the scoring noise.",
+    "default_in_cluster": (
+        "Your current settings scored within the noise of the best setup, so the "
+        "results don't justify changing them."
+    ),
+    "tied_with_baseline": (
+        "The best setup scored within the noise of your current settings, so the "
+        "results don't justify changing them."
+    ),
+    "tied_on_reported_score": (
+        "The best setup led on the cases used to pick it, but re-scored on the "
+        "held-out cases it came within the noise of your current settings. The "
+        "lead didn't hold up."
+    ),
+    "closest_to_default": (
+        "Several setups tied for the lead; this is the one that changes the "
+        "fewest settings."
+    ),
+    "no_judge_variance": (
+        "The scoring noise couldn't be measured, so a default noise level was "
+        "used. Treat the difference as a rough estimate."
+    ),
+}
+
+
+def winner_reason_text(reason: Optional[str]) -> Optional[str]:
+    """A winner_selection_reason in plain words, never the raw code."""
+    if not reason:
+        return None
+    return _WINNER_REASON_TEXT.get(reason, "The winner was picked by the optimizer's selection rule.")
 
 
 def _percent(score: Optional[float]) -> Optional[int]:
@@ -54,6 +123,13 @@ def with_percent_scores(summary: dict) -> dict:
     """
     summary["score_percent"] = _percent(summary.get("score"))
     summary["baseline_score_percent"] = _percent(summary.get("baseline_score"))
+    # The difference between the two numbers shown, not the rounded raw
+    # difference: 94.6% vs 93.4% is "95% vs 93%", a 2-point difference.
+    summary["difference_points"] = (
+        summary["score_percent"] - summary["baseline_score_percent"]
+        if summary["score_percent"] is not None and summary["baseline_score_percent"] is not None
+        else None
+    )
     return summary
 
 
@@ -87,7 +163,11 @@ def summarize_extraction_run(run: ExtractionOptimizationRun) -> dict:
         "status": run.status,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "score": run.optimized_score,
-        "baseline_score": run.baseline_default_score,
+        "baseline_score": _reported_baseline(run),
+        "compared_on_held_out_cases": (
+            _held_out_headline(run) is not None
+            and getattr(run, "holdout_default_score", None) is not None
+        ),
         "trigger": (run.options or {}).get("shadow_trigger"),
         "trigger_detail": (run.options or {}).get("shadow_trigger_detail") or {},
         "tied_with_baseline": getattr(run, "tied_with_baseline", False),
@@ -112,7 +192,11 @@ def summarize_workflow_run(run: WorkflowOptimizationRun) -> dict:
         "status": run.status,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "score": run.optimized_score,
-        "baseline_score": run.baseline_default_score,
+        "baseline_score": _reported_baseline(run),
+        "compared_on_held_out_cases": (
+            _held_out_headline(run) is not None
+            and getattr(run, "holdout_default_score", None) is not None
+        ),
         "trigger": (run.options or {}).get("shadow_trigger"),
         "trigger_detail": (run.options or {}).get("shadow_trigger_detail") or {},
         "tied_with_baseline": run.tied_with_baseline,

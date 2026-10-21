@@ -681,6 +681,12 @@ export interface ExtractionOptimizationRun {
   baseline_no_tool_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Held-out re-scores: present when the run split its test set. The
+   *  headline is held-out exactly when holdout_optimized_score is set; pair
+   *  scores with reportedBaselineScore (shared/optimizerScores). */
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  holdout_optimized_score?: number | null
   /** Sample-size discount applied to the headline scores above so they live on
    *  the same scale as the certified ValidationRun / quality tile (Option A).
    *  Null on legacy runs (their scores were stored raw/un-discounted). */

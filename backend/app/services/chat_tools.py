@@ -4099,7 +4099,11 @@ async def get_optimization_run(
         item_kind: One of 'knowledge_base', 'search_set', or 'workflow' (aliases 'kb' / 'extraction' accepted).
         run_uuid: UUID of the optimization run.
     """
-    from app.services.optimization_summary import get_run_by_uuid, summarize_run
+    from app.services.optimization_summary import (
+        get_run_by_uuid,
+        summarize_run,
+        winner_reason_text,
+    )
 
     kind = _OPTIMIZE_KIND_ALIASES.get(item_kind)
     if not kind:
@@ -4123,25 +4127,43 @@ async def get_optimization_run(
 
     summary = summarize_run(run) or {}
     summary.pop("apply_preview", None)
+    tokens_used = getattr(run, "tokens_used", None)
     summary.update({
         "phase": getattr(run, "phase", None),
         "progress_message": getattr(run, "progress_message", None),
-        "tokens_used": getattr(run, "tokens_used", None),
+        # Formatted as the editor shows it; a bare 281102 was read out as is.
+        "tokens_used": f"{tokens_used:,}" if isinstance(tokens_used, int) else tokens_used,
         "estimated_cost_usd": getattr(run, "estimated_cost_usd", None),
-        "winner_selection_reason": getattr(run, "winner_selection_reason", None),
+        # The reason in words; the raw code ("tied_on_reported_score") was
+        # quoted to users verbatim.
+        "why_this_result": winner_reason_text(getattr(run, "winner_selection_reason", None)),
         "stopped_reason": getattr(run, "stopped_reason", None),
         "error_message": getattr(run, "error_message", None),
     })
+    # Trial scores were measured on the cases used to pick the winner, the
+    # headline on held-out cases: "final 94%, best trial 88%" read as one
+    # result contradicting another.
+    for key in ("best_trial_score_percent", "top_trial_score_percent"):
+        if key in summary:
+            summary[key.replace("_score_percent", "_score_percent_on_selection_cases")] = summary.pop(key)
+    summary["how_to_report_scores"] = (
+        "Report exactly the editor's numbers: score_percent (optimized) against "
+        "baseline_score_percent (current settings), a difference of "
+        "difference_points points"
+        + (", both measured on held-out test cases" if summary.get("compared_on_held_out_cases") else "")
+        + ". A positive difference is better and a negative one worse; never "
+        "call a negative difference better. Trial scores (*_on_selection_cases) "
+        "come from the cases used to pick the winner and are not comparable "
+        "with those two; mention them only as such. Explain the outcome with "
+        "why_this_result, never with an internal code."
+    )
     if summary.get("status") == "completed" and not summary.get("applied_at"):
         if summary.get("tied_with_baseline"):
             summary["note"] = (
-                "No meaningful difference: the top trial is within measurement "
-                "noise of the current settings, so applying would not "
-                "meaningfully change quality. best_config is the simplest setup "
-                "among the tied trials, not the top scorer; give its score "
-                "(best_trial_score_percent) and the top trial's "
-                "(top_trial_score_percent) if you mention it, and quote scores as "
-                "percents (score_percent, baseline_score_percent)."
+                "No meaningful difference, and Apply is disabled in the editor for "
+                "this run. Do not offer apply_optimization; it will refuse. The "
+                "user can keep their current settings or run the optimizer again "
+                "with more test cases."
             )
         else:
             summary["note"] = "Completed and unapplied — offer apply_optimization."
@@ -4284,18 +4306,22 @@ async def apply_optimization(
     if run.status != "completed":
         return {"error": f"Cannot apply — run status is '{run.status}', expected 'completed'."}
 
-    optimized = getattr(run, "optimized_score", None)
-    baseline = getattr(run, "baseline_default_score", None)
-    delta = ""
-    if optimized is not None and baseline is not None:
-        # Scores are 0..1; the optimizer screens show whole percents.
-        delta = f" (score {round(baseline * 100)}% → {round(optimized * 100)}%)"
-    preview_text = f"Apply the winning autovalidate config to \"{title}\"{delta}."
     if getattr(run, "tied_with_baseline", False):
-        preview_text += (
-            " Note: the winner is statistically tied with the current config — "
-            "applying may not improve quality."
+        # The editor disables Apply for a tied run; chat offered it anyway.
+        return _err(
+            "This run found no meaningful difference from the current settings, "
+            "so it can't be applied (Apply is disabled in the editor too).",
+            hint="Keep the current settings, or run the optimizer again with more test cases.",
         )
+
+    from app.services.optimization_summary import summarize_run
+
+    # The same pair of numbers the editor's comparison card shows.
+    scores = summarize_run(run) or {}
+    delta = ""
+    if scores.get("score_percent") is not None and scores.get("baseline_score_percent") is not None:
+        delta = f" (score {scores['baseline_score_percent']}% → {scores['score_percent']}%)"
+    preview_text = f"Apply the winning autovalidate config to \"{title}\"{delta}."
     rollup = (getattr(run, "apply_preview", None) or {})
     preview_result: dict = {
         "action": "apply_optimization",

@@ -6,6 +6,7 @@ import { FailedBanner, CancelledBanner } from '../shared/RunBanners'
 import { ApplyBackButton } from '../shared/ApplyBackButton'
 import { SuggestionsList, type Suggestion } from '../shared/SuggestionsList'
 import { QualityComparisonCard, type BaselinePoint } from '../shared/QualityComparisonCard'
+import { isHeldOutHeadline, reportedBaselineScore } from '../shared/optimizerScores'
 import { TrialsTable, TrialRow, makeStandardSortOptions } from '../shared/TrialsTable'
 import { TrialExplainerModal } from './TrialExplainerModal'
 import { EvalSetCompositionStrip } from '../shared/EvalSetCompositionStrip'
@@ -77,16 +78,7 @@ export function OptimizationResults({
   // holdout-based) may flatly contradict. holdout_optimized_score is non-null
   // exactly when the headline is holdout-based; for runs that predate that
   // field, headline ≠ train score proves the holdout re-score succeeded.
-  const holdoutHeadline =
-    run.holdout_default_score != null
-    && (
-      run.holdout_optimized_score != null
-      || (
-        run.optimized_score != null
-        && run.optimized_score_train != null
-        && run.optimized_score !== run.optimized_score_train
-      )
-    )
+  const holdoutHeadline = isHeldOutHeadline(run) && run.holdout_default_score != null
   const trainCount = run.train_query_uuids?.length ?? null
   const holdoutCount = run.holdout_query_uuids?.length ?? null
 
@@ -95,7 +87,7 @@ export function OptimizationResults({
     {
       id: 'default',
       label: kbLabels.yourSettings,
-      score: (holdoutHeadline ? run.holdout_default_score : run.baseline_default_score) ?? null,
+      score: reportedBaselineScore(run),
       color: 'var(--workspace-info)',
     },
     { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: 'var(--workspace-success)', emphasised: true },

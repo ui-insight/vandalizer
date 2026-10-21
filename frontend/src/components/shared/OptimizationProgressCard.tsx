@@ -39,8 +39,9 @@ interface OptimizationProgressCardProps<TConfig> {
   scoreFloorLabel?: string
   /** Description for the score-floor sub-card. Default explains the baseline concept. */
   scoreFloorDescription?: string
-  /** Suffix on best-so-far lift readout. Default "vs baseline". */
-  liftLabel?: string
+  /** What the best-so-far score is compared against, e.g. "no custom
+   *  settings". The readout says "N pts better than" / "N pts worse than" it. */
+  baselineName?: string
   /** Heading on the token-spend progress bar. Default "Token budget". Set to
    *  e.g. "Judge spend" when the tracked tokens are only one slice of the
    *  total cost so users aren't misled into reading the bar as total spend. */
@@ -53,9 +54,14 @@ export function OptimizationProgressCard<TConfig>({
   queuedLabel = 'Optimization queued',
   scoreFloorLabel = 'Score to beat (baseline)',
   scoreFloorDescription = 'How well the system performs without this optimization. The result needs to clear this bar.',
-  liftLabel = 'vs baseline',
+  baselineName = 'the baseline',
   tokensBarLabel = 'Token budget',
 }: OptimizationProgressCardProps<TConfig>) {
+  // Between the two whole percents shown, so "88%" against "91%" is 3 pts.
+  const floorGap = run.best_score_so_far != null && scoreFloor != null
+    ? Number((run.best_score_so_far * 100).toFixed(0)) - Number((scoreFloor * 100).toFixed(0))
+    : null
+  const aheadOfFloor = floorGap != null && floorGap > 0
   const trialPct = run.total_trials_planned > 0
     ? (run.current_trial_index / run.total_trials_planned) * 100
     : 0
@@ -159,20 +165,18 @@ export function OptimizationProgressCard<TConfig>({
       {run.best_score_so_far != null && (
         <div style={{
           marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
-          backgroundColor: 'rgba(34, 197, 94, 0.08)',
-          border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: 'var(--workspace-radius-small)',
+          backgroundColor: aheadOfFloor ? 'rgba(34, 197, 94, 0.08)' : 'var(--workspace-canvas)',
+          border: `1px solid ${aheadOfFloor ? 'rgba(34, 197, 94, 0.25)' : 'var(--workspace-border)'}`, borderRadius: 'var(--workspace-radius-small)',
         }}>
           <div style={{
-            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)', textTransform: 'uppercase', letterSpacing: 0.5,
+            fontSize: 'var(--workspace-font-meta)', color: aheadOfFloor ? 'var(--workspace-success)' : 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5,
             marginBottom: 'var(--workspace-space-2)',
           }}>
             <Sparkles size={10} style={{ display: 'inline', marginRight: 'var(--workspace-space-4)' }} />
             Best so far
-            {scoreFloor != null && (
+            {floorGap != null && (
               <span style={{ marginLeft: 'var(--workspace-space-8)', color: 'var(--workspace-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                {run.best_score_so_far > scoreFloor
-                  ? `+${((run.best_score_so_far - scoreFloor) * 100).toFixed(0)}pp ${liftLabel}`
-                  : `${((run.best_score_so_far - scoreFloor) * 100).toFixed(0)}pp ${liftLabel}`}
+                {describeGap(floorGap, baselineName)}
               </span>
             )}
           </div>
@@ -332,4 +336,13 @@ function useElapsedSeconds(
 
   if (!active || !hasAnchor) return null
   return elapsed
+}
+
+
+/** "3 pts better than X" / "3 pts worse than X" / "same as X". A run that
+ *  trailed showed "88% · −3pp better than no custom settings" in green. */
+export function describeGap(pts: number, baselineName: string): string {
+  if (pts === 0) return `same as ${baselineName}`
+  const n = Math.abs(pts)
+  return `${n} ${n === 1 ? 'pt' : 'pts'} ${pts > 0 ? 'better' : 'worse'} than ${baselineName}`
 }

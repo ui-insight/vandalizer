@@ -133,6 +133,7 @@ def _make_run_doc(uuid: str = "opt-1") -> MagicMock:
     rd.optimized_score = None
     rd.optimized_score_train = None
     rd.holdout_default_score = None
+    rd.holdout_optimized_score = None
     rd.score_sample_size = None
     rd.judge_model = None
     rd.judge_variance = None

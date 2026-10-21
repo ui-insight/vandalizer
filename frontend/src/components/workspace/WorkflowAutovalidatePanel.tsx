@@ -34,6 +34,7 @@ import {
 } from '../../api/workflows'
 import { OptimizationProgressCard, type ProgressRunShape } from '../shared/OptimizationProgressCard'
 import { QualityComparisonCard, type BaselinePoint } from '../shared/QualityComparisonCard'
+import { reportedBaselineScore } from '../shared/optimizerScores'
 import { SuggestionsList, type Suggestion } from '../shared/SuggestionsList'
 import { ApplyBackButton } from '../shared/ApplyBackButton'
 import { ApplyPreviewModal } from '../shared/ApplyPreviewModal'
@@ -299,7 +300,7 @@ export function WorkflowAutovalidatePanel({
             cancelling={cancelling}
             scoreFloorLabel={DOMAIN_LABELS.workflow.scoreFloorLabel}
             scoreFloorDescription={DOMAIN_LABELS.workflow.scoreFloorDescription}
-            liftLabel={DOMAIN_LABELS.workflow.liftLabel}
+            baselineName={DOMAIN_LABELS.workflow.baselineName}
           />
         </div>
       )}
@@ -386,7 +387,7 @@ function CompletedView({
     out.push({
       id: 'default',
       label: workflowLabels.yourSettings,
-      score: run.baseline_default_score,
+      score: reportedBaselineScore(run),
       color: '#3b82f6',
     })
     out.push({

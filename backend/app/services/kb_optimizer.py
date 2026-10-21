@@ -31,6 +31,7 @@ from app.services.optimization_common import (
     build_apply_preview,
     pick_winner_variance_aware,
     tie_band,
+    reported_baseline_score,
     tied_on_reported_scores,
 )
 
@@ -951,7 +952,11 @@ class KBOptimizer:
             regated = tied_on_reported_scores(
                 tied=tied_with_baseline,
                 optimized_score=optimized_score,
-                baseline_score=baselines.get("default_kb"),
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=holdout_optimized_score,
+                    holdout_default_score=holdout_default_score,
+                    baseline_default_score=baselines.get("default_kb"),
+                ),
                 band=tie_band(blended_sigma, n_items_for_se),
                 lift_ci=lift_ci,
             )

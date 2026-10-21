@@ -49,3 +49,30 @@ describe("QualityComparisonCard follows the run's verdict", () => {
     expect(screen.queryByText(/spans zero/)).not.toBeInTheDocument()
   })
 })
+
+// Ticket: the editor showed Optimized 95% against Current 93% and called it a
+// "+1pts difference". The stated difference must be between the shown numbers.
+describe('QualityComparisonCard states the difference between the numbers it shows', () => {
+  const rounded: BaselinePoint[] = [
+    { id: 'default', label: 'Current settings', score: 0.934, color: '#888' },
+    { id: 'optimized', label: 'Optimized settings', score: 0.946, color: '#22c55e', emphasised: true },
+  ]
+
+  it('95% against 93% is a 2-point difference', () => {
+    render(<QualityComparisonCard baselines={rounded} variance={variance} tiedWithBaseline />)
+
+    expect(screen.getByText('95%')).toBeInTheDocument()
+    expect(screen.getByText('93%')).toBeInTheDocument()
+    expect(screen.getByText(/\+2pts difference is inside the judge's measurement noise/)).toBeInTheDocument()
+  })
+
+  it('a drop is shown with a minus sign, never a plus', () => {
+    render(<QualityComparisonCard
+      baselines={[{ ...rounded[0], score: 0.91 }, { ...rounded[1], score: 0.88 }]}
+      variance={variance}
+      tiedWithBaseline={false}
+    />)
+
+    expect(screen.getByText('-3pts')).toBeInTheDocument()
+  })
+})

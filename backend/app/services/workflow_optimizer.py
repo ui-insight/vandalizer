@@ -42,6 +42,7 @@ from app.services.optimization_common import (
     build_apply_preview,
     pick_winner_variance_aware,
     tie_band,
+    reported_baseline_score,
     tied_on_reported_scores,
 )
 from app.services.optimizer_notifications import notify_run_terminal
@@ -543,6 +544,7 @@ async def run_optimization(
                         )
                         if holdout_winner.get("score") is not None:
                             run_doc.optimized_score = holdout_winner.get("score")
+                            run_doc.holdout_optimized_score = holdout_winner.get("score")
                     except Exception as e:
                         logger.warning("Holdout re-score (winner) failed: %s", e)
 
@@ -591,7 +593,11 @@ async def run_optimization(
             regated = tied_on_reported_scores(
                 tied=run_doc.tied_with_baseline,
                 optimized_score=run_doc.optimized_score,
-                baseline_score=run_doc.baseline_default_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=run_doc.holdout_optimized_score,
+                    holdout_default_score=run_doc.holdout_default_score,
+                    baseline_default_score=run_doc.baseline_default_score,
+                ),
                 band=tie_band(
                     run_doc.judge_variance, n_items,
                     fallback_noise_floor=DEFAULT_WORKFLOW_JUDGE_NOISE_FLOOR,

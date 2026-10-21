@@ -26,6 +26,7 @@ import {
 } from '../../api/extractions'
 import { OptimizationProgressCard, type ProgressRunShape } from '../shared/OptimizationProgressCard'
 import { QualityComparisonCard, type BaselinePoint } from '../shared/QualityComparisonCard'
+import { reportedBaselineScore } from '../shared/optimizerScores'
 import { winnerTrials } from '../../lib/optimizerWinner'
 import { ApplyBackButton } from '../shared/ApplyBackButton'
 import { ApplyPreviewModal } from '../shared/ApplyPreviewModal'
@@ -337,7 +338,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
         queuedLabel="Tuning queued"
         scoreFloorLabel={DOMAIN_LABELS.extraction.scoreFloorLabel}
         scoreFloorDescription={DOMAIN_LABELS.extraction.scoreFloorDescription}
-        liftLabel={DOMAIN_LABELS.extraction.liftLabel}
+        baselineName={DOMAIN_LABELS.extraction.baselineName}
         /* Only judge tokens are tracked end-to-end; extraction tokens aren't
            counted yet, so labeling this "Token budget" would overclaim. */
         tokensBarLabel="Judge spend"
@@ -357,7 +358,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
   const extractionLabels = DOMAIN_LABELS.extraction.baselineTile
   const baselines: BaselinePoint[] = [
     { id: 'no-tool', label: extractionLabels.noBaseline, score: displayedRun.baseline_no_tool_score, color: 'var(--workspace-muted)' },
-    { id: 'default', label: extractionLabels.yourSettings, score: displayedRun.baseline_default_score, color: '#3b82f6' },
+    { id: 'default', label: extractionLabels.yourSettings, score: reportedBaselineScore(displayedRun), color: '#3b82f6' },
     { id: 'optimized', label: extractionLabels.tuned, score: displayedRun.optimized_score, color: 'var(--workspace-success)', emphasised: true },
   ]
   const isAlreadyApplied = displayedRun.previous_override !== null

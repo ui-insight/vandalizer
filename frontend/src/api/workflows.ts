@@ -807,6 +807,12 @@ export type WorkflowOptimizationRun = {
   baseline_no_workflow_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Held-out re-scores: present when the run split its test set. The
+   *  headline is held-out exactly when holdout_optimized_score is set; pair
+   *  scores with reportedBaselineScore (shared/optimizerScores). */
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  holdout_optimized_score?: number | null
   judge_variance: number | null
   judge_score_se: number | null
   judge_model: string | null

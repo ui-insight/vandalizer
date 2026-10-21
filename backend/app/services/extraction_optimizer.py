@@ -41,6 +41,7 @@ from app.services.optimization_common import (
     build_apply_preview,
     pick_winner_variance_aware,
     tie_band,
+    reported_baseline_score,
     tied_on_reported_scores,
 )
 from app.services.search_set_service import (
@@ -663,6 +664,7 @@ async def run_optimization(
                         holdout_winner_score = _covered_score_to_unit(holdout_winner, "holdout-winner")
                         if holdout_winner_score is not None:
                             run_doc.optimized_score = holdout_winner_score
+                            run_doc.holdout_optimized_score = holdout_winner_score
                         else:
                             # The headline stays the in-sample score this code
                             # documents as best-of-N inflated. Flag it rather
@@ -719,7 +721,11 @@ async def run_optimization(
             regated = tied_on_reported_scores(
                 tied=run_doc.tied_with_baseline,
                 optimized_score=run_doc.optimized_score,
-                baseline_score=run_doc.baseline_default_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=run_doc.holdout_optimized_score,
+                    holdout_default_score=run_doc.holdout_default_score,
+                    baseline_default_score=run_doc.baseline_default_score,
+                ),
                 band=tie_band(run_doc.judge_variance, n_items),
             )
             if regated and not run_doc.tied_with_baseline:
@@ -789,6 +795,7 @@ async def run_optimization(
         run_doc.baseline_default_score = _discount_unit_score(run_doc.baseline_default_score, ssf)
         run_doc.baseline_no_tool_score = _discount_unit_score(run_doc.baseline_no_tool_score, ssf)
         run_doc.holdout_default_score = _discount_unit_score(run_doc.holdout_default_score, ssf)
+        run_doc.holdout_optimized_score = _discount_unit_score(run_doc.holdout_optimized_score, ssf)
         run_doc.score_sample_size = {
             "sample_size_factor": round(ssf, 3),
             "num_test_cases": n_cases,
