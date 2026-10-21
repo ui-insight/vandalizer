@@ -27,6 +27,7 @@ import { useChat } from '../../hooks/useChat'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { isCertificationWriteResult } from '../../lib/certificationEvents'
 import { useChatWriteAnnouncer } from '../../lib/chatWrites'
+import { openPrintPage } from '../../lib/printPage'
 import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
 import { CertificationChatRecovery } from '../certification/CertificationChatRecovery'
 import { useProject } from '../../hooks/useProjects'
@@ -787,9 +788,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         if (evidence) parts.push(`<div class="evidence">${escHtml(evidence)}</div>`)
         return `<div class="msg ${m.role}"><div class="role">${exportRoleLabel(m)}</div><div>${parts.join('')}</div></div>`
       }).join('')}</body></html>`
-      const win = window.open('', '_blank')
-      if (win) { win.document.write(html); win.document.close(); win.print() }
-      else toast('The print window could not open. Allow pop-ups for this site or export Text or CSV.', 'error')
+      openPrintPage(html)
     }
   }
 
