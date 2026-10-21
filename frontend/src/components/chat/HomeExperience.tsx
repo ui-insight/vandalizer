@@ -67,6 +67,7 @@ function UploadPillButton({
     <>
       <button
         type="button"
+        className="home-upload-action"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
         style={{
@@ -456,39 +457,43 @@ export function ReturningHome({ embedded, orgName, brandIcon, disabled, onRunDem
         <div><span className="home-eyebrow">{orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</span><h2>Your workspace</h2><p>Pick up your work, or ask the assistant anything.</p></div>
       </div>}
       {workQueue}
-      {unfinished.length > 0 && <section className="home-activity" aria-label="Work in progress">
+      {unfinished.length > 0 && <section className="home-activity home-attention" aria-label="Work in progress">
         <h3>Work in progress</h3><ul>{unfinished.map(activityRow)}</ul>
       </section>}
-      <div className="home-primary-actions">
-        {!embedded && !hasWork && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
-        <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
-        {onOpenProjects && <button type="button" className="home-text-action" onClick={onOpenProjects}>Open projects</button>}
+      <div className="home-start-actions">
+        <div className="home-primary-actions">
+          {!embedded && !hasWork && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
+          <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
+          {onOpenProjects && <button type="button" className="home-text-action" onClick={onOpenProjects}>Open projects</button>}
+        </div>
+        {onPrepareTask && !tasksHidden && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} onHide={() => toggleTasks(true)} />}
       </div>
-      {onPrepareTask && !tasksHidden && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} onHide={() => toggleTasks(true)} />}
       {recent.length > 0 && <section className="home-activity" aria-label="Recent work">
         <h3>Recent work</h3><ul>{recent.slice(0, 3).map(activityRow)}</ul>
         {recent.length > 3 && <details className="home-other-actions"><summary>More recent work ({recent.length - 3})</summary><ul>{recent.slice(3).map(activityRow)}</ul></details>}
       </section>}
       {!status && <p className="home-meta" role="status">Workspace activity is unavailable. You can still start a conversation or upload a document.</p>}
-      {(documents.length > 0 || status?.has_ready_knowledge_base || status?.has_documents) && <details className="home-sources">
-        <summary>Choose from your sources</summary>
-        {documents.length > 0 && <>
-          <p className="home-meta">Select a document to attach to your next question.</p>
-          <ul>{documents.map(doc => <li key={doc.uuid}><FileSearch size={16} aria-hidden="true" /><span>{doc.title}</span><button className="home-text-action" type="button" disabled={disabled || !onSelectDocument} aria-label={`Select document: ${doc.title}`} onClick={() => onSelectDocument?.(doc)}>Select document</button></li>)}</ul>
-          {onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose other documents</button>}
-        </>}
-        {status?.has_ready_knowledge_base && <div className="home-knowledge-action"><button type="button" className="home-text-action" disabled={disabled} onClick={onChooseKnowledgeBase}>Choose a knowledge base</button><p className="home-meta">Select the sources for a question across documents.</p></div>}
-        {status?.has_documents && documents.length === 0 && onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose documents to work with</button>}
-      </details>}
       <HomeQualityAlerts alerts={status?.active_alerts || []} recentActivity={activities} onOpenActivity={onOpenActivity} onOpenTool={onOpenTool} onSendMessage={onSendMessage} onNoticeChanged={onNoticeChanged} disabled={disabled} />
-      <details className="home-other-actions"><summary>More ways to work</summary>
-        {onPrepareTask && tasksHidden && <button type="button" className="home-text-action" onClick={() => toggleTasks(false)}>Show task starters</button>}
-        {!status?.has_ready_knowledge_base && <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />}
-        <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
-        {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}
-        {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
-      </details>
-      <CertificationHomeActions disabled={disabled} onSendMessage={onSendMessage} />
+      <div className="home-utilities">
+        {(documents.length > 0 || status?.has_ready_knowledge_base || status?.has_documents) && <details className="home-sources">
+          <summary>Choose from your sources</summary>
+          {documents.length > 0 && <>
+            <p className="home-meta">Select a document to attach to your next question.</p>
+            <ul>{documents.map(doc => <li key={doc.uuid}><FileSearch size={16} aria-hidden="true" /><span>{doc.title}</span><button className="home-text-action" type="button" disabled={disabled || !onSelectDocument} aria-label={`Select document: ${doc.title}`} onClick={() => onSelectDocument?.(doc)}>Select document</button></li>)}</ul>
+            {onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose other documents</button>}
+          </>}
+          {status?.has_ready_knowledge_base && <div className="home-knowledge-action"><button type="button" className="home-text-action" disabled={disabled} onClick={onChooseKnowledgeBase}>Choose a knowledge base</button><p className="home-meta">Select the sources for a question across documents.</p></div>}
+          {status?.has_documents && documents.length === 0 && onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose documents to work with</button>}
+        </details>}
+        <details className="home-other-actions"><summary>More ways to work</summary>
+          {onPrepareTask && tasksHidden && <button type="button" className="home-text-action" onClick={() => toggleTasks(false)}>Show task starters</button>}
+          {!status?.has_ready_knowledge_base && <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />}
+          <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
+          {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}
+          {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
+        </details>
+        <CertificationHomeActions disabled={disabled} onSendMessage={onSendMessage} />
+      </div>
     </div>
   )
 }
