@@ -240,17 +240,55 @@ def _cells(line: str, off: int) -> list[tuple[int, int]]:
     return spans
 
 
+_CLAUSE_WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’.&/-]*")
+
+
+def clause_spans(s: str, start: int, end: int) -> list[tuple[int, int]]:
+    """``s[start:end]`` cut at its semicolons into the facts it strings
+    together: "PI must be a full-time employee…; each individual … at least
+    one month per year; postdoctoral researchers …" is checked, and
+    underlined, one clause at a time — no one passage states all of it. A
+    semicolon inside brackets or quotes stays, and so does the whole when a
+    piece would be a single word ("Budget; Travel" lists, it does not state)."""
+    cuts = []
+    depth = 0
+    quote = False
+    for i in range(start, end):
+        ch = s[i]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth = max(0, depth - 1)
+        elif ch in "\"“”":
+            quote = not quote if ch == '"' else (ch == "“")
+        elif ch == ";" and depth == 0 and not quote and i + 1 < end and s[i + 1].isspace():
+            cuts.append(i)
+    if not cuts:
+        return [(start, end)]
+    pieces = []
+    lo = start
+    for c in cuts:
+        pieces.append((lo, c))
+        lo = c + 1
+    pieces.append((lo, end))
+    trimmed = [_trim(s, a, b) for a, b in pieces]
+    if any(len(_CLAUSE_WORD_RE.findall(s[a:b])) < 2 for a, b in trimmed):
+        return [(start, end)]
+    return [(a, b) for a, b in trimmed if b > a]
+
+
 def _add(
     out: list[Statement], text: str, a: int, b: int, label: str, base: int = 0, context: tuple[str, ...] = (),
 ) -> None:
     a, b = _trim(text, a, b)
     if b <= a:
         return
-    p = plain(text[a:b])
-    kind = classify(p)
-    if kind == "skip":
-        return
-    out.append(Statement(base + a, base + b, p, label=label, kind=kind, context=context))
+    for ca, cb in clause_spans(text, a, b):
+        p = plain(text[ca:cb])
+        kind = classify(p)
+        if kind == "skip":
+            continue
+        out.append(Statement(base + ca, base + cb, p, label=label, kind=kind, context=context))
 
 
 def _lead(seg: str) -> str:
@@ -422,7 +460,11 @@ def _json_line(
         kind = classify(decoded)
         if kind != "skip" and b > a:
             if len(decoded) <= SHORT_LEAF_CHARS:
-                out.append(Statement(base + a, base + b, plain(decoded), label=lab, kind=kind, context=context))
+                for ca, cb in clause_spans(text, a, b):
+                    piece = plain(_unescape(text[ca:cb]))
+                    piece_kind = classify(piece)
+                    if piece_kind != "skip":
+                        out.append(Statement(base + ca, base + cb, piece, label=lab, kind=piece_kind, context=context))
             else:
                 for sa, sb in sentence_spans(text, a, b):
                     _add(out, text, sa, sb, lab, base, context)
@@ -672,13 +714,8 @@ def _string_statements(value: str, label: str) -> list[Statement]:
     a, b = _trim(value, 0, len(value))
     if b <= a:
         return []
-    spans = sentence_spans(value, a, b)
-    if len(spans) <= 1:
-        p = plain(value[a:b])
-        kind = classify(p)
-        return [] if kind == "skip" else [Statement(a, b, p, label=label, kind=kind)]
     out: list[Statement] = []
-    for sa, sb in spans:
+    for sa, sb in sentence_spans(value, a, b):
         _add(out, value, sa, sb, label)
     return out
 

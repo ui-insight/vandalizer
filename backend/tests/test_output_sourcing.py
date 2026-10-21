@@ -13,6 +13,8 @@ import re
 import pytest
 
 from app.services.output_sourcing import (
+    CONFIRM_INSTRUCTIONS,
+    RETRY_NOTE,
     ROLE_INSTRUCTIONS,
     ROLE_VOTES,
     Corpus,
@@ -90,14 +92,19 @@ class Judge:
     and how many role items it was shown before — yes unless told
     otherwise; ``role_asked`` records them."""
 
-    def __init__(self, *rules, raises=None, reply=None, role=None, role_raises=None):
+    def __init__(self, *rules, raises=None, reply=None, role=None, role_raises=None, confirm=None, retry_rules=None):
         self.rules = rules
         self.raises = raises
         self.reply = reply
         self.role = role or (lambda item, n: True)
         self.role_raises = role_raises
+        self.confirm = confirm or (lambda item: True)
+        # What the judge answers on a second look; by default what it said the first time.
+        self.retry_rules = rules if retry_rules is None else retry_rules
         self.asked: list[dict] = []
+        self.retried: list[dict] = []
         self.role_asked: list[dict] = []
+        self.confirm_asked: list[dict] = []
 
     def __call__(self, instructions, prompt):
         if self.raises:
@@ -105,6 +112,9 @@ class Judge:
         if self.reply is not None:
             return self.reply
         items = [json.loads(line) for line in prompt.split("STATEMENTS", 1)[1].splitlines() if line.strip()]
+        if instructions == CONFIRM_INSTRUCTIONS:
+            self.confirm_asked.extend(items)
+            return json.dumps({"items": [{"id": it["id"], "stated": self.confirm(it)} for it in items]})
         if instructions == ROLE_INSTRUCTIONS:
             if self.role_raises:
                 raise self.role_raises
@@ -114,11 +124,12 @@ class Judge:
                 self.role_asked.append(it)
             return json.dumps({"items": out})
         passages = dict(_PASSAGE_RE.findall(prompt))
-        self.asked.extend(items)
+        retry = instructions.endswith(RETRY_NOTE)
+        (self.retried if retry else self.asked).extend(items)
         out = []
         for it in items:
             answer = {"id": it["id"], "supported": False}
-            for needle, where, quote in self.rules:
+            for needle, where, quote in (self.retry_rules if retry else self.rules):
                 if needle not in it["statement"]:
                     continue
                 pid = next((p for p in it["passages"] if where in passages[p]), None)
@@ -292,6 +303,39 @@ def test_the_same_words_under_two_headings_are_judged_apart():
         ("Must be a full-time employee of the lead institution",
          "RFA Checklist — ELIGIBILITY — Eligible Individuals — Co‑Principal Investigator"),
     ]
+
+
+def test_a_statement_that_strings_facts_together_is_checked_one_clause_at_a_time():
+    """Seen in the NSF run: "PI must be a full‑time employee of the lead
+    institution; each individual receiving support must be funded for at
+    least one month per year; …" — every fact is in the RFA, on different
+    pages; no one excerpt states them all, so none was linked."""
+    md = ("- **Personnel Effort:** PI must be a full-time employee; each individual must be funded for at least "
+          "one month per year; postdoctoral researchers (U.S. citizens; nationals) may be funded only on the "
+          "SimCenter award.\n"
+          "- **Unallowable Costs:** Budget; Travel\n")
+    _, stmts = split_output(md)
+    assert [(md[s.start:s.end], s.text, s.label) for s in stmts] == [
+        ("PI must be a full-time employee", "PI must be a full-time employee", "Personnel Effort"),
+        ("each individual must be funded for at least one month per year",
+         "each individual must be funded for at least one month per year", "Personnel Effort"),
+        # A semicolon inside brackets is part of the clause.
+        ("postdoctoral researchers (U.S. citizens; nationals) may be funded only on the SimCenter award.",
+         "postdoctoral researchers (U.S. citizens; nationals) may be funded only on the SimCenter award.",
+         "Personnel Effort"),
+        # A piece of one word: a list, not facts strung together.
+        ("Budget; Travel", "Budget; Travel", "Unallowable Costs"),
+    ]
+    # JSON values too, as written and as a structured value.
+    detail = "Maximum 2 proposals per institution; only one per each of NCO, SimCenter, RAPID categories"
+    text = json.dumps({"risk_flags": [{"check": "Limited submission", "detail": detail}]})
+    assert [text[s.start:s.end] for s in split_output(text)[1]] == [
+        "Maximum 2 proposals per institution", "only one per each of NCO, SimCenter, RAPID categories",
+    ]
+    value = [{"check": "Limited submission", "detail": detail}]
+    got = [(s.path, value[0]["detail"][s.start:s.end]) for s in split_output(value)[1]]
+    assert got == [([0, "detail"], "Maximum 2 proposals per institution"),
+                   ([0, "detail"], "only one per each of NCO, SimCenter, RAPID categories")]
 
 
 def test_files_are_not_split():
@@ -469,7 +513,7 @@ def test_an_excerpt_must_say_most_of_a_longer_statement():
     )}
     judge = Judge(("acquire letters", "Matching Fund", "Matching Fund Verification Letter(s)"))
     advice = "Obtain matching-fund verification letters before full submission"
-    result = _trace({"final": {advice: "The budget component requires documented match evidence; acquire letters from partners early to avoid delays."}},
+    result = _trace({"final": {advice: "The budget component requires documented match evidence, so acquire letters from partners early to avoid delays."}},
                     judge, docs=[doc])
     assert _links(result, "final") == []
     assert result["reasons"] == {"quote_covers_too_little": 1}
@@ -834,7 +878,8 @@ def test_a_judge_that_fails_links_nothing():
     result = _trace({"final": {"recipient": "Southern Utah University"}}, Judge(raises=RuntimeError("timeout")))
     assert result["status"] == "done"
     assert _links(result, "final") == []
-    assert result["errors"] == 1
+    # The first look and its second look.
+    assert result["errors"] == 2
 
 
 @pytest.mark.parametrize("reply", ["not json", '{"items": [{"id": 1, "supported": "yes", "passage": "P1", "quote": "x"}]}'])
@@ -872,14 +917,158 @@ def test_a_role_check_that_fails_links_nothing():
 
 def test_a_deadline_that_passes_before_the_role_check_links_nothing():
     judge = Judge(("Southern Utah", "Recipient:", "Recipient: Southern Utah University"))
-    times = iter([0.0, 0.0])   # the judge starts in time; the role check does not
+    # The judge starts in time; the role check does not.
     result = trace_sources(
         {"final": {"recipient": "Southern Utah University"}}, [NOA], [], ask=judge,
-        workers=1, deadline=5.0, clock=lambda: next(times, 10.0),
+        workers=1, deadline=5.0, clock=lambda: 10.0 if judge.asked else 0.0,
     )
     assert judge.asked and not judge.role_asked
     assert _links(result, "final") == []
     assert result["reasons"] == {"role_unchecked": 1} and result["unchecked"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Second looks, order, and results while tracing
+# ---------------------------------------------------------------------------
+
+RECIPIENT = ("Southern Utah", "Recipient:", "Recipient: Southern Utah University")
+
+
+def test_a_second_look_links_only_what_a_separate_check_confirms():
+    """The first look said no; a second look, with more passages, finds the
+    excerpt. A second chance to say yes is not a second opinion: a separate
+    call, asked only whether the excerpt states the statement, must agree."""
+    statement = "The recipient is Southern Utah University."
+    judge = Judge(retry_rules=(RECIPIENT,))
+    result = _trace({"final": statement}, judge)
+    [(_, src)] = _links(result, "final")
+    assert src["quote"] == "Recipient: Southern Utah University"
+    assert [it["statement"] for it in judge.asked] == [statement]
+    assert [it["statement"] for it in judge.retried] == [statement]
+    assert [(it["statement"], it["excerpt"]) for it in judge.confirm_asked] == [(statement, RECIPIENT[2])]
+    assert (result["retried"], result["rescued"]) == (1, 1)
+
+    judge = Judge(retry_rules=(RECIPIENT,), confirm=lambda item: False)
+    result = _trace({"final": statement}, judge)
+    assert _links(result, "final") == [] and result["reasons"] == {"not_confirmed": 1}
+
+
+def test_a_statement_that_says_more_than_its_excerpt_is_confirmed_apart():
+    """Seen in the NSF run: "Include the required single-copy PDFs (…) and
+    adhere to file-format and naming rules of the chosen system", linked to
+    an excerpt that says nothing of formats or names. Every check passed;
+    only a separate call asked whether the excerpt states all of it caught
+    it."""
+    statement = "The recipient is Southern Utah University and it must file quarterly vendor reports."
+    judge = Judge(RECIPIENT, confirm=lambda item: False)
+    result = _trace({"final": statement}, judge, docs=[NOA])
+    assert _links(result, "final") == [] and result["reasons"] == {"not_confirmed": 1}
+    assert [it["statement"] for it in judge.confirm_asked] == [statement]
+    # Confirmed, it links.
+    judge = Judge(RECIPIENT)
+    assert len(_links(_trace({"final": statement}, judge, docs=[NOA]), "final")) == 1
+
+
+def test_a_link_the_first_look_found_needs_no_confirmation():
+    judge = Judge(RECIPIENT)
+    result = _trace({"final": "The recipient is Southern Utah University."}, judge)
+    assert len(_links(result, "final")) == 1
+    assert judge.retried == [] and judge.confirm_asked == []
+
+
+@pytest.mark.parametrize("judge, reason", [
+    # A refusal on what the excerpt says is not tried again.
+    (Judge(RECIPIENT, role=lambda item, n: False), "role_not_shown"),
+    (Judge(("Southern Utah", "Recipient:", "Recipient: Southern Utah University")), None),
+])
+def test_only_a_miss_the_judge_could_have_avoided_gets_a_second_look(judge, reason):
+    result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
+    assert judge.retried == []
+    if reason:
+        assert result["reasons"] == {reason: 1}
+
+
+def test_the_deliverable_is_checked_first_and_from_the_top():
+    """Underlines appear while the trace runs: the deliverable's, from the
+    top down, before any step's."""
+    judge = Judge(RECIPIENT, ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
+    trace_sources({
+        "step:Read": {"vendor": "Forestry Suppliers Inc."},
+        "final": "The recipient is Southern Utah University.\n\nIt bought from Forestry Suppliers Inc.\n",
+    }, [NOA, EXPENSE], [], ask=judge, workers=1, first={"final"})
+    assert [it["statement"] for it in judge.asked][:2] == [
+        "The recipient is Southern Utah University.", "It bought from Forestry Suppliers Inc.",
+    ]
+    assert judge.asked[-1]["statement"] == "Forestry Suppliers Inc."
+
+
+def test_other_outputs_wait_until_the_deliverable_is_settled():
+    """The model server is shared: a step's statements checked alongside the
+    deliverable's would slow the underlines the reader is waiting for."""
+    calls = []
+    inner = Judge(RECIPIENT, ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
+
+    def judge(instructions, prompt):
+        kind = "role" if instructions == ROLE_INSTRUCTIONS else "judge"
+        calls.append((kind, "Forestry" in prompt.split("STATEMENTS", 1)[1]))
+        return inner(instructions, prompt)
+
+    trace_sources({"step:Read": {"vendor": "Forestry Suppliers Inc."},
+                   "final": {"recipient": "Southern Utah University"}},
+                  [NOA, EXPENSE], [], ask=judge, workers=4, first={"final"})
+    step_at = calls.index(("judge", True))
+    assert calls[:step_at] == [("judge", False)] + [("role", False)] * ROLE_VOTES
+
+
+def test_checks_that_settle_a_link_run_before_the_next_judge_call():
+    calls = []
+    inner = Judge(RECIPIENT, ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
+
+    def judge(instructions, prompt):
+        calls.append("role" if instructions == ROLE_INSTRUCTIONS else "judge")
+        return inner(instructions, prompt)
+
+    from app.services import output_sourcing as O
+    old = O.BATCH_STATEMENTS
+    O.BATCH_STATEMENTS = 1
+    try:
+        trace_sources({"final": {"recipient": "Southern Utah University", "vendor": "Forestry Suppliers Inc."}},
+                      [NOA, EXPENSE], [], ask=judge, workers=1)
+    finally:
+        O.BATCH_STATEMENTS = old
+    assert calls[:2 + ROLE_VOTES] == ["judge"] + ["role"] * ROLE_VOTES + ["judge"]
+
+
+def test_results_while_tracing_mark_what_is_still_being_checked():
+    published = []
+    judge = Judge(RECIPIENT, ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
+    from app.services import output_sourcing as O
+    old = (O.BATCH_STATEMENTS, O.PUBLISH_EVERY)
+    O.BATCH_STATEMENTS, O.PUBLISH_EVERY = 1, 0.0
+    try:
+        result = trace_sources(
+            {"final": "The recipient is Southern Utah University.\n\nIt bought from Forestry Suppliers Inc.\n"},
+            [NOA, EXPENSE], [], ask=judge, workers=1, publish=published.append,
+        )
+    finally:
+        O.BATCH_STATEMENTS, O.PUBLISH_EVERY = old
+    assert published and all(p["status"] == "running" for p in published)
+    rows = published[0]["targets"]["final"]["statements"]
+    assert [("src" in r, r.get("w")) for r in rows] == [(True, None), (False, 1)]
+    # A source keeps its index: the final result extends what was shown.
+    assert result["status"] == "done"
+    assert result["sources"][:len(published[0]["sources"])] == published[0]["sources"]
+    assert [r.get("src") for r in result["targets"]["final"]["statements"]] == [0, 1]
+    assert all("w" not in r for r in result["targets"]["final"]["statements"])
+
+
+def test_a_judge_reply_with_a_line_break_inside_a_quote_is_read():
+    """gpt-oss and others copy a passage's line break into the quote as a
+    raw character: invalid JSON, and every statement of the call lost."""
+    reply = '{"items": [{"id": 1, "supported": true, "passage": "P1", "quote": "Recipient: Southern\nUtah University"}]}'
+    result = _trace({"final": "The recipient is Southern Utah University."}, Judge(reply=reply), docs=[NOA])
+    [(_, src)] = _links(result, "final")
+    assert src["quote"] == "Recipient: Southern Utah University"
 
 
 # ---------------------------------------------------------------------------

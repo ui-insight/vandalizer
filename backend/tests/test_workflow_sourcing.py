@@ -208,14 +208,39 @@ def test_the_task_writes_only_the_sourcing_field():
          patch("app.services.workflow_engine._run_form_filler_model",
                side_effect=lambda model, i, p, **kw: judge(i, p)):
         trace_run_sources.run(str(oid), ["exp"])
-    claim, final = [c[0] for c in db.workflow_result.update_one.call_args_list]
+    calls = [c[0] for c in db.workflow_result.update_one.call_args_list]
+    claim, partials, final = calls[0], calls[1:-1], calls[-1]
     assert claim[0] == {"_id": oid, "status": "completed", "sourcing.status": "pending"}
+    # What is settled while it runs goes into the sourcing field only, and
+    # only while the trace still owns it.
+    for query, update in partials:
+        assert query == {"_id": oid, "sourcing.status": "running"}
+        assert set(update["$set"]) <= {"sourcing.targets", "sourcing.sources", "sourcing.updated_at"}
     assert set(final[1]["$set"]) == {"sourcing"}
     sourcing = final[1]["$set"]["sourcing"]
     assert sourcing["status"] == "done"
     assert set(sourcing["targets"]) == {"step:Read", "final"}       # never the Document trigger
     assert sourcing["targets"]["final"]["summary"] == {"statements": 1, "traced": 1}
     assert sourcing["sources"][0]["document_uuid"] == "exp"
+
+
+def test_the_task_shows_what_is_settled_while_it_runs():
+    from app.services import output_sourcing as O
+    from app.tasks.sourcing_tasks import trace_run_sources
+
+    oid, run = _saved_run()
+    db = _task_db(run)
+    judge = Judge(("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
+    with patch("app.tasks.sourcing_tasks._get_db", return_value=db), \
+         patch.object(O, "PUBLISH_EVERY", 0.0), \
+         patch("app.services.workflow_engine._run_form_filler_model",
+               side_effect=lambda model, i, p, **kw: judge(i, p)):
+        trace_run_sources.run(str(oid), ["exp"])
+    calls = db.workflow_result.update_one.call_args_list
+    partials = [c[0][1]["$set"]["sourcing.targets"]["final"]["statements"][0] for c in calls[1:-1]]
+    # Shown as being checked while its role checks are out, then settled.
+    assert partials and partials[0].get("w") == 1 and "src" not in partials[0]
+    assert "src" in calls[-1][0][1]["$set"]["sourcing"]["targets"]["final"]["statements"][0]
 
 
 def test_a_task_that_fails_records_the_failure_and_nothing_else():
@@ -266,3 +291,11 @@ def test_sourcing_is_on_unless_turned_off(monkeypatch, value, enabled):
 
     monkeypatch.setenv("WORKFLOW_SOURCING", value)
     assert sourcing_enabled() is enabled
+
+
+@pytest.mark.parametrize("value, workers", [("", 16), ("4", 4), ("0", 1), ("99", 32), ("many", 16)])
+def test_a_deployment_can_make_fewer_calls_at_once(monkeypatch, value, workers):
+    from app.tasks.sourcing_tasks import sourcing_workers
+
+    monkeypatch.setenv("WORKFLOW_SOURCING_WORKERS", value)
+    assert sourcing_workers() == workers

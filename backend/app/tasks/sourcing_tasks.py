@@ -18,11 +18,23 @@ logger = logging.getLogger(__name__)
 
 TIME_BUDGET_SECONDS = 600
 DISABLE_ENV = "WORKFLOW_SOURCING"
+WORKERS_ENV = "WORKFLOW_SOURCING_WORKERS"
 
 
 def sourcing_enabled() -> bool:
     """On unless the deployment turns it off (``WORKFLOW_SOURCING=off``)."""
     return os.environ.get(DISABLE_ENV, "on").strip().lower() not in ("0", "off", "false", "no")
+
+
+def sourcing_workers() -> int:
+    """Model calls a trace makes at once (``WORKFLOW_SOURCING_WORKERS``,
+    1–32): fewer on a model server that is busy or rate-limits harder."""
+    from app.services.output_sourcing import WORKERS
+
+    try:
+        return max(1, min(32, int(os.environ.get(WORKERS_ENV, "") or WORKERS)))
+    except ValueError:
+        return WORKERS
 
 
 def _now():
@@ -151,7 +163,7 @@ def _model_for(db, sys_config: dict, preferred: str | None, user_id: str | None)
 
 
 def _trace(targets: dict, documents: list[dict], passages: list[dict], *, model: str, sys_config: dict,
-           user_id: str | None, team_id: str | None) -> dict:
+           user_id: str | None, team_id: str | None, first: set[str] | None = None, publish=None) -> dict:
     from app.services.metering import metered
     from app.services.output_sourcing import trace_sources
 
@@ -161,10 +173,29 @@ def _trace(targets: dict, documents: list[dict], passages: list[dict], *, model:
             targets, documents, passages,
             ask=_judge(model, sys_config),
             deadline=started + TIME_BUDGET_SECONDS,
+            workers=sourcing_workers(),
+            first=first,
+            publish=publish,
         )
     payload["model"] = model
     payload["seconds"] = round(time.monotonic() - started, 1)
     return payload
+
+
+def _publisher(db, oid):
+    """Write what is settled so far into the run while it is still being
+    traced: the UI draws these underlines and keeps polling. Only while the
+    trace still owns the field — never over a finished result."""
+    def publish(partial: dict) -> None:
+        db.workflow_result.update_one(
+            {"_id": oid, "sourcing.status": "running"},
+            {"$set": {
+                "sourcing.targets": partial.get("targets") or {},
+                "sourcing.sources": partial.get("sources") or [],
+                "sourcing.updated_at": _now(),
+            }},
+        )
+    return publish
 
 
 @celery_app.task(
@@ -202,6 +233,8 @@ def trace_run_sources(self, workflow_result_id: str, doc_uuids: list[str] | None
             passages,
             model=_model_for(db, sys_config, result_doc.get("model"), user_id),
             sys_config=sys_config, user_id=user_id, team_id=workflow_doc.get("team_id"),
+            # The deliverable first, and shown as its statements are settled.
+            first={"final"}, publish=_publisher(db, oid),
         )
     except Exception as e:  # noqa: BLE001 — the run is done; this only loses the underlines
         logger.warning("Sourcing failed for run %s: %s", workflow_result_id, e)

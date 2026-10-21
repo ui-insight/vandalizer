@@ -65,7 +65,7 @@ import math
 import re
 import time
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Callable
@@ -86,7 +86,11 @@ WINDOW_CHARS = 700         # a candidate passage shown to the judge
 WINDOW_STRIDE = 350        # windows overlap by half, so a short excerpt sits whole in one
 KB_WHOLE_CHARS = 1400      # a knowledge-base passage this short is one window
 CANDIDATES = 3             # passages per statement
+RETRY_CANDIDATES = 5       # passages per statement on its second look
 BATCH_STATEMENTS = 8       # statements per judge call
+WORKERS = 16               # model calls at once: the server batches them, so more is faster up to a point
+MAX_RETRIED = 120          # second looks per run
+PUBLISH_EVERY = 0.75       # seconds between partial results written while tracing
 BATCH_CHARS = 12000        # passage text per judge call
 ROLE_BATCH = 8             # statements per role check
 ROLE_MAX_WORDS = 6         # a statement this short takes its meaning from its label
@@ -101,6 +105,7 @@ COVERAGE_TEXT = 0.3        # share of the statement's own content words, or
 COVERAGE_WITH_LABEL = 0.35  # share of its and its label's words together;
 COVERAGE_TEXT_VALUES = 0.2  # less for a statement its values already anchor
 COVERAGE_WITH_LABEL_VALUES = 0.25
+CONFIRM_BELOW = 0.8        # a linked statement with less of its wording in the excerpt is confirmed apart
 EXCERPT_CONTEXT = 320      # document text kept either side of a quote for display
 
 JUDGE_INSTRUCTIONS = (
@@ -173,6 +178,30 @@ ROLE_INSTRUCTIONS = (
     "- the excerpt does not let you tell.\n\n"
     "Reply with JSON only: "
     '{"items": [{"id": 1, "passage_says": "...", "shown": true}, {"id": 2, "passage_says": "...", "shown": false}]}'
+)
+
+# A second look is a second chance for the judge to say yes; a link it
+# finds then must also be confirmed, apart, by a call asked only that.
+RETRY_NOTE = (
+    "\n\nThese statements were checked once and not linked. Read every passage offered for each "
+    "statement afresh; some are new. When one states it, copy the excerpt exactly: one contiguous run "
+    "of that passage, character for character, with no ellipsis, including the words that name the "
+    "subject together with the values."
+)
+
+CONFIRM_INSTRUCTIONS = (
+    "You check links between statements in an AI-written report and the excerpts they were traced to. "
+    "Each item gives a statement, its label — the field, table row or heading it sits under — sometimes "
+    "its context, the headings and list items above it, and an excerpt with the passage around it.\n\n"
+    "Answer stated: true only when the excerpt itself states the statement: the same subject, and every "
+    "fact in it — each name, number, date, amount and condition — connected as the statement connects "
+    "them, read as its label and context put it.\n\n"
+    "Answer stated: false when the excerpt only shares words with the statement; states something "
+    "narrower, broader or conditional that the statement does not; needs a fact from outside the excerpt; "
+    "is about a different item, person or program than the label and context name; or does not let you "
+    "tell.\n\n"
+    "Reply with JSON only: "
+    '{"items": [{"id": 1, "stated": true}, {"id": 2, "stated": false}]}'
 )
 
 
@@ -1042,10 +1071,30 @@ def _judge_prompt(items: list[tuple[int, Statement, list[int]]], corpus: Corpus)
     return "\n\n".join(parts), {v: k for k, v in ids.items()}
 
 
+def _escape_raw_controls(text: str) -> str:
+    """``text`` with the line breaks and tabs that sit inside JSON strings
+    escaped. Models copying a passage that runs over lines often write the
+    break itself into the quote — invalid JSON, and a whole batch lost."""
+    out: list[str] = []
+    inside = escaped = False
+    for ch in text:
+        if inside and not escaped and ch in "\n\r\t":
+            out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t"}[ch])
+            continue
+        if ch == '"' and not escaped:
+            inside = not inside
+        escaped = ch == "\\" and not escaped
+        out.append(ch)
+    return "".join(out)
+
+
 def _parse(reply: str) -> dict[int, dict]:
     from app.services.workflow_validator import _extract_json
 
-    data = _extract_json(reply)
+    try:
+        data = _extract_json(reply)
+    except ValueError:
+        data = _extract_json(_escape_raw_controls(reply))
     items = data.get("items") if isinstance(data, dict) else data
     out: dict[int, dict] = {}
     for it in items if isinstance(items, list) else []:
@@ -1056,10 +1105,11 @@ def _parse(reply: str) -> dict[int, dict]:
 
 def _judge_batch(
     batch: list[tuple[str, Statement, list[int]]], corpus: Corpus, ask: Callable[[str, str], str],
+    instructions: str = JUDGE_INSTRUCTIONS,
 ) -> dict[str, Verdict]:
     items = [(n, st, cands) for n, (_, st, cands) in enumerate(batch, 1)]
     prompt, by_id = _judge_prompt(items, corpus)
-    verdicts = _parse(ask(JUDGE_INSTRUCTIONS, prompt))
+    verdicts = _parse(ask(instructions, prompt))
     out: dict[str, Verdict] = {}
     for n, (key, st, cands) in enumerate(batch, 1):
         v = verdicts.get(n) or {}
@@ -1079,8 +1129,13 @@ def _judge_batch(
     return out
 
 
-def _batches(jobs: list[tuple[str, Statement, list[int]]], corpus: Corpus) -> list[list]:
-    jobs = sorted(jobs, key=lambda j: (corpus.windows[j[2][0]].src, corpus.windows[j[2][0]].start))
+def _batches(jobs: list[tuple[str, Statement, list[int]]], corpus: Corpus, ordered: bool = False) -> list[list]:
+    """Judge calls of up to ``BATCH_STATEMENTS`` statements and
+    ``BATCH_CHARS`` of passages: grouped by where their passages are, so a
+    call reads each once, or — ``ordered`` — in the order given, so the top
+    of a report is checked first."""
+    if not ordered:
+        jobs = sorted(jobs, key=lambda j: (corpus.windows[j[2][0]].src, corpus.windows[j[2][0]].start))
     out: list[list] = []
     cur: list = []
     seen: set[int] = set()
@@ -1099,6 +1154,19 @@ def _batches(jobs: list[tuple[str, Statement, list[int]]], corpus: Corpus) -> li
     if cur:
         out.append(cur)
     return out
+
+
+def says_more(st: Statement, link: dict | None) -> bool:
+    """Whether a statement of several words has much the excerpt does not:
+    then a separate call must confirm the excerpt states all of it. Seen in
+    the NSF run: "Include the required single-copy PDFs (List of
+    Participating Organizations and List of Project Personnel) and adhere to
+    file-format and naming rules of the chosen system", linked to an excerpt
+    that says nothing of formats or names."""
+    words = stems(st.text)
+    if len(words) < COVERAGE_MIN_WORDS:
+        return False
+    return len(words & stems((link or {}).get("quote") or "")) / len(words) < CONFIRM_BELOW
 
 
 def label_names_role(st: Statement) -> bool:
@@ -1136,38 +1204,86 @@ def _role_vote(
     return {(key, vote): (answers.get(n) or {}).get("shown") is True for n, (key, _, _) in enumerate(items, 1)}
 
 
-def _in_pool(
-    jobs: list, run: Callable[[object], dict], *,
-    workers: int, deadline: float | None, clock: Callable[[], float],
-) -> tuple[dict, list, int]:
-    """``run`` on every job, a few at once, until ``deadline``: the merged
-    results of the jobs that finished, the jobs that did not (out of time
-    or failed), and how many failed."""
-    if not jobs:
-        return {}, [], 0
-    if deadline is not None and clock() >= deadline:
-        return {}, list(jobs), 0
-    results: dict = {}
-    missed: list = []
-    errors = 0
-    pool = ThreadPoolExecutor(max_workers=max(1, workers))
-    try:
-        futures = {pool.submit(contextvars.copy_context().run, run, j): j for j in jobs}
-        remaining = None if deadline is None else max(0.0, deadline - clock())
-        done, pending = wait(futures, timeout=remaining)
-        for f in pending:
-            f.cancel()
-            missed.append(futures[f])
-        for f in done:
-            try:
-                results.update(f.result())
-            except Exception as e:  # noqa: BLE001 — a failed call links nothing
-                logger.warning("Source judge call failed: %s", e)
-                errors += 1
-                missed.append(futures[f])
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
-    return results, missed, errors
+def _confirm_vote(
+    batch: list[tuple[str, Statement, Verdict]], ask: Callable[[str, str], str],
+) -> dict[str, bool]:
+    """Whether each excerpt, read in its passage, states its statement:
+    asked only of links a second look found."""
+    answers = _parse(ask(CONFIRM_INSTRUCTIONS, _role_prompt([(n, st, v.link) for n, (_, st, v) in enumerate(batch, 1)])))
+    return {key: (answers.get(n) or {}).get("stated") is True for n, (key, _, _) in enumerate(batch, 1)}
+
+
+@dataclass
+class _Job:
+    rank: int                  # lower runs first
+    seq: int
+    run: Callable[[], object]
+    done: Callable[[object], None]
+    failed: Callable[[], None]
+
+
+class _Scheduler:
+    """Model calls on a few threads, at most ``workers`` at once, the
+    lowest rank first, until ``deadline``. A finished job may queue more
+    (a judged batch queues its role checks); ``tick`` runs between results,
+    on the calling thread, as do every job's callbacks."""
+
+    def __init__(self, workers: int, deadline: float | None, clock: Callable[[], float]) -> None:
+        self.workers = max(1, workers)
+        self.deadline = deadline
+        self.clock = clock
+        self.queue: list[_Job] = []
+        self.seq = 0
+        self.errors = 0
+
+    def add(self, rank: int, run, done, failed) -> None:
+        self.seq += 1
+        self.queue.append(_Job(rank, self.seq, run, done, failed))
+
+    def _late(self) -> bool:
+        return self.deadline is not None and self.clock() >= self.deadline
+
+    def run(self, tick: Callable[[], None] | None = None) -> list[_Job]:
+        """Run everything queued, and everything it queues. Returns the
+        jobs that never ran or never finished, out of time."""
+        pool = ThreadPoolExecutor(max_workers=self.workers)
+        flying: dict = {}
+        try:
+            while True:
+                while self.queue and len(flying) < self.workers and not self._late():
+                    self.queue.sort(key=lambda j: (j.rank, j.seq))
+                    job = self.queue.pop(0)
+                    flying[pool.submit(contextvars.copy_context().run, job.run)] = job
+                if not flying:
+                    # Nothing out: ``tick`` may start the next stage.
+                    if tick and not self._late():
+                        tick()
+                        if self.queue:
+                            continue
+                    break
+                remaining = None if self.deadline is None else max(0.0, self.deadline - self.clock())
+                finished, _ = wait(flying, timeout=remaining, return_when=FIRST_COMPLETED)
+                if not finished:
+                    break   # out of time with calls still out
+                for f in sorted(finished, key=lambda f: (flying[f].rank, flying[f].seq)):
+                    job = flying.pop(f)
+                    try:
+                        result = f.result()
+                    except Exception as e:  # noqa: BLE001 — a failed call links nothing
+                        logger.warning("Source check call failed: %s", e)
+                        self.errors += 1
+                        job.failed()
+                        continue
+                    job.done(result)
+                if tick:
+                    tick()
+        finally:
+            for f in flying:
+                f.cancel()
+            pool.shutdown(wait=False, cancel_futures=True)
+        left = list(flying.values()) + self.queue
+        self.queue = []
+        return left
 
 
 # ---------------------------------------------------------------------------
@@ -1200,6 +1316,17 @@ class _Run:
         return self.index[key]
 
 
+# A first look that ends in one of these may have missed a passage that
+# states the statement, or copied it badly: it gets a second look. A link
+# refused by a check on what the excerpt says (a value, a role, a rule's
+# condition) does not.
+RETRY_REASONS = frozenset({
+    "judge_unsupported", "judge_named_no_passage", "quote_not_in_passage", "quote_too_short",
+    "quote_too_long", "no_shared_word", "quote_covers_too_little", "value_not_in_quote",
+    "check_error", "judge_call_failed",
+})
+
+
 def trace_sources(
     targets: dict,
     documents: list[dict],
@@ -1207,18 +1334,21 @@ def trace_sources(
     *,
     ask: Callable[[str, str], str],
     deadline: float | None = None,
-    workers: int = 3,
+    workers: int = WORKERS,
     max_judged: int = MAX_JUDGED,
+    max_retried: int = MAX_RETRIED,
     clock: Callable[[], float] = time.monotonic,
+    first: set[str] | None = None,
+    publish: Callable[[dict], None] | None = None,
 ) -> dict:
     """Source every statement of every output in ``targets`` (key → value).
 
     Returns the sidecar the UI draws from::
 
         {"version", "status": "done", "sources": [link, …],
-         "targets": {key: {"format", "statements": [{"s", "e", "p"?, "src"?, "t"?}],
+         "targets": {key: {"format", "statements": [{"s", "e", "p"?, "src"?, "t"?, "w"?}],
                            "summary": {"statements", "traced"}}},
-         "judged", "unchecked", "errors"}
+         "judged", "retried", "rescued", "unchecked", "errors", "reasons"}
 
     ``s``/``e`` are offsets into a text output (``format: text``) or into
     the leaf string at path ``p`` (``format: json``; absent for a whole
@@ -1226,86 +1356,262 @@ def trace_sources(
     path ``p`` and its offsets inside that leaf, ``ls``/``le``. Offsets
     count code points. ``src`` indexes ``sources``; ``t`` marks an
     ``absent`` or ``verdict`` statement. The outputs themselves are only read.
+
+    The statements of the ``first`` targets (all of them when not given)
+    are checked first, in the order they are written, so the top of a
+    report is underlined first; then their second looks; then the other
+    targets'. ``publish`` receives the sidecar so far, ``status:
+    "running"``, as links are settled — ``w`` marks a statement still being
+    checked — and a source's index never changes once given.
     """
     corpus = Corpus(documents, passages)
+    first_keys = [k for k in targets if first is None or k in first]
+    keys_in_order = first_keys + [k for k in targets if k not in first_keys]
     split: dict[str, tuple[str, list[Statement]]] = {}
     unique: dict[str, Statement] = {}
-    for key, value in (targets or {}).items():
-        fmt, stmts = split_output(value)
+    lead: dict[str, int] = {}   # 0: in a first target, 1: not
+    for key in keys_in_order:
+        fmt, stmts = split_output(targets[key])
         split[key] = (fmt, stmts)
         for st in stmts:
             if st.kind == "claim":
-                unique.setdefault(statement_key(st), st)
+                skey = statement_key(st)
+                unique.setdefault(skey, st)
+                lead[skey] = min(lead.get(skey, 1), 0 if key in first_keys else 1)
 
-    jobs = []
+    settled: dict[str, Verdict] = {}
+    open_keys: set[str] = set()        # still being checked: shown as waiting
+    retry_due: dict[str, Statement] = {}
+    awaiting: dict[str, str] = {}      # a link waiting on a check: what it becomes if cut off
+    stats: Counter = Counter()
+    sched = _Scheduler(workers, deadline, clock)
+    first_out: Counter = Counter()     # first-look judge calls not yet back, per class
+    retried_class: set[int] = set()
+    run = _Run()
+
+    def settle(skey: str, verdict: Verdict, *, may_retry: bool) -> None:
+        settled[skey] = verdict
+        awaiting.pop(skey, None)
+        if may_retry and verdict.link is None and verdict.reason in RETRY_REASONS:
+            retry_due[skey] = unique[skey]
+        else:
+            retry_due.pop(skey, None)
+            open_keys.discard(skey)
+
+    def checks(items: list[tuple[str, Statement, Verdict]], *, retry: bool) -> None:
+        """Queue the separate calls a link still needs — a confirmation for
+        one a second look found or whose statement says more than its
+        excerpt's words, role checks for a short statement — and settle each
+        when they are back."""
+        needs: dict[str, tuple[bool, bool]] = {}
+        waiting = []
+        for skey, st, v in items:
+            confirm, role = retry or says_more(st, v.link), label_names_role(st)
+            if confirm or role:
+                needs[skey] = (confirm, role)
+                waiting.append((skey, st, v))
+            else:
+                settle(skey, v, may_retry=False)
+        for i in range(0, len(waiting), ROLE_BATCH):
+            chunk = waiting[i:i + ROLE_BATCH]
+            to_confirm = [it for it in chunk if needs[it[0]][0]]
+            roles = [it for it in chunk if needs[it[0]][1]]
+            answers: dict = {"confirm": None, "roles": [None] * ROLE_VOTES}
+            jobs: list[tuple] = []
+            if to_confirm:
+                jobs.append(("confirm", 0, lambda c=to_confirm: _confirm_vote(c, ask)))
+            if roles:
+                jobs.extend(("role", n, (lambda r=roles, n=n: _role_vote(r, n, ask))) for n in range(ROLE_VOTES))
+            for skey, _, _ in chunk:
+                awaiting[skey] = "confirm_unchecked" if needs[skey][0] else "role_unchecked"
+            left = {"n": len(jobs)}
+
+            def decide(chunk=chunk, answers=answers) -> None:
+                for skey, _, v in chunk:
+                    confirm, role = needs[skey]
+                    if confirm:
+                        said = (answers["confirm"] or {}).get(skey)
+                        if said is None:
+                            stats["unchecked"] += 1
+                            settle(skey, Verdict(None, "confirm_unchecked"), may_retry=False)
+                            continue
+                        if said is False:
+                            settle(skey, Verdict(None, "not_confirmed"), may_retry=False)
+                            continue
+                    if role:
+                        votes = [(r or {}).get((skey, n)) for n, r in enumerate(answers["roles"])]
+                        if False in votes:
+                            settle(skey, Verdict(None, "role_not_shown"), may_retry=False)
+                            continue
+                        if None in votes:
+                            stats["unchecked"] += 1
+                            settle(skey, Verdict(None, "role_unchecked"), may_retry=False)
+                            continue
+                    if retry:
+                        stats["rescued"] += 1
+                    settle(skey, v, may_retry=False)
+
+            for kind, n, call in jobs:
+                def done(result, kind=kind, n=n, answers=answers, left=left, decide=decide) -> None:
+                    if kind == "confirm":
+                        answers["confirm"] = result
+                    else:
+                        answers["roles"][n] = result
+                    left["n"] -= 1
+                    if left["n"] == 0:
+                        decide()
+
+                def failed(left=left, decide=decide) -> None:
+                    left["n"] -= 1
+                    if left["n"] == 0:
+                        decide()
+
+                sched.add(0, call, done, failed)
+
+    def look(batch: list, cls: int, *, retry: bool) -> None:
+        """A judge call on ``batch``: a first look, or a second one with more
+        passages and a reminder to copy exactly."""
+        instructions = JUDGE_INSTRUCTIONS + RETRY_NOTE if retry else JUDGE_INSTRUCTIONS
+        if not retry:
+            first_out[cls] += 1
+
+        def done(result: dict) -> None:
+            if not retry:
+                first_out[cls] -= 1
+            linked = []
+            for skey, st, _ in batch:
+                v = result.get(skey) or Verdict(None, "judge_unsupported")
+                if v.link is not None:
+                    linked.append((skey, st, v))
+                else:
+                    settle(skey, v, may_retry=not retry)
+            checks(linked, retry=retry)
+
+        def failed() -> None:
+            if not retry:
+                first_out[cls] -= 1
+            for skey, _, _ in batch:
+                settle(skey, Verdict(None, "judge_call_failed"), may_retry=not retry)
+
+        sched.add(1 + 2 * cls + (1 if retry else 0),
+                  lambda: _judge_batch(batch, corpus, ask, instructions), done, failed)
+
+    # First looks: the first targets' statements in the order written, then
+    # the rest; past the budget a statement stays plain.
+    jobs: dict[int, list] = {0: [], 1: []}
+    budget = max_judged
     for skey, st in unique.items():
         cands = corpus.candidates(st)
-        if cands:
-            jobs.append((skey, st, cands))
-    unchecked = max(0, len(jobs) - max_judged)
-    jobs = jobs[:max_judged]
+        if not cands:
+            continue
+        if budget <= 0:
+            stats["unchecked"] += 1
+            continue
+        budget -= 1
+        stats["judged"] += 1
+        open_keys.add(skey)
+        jobs[lead[skey]].append((skey, st, cands))
+    for batch in _batches(jobs[0], corpus, ordered=True):
+        look(batch, 0, retry=False)
 
-    batches = _batches(jobs, corpus)
-    verdicts, missed, errors = _in_pool(
-        batches, lambda b: _judge_batch(b, corpus, ask), workers=workers, deadline=deadline, clock=clock,
-    )
-    unchecked += sum(len(b) for b in missed)
+    retry_left = {"n": max_retried}
+    rest_started = {"yes": False}
 
-    # The judge's links whose label names a role, in the judge's order so a
-    # check reads neighbouring statements together. Each is asked more than
-    # once, apart, and kept only when every answer is yes: on a statement
-    # it finds arguable the model says yes one time and no the next.
-    role_jobs = [
-        (key, st, verdicts[key]) for b in batches for key, st, _ in b
-        if key in verdicts and verdicts[key].link is not None and label_names_role(st)
-    ]
-    votes, _, role_errors = _in_pool(
-        [(role_jobs[i:i + ROLE_BATCH], vote) for i in range(0, len(role_jobs), ROLE_BATCH) for vote in range(ROLE_VOTES)],
-        lambda job: _role_vote(job[0], job[1], ask), workers=workers, deadline=deadline, clock=clock,
-    )
-    for key, _, _ in role_jobs:
-        said =[votes.get((key, vote)) for vote in range(ROLE_VOTES)]
-        if False in said:
-            verdicts[key] = Verdict(None, "role_not_shown")
-        elif None in said:
-            verdicts[key] = Verdict(None, "role_unchecked")
-            unchecked += 1
-    errors += role_errors
+    def queue_retries(cls: int) -> None:
+        retried_class.add(cls)
+        todo = []
+        for skey, st in [(k, s) for k, s in retry_due.items() if lead[k] == cls]:
+            retry_due.pop(skey, None)
+            cands = corpus.candidates(st, k=RETRY_CANDIDATES) if retry_left["n"] > 0 else []
+            if not cands:
+                open_keys.discard(skey)
+                continue
+            retry_left["n"] -= 1
+            stats["retried"] += 1
+            todo.append((skey, st, cands))
+        for batch in _batches(todo, corpus, ordered=True):
+            look(batch, cls, retry=True)
 
-    run = _Run()
-    out_targets: dict[str, dict] = {}
-    for key, (fmt, stmts) in split.items():
-        rows = []
-        traced = 0
-        for st in stmts:
-            row: dict = {}
-            if st.path is not None:
-                row["p"] = st.path
-            if st.start is not None:
-                row["s"], row["e"] = st.start, st.end
-            if fmt == "text" and "leaf" in st.extra:
-                # JSON written as text: also where the statement sits inside
-                # its leaf, for a view that pretty-prints the JSON.
-                row["ls"], row["le"] = st.extra["leaf"]
-            if st.kind != "claim":
-                row["t"] = st.kind
-            else:
-                v = verdicts.get(statement_key(st))
-                if v is not None and v.link is not None:
-                    row["src"] = run.add(v.link)
-                    traced += 1
-            rows.append(row)
-        out_targets[key] = {
-            "format": fmt, "statements": rows,
-            "summary": {"statements": len(rows), "traced": traced},
+    def advance() -> None:
+        """The next stage, when the one before it is done: the first
+        targets' second looks once all their first looks are back; the other
+        targets only once every first-target statement is settled, so they
+        never slow the deliverable on a shared model server; then theirs."""
+        if 0 not in retried_class and first_out[0] == 0:
+            queue_retries(0)
+        if not rest_started["yes"] and not any(lead[k] == 0 for k in open_keys):
+            rest_started["yes"] = True
+            for batch in _batches(jobs[1], corpus):
+                look(batch, 1, retry=False)
+        if rest_started["yes"] and 1 not in retried_class and first_out[1] == 0:
+            queue_retries(1)
+
+    def build(status: str) -> dict:
+        out_targets: dict[str, dict] = {}
+        for key in targets:
+            fmt, stmts = split[key]
+            rows = []
+            traced = 0
+            for st in stmts:
+                row: dict = {}
+                if st.path is not None:
+                    row["p"] = st.path
+                if st.start is not None:
+                    row["s"], row["e"] = st.start, st.end
+                if fmt == "text" and "leaf" in st.extra:
+                    # JSON written as text: also where the statement sits inside
+                    # its leaf, for a view that pretty-prints the JSON.
+                    row["ls"], row["le"] = st.extra["leaf"]
+                if st.kind != "claim":
+                    row["t"] = st.kind
+                else:
+                    skey = statement_key(st)
+                    v = settled.get(skey)
+                    if skey in open_keys:
+                        row["w"] = 1
+                    elif v is not None and v.link is not None:
+                        row["src"] = run.add(v.link)
+                        traced += 1
+                rows.append(row)
+            out_targets[key] = {
+                "format": fmt, "statements": rows,
+                "summary": {"statements": len(rows), "traced": traced},
+            }
+        return {
+            "version": VERSION,
+            "status": status,
+            "sources": list(run.sources),
+            "targets": out_targets,
+            "judged": stats["judged"],
+            "retried": stats["retried"],
+            "rescued": stats["rescued"],
+            "unchecked": stats["unchecked"],
+            "errors": sched.errors,
+            "reasons": dict(Counter(v.reason for v in settled.values())),
         }
-    return {
-        "version": VERSION,
-        "status": "done",
-        "sources": run.sources,
-        "targets": out_targets,
-        "judged": len(jobs),
-        "unchecked": unchecked,
-        "errors": errors,
-        "reasons": dict(Counter(v.reason for v in verdicts.values())),
-    }
+
+    shown = {"at": 0.0, "open": -1}
+
+    def tick() -> None:
+        advance()
+        if publish is None:
+            return
+        now = time.monotonic()
+        if len(open_keys) != shown["open"] and now - shown["at"] >= PUBLISH_EVERY:
+            shown["at"], shown["open"] = now, len(open_keys)
+            try:
+                publish(build("running"))
+            except Exception as e:  # noqa: BLE001 — a missed update only delays the underlines
+                logger.warning("Could not publish partial sourcing: %s", e)
+
+    advance()
+    sched.run(tick)
+    # Whatever a deadline cut off stays plain, and is counted.
+    for skey in list(open_keys):
+        stats["unchecked"] += 1
+        if skey in awaiting:
+            settled[skey] = Verdict(None, awaiting[skey])
+        elif skey not in settled:
+            settled[skey] = Verdict(None, "unchecked")
+    open_keys.clear()
+    return build("done")
