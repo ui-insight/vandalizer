@@ -821,3 +821,12 @@ class TestNoDocumentChatRulesContent:
 
     def test_still_permits_general_knowledge_answers(self):
         assert "general" in self._rules()
+
+    def test_a_document_from_earlier_turns_is_reported_as_no_longer_attached(self):
+        """Support ticket: a reopened chat had lost its document, and asked
+        "What document is attached?" the model invented an explanation
+        ("provided before the system confirmed the attachment status")."""
+        rules = self._rules()
+        assert "earlier messages" in rules
+        assert "not attached now" in rules
+        assert "do not invent a reason" in rules
