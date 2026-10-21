@@ -6205,6 +6205,13 @@ async def get_certification_module(
         # Old reflection keys must never redirect a competency enrollment
         # into the legacy participation route, even in a mixed package.
         "assessment_mode": assessment_mode,
+        # Support ticket: asked to check Advanced Nodes, chat read this card,
+        # said no pass/fail list existed and staged a workflow run instead.
+        **({"module_check": (
+            "check_certification_module returns pass or fail for each of this "
+            "module's requirements from the learner's saved work, without running "
+            "anything. Use it when the learner asks to check the module."
+        )} if assessment_mode != "selected_saved_outcomes" else {}),
         "required_outcomes": required_outcomes,
         "selected_outcome_completion": selected_completion,
         **({"scenario_case_count": scenario_cases} if scenario_cases is not None else {}),
@@ -6409,14 +6416,20 @@ async def check_certification_module(
     module_id: str,
     enrollment_id: str | None = None,
 ) -> dict:
-    """Read a supported legacy module's pinned validation result.
+    """Run the module check: pass or fail for each of a legacy module's requirements.
 
-    Use only after get_certification_module identifies a legacy assessment
-    mode. This read-only check does not complete a module. Relay saved checks
-    faithfully and distinguish unavailable grading from a learner failure.
-    A passing legacy check permits offering complete_certification_module.
-    For selected_saved_outcomes, direct the learner to Open module assessment:
-    this tool cannot select saved evidence or replace that assessment path.
+    Call this whenever the learner asks to check their module or which checks
+    pass, for legacy_reflection and legacy_practical modules alike. It reads
+    the learner's saved work and runs nothing: never run a workflow,
+    extraction or anything else to "check" a module, and never tell the
+    learner no pass/fail list exists. Relay each check and its detail
+    faithfully, and distinguish unavailable grading from a learner failure.
+    A failed check's detail says what is missing; running existing work
+    cannot change a check about how the work is built. This check does not
+    complete a module; a passing check permits offering
+    complete_certification_module. For selected_saved_outcomes, direct the
+    learner to Open module assessment: this tool cannot select saved
+    evidence or replace that assessment path.
 
     Args:
         context: The call context.
