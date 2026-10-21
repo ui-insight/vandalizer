@@ -227,6 +227,9 @@ def test_identifiers_lead_ins_and_provenance_columns_are_not_statements():
     md = "Check results:\n\n| Component | Details | Source |\n|---|---|---|\n| Project title | Up to 250 characters | Announcement |\n"
     _, stmts = split_output(md)
     assert [(s.text, s.label) for s in stmts] == [("Up to 250 characters", "Project title — Details")]
+    # A pointer to another part of the report is not a statement either.
+    md = "| Component | Special Requirements |\n|---|---|\n| Project Description | **See required structure below.** |\n"
+    assert split_output(md)[1] == []
 
 
 def test_a_record_name_labels_its_fields():
@@ -645,6 +648,88 @@ def test_the_role_check_reads_the_highlighted_excerpt_not_the_passage_around_it(
     assert "the label names a party" in ROLE_INSTRUCTIONS
 
 
+NHERI_ELIG = _doc("nheri2", "NHERI.pdf", [
+    "Who May Serve as PI:\n\nThe PI must be a full-time employee of the lead institution by the start date of the "
+    "NSF cooperative agreement award.\n\nAn individual may appear as PI or co-PI in no more than one proposal.\n" + FILLER,
+])
+
+
+def test_a_rule_for_the_pi_does_not_source_the_co_investigator_s_criterion():
+    """Seen in a fresh NSF NHERI run: "Criteria: Must be a full-time employee
+    of the lead institution…" under the co-investigator was linked to "The PI
+    must be a full-time employee…" — the RFA says it of the PI alone. Its
+    context named the co-investigator; the judge linked it anyway."""
+    md = ("### Eligible Individuals\n\n"
+          "- **Principal Investigator**\n  - Criteria: Must be a full-time employee of the lead institution\n"
+          "- **Co‑Investigator**\n  - Criteria: Must be a full-time employee of the lead institution\n"
+          "  - Conditions: May appear as PI or co-PI in no more than one proposal\n")
+    judge = Judge(("full-time", "Who May Serve", "The PI must be a full-time employee of the lead institution"),
+                  ("appear as", "no more than one", "An individual may appear as PI or co-PI in no more than one proposal."))
+    result = _trace({"final": md}, judge, docs=[NHERI_ELIG])
+    linked = [md[r["s"]:r["e"]] for r, _ in _links(result, "final")]
+    assert linked.count("Must be a full-time employee of the lead institution") == 1   # the PI's only
+    assert "May appear as PI or co-PI in no more than one proposal" in linked          # names both
+    assert result["reasons"]["subject_differs"] == 1
+    rows = result["targets"]["final"]["statements"]
+    under_co = [r for r in rows if md[r["s"]:r["e"]].startswith("Must be")][1]
+    assert "src" not in under_co
+
+
+@pytest.mark.parametrize("sentence, linked", [
+    ("The Foundation for Food & Agriculture Research (FFAR) announces the 2022 Seeding Solutions program.", True),
+    ("This cooperative agreement is made and entered into by the Bureau of Land Management and the recipient.", True),
+    ("The National Science Foundation (NSF) is an independent Federal agency created by the National Science "
+     "Foundation Act of 1950.", False),
+    ("The National Science Foundation has Telephonic Device for the Deaf (TDD) capabilities about NSF programs.", False),
+])
+def test_a_sponsor_needs_a_sentence_that_ties_it_to_this_opportunity(sentence, linked):
+    """Seen on every NSF solicitation: "Sponsor: National Science Foundation"
+    linked to the agency's description of itself."""
+    from app.services.output_statements import Statement
+    from app.services.output_sourcing import party_unbound
+
+    assert party_unbound(Statement(0, 0, "x", label="Sponsor"), sentence) is not linked
+    assert party_unbound(Statement(0, 0, "x", label="sponsor name"), sentence) is not linked
+    # Only a sponsor's or funder's label asks it.
+    assert party_unbound(Statement(0, 0, "x", label="Recipient"), sentence) is False
+
+
+MRI = _doc("mri", "MRI.pdf", [
+    "Note: A Data Management Plan is required for MRI proposals. Researchers are expected to share with other "
+    "researchers, at no more than incremental cost and within a reasonable amount of time, the primary data. "
+    "As a result MRI budgets may include incremental costs associated with the implementation of this plan.\n"
+    + FILLER,
+])
+
+
+def test_the_highlight_takes_in_the_sentence_the_statement_rests_on():
+    """Seen in the MRI solicitation: "Data management plan incremental
+    costs" highlighted the sentence about sharing data at incremental cost;
+    the next sentence is the one that says budgets may include them."""
+    judge = Judge(("incremental", "incremental cost", "share with other researchers, at no more than incremental cost"))
+    result = _trace({"final": {"allowable_costs": ["Data management plan incremental costs"]}}, judge, docs=[MRI])
+    [(_, src)] = _links(result, "final")
+    assert src["quote"].startswith("share with other researchers, at no more than incremental cost")
+    assert src["quote"].endswith("MRI budgets may include incremental costs associated with the implementation of this plan.")
+    assert src["excerpt"][src["quote_start"]:src["quote_end"]] == src["quote"]
+    # The judge's own excerpt said little of the statement: a separate call confirmed it.
+    assert [it["excerpt"] for it in judge.confirm_asked] == [src["quote"]]
+    assert "judge_quote" not in src
+
+
+def test_the_sentence_around_an_excerpt_at_the_start_of_a_text_keeps_its_first_letter():
+    from app.services.output_sourcing import sentence_around
+
+    assert sentence_around("EXPENSE RECORD for the award", 8, 14) == "EXPENSE RECORD for the award"
+    assert sentence_around("One. Two words here. Three.", 5, 8) == "Two words here."
+
+
+def test_a_highlight_already_saying_the_statement_is_left_as_the_judge_copied_it():
+    judge = Judge(RECIPIENT)
+    [(_, src)] = _links(_trace({"final": "The recipient is Southern Utah University."}, judge), "final")
+    assert src["quote"] == "Recipient: Southern Utah University"
+
+
 def test_a_check_s_name_is_not_a_statement_but_names_its_fields():
     """Seen in the NSF run: {"check": "Cost share / matching required",
     "status": "no", "detail": "…cost sharing is prohibited"} — the name,
@@ -744,7 +829,8 @@ def test_an_excerpt_from_another_offered_passage_is_checked_where_it_is():
     judge = Judge(("expense record", "NOTICE OF AWARD", "Award: L24AC00293-00 (BLM, Southern Utah University)"))
     result = _trace({"final": "The expense record charges the purchase to award L24AC00293-00."}, judge)
     [(_, src)] = _links(result, "final")
-    assert (src["document_uuid"], src["quote"]) == ("exp", "Award: L24AC00293-00 (BLM, Southern Utah University)")
+    # The highlight also takes in the record's title, which the statement names.
+    assert (src["document_uuid"], src["quote"]) == ("exp", "EXPENSE RECORD\nAward: L24AC00293-00 (BLM, Southern Utah University)")
     # Still every check: there, the excerpt has no word of the statement.
     judge = Judge(("purchase", "NOTICE OF AWARD", "Vendor: Forestry Suppliers Inc."))
     result = _trace({"final": "The purchase was approved under award L24AC00293-00."}, judge)

@@ -534,12 +534,75 @@ def is_action(st: Statement) -> bool:
     return bool(first and first.group(1).lower() in _ACTION_VERBS) or bool(_ACTION_LABEL_RE.search(st.label or ""))
 
 
+def _sentence_start(text: str, pos: int, lo: int = 0) -> int:
+    """Where the sentence (or line) holding ``text[pos - 1]`` begins, not
+    before ``lo``."""
+    dot, nl = text.rfind(". ", lo, pos), text.rfind("\n", lo, pos)
+    return max(dot + 2 if dot != -1 else lo, nl + 1 if nl != -1 else lo, lo)
+
+
 def sentence_around(text: str, start: int, end: int) -> str:
     """The sentence (or list item) ``text[start:end]`` sits in."""
-    lo = max(text.rfind(". ", 0, start) + 2, text.rfind("\n", 0, start) + 1, 0)
+    lo = _sentence_start(text, start)
     stops = [i for i in (text.find(". ", end), text.find("\n", end)) if i != -1]
     hi = min(stops) + 1 if stops else len(text)
     return text[lo:hi]
+
+
+# ---------------------------------------------------------------------------
+# Whose rule it is: the PI's or a co-PI's; whose program: this one
+# ---------------------------------------------------------------------------
+
+_CO_ROLE_RE = re.compile(r"\bco[-‐‑ ]?(?:pis?|principal|investigators?)\b", re.I)
+_PI_ROLE_RE = re.compile(r"(?<![-‐‑\w])(?:pis?|principal investigators?)\b", re.I)
+
+
+def _role_named(text: str) -> str | None:
+    """"co" or "pi" when ``text`` speaks of a co-PI or of the PI only."""
+    co, pi = bool(_CO_ROLE_RE.search(text or "")), bool(_PI_ROLE_RE.search(text or ""))
+    if co == pi:
+        return None
+    return "co" if co else "pi"
+
+
+def subject_differs(st: Statement, sentence: str) -> bool:
+    """Whether a statement about a co-PI is sourced to a sentence that
+    speaks of the PI only, or the reverse. A statement with no subject of
+    its own ("Criteria: Must be a full-time employee…") is about the list
+    item it sits under. Seen in the NSF run: the co-investigator's criterion
+    linked to "The PI must be a full-time employee…", which the RFA says of
+    the PI alone; its context named the co-investigator, and the judge
+    linked it anyway."""
+    role = _role_named(st.text) or _role_named(" ".join([st.label, *st.context[-1:]]))
+    if role is None:
+        return False
+    co, pi = bool(_CO_ROLE_RE.search(sentence)), bool(_PI_ROLE_RE.search(sentence))
+    return (not co and pi) if role == "co" else (co and not pi)
+
+
+# A label that names who offers the opportunity. The documents that name
+# the organization most often describe it — "The National Science
+# Foundation (NSF) is an independent Federal agency…", its relay service
+# for the hearing-impaired — which says nothing of who sponsors this one.
+_PARTY_LABEL_RE = re.compile(
+    r"\b(?:sponsor|funder|grantor|funding (?:agency|organi[sz]ation|source)"
+    r"|(?:issuing|awarding) (?:agency|organi[sz]ation))", re.I,
+)
+_BOUND_TO_THIS_RE = re.compile(
+    r"\b(?:announc|invit|solicit|seek)\w*"
+    r"|\bthis\s+(?:[\w&-]+\s+){0,3}(?:program|programme|solicitation|opportunity|announcement|agreement"
+    r"|award|grant|initiative|competition|funding|rfa|rfp|nofo|foa)\b"
+    r"|\b(?:made|entered into)\b[^.]{0,80}?\bby\b"
+    r"|\bsponsor(?:ed|s)?\b|\bfunded by\b",
+    re.I,
+)
+
+
+def party_unbound(st: Statement, sentence: str) -> bool:
+    """Whether a sponsor or funder is sourced to a sentence that does not
+    tie the organization to this opportunity (it announces, invites or
+    funds it; this agreement is made by it)."""
+    return bool(_PARTY_LABEL_RE.search(field_label(st))) and not _BOUND_TO_THIS_RE.search(sentence)
 
 
 def obligation(text: str) -> tuple[bool, bool, bool]:
@@ -944,6 +1007,11 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         return Verdict(None, "rule_applies_only_if")
     if st_values and not _bound(st_values, shared, exact, q_values):
         return Verdict(None, "value_not_bound_to_label")
+    sentence = sentence_around(src.text, *spots[0])
+    if subject_differs(st, sentence):
+        return Verdict(None, "subject_differs")
+    if party_unbound(st, sentence):
+        return Verdict(None, "party_not_bound")
 
     if src.kind == "document":
         pages = set()
@@ -955,10 +1023,68 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         if len(pages) > 1:
             return Verdict(None, "quote_on_several_pages")
         start, end = spots[0]
-        return Verdict(_document_link(src, start, end, pages.pop(), approx), "ok")
+        first = page_marker_for_offset(start, src.markers or [])
+        start, end = widen_to_statement(
+            src.text, start, end, w.start, w.end, text_words,
+            same_page=lambda a: page_marker_for_offset(a, src.markers or []) == first,
+        )
+        link = _document_link(src, start, end, pages.pop(), approx)
+        link["judge_quote"] = exact
+        return Verdict(link, "ok")
     if len(spots) > 1 and len({_kb_page(src, a) for a, _ in spots}) > 1:
         return Verdict(None, "quote_on_several_pages")
-    return Verdict(_kb_link(src, *spots[0]), "ok")
+    start, end = spots[0]
+    page = _kb_page(src, start)
+    start, end = widen_to_statement(
+        src.text, start, end, w.start, w.end, text_words, same_page=lambda a: _kb_page(src, a) == page,
+    )
+    link = _kb_link(src, start, end)
+    link["judge_quote"] = exact
+    return Verdict(link, "ok")
+
+
+def widen_to_statement(
+    text: str, start: int, end: int, lo: int, hi: int, words: set[str], same_page: Callable[[int], bool],
+) -> tuple[int, int]:
+    """``[start, end)`` grown, inside ``[lo, hi)`` and on its page, by the
+    sentences next to it that hold words of the statement the excerpt does
+    not: the highlight then covers what the statement rests on. Seen in the
+    MRI solicitation: "Data management plan incremental costs" highlighted
+    "…share with other researchers, at no more than incremental cost…",
+    while the next sentence says "MRI budgets may include incremental costs
+    associated with the implementation of this plan". Shown only — every
+    check has already passed on the judge's excerpt."""
+    if not words:
+        return start, end
+    for _ in range(3):
+        have = stems(text[start:end]) & words
+        if len(have) / len(words) >= CONFIRM_BELOW:
+            break
+        best, gain = None, 0
+        # The rest of the excerpt's sentence and the one after it.
+        a = end
+        stops = [i for i in (text.find(". ", a), text.find("\n", a)) if i != -1 and i < hi]
+        b = min(stops) + 1 if stops else hi
+        if b > a and b - start <= MAX_QUOTE_CHARS:
+            g = len((stems(text[a:b]) & words) - have)
+            if g > gain:
+                best, gain = (start, b), g
+        # The start of its sentence and the one before it.
+        b = start
+        a = _sentence_start(text, max(lo, b - 1), lo)
+        if b > a and end - a <= MAX_QUOTE_CHARS and same_page(a):
+            g = len((stems(text[a:b]) & words) - have)
+            if g > gain:
+                best, gain = (a, end), g
+        if best is None:
+            break
+        start, end = best
+    # Never end on the space or line break a sentence was cut at.
+    while end > start and text[end - 1] in " \t\r\n":
+        end -= 1
+    while start < end and text[start] in " \t\r\n":
+        start += 1
+    return start, end
 
 
 def verify_offered(st: Statement, corpus: Corpus, wi: int, offered: list[int], quote: str) -> Verdict:
@@ -1166,7 +1292,8 @@ def says_more(st: Statement, link: dict | None) -> bool:
     words = stems(st.text)
     if len(words) < COVERAGE_MIN_WORDS:
         return False
-    return len(words & stems((link or {}).get("quote") or "")) / len(words) < CONFIRM_BELOW
+    quote = (link or {}).get("judge_quote") or (link or {}).get("quote") or ""
+    return len(words & stems(quote)) / len(words) < CONFIRM_BELOW
 
 
 def label_names_role(st: Statement) -> bool:
@@ -1312,7 +1439,7 @@ class _Run:
         )
         if key not in self.index:
             self.index[key] = len(self.sources)
-            self.sources.append({k: v for k, v in link.items() if k != "offset"})
+            self.sources.append({k: v for k, v in link.items() if k not in ("offset", "judge_quote")})
         return self.index[key]
 
 

@@ -83,6 +83,11 @@ _VERDICTS = frozenset({
 })
 
 
+# A pointer to another part of the report ("See required structure
+# below."): nothing a source could state. One RFA checklist repeated it in
+# 15 table rows, each counted as untraced.
+_CROSS_REFERENCE_RE = re.compile(r"^see\b[^.]{0,80}\b(?:below|above)$", re.IGNORECASE)
+
 # A machine token ("expense:transaction_date", "award_terms", "KB2"): a key
 # or pointer the workflow wrote, not something a reader would check.
 _IDENTIFIER_RE = re.compile(r"^(?:[a-z][a-z0-9]*(?:[_:][a-z0-9]+)+|KB\d+|kb\d+)$")
@@ -98,7 +103,7 @@ def classify(text: str) -> str:
     low = t.lower()
     if low in _VERDICTS or low.replace("_", " ") in _VERDICTS:
         return "verdict"
-    if _IDENTIFIER_RE.match(t):
+    if _IDENTIFIER_RE.match(t) or _CROSS_REFERENCE_RE.match(t):
         return "skip"
     if raw.endswith(":") and len(t) <= 80:
         return "skip"   # a lead-in ("Check results:"), not a statement
