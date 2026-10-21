@@ -706,6 +706,29 @@ class TestBuildWorkflowEngine:
             assert len(order) == 2, f"Failed for task type: {task_name}"
             assert len(order[1].tasks) == 1, f"No task created for: {task_name}"
 
+    def test_every_task_sees_the_admin_allowed_private_hosts(self):
+        """APINode and CrawlerNode were built without the config snapshot, so
+        a host the admin allowed passed Test Step but was blocked in the full
+        run ("URL resolves to blocked IP range")."""
+        cfg = {"outbound_url_allowed_hosts": ["mindrouter.example.edu"]}
+        task_names = [
+            "Extraction", "Prompt", "Formatter", "AddWebsite", "AddDocument",
+            "DescribeImage", "CodeNode", "CrawlerNode", "ResearchNode",
+            "APINode", "DocumentRenderer", "FormFiller", "DataExport",
+            "PackageBuilder", "BrowserAutomation", "KnowledgeBaseQuery", "Approval",
+        ]
+        steps = [
+            {"name": "Document", "data": {"doc_uuids": ["u1"]}, "tasks": []},
+            {"name": "Step", "data": {}, "tasks": [
+                {"name": name, "data": {}} for name in task_names
+            ]},
+        ]
+        engine = build_workflow_engine(
+            steps, model="gpt-4o", system_config_doc=cfg, allow_code_execution=True,
+        )
+        for task in engine.get_topological_order()[1].tasks:
+            assert "mindrouter.example.edu" in task._allowed_hosts(), task
+
     def test_code_node_rejected_when_not_admin_fails_the_build(self):
         """A skipped CodeNode left an empty pass-through node and a run that
         finished Completed minus a step the author asked for. The builder now

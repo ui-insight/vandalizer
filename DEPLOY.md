@@ -65,8 +65,10 @@ docker compose exec \
 
 # 5. Verify
 curl http://localhost:8001/api/health
-# → {"status":"ok","checks":{...}}
+# → {"status":"ok","checks":{...},"workers":{"status":"ok",...}}
 ```
+
+`workers` reports which Celery queues have a live worker. It is informational and doesn't affect the status code, so the API stays up while the workers are down. `"status": "down"` with queues under `missing_queues` means work on those queues will wait until a worker comes back (`docker compose ps celery`, `docker compose up -d celery`).
 
 The frontend is available at `http://localhost` (port 80) and the API at `http://localhost:8001`. Log in with the admin credentials you provided to the bootstrap command.
 

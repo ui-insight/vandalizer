@@ -121,6 +121,9 @@ class WorkflowStatusResponse(BaseModel):
     # WorkflowResult.models_used). Shown on every run view.
     model: Optional[str] = None
     models_used: list[str] = []
+    # Models used, the settings each call was sent with, and the run's
+    # configuration snapshot; None for runs recorded before it existed.
+    run_metadata: Optional[dict] = None
 
 
 class BatchStatusItem(BaseModel):

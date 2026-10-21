@@ -12,6 +12,7 @@ reviewed is exactly what is indexed.
 
 from __future__ import annotations
 
+import datetime
 import logging
 
 from app.models.knowledge import (
@@ -34,6 +35,50 @@ logger = logging.getLogger(__name__)
 EXCERPT_CHARS = 1500
 
 GARBLED_REASON = "Most of the text is unreadable characters — the page may not have extracted properly"
+
+#: How long a preview may wait for a worker before the user is told it is
+#: taking longer than expected. An idle worker starts one in a second or two.
+NOT_STARTED_AFTER = datetime.timedelta(seconds=60)
+#: How long a started preview may go without recording a page. One page is at
+#: most a fetch plus a browser render, each bounded by the fetch timeout.
+NO_PROGRESS_AFTER = datetime.timedelta(seconds=90)
+#: Past the task's hard time limit (1860s) with no progress, no worker is
+#: running it any more: the preview is settled as failed.
+DEAD_AFTER = datetime.timedelta(seconds=1860)
+
+NOT_STARTED_MESSAGE = (
+    "This is taking longer than expected. The server hasn't started fetching "
+    "yet — it may be busy with other work."
+)
+NO_PROGRESS_MESSAGE = (
+    "This is taking longer than expected. The server hasn't fetched another "
+    "page for a while — a site may be slow to respond."
+)
+NO_WORKERS_MESSAGE = (
+    "The server's background workers aren't running, so the preview can't "
+    "start. Retrying won't help — ask your administrator to restart them."
+)
+DEAD_MESSAGE = "The preview stopped before it finished. Try again."
+
+#: The task run_preview runs in; its queue is the one that must have a worker.
+PREVIEW_TASK = "tasks.kb.preview_urls"
+
+
+class PreviewCanceled(Exception):
+    """The user canceled the preview while it was fetching."""
+
+
+def _utc(value: datetime.datetime) -> datetime.datetime:
+    # Mongo hands datetimes back naive; they are UTC.
+    return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+
+
+def _now() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+def _collection():
+    return KBUrlPreview.get_motor_collection()
 
 
 async def start_preview(
@@ -77,6 +122,12 @@ class _Recorder:
     def has(self, url: str) -> bool:
         return normalize_crawl_url(url) in self.seen
 
+    async def check_canceled(self) -> None:
+        """Stop between pages once the user has canceled."""
+        doc = await _collection().find_one({"uuid": self.preview.uuid}, {"status": 1})
+        if not doc or doc.get("status") != "running":
+            raise PreviewCanceled()
+
     async def record(self, url: str, verdict: str, **fields) -> KBUrlPreviewPage:
         self.seen.add(normalize_crawl_url(url))
         page = KBUrlPreviewPage(
@@ -89,6 +140,9 @@ class _Recorder:
         )
         self.order += 1
         await page.insert()
+        await _collection().update_one(
+            {"uuid": self.preview.uuid}, {"$set": {"progress_at": _now()}},
+        )
         return page
 
 
@@ -129,6 +183,7 @@ async def _preview_page(
     from app.config import Settings
     from app.utils.page_quality import describe_low_value_page
 
+    await rec.check_canceled()
     try:
         result = await ks.fetch_source_page(url)
     except Exception as e:  # noqa: BLE001 — every failure is shown, as ingestion records it
@@ -194,11 +249,21 @@ async def _url_in_kb(kb_uuid: str, url: str) -> bool:
 
 async def run_preview(preview_uuid: str) -> None:
     """Fetch (and crawl) a preview's URLs, recording every page. Never raises."""
+    # Claim it: a preview canceled while queued, or already started by another
+    # delivery of the task, is left alone.
+    now = _now()
+    claimed = await _collection().update_one(
+        {"uuid": preview_uuid, "status": "running", "started_at": None},
+        {"$set": {"started_at": now, "progress_at": now}},
+    )
+    if claimed.modified_count != 1:
+        logger.info("URL preview %s not started: canceled, missing or already running", preview_uuid)
+        return
     preview = await KBUrlPreview.find_one(KBUrlPreview.uuid == preview_uuid)
     if not preview:
-        logger.warning("URL preview %s not found", preview_uuid)
         return
     rec = _Recorder(preview)
+    status, error_message = "ready", None
     try:
         for seed in preview.urls:
             if rec.has(seed):
@@ -226,12 +291,63 @@ async def run_preview(preview_uuid: str) -> None:
             await ks._crawl_bfs(
                 seed, fetched, preview.max_crawl_pages, preview.allowed_domains, visit,
             )
-        preview.status = "ready"
+    except PreviewCanceled:
+        logger.info("URL preview %s canceled", preview_uuid)
+        return
     except Exception as e:
         logger.exception("URL preview %s failed", preview_uuid)
-        preview.status = "error"
-        preview.error_message = f"The preview could not be completed: {str(e)[:300]}"
-    await preview.save()
+        status = "error"
+        error_message = f"The preview could not be completed: {str(e)[:300]}"
+    # Only a preview still running is finished here: save() would overwrite a
+    # cancel that landed during the last page.
+    await _collection().update_one(
+        {"uuid": preview_uuid, "status": "running"},
+        {"$set": {"status": status, "error_message": error_message}},
+    )
+
+
+async def cancel_preview(preview: KBUrlPreview) -> bool:
+    """Stop a running preview; the worker stops before its next page.
+
+    False if it had already finished.
+    """
+    result = await _collection().update_one(
+        {"uuid": preview.uuid, "status": "running"},
+        {"$set": {"status": "canceled"}},
+    )
+    return result.modified_count == 1
+
+
+async def check_progress(preview: KBUrlPreview, now: datetime.datetime | None = None) -> str | None:
+    """Why a running preview looks stuck, or None.
+
+    A preview with no progress past the task's hard time limit has no worker
+    left: it is settled as failed, so the user gets an error instead of a
+    spinner until the TTL removes it.
+    """
+    if preview.status != "running":
+        return None
+    now = now or _now()
+    last = _utc(preview.progress_at or preview.started_at or preview.created_at)
+    if now - last > DEAD_AFTER:
+        result = await _collection().update_one(
+            {"uuid": preview.uuid, "status": "running"},
+            {"$set": {"status": "error", "error_message": DEAD_MESSAGE}},
+        )
+        if result.modified_count == 1:
+            preview.status = "error"
+            preview.error_message = DEAD_MESSAGE
+        return None
+    if preview.started_at is None:
+        if now - last <= NOT_STARTED_AFTER:
+            return None
+        # Busy and down look the same from here; only down makes Retry useless.
+        from app.services.worker_status import queue_for, queue_has_worker
+
+        if await queue_has_worker(queue_for(PREVIEW_TASK)) is False:
+            return NO_WORKERS_MESSAGE
+        return NOT_STARTED_MESSAGE
+    return NO_PROGRESS_MESSAGE if now - last > NO_PROGRESS_AFTER else None
 
 
 async def get_preview(kb_uuid: str, preview_uuid: str, user_id: str) -> KBUrlPreview | None:
