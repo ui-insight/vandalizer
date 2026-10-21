@@ -1,4 +1,5 @@
 import { apiFetch, ApiError, rawFetch } from './client'
+import { filenameFromDisposition } from '../utils/contentDisposition'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
@@ -972,9 +973,7 @@ export async function downloadValidationZip(uuid: string): Promise<void> {
     throw new ApiError(res.status, body.detail || 'Download failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : `validation-${uuid}.zip`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `validation-${uuid}.zip`)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1002,9 +1001,7 @@ export async function downloadValidationResults(uuid: string, runUuid?: string):
     throw new ApiError(res.status, body.detail || 'Download failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : `validation-results-${uuid}.zip`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `validation-results-${uuid}.zip`)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1057,9 +1054,7 @@ export async function generateExampleTemplate(uuid: string): Promise<void> {
     throw new ApiError(res.status, body.detail || 'Generation failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : 'template.pdf'
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), 'template.pdf')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1087,9 +1082,7 @@ export async function exportExtractionPdf(
     throw new ApiError(res.status, body.detail || 'Export failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : 'extraction.pdf'
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), 'extraction.pdf')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

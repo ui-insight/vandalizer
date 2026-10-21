@@ -32,6 +32,7 @@ from app.services.certification_versions.practical_assessment import AssessmentS
 from app.services.certification_versions.process_submissions import ProcessSubmission
 from app.services.certification_versions.workflow_design_inputs import DesignCaptureRequest
 from app.services.certification_versions.workflow_design_submissions import WorkflowDesignSubmission
+from app.utils.content_disposition import content_disposition
 
 
 class AssessmentPayload(BaseModel):
@@ -119,7 +120,7 @@ def _credential_response(record: CredentialSnapshot):
         credential_promise=(record.credential_scope.promise if getattr(record, 'credential_scope', None) else None),
     )
     return Response(content=pdf, media_type='application/pdf', headers={
-        'Content-Disposition': f'attachment; filename="vandal-certification-{record.credential_id}.pdf"',
+        'Content-Disposition': content_disposition(f"vandal-certification-{record.credential_id}.pdf"),
     })
 
 

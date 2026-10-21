@@ -14,6 +14,7 @@ from app.rate_limit import limiter
 from app.services import access_control
 from app.services import verification_service as svc
 from app.services import organization_service
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
@@ -303,7 +304,7 @@ async def download_test_file(
     return StreamingResponse(
         io.BytesIO(content),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{original_name}"'},
+        headers={"Content-Disposition": content_disposition(original_name)},
     )
 
 

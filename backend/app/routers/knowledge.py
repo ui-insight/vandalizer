@@ -55,6 +55,7 @@ from app.services import kb_url_refresh
 from app.services import knowledge_service as svc
 from app.services.name_conflicts import DuplicateNameError
 from app.services.kb_optimization_status import OptimizationStatus, optimization_status_by_kb
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -665,7 +666,7 @@ async def export_knowledge_base(uuid: str, user: User = Depends(get_current_user
     filename = f"{safe_title or 'knowledge_base'}.kb.json"
     return JSONResponse(
         content=payload,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -1776,7 +1777,7 @@ async def export_kb_validation_run(
     if format == "json":
         return JSONResponse(
             content=payload,
-            headers={"Content-Disposition": f'attachment; filename="{base_name}.json"'},
+            headers={"Content-Disposition": content_disposition(f"{base_name}.json")},
         )
     if format == "xlsx":
         from fastapi.responses import Response
@@ -1784,14 +1785,14 @@ async def export_kb_validation_run(
         return Response(
             content=render_results_xlsx(run_meta, rows, payload.get("kb_sources")),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{base_name}.xlsx"'},
+            headers={"Content-Disposition": content_disposition(f"{base_name}.xlsx")},
         )
     from fastapi.responses import PlainTextResponse
 
     return PlainTextResponse(
         content=render_results_csv(run_meta, rows),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{base_name}.csv"'},
+        headers={"Content-Disposition": content_disposition(f"{base_name}.csv")},
     )
 
 

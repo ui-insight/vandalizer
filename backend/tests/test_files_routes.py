@@ -153,6 +153,37 @@ class TestFileDownloadRangeAndInline:
         assert resp.headers["content-disposition"].startswith("inline;")
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("range_header", [None, "bytes=0-9"])
+    async def test_download_title_with_a_long_dash_keeps_its_name(self, client, range_header):
+        """Support ticket: chat saved "Year-by-Year Budget — nih-r01-neuroscience.xlsx"
+        and its download failed. The "—" can't be encoded in a latin-1 header,
+        so the browser saved the error body as "download.json"."""
+        from urllib.parse import unquote
+
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        from app.services.file_service import DownloadResult
+
+        title = "Year-by-Year Budget — nih-r01-neuroscience.xlsx"
+        result = DownloadResult(data=b"PK" * 64, extension="xlsx", title=title)
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.download_document = AsyncMock(return_value=result)
+
+            resp = await client.get(
+                "/api/files/download?docid=u",
+                cookies=cookies,
+                headers={**headers, **({"Range": range_header} if range_header else {})},
+            )
+
+        assert resp.status_code == (206 if range_header else 200)
+        disposition = resp.headers["content-disposition"]
+        assert disposition.startswith("attachment;")
+        assert unquote(disposition.split("filename*=UTF-8''", 1)[1]) == title
+
+    @pytest.mark.asyncio
     async def test_download_range_request_returns_206(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()

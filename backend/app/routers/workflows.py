@@ -50,6 +50,7 @@ from app.services import workflow_service as svc
 from app.services.docx_service import data_to_docx_bytes
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -637,7 +638,7 @@ async def download_results(
     return StreamingResponse(
         io.BytesIO(content),
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -715,7 +716,7 @@ async def download_batch_results(
     return StreamingResponse(
         zip_buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{zip_name}.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{zip_name}.zip")},
     )
 
 
@@ -804,7 +805,7 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_name}.vandalizer.json")},
     )
 
 
@@ -1603,7 +1604,7 @@ async def download_validation_report(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 

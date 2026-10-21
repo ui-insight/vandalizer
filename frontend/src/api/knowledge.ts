@@ -1,4 +1,5 @@
 import { apiFetch, rawFetch } from './client'
+import { filenameFromDisposition } from '../utils/contentDisposition'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, KBSourceVersionCompare, KBSourceVersionDetail, KBSourceVersionList, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
@@ -1287,9 +1288,7 @@ export async function downloadKBValidationRunExport(
     throw new Error(detail)
   }
   // Honor the server-provided filename (KB title + run timestamp + run id).
-  const disposition = res.headers.get('Content-Disposition') || ''
-  const match = disposition.match(/filename="?([^"]+)"?/)
-  const filename = match?.[1] || `kb-validation-results.${format}`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `kb-validation-results.${format}`)
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

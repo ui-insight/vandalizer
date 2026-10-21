@@ -21,6 +21,7 @@ from app.services import document_usage as document_usage_service
 from app.services import file_service
 from app.services import knowledge_service
 from app.utils.file_validation import ALLOWED_EXTS
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
@@ -164,7 +165,7 @@ async def download(
             status_code=206,
             media_type=media_type,
             headers={
-                "Content-Disposition": f'{disposition}; filename="{result.title}"',
+                "Content-Disposition": content_disposition(result.title, disposition),
                 "Content-Range": f"bytes {start}-{end}/{total}",
                 "Content-Length": str(len(chunk)),
                 "Accept-Ranges": "bytes",
@@ -175,7 +176,7 @@ async def download(
         io.BytesIO(data),
         media_type=media_type,
         headers={
-            "Content-Disposition": f'{disposition}; filename="{result.title}"',
+            "Content-Disposition": content_disposition(result.title, disposition),
             "Content-Length": str(total),
             "Accept-Ranges": "bytes",
         },

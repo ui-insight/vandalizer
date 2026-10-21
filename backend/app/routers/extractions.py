@@ -44,6 +44,7 @@ from app.schemas.extractions import (
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
 from app.services.name_conflicts import DuplicateNameError
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_name}.vandalizer.json")},
     )
 
 
@@ -384,7 +385,7 @@ async def download_validation_zip(uuid: str, user: User = Depends(get_current_us
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_validation.zip")},
     )
 
 
@@ -588,7 +589,7 @@ async def download_validation_results(
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation-results.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_validation-results.zip")},
     )
 
 
@@ -790,7 +791,7 @@ async def generate_pdf_template(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_template.pdf"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_template.pdf")},
     )
 
 
@@ -851,7 +852,7 @@ async def export_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}.pdf")},
     )
 
 
