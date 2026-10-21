@@ -18,6 +18,7 @@ import { ConceptStrip } from './ConceptTip'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 import { HomeQualityAlerts } from './HomeQualityAlerts'
 import { HomeTaskShortcuts, type TaskDocument } from './HomeTaskShortcuts'
+import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
 import './home-work.css'
 
 /**
@@ -36,10 +37,10 @@ function CertificationHomeActions({ disabled, onSendMessage }: { disabled?: bool
   const certCta = useCertificationCta()
   const certification = useCertificationPanelOptional()
   if (!certCta && !certification) return null
-  return <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+  return <div className="home-learning-area"><div className="flex flex-wrap items-center gap-x-4 gap-y-2">
     {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     {certification && <button className="home-learning-link" type="button" onClick={certification.openPanel}><BookOpen size={14} /> {certification.progress?.certified ? 'Review completed course' : 'Open course without chat'}</button>}
-  </div>
+  </div><CertificationRefreshNotice compact /></div>
 }
 
 function UploadPillButton({
@@ -358,6 +359,7 @@ function activityLabel(item: RecentActivityItem): string {
 }
 
 interface SharedHomeProps {
+  embedded?: boolean
   orgName: string
   brandIcon: string | null
   disabled?: boolean
@@ -368,17 +370,18 @@ interface SharedHomeProps {
   onSendMessage: (message: string) => void
 }
 
-export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage }: SharedHomeProps) {
+export function FirstSessionHome({ embedded, orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage }: SharedHomeProps) {
   const openTour = useWorkspaceTour()
   return (
     <div className="chat-home first-session-home">
-      <div className="chat-home-heading">
+      {!embedded && <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
         <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Ask a question, upload a source, or try a sample.</p></div>
-      </div>
+      </div>}
       <div className="home-primary-actions">
-        <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
+        {!embedded && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
         <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
+        {embedded && <button className="home-text-action" type="button" disabled={disabled} onClick={onChooseKnowledgeBase}>Choose a knowledge base</button>}
       </div>
       <details>
         <summary className="home-learning-link">Try a sample document demo</summary>
@@ -389,29 +392,32 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
           <SampleAnswerPreview />
         </div>
       </details>
-      <ol className="first-task-steps" aria-label="Your first useful task">
-        <li><strong>1</strong> Upload or try a sample</li>
-        <li><strong>2</strong> Ask a specific question</li>
-        <li><strong>3</strong> Inspect the source</li>
-        <li><strong>4</strong> Export or reuse</li>
-      </ol>
-      <div className="home-two-columns">
-        <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
-          <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />
-        </SurfaceCard>
-        <SurfaceCard title="Put the assistant to work" subtitle="Build a reusable workflow for a recurring task.">
-          <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
-        </SurfaceCard>
-      </div>
-      <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
-      <GlossaryDisclosure />
-      {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
+      <details className="home-other-actions" open={embedded ? undefined : true}>
+        <summary>Learn the basics</summary>
+        <ol className="first-task-steps" aria-label="Your first useful task">
+          <li><strong>1</strong> Upload or try a sample</li>
+          <li><strong>2</strong> Ask a specific question</li>
+          <li><strong>3</strong> Inspect the source</li>
+          <li><strong>4</strong> Export or reuse</li>
+        </ol>
+        <div className="home-two-columns">
+          <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
+            <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />
+          </SurfaceCard>
+          <SurfaceCard title="Put the assistant to work" subtitle="Build a reusable workflow for a recurring task.">
+            <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
+          </SurfaceCard>
+        </div>
+        <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
+        <GlossaryDisclosure />
+        {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
+      </details>
       <CertificationHomeActions disabled={disabled} onSendMessage={onSendMessage} />
     </div>
   )
 }
 
-export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, onOpenTool, onSelectDocument, onChooseDocuments, onNoticeChanged, onPrepareTask, onOpenProjects, workspaceLabel, status, workQueue }: SharedHomeProps & {
+export function ReturningHome({ embedded, orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, onOpenTool, onSelectDocument, onChooseDocuments, onNoticeChanged, onPrepareTask, onOpenProjects, workspaceLabel, status, workQueue }: SharedHomeProps & {
   onOpenActivity: (activityId: string) => void
   onOpenTool?: (alert: ActiveAlertItem) => void
   onSelectDocument?: (document: { uuid: string; title: string }) => void
@@ -445,36 +451,35 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
   }
   return (
     <div className="chat-home returning-home">
-      <div className="chat-home-heading">
+      {!embedded && <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
         <div><span className="home-eyebrow">{orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</span><h2>Your workspace</h2><p>Pick up your work, or ask the assistant anything.</p></div>
-      </div>
+      </div>}
       {workQueue}
       {unfinished.length > 0 && <section className="home-activity" aria-label="Work in progress">
         <h3>Work in progress</h3><ul>{unfinished.map(activityRow)}</ul>
       </section>}
       <div className="home-primary-actions">
-        {!hasWork && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
+        {!embedded && !hasWork && <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />}
         <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
         {onOpenProjects && <button type="button" className="home-text-action" onClick={onOpenProjects}>Open projects</button>}
       </div>
-      <p className="home-meta home-upload-note">An uploaded document is attached to your next question. Nothing runs until you send it.</p>
       {onPrepareTask && !tasksHidden && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} onHide={() => toggleTasks(true)} />}
       {recent.length > 0 && <section className="home-activity" aria-label="Recent work">
-        <h3>Recent work</h3><p className="home-meta">Your most recent conversations and runs across workspaces.</p><ul>{recent.map(activityRow)}</ul>
+        <h3>Recent work</h3><ul>{recent.slice(0, 3).map(activityRow)}</ul>
+        {recent.length > 3 && <details className="home-other-actions"><summary>More recent work ({recent.length - 3})</summary><ul>{recent.slice(3).map(activityRow)}</ul></details>}
       </section>}
       {!status && <p className="home-meta" role="status">Workspace activity is unavailable. You can still start a conversation or upload a document.</p>}
-      {status && activities.length === 0 && <p className="home-meta">No recent conversations or runs to resume. Ask a question or upload a document to get started.</p>}
-      {(documents.length > 0 || status?.has_ready_knowledge_base) && <section className="home-sources" aria-label="Start from your sources">
-        <h3>Start from your sources</h3>
+      {(documents.length > 0 || status?.has_ready_knowledge_base || status?.has_documents) && <details className="home-sources">
+        <summary>Choose from your sources</summary>
         {documents.length > 0 && <>
-          <p className="home-meta">Recent readable documents you own. Select a document to ask about it; nothing runs until you send a request.</p>
+          <p className="home-meta">Select a document to attach to your next question.</p>
           <ul>{documents.map(doc => <li key={doc.uuid}><FileSearch size={16} aria-hidden="true" /><span>{doc.title}</span><button className="home-text-action" type="button" disabled={disabled || !onSelectDocument} aria-label={`Select document: ${doc.title}`} onClick={() => onSelectDocument?.(doc)}>Select document</button></li>)}</ul>
           {onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose other documents</button>}
         </>}
         {status?.has_ready_knowledge_base && <div className="home-knowledge-action"><button type="button" className="home-text-action" disabled={disabled} onClick={onChooseKnowledgeBase}>Choose a knowledge base</button><p className="home-meta">Select the sources for a question across documents.</p></div>}
-      </section>}
-      {status?.has_documents && documents.length === 0 && onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose documents to work with</button>}
+        {status?.has_documents && documents.length === 0 && onChooseDocuments && <button type="button" className="home-text-action" onClick={onChooseDocuments}>Choose documents to work with</button>}
+      </details>}
       <HomeQualityAlerts alerts={status?.active_alerts || []} recentActivity={activities} onOpenActivity={onOpenActivity} onOpenTool={onOpenTool} onSendMessage={onSendMessage} onNoticeChanged={onNoticeChanged} disabled={disabled} />
       <details className="home-other-actions"><summary>More ways to work</summary>
         {onPrepareTask && tasksHidden && <button type="button" className="home-text-action" onClick={() => toggleTasks(false)}>Show task starters</button>}

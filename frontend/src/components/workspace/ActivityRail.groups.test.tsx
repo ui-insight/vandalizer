@@ -68,6 +68,19 @@ beforeEach(() => {
 })
 
 describe("activity list groups a chat's runs under it (ticket)", () => {
+  it('keeps history behind one expand control when docked and restores titles when expanded', () => {
+    const expand = vi.fn()
+    const view = render(<ActivityRail forceDocked onExpand={expand} />)
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeInTheDocument()
+    expect(screen.queryByText('Full Life Cycle Test')).not.toBeInTheDocument()
+    expect(screen.queryByText('Budget Extraction')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Expand activity' }))
+    expect(expand).toHaveBeenCalledOnce()
+    view.rerender(<ActivityRail forceExpanded />)
+    expect(screen.getByText('Full Life Cycle Test')).toBeInTheDocument()
+    expect(screen.getByText('Budget Extraction')).toBeInTheDocument()
+  })
+
   it('shows the chat with its run count and hides its runs until expanded', () => {
     render(<ActivityRail />)
 

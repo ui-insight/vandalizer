@@ -813,9 +813,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     && !showReturningHome
     && !showSupportingHome
 
+  const showHome = showFirstSessionHome || showReturningHome
+
   return (
     <div
-      className="chat-pane flex h-full min-h-0 flex-col"
+      className={`chat-pane flex h-full min-h-0 flex-col${showHome ? ' chat-pane--home' : ''}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -908,6 +910,57 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         </div>
       )}
       {isLoadingHistory && <div role="status" className="px-4 py-3 text-sm text-gray-600">Loading conversation…</div>}
+      {/* Keep one composer mounted across home, source selection, and chat. */}
+      <div className="chat-composer-slot">
+        {showHome && <div className="home-compose-heading">
+          <p className="home-eyebrow">{branding.orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</p>
+          <h2>What would you like to get done?</h2>
+        </div>}
+        {(attachLoading || anySelectedProcessing || isLoadingHistory) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : isLoadingHistory ? 'Loading this conversation. Keep typing; Send becomes available when it has loaded.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
+        {/* Input. Typing stays enabled while a turn streams (Phase 10):
+            submits mid-run queue into the current turn instead of sending. */}
+        {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
+        {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
+        {!showHome && <CertificationRefreshNotice />}
+        <ChatInput
+          initialDraft={initialDraft}
+          draftInsertion={draftInsertion}
+          onDraftChange={onDraftChange}
+          onSend={async (msg) => {
+            if (isStreaming) await queueMessage(msg)
+            else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
+          }}
+          onAttachFile={handleAttachFile}
+          onAttachLink={handleAttachLink}
+          onAddKnowledge={() => setShowAttachKB(true)}
+          disabled={false}
+          sendDisabled={attachLoading || isLoadingHistory}
+          isStreaming={isStreaming}
+          onStop={stop}
+          selectedModel={selectedModel}
+          onModelChange={handleModelChange}
+          onModelsLoaded={modelPreference.setModels}
+          onExport={handleExport}
+          onNewChat={() => { triggerNewChat(); focusChat() }}
+          hasMessages={messages.length > 0}
+          hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+          memoryControl={<MemoryPanel />}
+          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
+          focusSignal={focusChatSignal}
+          contextMeter={
+            messages.length > 0 && (contextMeter || contextTokens > 0) ? (
+              <ContextMeter
+                tokensUsed={contextMeter?.estimated_tokens ?? contextTokens}
+                contextWindow={contextMeter?.context_window ?? contextWindow}
+                state={contextMeter?.state}
+                percentUntilCompact={contextMeter?.percent_until_compact}
+                onClick={() => setShowContextDialog(true)}
+              />
+            ) : null
+          }
+        />
+      </div>
+
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
@@ -920,7 +973,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // visible position before the action changes the workspace.
         onClickCapture={rememberReadingPosition}
         onKeyDownCapture={rememberReadingPosition}
-        className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
+        className="chat-conversation min-h-0 flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
       >
         {showSupportingHome && <div className="supporting-assistant-home">
@@ -933,6 +986,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {showFirstSessionHome && (
           <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
             <FirstSessionHome
+              embedded
               orgName={branding.orgName}
               brandIcon={brandIcon}
               disabled={homeActionsDisabled}
@@ -948,6 +1002,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {showReturningHome && (
           <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
             <ReturningHome
+              embedded
               orgName={branding.orgName}
               brandIcon={brandIcon}
               disabled={homeActionsDisabled}
@@ -1570,49 +1625,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       )}
 
-      {(attachLoading || anySelectedProcessing || isLoadingHistory) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : isLoadingHistory ? 'Loading this conversation. Keep typing; Send becomes available when it has loaded.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
-      {/* Input. Typing stays enabled while a turn streams (Phase 10):
-          submits mid-run queue into the current turn instead of sending. */}
-      {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
-      {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
-      <CertificationRefreshNotice />
-      <ChatInput
-        initialDraft={initialDraft}
-        draftInsertion={draftInsertion}
-        onDraftChange={onDraftChange}
-        onSend={async (msg) => {
-          if (isStreaming) await queueMessage(msg)
-          else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
-        }}
-        onAttachFile={handleAttachFile}
-        onAttachLink={handleAttachLink}
-        onAddKnowledge={() => setShowAttachKB(true)}
-        disabled={false}
-        sendDisabled={attachLoading || isLoadingHistory}
-        isStreaming={isStreaming}
-        onStop={stop}
-        selectedModel={selectedModel}
-        onModelChange={handleModelChange}
-        onModelsLoaded={modelPreference.setModels}
-        onExport={handleExport}
-        onNewChat={() => { triggerNewChat(); focusChat() }}
-        hasMessages={messages.length > 0}
-        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
-        memoryControl={<MemoryPanel />}
-        navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
-        focusSignal={focusChatSignal}
-        contextMeter={
-          messages.length > 0 && (contextMeter || contextTokens > 0) ? (
-            <ContextMeter
-              tokensUsed={contextMeter?.estimated_tokens ?? contextTokens}
-              contextWindow={contextMeter?.context_window ?? contextWindow}
-              state={contextMeter?.state}
-              percentUntilCompact={contextMeter?.percent_until_compact}
-              onClick={() => setShowContextDialog(true)}
-            />
-          ) : null
-        }
-      />
 
       {/* Context limit dialog */}
       <ContextLimitDialog

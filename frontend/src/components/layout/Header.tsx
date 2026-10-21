@@ -86,22 +86,22 @@ export function Header({ onOpenActivity }: { onOpenActivity?: () => void } = {})
         role="banner"
         className="workspace-header flex items-center justify-between bg-white shrink-0"
         style={{
-          height: 69,
+          height: 56,
           borderBottom: '2px solid #F4F4F6',
-          padding: '0 30px',
+          padding: '0 20px',
         }}
       >
         {/* Left: Logo images */}
         <div className="workspace-brand flex items-center">
           <button onClick={handleLogoClick} aria-label="Go to home page" className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             {brandIcon && (
-              <img src={brandIcon} alt="" style={{ width: 25, height: 40, marginTop: 4, objectFit: 'contain' }} />
+              <img src={brandIcon} alt="" style={{ width: 22, height: 34, marginTop: 4, objectFit: 'contain' }} />
             )}
             <img
               className="brand-wordmark"
               src={branding.logoUrl}
               alt={branding.orgName}
-              style={{ height: 50, maxWidth: 240, objectFit: 'contain', marginLeft: brandIcon ? 4 : 0 }}
+              style={{ height: 40, maxWidth: 200, objectFit: 'contain', marginLeft: brandIcon ? 4 : 0 }}
             />
           </button>
         </div>

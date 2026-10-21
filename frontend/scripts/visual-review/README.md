@@ -131,3 +131,13 @@ tar -xzf artifacts/visual-review/.archive/superseded-2026-09-28.tar.gz \
 After cleanup or restoration, rebuild the selected report with
 `python3 artifacts/visual-review/upgrade-review/build.py` and verify its local
 links. Never prune evidence by directory-name suffix alone.
+
+### Home-screen cleanup regression
+
+Run `REVIEW_BASE_URL=http://127.0.0.1:5198 node scripts/visual-review/home-cleanup.mjs`
+from `frontend/` against a local dev or preview server. Set `REVIEW_CHROMIUM` to an
+installed Chrome executable if the Playwright browser is unavailable. The script
+uses synthetic API fixtures to check desktop/mobile home states, source selection
+without draft loss, task preparation, sending, and compact certification errors.
+Screenshots, accessibility results, and a manifest go to `REVIEW_OUTPUT` (default:
+`/private/tmp/vandalizer-home-cleanup`).

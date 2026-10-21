@@ -251,6 +251,7 @@ describe('ReturningHome', () => {
     const obligations = screen.getByRole('region', { name: 'Project obligations' })
     const notices = screen.getByRole('region', { name: 'Tool quality notices' })
     expect(obligations.compareDocumentPosition(notices) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(screen.getByText('Choose from your sources'))
     fireEvent.click(screen.getByRole('button', { name: 'Select document: Award notice.pdf' }))
     expect(onSelectDocument).toHaveBeenCalledWith({ uuid: 'doc-1', title: 'Award notice.pdf' })
     expect(onSendMessage).not.toHaveBeenCalled()
@@ -274,7 +275,7 @@ describe('ReturningHome', () => {
       status={baseStatus} suggestionPills={[]} />)
     expect(screen.queryByRole('button', { name: 'Start a conversation' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Upload a document' })).toBeInTheDocument()
-    expect(screen.getByText(/Nothing runs until you send it/)).toBeInTheDocument()
+    expect(screen.queryByText(/Nothing runs until you send it/)).not.toBeInTheDocument()
   })
 
   it('hides the task starters on request and brings them back (#1014 item 58)', () => {

@@ -41,17 +41,18 @@ export function RightPanel({ hideTabs = false }: { hideTabs?: boolean }) {
       </div>}
       <div className={cn('flex min-h-0 flex-1 flex-col', editor && 'hidden')}>
         {/* Compact source modes already expose these choices above both panes. */}
-        {!hideTabs && <div className="flex bg-panel-dark border-b border-[#cccccc48]">
+        {!hideTabs && <div className="workspace-mode-switch" role="group" aria-label="Assistant and library">
           {TABS.map((tab) => (
             <button
               key={tab}
+              type="button"
+              aria-pressed={activeRightTab === tab}
               onClick={() => setActiveRightTab(tab)}
               style={{ fontSize: 'var(--workspace-font-control)' }}
               className={cn(
-                'min-w-0 flex-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 py-3 cursor-pointer transition-colors',
+                'workspace-mode-button',
                 activeRightTab === tab
-                  ? 'bg-highlight text-highlight-text font-black'
-                  : 'text-white font-black hover:bg-[#363636]',
+                  ? 'is-active' : '',
               )}
             >
               {tab === 'assistant' ? <><MessageSquare size={16} aria-hidden="true" /><span className="min-w-0 break-words">Assistant</span></> : <><BookOpen size={16} aria-hidden="true" /><span className="min-w-0 break-words">Library</span></>}

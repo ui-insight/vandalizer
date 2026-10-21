@@ -57,6 +57,40 @@
 /* #1014 density: tighter rhythm, one bordered control per row, quiet headings. */
 .returning-home { gap: 16px; }
 .returning-home .chat-home-heading h2 { font-size: 22px; }
-.home-upload-note { margin-top: -8px !important; }
 .home-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .home-section-heading h3 { margin-bottom: 8px; }
+
+/* Keep one mounted composer across home, source selection and conversation. */
+.chat-composer-slot { order: 10; flex-shrink: 0; min-width: 0; }
+.chat-pane--home { overflow-y: auto; }
+.chat-pane--home .chat-composer-slot { order: 0; width: min(100%, 800px); margin: 0 auto; padding: clamp(28px, 6vh, 64px) 20px 0; }
+.home-compose-heading { margin-bottom: 24px; }
+.home-compose-heading .home-eyebrow { margin: 0 0 10px; }
+.home-compose-heading h2 { font-size: clamp(24px, 3vw, 30px); font-weight: 600; letter-spacing: -.6px; line-height: 1.3; margin: 0; color: #242b32; }
+.chat-pane--home .chat-composer { padding: 0; box-shadow: none !important; position: relative; }
+.chat-pane--home .chat-composer-editor { border: 1px solid #dce1e5; border-radius: 18px; padding: 16px; background: #f7f8fa !important; }
+.chat-pane--home .chat-conversation { order: 1; flex: 0 0 auto; overflow: visible; width: min(100%, 800px); margin: 0 auto; padding: 0 20px 28px !important; }
+.chat-pane--home .chat-home { margin: 20px 0 0; gap: 24px; }
+.chat-pane--home .home-primary-actions { gap: 16px; }
+.chat-pane--home .home-primary-actions > button { padding: 4px 0 !important; border: 0 !important; background: transparent !important; font-weight: 500 !important; }
+.home-sources { border: 0; border-top: 1px solid #e3e7eb; border-radius: 0; padding: 16px 0 0; }
+.home-sources > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #374151; }
+.home-sources[open] > summary { margin-bottom: 12px; }
+.home-learning-area { border-top: 1px solid #e3e7eb; padding-top: 16px; }
+.home-certification-notice { font-size: 13px; line-height: 1.5; color: #76531b; margin-top: 10px; }
+.home-certification-notice p { margin: 0; }
+.home-certification-notice button { color: #76531b; }
+.home-sources summary:focus-visible { outline: 2px solid #28548c; outline-offset: 4px; border-radius: 3px; }
+@media (max-width: 480px) {
+  .chat-pane--home .chat-composer-slot { padding: 24px 16px 0; }
+  .chat-pane--home .chat-conversation { padding: 0 16px 24px !important; }
+  .home-compose-heading { margin-bottom: 18px; }
+  .home-task-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-task-buttons button { text-align: left; }
+}
+
+.chat-pane--home .chat-composer [role="menu"] { top: calc(100% + 8px); bottom: auto !important; }
+@media (max-width: 480px) {
+  .home-activity li > div, .home-approvals li > div, .home-sources li > span { flex: 1 1 calc(100% - 32px); }
+  .chat-pane--home .chat-composer button[aria-label="Send message"] { margin-left: auto; }
+}

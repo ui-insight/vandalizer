@@ -460,7 +460,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           {!loading && !error && activities.length === 0 && !visualDocked && <p className="px-2 text-xs text-[#59616b]">No activity yet. Start a conversation or run a tool to see it here.</p>}
 
 
-          {chats.map(group => {
+          {!visualDocked && chats.map(group => {
             const expanded = !visualDocked && group.runs.length > 0 && isChatExpanded(group)
             return (
               <div key={group.chat.id}>
@@ -487,7 +487,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               <span className="activity-count">{otherRuns.length}</span>
             </button>
           )}
-          {(otherRunsOpen || visualDocked) && otherRuns.map(run => renderEntry(run))}
+          {!visualDocked && otherRunsOpen && otherRuns.map(run => renderEntry(run))}
         </div>
       </div>
 

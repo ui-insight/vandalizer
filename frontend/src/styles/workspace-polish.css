@@ -347,7 +347,7 @@
 .supporting-assistant-home button { font-size: var(--workspace-font-control); padding: 8px 12px; border: 1px solid var(--workspace-border); border-radius: var(--workspace-radius-small); background: var(--workspace-surface); margin: 0 8px 8px 0; }
 
 /* Keep header controls separate from the logo when text is enlarged. */
-.workspace-header { flex-wrap: wrap; height: auto !important; min-height: 69px; padding-block: 8px !important; }
+.workspace-header { flex-wrap: wrap; height: auto !important; min-height: 56px; padding-block: 6px !important; }
 .workspace-brand { flex-shrink: 0; }
 @media (max-width: 1023px) {
   .workspace-header { padding-inline: 12px !important; gap: 8px; }
@@ -487,3 +487,11 @@ details[open] > .config-advanced-summary .config-disclosure { transform: rotate(
 
 /* Chart series colors describe marks; tooltip text needs readable contrast. */
 .section-page__content .recharts-default-tooltip .recharts-tooltip-item { color: #334155 !important; }
+
+/* Workspace modes are navigation; keep the page's work visually primary. */
+.workspace-mode-switch { display: flex; flex-shrink: 0; justify-content: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #edf0f2; background: #fff; }
+.workspace-mode-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; border: 1px solid transparent; border-radius: 8px; padding: 7px 18px; font-weight: 500; color: #59616b; cursor: pointer; }
+.workspace-mode-button:hover { background: #f7f8fa; color: #242b32; }
+.workspace-mode-button.is-active { background: #f3f4f6; border-color: #e3e7eb; color: #242b32; }
+.workspace-mode-button.is-active svg { color: var(--highlight-on-light, #806600); }
+.workspace-mode-button:focus-visible { outline: 2px solid var(--highlight-on-light, #806600); outline-offset: 2px; }
