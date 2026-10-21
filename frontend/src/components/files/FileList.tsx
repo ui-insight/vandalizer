@@ -57,7 +57,7 @@ export function FileList({
   const headerStyle: React.CSSProperties = {
     padding: "var(--workspace-space-8) 15px",
     textAlign: 'left',
-    fontSize: '0.8em',
+    fontSize: 'var(--workspace-font-meta)',
     fontWeight: 500,
     color: '#555e68',
     cursor: onSort ? 'pointer' : undefined,
@@ -79,7 +79,7 @@ export function FileList({
   }
 
   return (
-    <table className="file-table w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+    <table className="file-table w-full" style={{ fontSize: 'var(--workspace-font-body)', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 32 }} />
         <col />

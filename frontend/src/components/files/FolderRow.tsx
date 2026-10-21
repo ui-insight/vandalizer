@@ -14,7 +14,7 @@ interface FolderRowProps {
 
 export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect, onDropFile, isWatched }: FolderRowProps) {
   const isTeam = !!folder.team_id || folder.is_shared_team_root
-  const iconColor = isTeam ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
+  const iconColor = isTeam ? '#006b6b' : 'rgb(162, 162, 162)'
   const [isDragOver, setIsDragOver] = useState(false)
   const dragCounter = useRef(0)
   const justDropped = useRef(false)
@@ -97,7 +97,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           ) : (
             <FolderIcon className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
           )}
-          <span className="file-name"
+          <span className="file-name" title={folder.title}
             style={{
               paddingRight: 'var(--workspace-space-12)',
               paddingLeft: 'var(--workspace-space-6)',
@@ -112,25 +112,27 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           >
             {folder.title}
           </span>
-          {isTeam && (
-            <span className="shrink-0" style={{
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
-              color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
-              marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap',
-            }}>
-              Team
-            </span>
-          )}
-          {isWatched && (
-            <span className="shrink-0" style={{
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
-              color: '#1e40af', backgroundColor: 'rgba(37, 99, 235, 0.1)',
-              marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-2)',
-            }}>
-              <Eye style={{ width: 9, height: 9 }} />
-              Watched
-            </span>
-          )}
+          {(isTeam || isWatched) && <span className="folder-badges">
+            {isTeam && (
+              <span className="shrink-0" style={{
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
+                color: '#006b6b', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+                marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap',
+              }}>
+                Team
+              </span>
+            )}
+            {isWatched && (
+              <span className="shrink-0" style={{
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
+                color: '#1e40af', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-2)',
+              }}>
+                <Eye style={{ width: 9, height: 9 }} />
+                Watched
+              </span>
+            )}
+          </span>}
         </div>
       </td>
 

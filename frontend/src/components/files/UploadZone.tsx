@@ -44,28 +44,27 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         }
       }}
       className={cn(
-        'group relative flex cursor-pointer flex-col items-center gap-1 rounded-[var(--ui-radius)] border-2 border-dashed',
+        'file-upload-zone group relative cursor-pointer border border-dashed',
         active
           ? 'border-[var(--highlight-color,#eab308)] bg-[var(--highlight-color,#eab308)]/[0.06] scale-[1.01]'
           : 'border-[#17181a30] hover:border-[#17181a60] hover:bg-[#17181a06]',
       )}
       style={{
-        minHeight: 88, padding: 'var(--workspace-space-12)', margin: "var(--workspace-space-12) 0", justifyContent: 'center',
         transition: 'border-color 0.2s, background-color 0.2s, transform 0.2s',
       }}
     >
       <CloudUpload
-        className="h-6 w-6 transition-transform duration-200 group-hover:scale-110"
-        style={{ color: active ? 'var(--highlight-color, #eab308)' : '#17181abb' }}
+        className="file-upload-icon h-5 w-5 transition-transform duration-200 group-hover:scale-110"
+        style={{ color: active ? 'var(--highlight-on-light, #806600)' : '#17181abb' }}
       />
-      <div style={{
-        fontSize: 'var(--workspace-font-body)', fontWeight: 500, padding: '0 15px', textAlign: 'center',
-        color: active ? 'var(--highlight-color, #eab308)' : '#17181abb',
+      <div className="file-upload-title" style={{
+        fontSize: 'var(--workspace-font-body)', fontWeight: 500,
+        color: active ? 'var(--highlight-on-light, #806600)' : '#17181abb',
         transition: 'color 0.2s',
       }}>
         {active ? 'Drop files here' : 'Upload files or drop them here'}
       </div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 400, color: '#58616d', textAlign: 'center', lineHeight: 1.6 }}>
+      <div className="file-upload-description" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 400, color: '#58616d', lineHeight: 1.5 }}>
         {description}
       </div>
       <input

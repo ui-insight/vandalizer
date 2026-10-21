@@ -786,10 +786,9 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
 
       {contentSearchState === 'error' && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Content search is unavailable. Name matches from this folder remain available. <button onClick={onRetryContentSearch} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry search</button></div>}
       {contentsError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Could not load this folder. {documents.length || folders.length ? 'Previously loaded items are shown.' : 'Its contents are unavailable.'} <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry folder</button></div>}
-      {/* File table - matches Flask .styled-table */}
+      {/* File list surface */}
       <div
-        className="mt-2.5 rounded-[12px] overflow-hidden"
-        style={{ boxShadow: '0 0 20px rgba(0, 0, 0, 0.15)' }}
+        className="file-list-surface"
       >
         {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or use Close search to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">This folder is empty. Upload files here or use Add to create a folder.</p> : <FileList
           folders={sortedFolders}
