@@ -106,6 +106,10 @@ JUDGE_INSTRUCTIONS = (
     "- the statement is a judgment, conclusion, recommendation, count, calculation or summary "
     "of several facts that the passage does not state in so many words (\"allowable\", "
     "\"eligible: yes\", \"no red flags\", \"falls within the period\", a total someone added up);\n"
+    "- the statement tells the reader what to do in this case (\"Obtain quotations…\", "
+    "\"Provide documentation…\") and the passage is a rule that applies only under conditions "
+    "or within a scope — a dollar threshold, a type of cost or purchase, a procurement method, "
+    "an \"if …\" — that the statement does not itself show are met;\n"
     "- the statement says anything the passage does not.\n\n"
     "When supported is true, give the passage id and copy the excerpt of that passage that "
     "states it: one contiguous run of the passage's text, copied character for character, "
@@ -431,6 +435,47 @@ _LIMIT_RE = re.compile(
     r"|limit(?:s|ed)?|cap(?:s|ped)?|only)\b",
     re.I,
 )
+
+
+# ---------------------------------------------------------------------------
+# Advice for this case, and rules that apply only in some cases
+# ---------------------------------------------------------------------------
+
+# Imperatives a report opens a recommendation or follow-up action with.
+_ACTION_VERBS = frozenset("""
+obtain provide request submit ensure verify document confirm maintain retain prepare collect attach
+include register contact clarify secure acquire get seek consider follow complete file keep supply
+upload send notify update revise add track monitor establish develop implement justify demonstrate
+assess evaluate determine compare reconcile resolve gather identify check review
+""".split())
+_ACTION_LABEL_RE = re.compile(
+    r"\bfollow[- ]?ups?\b|\brecommend|\bnext steps?\b|\bactions?\b|\bto[- ]dos?\b|\bremediat|\bmitigat", re.I,
+)
+# A rule that applies only in some cases: a condition, or a threshold.
+_CONDITION_RE = re.compile(
+    r"\b(?:if|unless|whenever|provided that|in the case of|in cases where|only when|only if)\b"
+    r"|\bwhen\b(?!\s+(?:applicable|appropriate|possible|practicable|necessary|available|requested))"
+    r"|\b(?:above|below|over|under|exceed(?:s|ing)?|in excess of|less than|more than|greater than)\s+"
+    r"(?:the\s+)?(?:\$|micro-?purchase|simplified acquisition|threshold)"
+    r"|\bthreshold\b",
+    re.I,
+)
+
+
+def is_action(st: Statement) -> bool:
+    """Whether a statement tells the reader what to do in this case: it
+    opens with an imperative ("Obtain vendor quotations…"), or sits under a
+    follow-up or recommendation label."""
+    first = re.match(r"\W*([A-Za-z]+)", st.text or "")
+    return bool(first and first.group(1).lower() in _ACTION_VERBS) or bool(_ACTION_LABEL_RE.search(st.label or ""))
+
+
+def sentence_around(text: str, start: int, end: int) -> str:
+    """The sentence (or list item) ``text[start:end]`` sits in."""
+    lo = max(text.rfind(". ", 0, start) + 2, text.rfind("\n", 0, start) + 1, 0)
+    stops = [i for i in (text.find(". ", end), text.find("\n", end)) if i != -1]
+    hi = min(stops) + 1 if stops else len(text)
+    return text[lo:hi]
 
 
 def obligation(text: str) -> tuple[bool, bool, bool]:
@@ -795,6 +840,16 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     # "should"; only the statement's own words count, not its label's.
     if obligation_differs(st.text, exact):
         return Verdict(None, "obligation_differs")
+    # Advice for this case ("Obtain vendor quotations…") sourced to a rule
+    # that applies only in some cases ("If simplified acquisition procedures
+    # are used, price or rate quotations must be obtained…") says the case
+    # needs it; the report has not shown the condition holds, and here it
+    # did not (a $1,240 purchase is under the micro-purchase threshold). The
+    # judge quotes the main clause, so the whole sentence is read.
+    if is_action(st) and not _CONDITION_RE.search(st.text) and _CONDITION_RE.search(
+        sentence_around(src.text, *spots[0])
+    ):
+        return Verdict(None, "rule_applies_only_if")
     if st_values and not _bound(st_values, shared, exact, q_values):
         return Verdict(None, "value_not_bound_to_label")
 

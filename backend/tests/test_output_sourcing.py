@@ -609,6 +609,63 @@ def test_a_knowledge_base_passage_is_a_source_too():
     assert src["excerpt"][src["quote_start"]:src["quote_end"]] == src["quote"]
 
 
+PROCUREMENT = {
+    "chunk_id": "ug_d_320", "kb_title": "OMB Uniform Guidance", "document_title": "Subpart D",
+    "label": "OMB Uniform Guidance — Subpart D · part 41", "page": None,
+    "content": ("§ 200.320 Procurement methods.\n(a)(2) Small purchase procedures. If simplified acquisition "
+                "procedures are used, price or rate quotations must be obtained from an adequate number of "
+                "qualified sources.\n"),
+}
+
+
+def test_advice_is_not_sourced_to_a_rule_that_applies_only_in_some_cases():
+    """Seen in a real run: "Obtain vendor quotations…" for a $1,240 purchase
+    was linked to the small-purchase rule, which applies only if simplified
+    acquisition procedures are used — implying a requirement this purchase,
+    under the micro-purchase threshold, does not have. The judge quoted the
+    main clause; the condition sits in the rest of the sentence."""
+    judge = Judge(("vendor quotations", "Small purchase",
+                   "price or rate quotations must be obtained from an adequate number of qualified sources."))
+    result = _trace({"final": "Obtain vendor quotations or comparable market price evidence for the GPS receivers."},
+                    judge, docs=[], passages=[PROCUREMENT])
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"rule_applies_only_if": 1}
+
+
+def test_advice_that_states_the_rule_s_condition_may_cite_it():
+    judge = Judge(("simplified acquisition", "Small purchase",
+                   "If simplified acquisition procedures are used, price or rate quotations must be obtained "
+                   "from an adequate number of qualified sources."))
+    value = {"follow_up_actions": [
+        "If simplified acquisition procedures are used, obtain price or rate quotations from qualified sources.",
+    ]}
+    [(_, src)] = _links(_trace({"final": value}, judge, docs=[], passages=[PROCUREMENT]), "final")
+    assert src["chunk_id"] == "ug_d_320"
+
+
+def test_advice_from_the_document_itself_is_still_sourced():
+    """An announcement's own instructions apply to its applicants: no
+    condition stands between them and the case."""
+    rfa = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "Submission\nOnly applications submitted by the deadline through FFAR's Grant Management System "
+        "will be accepted and considered eligible for evaluation.\n"
+    )}
+    judge = Judge(("Submit", "Grant Management", "Only applications submitted by the deadline through FFAR's "
+                   "Grant Management System will be accepted"))
+    result = _trace({"final": {"submission_details": "Submit applications through FFAR's Grant Management System by the deadline."}},
+                    judge, docs=[rfa])
+    assert len(_links(result, "final")) == 1
+
+
+def test_a_transaction_date_is_not_an_action():
+    from app.services.output_sourcing import is_action
+    from app.services.output_statements import Statement
+
+    assert not is_action(Statement(0, 0, "2025-03-14", label="Expense Record — transaction date"))
+    assert is_action(Statement(0, 0, "Vendor quotes", label="Cost Reasonableness — follow up actions"))
+    assert is_action(Statement(0, 0, "Obtain itemized invoices.", label=""))
+
+
 def test_absences_and_verdicts_are_never_judged():
     judge = Judge()
     result = _trace({"final": "**Funding Instrument:** Not specified in the document\n**Decision:** Allowable\n"}, judge)
