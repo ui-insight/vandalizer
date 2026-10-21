@@ -248,6 +248,52 @@ def test_a_bold_line_without_a_sentence_is_a_heading():
     assert [md[s.start:s.end] for s in stmts] == ["The cost is allocable.", "The award ends in 2029."]
 
 
+ELIGIBILITY_MD = (
+    "# RFA Checklist\n\n"
+    "## ELIGIBILITY\n\n"
+    "### Eligible Individuals\n\n"
+    "- **Principal Investigator**\n"
+    "  - Criteria: Must be a full-time employee of the lead institution\n\n"
+    "- **Co‑Principal Investigator**\n"
+    "  - Criteria: Must be a full-time employee of the lead institution\n\n"
+    "**Budget**\n\n"
+    "- **Unallowable Costs:**\n"
+    "  - Post-fire perishable data collection\n"
+    "Plain paragraph after the list.\n"
+)
+
+
+def test_a_markdown_statement_carries_the_headings_and_items_above_it():
+    _, stmts = split_output(ELIGIBILITY_MD)
+    got = [(s.text, s.label, s.context) for s in stmts]
+    elig = ("RFA Checklist", "ELIGIBILITY", "Eligible Individuals")
+    assert got == [
+        ("Principal Investigator", "", elig),
+        ("Must be a full-time employee of the lead institution", "Criteria", elig + ("Principal Investigator",)),
+        ("Co‑Principal Investigator", "", elig),
+        ("Must be a full-time employee of the lead institution", "Criteria", elig + ("Co‑Principal Investigator",)),
+        ("Post-fire perishable data collection", "", ("RFA Checklist", "ELIGIBILITY", "Eligible Individuals",
+                                                       "Budget", "Unallowable Costs")),
+        ("Plain paragraph after the list.", "", ("RFA Checklist", "ELIGIBILITY", "Eligible Individuals", "Budget")),
+    ]
+
+
+def test_the_same_words_under_two_headings_are_judged_apart():
+    """Seen in the NSF run: "Criteria: Must be a full-time employee…" under
+    the PI and under the co-PI were judged once, by their shared words and
+    label, and both linked to the PI rule — the RFA says it of the PI only."""
+    doc = _doc("rfa", "RFA.pdf", ["Who May Serve as PI: The PI must be a full-time employee of the lead institution.\n" + FILLER])
+    judge = Judge(("full-time", "Who May Serve", "The PI must be a full-time employee of the lead institution."))
+    _trace({"final": ELIGIBILITY_MD}, judge, docs=[doc])
+    asked = [(it["statement"], it.get("context")) for it in judge.asked if "full-time" in it["statement"]]
+    assert asked == [
+        ("Must be a full-time employee of the lead institution",
+         "RFA Checklist — ELIGIBILITY — Eligible Individuals — Principal Investigator"),
+        ("Must be a full-time employee of the lead institution",
+         "RFA Checklist — ELIGIBILITY — Eligible Individuals — Co‑Principal Investigator"),
+    ]
+
+
 def test_files_are_not_split():
     assert split_output({"type": "file_download", "filename": "x.pdf"}) == ("none", [])
 
@@ -269,11 +315,26 @@ def test_files_are_not_split():
     ("L24AC00293-00", "GRANT NO. L24AC00293", False),
     ("Fall 2022", "by November 1, 2022", True),
     ("801-427-9603", "Phone: 801-427-9603", True),
+    # A section number is a value: the NSF run's "(Section F.2)" was item 1
+    # of Section II.F.
+    ("insurance (Section F.2)", "The facility will be responsible for insurance", False),
+    ("insurance (Section F.2)", "see Section F.2.", True),
+    ("per GPG Section II.C.2.d.iii.", "GPG, Section II.C.2.d.iii.", True),
+    ("subsection 2.A", "Include a subsection 2.A, with the heading", True),
+    ("subsection 2.A", "Include a subsection 2.B", False),
 ])
 def test_values_compare_as_the_same_value(statement, quote, same):
     want = {v.key for v in values_in(statement)}
     from app.services.output_sourcing import _quote_keys
     assert want and (want <= _quote_keys(values_in(quote))) is same
+
+
+@pytest.mark.parametrize("text", [
+    "5 p.m. ET", "U.S. citizens", "e.g. a budget", "Ph.D. students", "17.5% rate", "WBS level 3 (i.e., 1.2.3)",
+    "www.nsf.gov/funding/nsf15-598", "No. 2 of the list", "§ 200.403(h)",
+])
+def test_abbreviations_and_plain_numbers_are_not_section_numbers(text):
+    assert not [v for v in values_in(text) if v.kind == "id" and "." in v.raw]
 
 
 # ---------------------------------------------------------------------------
@@ -303,13 +364,29 @@ def test_an_estimated_page_keeps_its_hedge():
 @pytest.mark.parametrize("quote, reason", [
     ("Recipient is Southern Utah University", "quote_not_in_passage"),          # paraphrase
     ("Recipient: … Southern Utah University", "quote_not_in_passage"),          # spliced
+    ("Recipient: ... Southern Utah University", "quote_not_in_passage"),
     ("Southern", "quote_too_short"),
+    ("…Southern…", "quote_too_short"),
 ])
 def test_an_excerpt_must_be_verbatim_and_contiguous(quote, reason):
     judge = Judge(("Southern Utah", "Recipient:", quote))
     result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
     assert _links(result, "final") == []
     assert result["reasons"] == {reason: 1}
+
+
+@pytest.mark.parametrize("quote", [
+    "Recipient: Southern Utah University...",
+    "…Recipient: Southern Utah University",
+    "... Recipient: Southern Utah University …",
+])
+def test_an_ellipsis_at_either_end_only_says_the_passage_goes_on(quote):
+    """Seen in the NSF run: "…up to three cross-Awardee activities..." —
+    the words are the passage's, word for word; the dots are not."""
+    judge = Judge(("Southern Utah", "Recipient:", quote))
+    result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
+    [(_, src)] = _links(result, "final")
+    assert src["quote"] == "Recipient: Southern Utah University"
 
 
 def _window_with(corpus, needle):
@@ -496,9 +573,9 @@ UG_FACTORS = {
     ({"sponsor": "BLM, Southern Utah University"}, ("sponsor", "BLM, Southern Utah University"),
      ("Southern Utah", "Bureau of Land", "Bureau of Land Management (BLM), and Southern Utah University"),
      [AGREEMENT], []),
-    # The report named its own check after the rule; the rule names no check.
-    ([{"check_name": "Consistent Cost Treatment", "result": "Pass"}], ("check name", "Consistent Cost Treatment"),
-     ("Consistent", "consistent treatment", "Be accorded consistent treatment."), [], [UG_FACTORS]),
+    # A heading names what an unlabelled list item is.
+    ("## Sponsor\n\n- Bureau of Land Management\n", ("Sponsor", "Bureau of Land Management"),
+     ("Bureau", "Bureau of Land", "Bureau of Land Management (BLM)"), [AGREEMENT], []),
 ])
 def test_a_label_s_role_must_be_what_the_passage_gives_it(target, asked, rule, docs, passages):
     judge = Judge(rule, role=lambda item, n: False)
@@ -511,6 +588,40 @@ def test_a_label_s_role_must_be_what_the_passage_gives_it(target, asked, rule, d
     for item in judge.role_asked:
         assert (item["label"], item["statement"]) == asked
         assert item["excerpt"] == rule[2] and rule[2] in item["passage"]
+
+
+def test_the_role_check_reads_the_highlighted_excerpt_not_the_passage_around_it():
+    """Seen in the NSF run: "Sponsor: National Science Foundation" was linked
+    to the NSF's relay service for the hearing-impaired; the text around it
+    says the NSF awards grants, and the check counted that."""
+    assert "a role the passage gives elsewhere, outside the excerpt, does not count" in ROLE_INSTRUCTIONS
+    assert "only describes the organization or person itself" in ROLE_INSTRUCTIONS
+    # "The National Science Foundation (NSF) is an independent Federal
+    # agency created by…" passed half the time without this; 0 of 10 with it.
+    assert "the label names a party" in ROLE_INSTRUCTIONS
+
+
+def test_a_check_s_name_is_not_a_statement_but_names_its_fields():
+    """Seen in the NSF run: {"check": "Cost share / matching required",
+    "status": "no", "detail": "…cost sharing is prohibited"} — the name,
+    which says the opposite of the finding, was linked to a definition of
+    mandatory cost share. The workflow named its check; no passage did."""
+    value = [{"check": "Cost share / matching required", "category": "escalation", "status": "no",
+              "detail": "Inclusion of voluntary committed cost sharing is prohibited"},
+             {"check_name": "Consistent Cost Treatment", "result": "Pass"},
+             {"item": "Letter of Intent", "source": "Announcement"}]
+    _, stmts = split_output(value)
+    assert [(s.text, s.label, s.kind) for s in stmts] == [
+        ("escalation", "Cost share / matching required — category", "claim"),
+        ("no", "Cost share / matching required — status", "verdict"),
+        ("Inclusion of voluntary committed cost sharing is prohibited", "Cost share / matching required — detail", "claim"),
+        ("Pass", "Consistent Cost Treatment — result", "verdict"),
+        ("Letter of Intent", "item", "claim"),
+    ]
+    text = json.dumps({"risk_flags": value[:1]})
+    assert [s.text for s in split_output(text)[1]] == [
+        "escalation", "no", "Inclusion of voluntary committed cost sharing is prohibited",
+    ]
 
 
 def test_a_role_link_needs_every_check_to_say_yes():
@@ -582,13 +693,53 @@ def test_a_value_in_two_documents_links_to_the_one_the_judge_read():
     assert (src["document_uuid"], src["page"]) == ("exp", None)
 
 
-def test_an_excerpt_from_another_document_than_the_one_named_is_refused():
-    # The judge names the Notice of Award's passage but quotes the record:
-    # the excerpt is checked in the passage named, never searched elsewhere.
+def test_an_excerpt_from_another_offered_passage_is_checked_where_it_is():
+    """Seen in the NSF run, seven times: the judge names one of a
+    statement's passages and copies the excerpt, word for word, from
+    another it was offered. The excerpt is checked in full where it is."""
     judge = Judge(("expense record", "NOTICE OF AWARD", "Award: L24AC00293-00 (BLM, Southern Utah University)"))
     result = _trace({"final": "The expense record charges the purchase to award L24AC00293-00."}, judge)
+    [(_, src)] = _links(result, "final")
+    assert (src["document_uuid"], src["quote"]) == ("exp", "Award: L24AC00293-00 (BLM, Southern Utah University)")
+    # Still every check: there, the excerpt has no word of the statement.
+    judge = Judge(("purchase", "NOTICE OF AWARD", "Vendor: Forestry Suppliers Inc."))
+    result = _trace({"final": "The purchase was approved under award L24AC00293-00."}, judge)
     assert _links(result, "final") == []
-    assert result["reasons"] == {"quote_not_in_passage": 1}
+
+
+def test_an_excerpt_in_two_offered_passages_and_not_the_one_named_is_refused():
+    page = "Recipient: Southern Utah University\n" + FILLER
+    doc = _doc("rep", "Repeated.pdf", [page, page, "Unrelated recipient text.\n" + FILLER])
+    corpus = Corpus([doc], [])
+    from app.services.output_sourcing import verify_offered
+    from app.services.output_statements import Statement
+
+    st = Statement(0, 0, "Southern Utah University", label="recipient")
+    windows = [i for i, _ in enumerate(corpus.windows) if "Recipient: Southern" in corpus.window_text(i)]
+    other = next(i for i, _ in enumerate(corpus.windows) if "Unrelated recipient" in corpus.window_text(i))
+    assert len({corpus.windows[i].start for i in windows}) >= 2
+    v = verify_offered(st, corpus, other, [other, *windows], "Recipient: Southern Utah University")
+    assert (v.link, v.reason) == (None, "quote_not_in_passage")
+
+
+def test_a_statement_copied_word_for_word_links_only_to_where_it_was_copied_from():
+    """Seen in the NSF run: "A facility with any resources that can only be
+    accessed or used outside the United States" is the RAPID list's, word
+    for word, on p. 21; the judge linked another component's list on p. 28,
+    which says "equipment"."""
+    doc = _doc("nheri", "NHERI.pdf", [
+        "RAPID will not support: A facility with any resources that can only be accessed or used outside the "
+        "United States.\n" + FILLER,
+        "EF will not support: A facility with any equipment that can only be accessed or used outside the "
+        "United States.\n" + FILLER,
+    ])
+    statement = "A facility with any resources that can only be accessed or used outside the United States"
+    wrong = Judge(("facility", "EF will not", "A facility with any equipment that can only be accessed or used outside the United States"))
+    result = _trace({"final": {"unallowable_costs": [statement]}}, wrong, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"] == {"statement_is_elsewhere": 1}
+    right = Judge(("facility", "RAPID will not", statement))
+    [(_, src)] = _links(_trace({"final": {"unallowable_costs": [statement]}}, right, docs=[doc]), "final")
+    assert src["page"] == 1
 
 
 def test_a_passage_the_statement_was_not_offered_is_refused():

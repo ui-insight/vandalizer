@@ -49,6 +49,11 @@ class Statement:
     label: str = ""
     path: list | None = None
     kind: str = "claim"
+    # The headings and list items a Markdown statement sits under
+    # ("ELIGIBILITY — Eligible Individuals — Co‑Principal Investigator"):
+    # "Criteria: Must be a full-time employee…" says whose criteria only
+    # through them.
+    context: tuple[str, ...] = ()
     # Set by the caller for its own bookkeeping (cache key, result).
     extra: dict = field(default_factory=dict)
 
@@ -235,7 +240,9 @@ def _cells(line: str, off: int) -> list[tuple[int, int]]:
     return spans
 
 
-def _add(out: list[Statement], text: str, a: int, b: int, label: str, base: int = 0) -> None:
+def _add(
+    out: list[Statement], text: str, a: int, b: int, label: str, base: int = 0, context: tuple[str, ...] = (),
+) -> None:
     a, b = _trim(text, a, b)
     if b <= a:
         return
@@ -243,10 +250,27 @@ def _add(out: list[Statement], text: str, a: int, b: int, label: str, base: int 
     kind = classify(p)
     if kind == "skip":
         return
-    out.append(Statement(base + a, base + b, p, label=label, kind=kind))
+    out.append(Statement(base + a, base + b, p, label=label, kind=kind, context=context))
 
 
-def _content(out: list[Statement], text: str, a: int, b: int, label: str, base: int) -> None:
+def _lead(seg: str) -> str:
+    """What a list item names, for the items nested under it: its bold or
+    plain label ("**Principal Investigator**", "Criteria: …"), or the whole
+    item when it is short."""
+    seg = seg.strip()
+    bold = _BOLD_LABEL_RE.match(seg)
+    if bold:
+        return plain(bold.group(2))
+    lab = _PLAIN_LABEL_RE.match(seg)
+    if lab:
+        return lab.group(1).strip()
+    p = plain(seg)
+    return p if len(p) <= 80 else ""
+
+
+def _content(
+    out: list[Statement], text: str, a: int, b: int, label: str, base: int, context: tuple[str, ...] = (),
+) -> None:
     """A list item's or paragraph's text: a leading "Label:" names the field;
     the rest is one statement per sentence."""
     seg = text[a:b]
@@ -267,10 +291,10 @@ def _content(out: list[Statement], text: str, a: int, b: int, label: str, base: 
         return
     whole = plain(text[a:b])
     if len(whole) <= 160 and classify(whole) != "claim":
-        _add(out, text, a, b, label, base)
+        _add(out, text, a, b, label, base, context)
         return
     for sa, sb in sentence_spans(text, a, b):
-        _add(out, text, sa, sb, label, base)
+        _add(out, text, sa, sb, label, base, context)
 
 
 def _join_label(*parts: str) -> str:
@@ -279,10 +303,28 @@ def _join_label(*parts: str) -> str:
 
 def markdown_statements(text: str, base: int = 0, label: str = "") -> list[Statement]:
     """Statements in Markdown ``text``: sentences of paragraphs and list
-    items, and table cells, as spans offset by ``base``."""
+    items, and table cells, as spans offset by ``base``. Each carries the
+    headings and the list items it sits under as its ``context``."""
     out: list[Statement] = []
     lines = _lines(text)
     in_fence = False
+    # (level, text) of the headings above the current line; a bold line
+    # that is a heading ranks below every "#" heading.
+    heads: list[tuple[int, str]] = []
+    # (indent, what the item names) of the list items the current line is
+    # nested in.
+    items: list[tuple[int, str]] = []
+
+    def context() -> tuple[str, ...]:
+        return tuple(t for _, t in heads) + tuple(t for _, t in items if t)
+
+    def heading(level: int, title: str) -> None:
+        while heads and heads[-1][0] >= level:
+            heads.pop()
+        if title:
+            heads.append((level, title))
+        items.clear()
+
     i = 0
     while i < len(lines):
         off, line = lines[i]
@@ -291,14 +333,25 @@ def markdown_statements(text: str, base: int = 0, label: str = "") -> list[State
             i += 1
             continue
         if in_fence:
-            _json_line(out, text, off, line, label, base)
+            _json_line(out, text, off, line, label, base, context())
             i += 1
             continue
-        if not line.strip() or _HR_RE.match(line) or _HEADING_RE.match(line) or _BOLD_HEADING_RE.match(line):
+        if not line.strip() or _HR_RE.match(line):
+            i += 1
+            continue
+        h = _HEADING_RE.match(line)
+        if h:
+            heading(len(h.group(1)), plain(h.group(2)))
+            i += 1
+            continue
+        if _BOLD_HEADING_RE.match(line):
+            heading(7, plain(line).rstrip(":"))
             i += 1
             continue
         # A table: a header row, then a separator row, then body rows.
         if "|" in line and i + 1 < len(lines) and _TABLE_SEP_RE.match(lines[i + 1][1]):
+            items.clear()
+            ctx = context()
             headers = [plain(text[a:b]) for a, b in _cells(line, off)]
             i += 2
             while i < len(lines) and "|" in lines[i][1] and lines[i][1].strip():
@@ -314,14 +367,11 @@ def markdown_statements(text: str, base: int = 0, label: str = "") -> list[State
                     cell_label = _join_label(label, row_label if len(cells) > 1 else "", col)
                     cell_plain = plain(text[a:b])
                     if len(cell_plain) <= SHORT_LEAF_CHARS:
-                        _add(out, text, a, b, cell_label, base)
+                        _add(out, text, a, b, cell_label, base, ctx)
                     else:
                         for sa, sb in sentence_spans(text, a, b):
-                            _add(out, text, sa, sb, cell_label, base)
+                            _add(out, text, sa, sb, cell_label, base, ctx)
                 i += 1
-            continue
-        if _json_line(out, text, off, line, label, base):
-            i += 1
             continue
         a = off
         rest = line
@@ -329,21 +379,38 @@ def markdown_statements(text: str, base: int = 0, label: str = "") -> list[State
         if q:
             a += q.end()
             rest = rest[q.end():]
+        indent = len(rest) - len(rest.lstrip())
         li = _LIST_RE.match(rest)
         if li:
+            # A sibling or an outer item closes the items it was nested in.
+            while items and items[-1][0] >= indent:
+                items.pop()
+        elif not (items and indent > items[-1][0]):
+            items.clear()   # a paragraph that is not part of a list item
+        if _json_line(out, text, off, line, label, base, context()):
+            i += 1
+            continue
+        if li:
             a += li.end()
-        _content(out, text, a, off + len(line), label, base)
+        _content(out, text, a, off + len(line), label, base, context())
+        if li:
+            items.append((indent, _lead(text[a:off + len(line)])))
         i += 1
     return out
 
 
-def _json_line(out: list[Statement], text: str, off: int, line: str, label: str, base: int) -> bool:
+def _json_line(
+    out: list[Statement], text: str, off: int, line: str, label: str, base: int, context: tuple[str, ...] = (),
+) -> bool:
     """A ``"key": value,`` line of JSON written into Markdown or a code
     block: the value is the statement, the key its label."""
     m = _JSON_LINE_RE.match(line)
     if not m:
         return False
-    key = _humanize(_unescape(m.group(1)))
+    raw_key = _unescape(m.group(1))
+    if _not_a_statement_key(raw_key):
+        return True
+    key = _humanize(raw_key)
     rest_at = m.end()
     rest = line[rest_at:].rstrip()
     if rest.endswith(","):
@@ -355,18 +422,18 @@ def _json_line(out: list[Statement], text: str, off: int, line: str, label: str,
         kind = classify(decoded)
         if kind != "skip" and b > a:
             if len(decoded) <= SHORT_LEAF_CHARS:
-                out.append(Statement(base + a, base + b, plain(decoded), label=lab, kind=kind))
+                out.append(Statement(base + a, base + b, plain(decoded), label=lab, kind=kind, context=context))
             else:
                 for sa, sb in sentence_spans(text, a, b):
-                    _add(out, text, sa, sb, lab, base)
+                    _add(out, text, sa, sb, lab, base, context)
         return True
     if re.fullmatch(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?", rest):
         a = off + rest_at
-        out.append(Statement(base + a, base + a + len(rest), rest, label=lab, kind="claim"))
+        out.append(Statement(base + a, base + a + len(rest), rest, label=lab, kind="claim", context=context))
         return True
     if rest in ("true", "false"):
         a = off + rest_at
-        out.append(Statement(base + a, base + a + len(rest), rest, label=lab, kind="verdict"))
+        out.append(Statement(base + a, base + a + len(rest), rest, label=lab, kind="verdict", context=context))
         return True
     return True   # null, or an object/array opening: nothing to check here
 
@@ -535,7 +602,9 @@ def parse_json_positions(text: str):
 # Keys whose value names the object it sits in ("item": "Full Applications
 # Due"), so a sibling leaf reads as that thing's field.
 _IDENT_KEYS = (
-    "name", "title", "item", "category", "label", "field", "check", "check_name",
+    # A check's name before its category: "Limited submission", not
+    # "escalation", is what a risk flag's detail is about.
+    "name", "title", "item", "check", "check_name", "category", "label", "field",
     "requirement", "component", "event", "deadline", "type", "role", "heading", "section",
     "topic", "question", "criterion", "rule", "cost", "expense",
     # Last: which record an object was read from ("source_document":
@@ -546,6 +615,26 @@ _IDENT_KEYS = (
 # A table column that says where the model got a row ("Source:
 # Announcement") annotates the row; it is not a statement about the subject.
 _PROVENANCE_HEADER_RE = re.compile(r"^(?:sources?|references?|citations?|cited|page|pages|p\.)$", re.IGNORECASE)
+
+# Fields that hold the name of one of the workflow's own checks. Seen in a
+# real run: {"check": "Cost share / matching required", "status": "no",
+# "detail": "…cost sharing is prohibited"} — the name says the opposite of
+# the finding, and was linked to a definition of mandatory cost share. The
+# workflow wrote the name; no passage states it. It still names its
+# object's other fields ("… — Cost share / matching required — detail").
+_CHECK_NAME_KEY_RE = re.compile(r"^(?:check|check_name|check_title|checklist_item|criterion_name|test_name)$", re.IGNORECASE)
+
+
+def _not_a_statement_key(key) -> bool:
+    """Whether a JSON leaf under ``key`` is the workflow's own wording: an
+    identifier, a check's name, or a note on where a value came from."""
+    if isinstance(key, int):
+        return False
+    key = str(key)
+    return bool(
+        _ID_KEY_RE.search(key) or _CHECK_NAME_KEY_RE.match(key)
+        or _PROVENANCE_HEADER_RE.match(_humanize(key))
+    )
 
 
 def _ident(items: list, skip_key: str) -> str:
@@ -600,7 +689,7 @@ def _positional_statements(node, label: str, path: list) -> list[Statement]:
     out: list[Statement] = []
     if kind == "obj":
         for key, child in node[1]:
-            if child[0] not in ("obj", "arr") and _ID_KEY_RE.search(str(key)):
+            if child[0] not in ("obj", "arr") and _not_a_statement_key(key):
                 continue
             lab = _leaf_label(label, key, node[1]) if child[0] not in ("obj", "arr") else _join_label(label, _humanize(key))
             out.extend(_positional_statements(child, lab, path + [key]))
@@ -639,7 +728,7 @@ def _value_statements(value, label: str, path: list, items: list | None, key) ->
     if isinstance(value, dict):
         pairs = list(value.items())
         for k, v in pairs:
-            if not isinstance(v, (dict, list)) and _ID_KEY_RE.search(str(k)):
+            if not isinstance(v, (dict, list)) and _not_a_statement_key(k):
                 continue
             lab = _leaf_label(label, k, pairs) if not isinstance(v, (dict, list)) else _join_label(label, _humanize(k))
             out.extend(_value_statements(v, lab, path + [k], pairs, k))

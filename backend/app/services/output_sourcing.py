@@ -11,9 +11,15 @@ run. A statement is linked only when all of these hold:
    (after folding case, whitespace, dashes and quotes, and ignoring the
    ``**``/``<u>`` formatting marks a text extractor writes) — checked here,
    not taken on the model's word, and an excerpt found twice there on
-   different pages is refused, since it cannot say which page it means;
-3. every number, date and identifier in the statement is in the excerpt as
-   the same value (``extraction_sources.value_supported_by_quote`` plus the
+   different pages is refused, since it cannot say which page it means. An
+   ellipsis at either end is dropped (one inside fails the check); an
+   excerpt that is not in the named passage but is, word for word, in
+   exactly one place among the other passages offered for the statement
+   is checked there instead. A statement of several words that is itself
+   word for word in a source must link to that place;
+3. every number, date, identifier and section number ("F.2") in the
+   statement is in the excerpt as the same value
+   (``extraction_sources.value_supported_by_quote`` plus the
    date/time/percent forms it does not cover);
 4. the excerpt shares a content word with the statement or its label, says
    most of a statement of several words (not just its subject's name), the
@@ -30,10 +36,17 @@ run. A statement is linked only when all of these hold:
 6. for a statement of a few words whose label says what it is in words of
    its own ("sponsor" over "Bureau of Land Management", "check name" over
    "Consistent Cost Treatment"), separate temperature-0 calls, asked only
-   that, each confirm the passage gives it as what the label names. Every
-   word of "sponsor: BLM, Southern Utah University" is in "…Bureau of Land
-   Management (BLM), and Southern Utah University", and the judge said so;
-   the university is the recipient, which no word count can see.
+   that, each confirm the excerpt itself gives it as what the label names.
+   Every word of "sponsor: BLM, Southern Utah University" is in "…Bureau
+   of Land Management (BLM), and Southern Utah University", and the judge
+   said so; the university is the recipient, which no word count can see.
+   And "Sponsor: National Science Foundation" was linked to the NSF's
+   hearing-impaired relay service, because the text around it says the
+   NSF awards grants.
+
+A Markdown statement is judged with the headings and list items above it
+(``Statement.context``), and a statement with no label of its own is
+gated by the one it sits directly under (``field_label``).
 
 Anything else — no candidate passage, a judge error, a check that fails —
 leaves the statement plain. Nothing here changes an output: the result is a
@@ -81,6 +94,7 @@ ROLE_VOTES = 2             # role checks per statement; every one must say yes
 MAX_JUDGED = 300           # statements judged per run; the rest stay plain
 MIN_QUOTE_CHARS = 12
 MAX_QUOTE_CHARS = 600
+VERBATIM_MIN_WORDS = 4     # a statement this long found word for word in a source came from there
 BIND_MAX_CHARS = 160       # how far a label word may sit from its value
 COVERAGE_MIN_WORDS = 4     # statements this long must be mostly in the excerpt:
 COVERAGE_TEXT = 0.3        # share of the statement's own content words, or
@@ -93,7 +107,9 @@ JUDGE_INSTRUCTIONS = (
     "You check statements taken from an AI-written report against passages from the "
     "documents and knowledge bases the report was written from. Each statement comes with "
     "a label — the field, table row or heading it sits under, which says what the statement "
-    "is about — and the ids of up to three passages to check it against.\n\n"
+    "is about — sometimes a context, the headings and list items above it (\"Eligible "
+    "Individuals — Co-Principal Investigator\" makes \"Criteria: …\" the co-PI's criteria), "
+    "and the ids of up to three passages to check it against.\n\n"
     "For each statement decide whether one of its passages itself states it: the same "
     "subject and the same facts — every name, number, date, amount and condition in the "
     "statement — connected in the passage the way the statement connects them.\n\n"
@@ -130,7 +146,9 @@ ROLE_INSTRUCTIONS = (
     "Each statement is a few words — a name, a date, an amount, a short phrase — and its label, the field, "
     "table row or heading it sits under in the report, says what it is: a sponsor, a due date, a budget "
     "category. The statement's words are already known to be in the excerpt. Decide only whether the "
-    "passage gives the statement as what its label names.\n\n"
+    "excerpt — the words a reader will see highlighted as this statement's source — gives the statement as "
+    "what its label names. The passage around the excerpt only helps you read it: a role the passage gives "
+    "elsewhere, outside the excerpt, does not count.\n\n"
     "For each statement, first say in passage_says, in a few words, what the passage makes each name, date "
     "or amount in the statement: its role, or the item it belongs to. Then answer shown.\n\n"
     "shown: true when the passage ties the statement to what its label names: by the label's words or its "
@@ -145,7 +163,14 @@ ROLE_INSTRUCTIONS = (
     "- the statement is the name the report gives one of its own parts — a check, step or section it "
     "carries out — even when the passage is what that part is about: the report named it, the passage "
     "did not;\n"
-    "- the passage does not let you tell.\n\n"
+    "- the excerpt only describes the organization or person itself — what it is, its history or legal "
+    "basis, its services, offices or contact details — and does not tie it to this program, solicitation, "
+    "award or document in the role the label names;\n"
+    "- the label names a party — a sponsor, funder, issuing agency, recipient or applicant — and the excerpt "
+    "does not say the name announces, issues, funds, awards, administers, receives or applies for this "
+    "program, solicitation or award (a sentence about what the organization is, when it was created or what "
+    "it does in general does not);\n"
+    "- the excerpt does not let you tell.\n\n"
     "Reply with JSON only: "
     '{"items": [{"id": 1, "passage_says": "...", "shown": true}, {"id": 2, "passage_says": "...", "shown": false}]}'
 )
@@ -177,6 +202,13 @@ _TIME_RE = re.compile(
     r"\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\b\.?|\b(\d{1,2}):(\d{2})\b|\b(noon|midnight)\b", re.I,
 )
 _TITLE_PREFIX_RE = re.compile(r"\b\d{1,2}\s*(?:C\.?F\.?R|U\.?S\.?C)\.?", re.I)
+# A dotted section number with a letter and a digit in it: "F.2", "2.A",
+# "II.C.2.d.iii". "Facility will be responsible for insurance (Section F.2)"
+# was linked to item 1 of Section II.F: the statement names a section the
+# excerpt is not.
+_SECTION_REF_RE = re.compile(
+    r"(?<![\w.])(?=[A-Za-z0-9.]*\d)(?=[A-Za-z0-9.]*[A-Za-z])(?:[A-Z]{1,4}|\d{1,3})(?:\.[A-Za-z0-9]{1,4})+(?![\w]|\.\w)"
+)
 _DASHED_ID_RE = re.compile(r"(?<![\w.,])\d+(?:-\d+){2,}(?![\w])|(?<![\w.,])\d{3,}-\d{3,}(?![\w])")
 _ALNUM_ID_RE = re.compile(
     r"(?<![\w$])(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{2,}(?:[-/.][A-Za-z0-9]+)*(?![\w])"
@@ -292,6 +324,9 @@ def values_in(text: str) -> list[Value]:
     for m in _TITLE_PREFIX_RE.finditer(text):
         if free(m.start(), m.end()):
             taken.append((m.start(), m.end()))
+    for m in _SECTION_REF_RE.finditer(text):
+        if free(m.start(), m.end()):
+            add(Value("id", "id:" + re.sub(r"[^a-z0-9]", "", m.group().lower()), m.start(), m.end(), m.group(), True))
     for m in _DASHED_ID_RE.finditer(text):
         if free(m.start(), m.end()):
             add(Value("id", "id:" + re.sub(r"[^0-9]", "", m.group()), m.start(), m.end(), m.group(), True))
@@ -648,7 +683,7 @@ class Corpus:
         """The windows most likely to state ``st``: every value in it must be
         there; then the words of the statement, and less so of its label."""
         words = stems(st.text)
-        label_words = stems(st.label) - words
+        label_words = stems(field_label(st)) - words
         keys = {v.key for v in values_in(st.text)}
         if keys:
             pool = None
@@ -784,10 +819,27 @@ class Verdict:
     reason: str
 
 
+def field_label(st: Statement) -> str:
+    """What a statement is, for the checks that read its label: its own
+    label, or for a statement with none, the heading or list item it sits
+    directly under ("Eligible Individuals" over "Co‑Principal
+    Investigator")."""
+    return st.label or (st.context[-1] if st.context else "")
+
+
+# An ellipsis at either end of an excerpt only says the passage goes on;
+# one inside it skips words, and is refused by the verbatim check.
+_EDGE_ELLIPSIS_RE = re.compile(r"^\s*(?:\.{3}|…)\s*|\s*(?:\.{3}|…)\s*$")
+
+
+def clean_quote(quote: str) -> str:
+    return _EDGE_ELLIPSIS_RE.sub("", (quote or "").strip()).strip()
+
+
 def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     """Whether the judge's ``quote`` from window ``wi`` may source ``st``;
     when it may, the source entry the UI shows."""
-    quote = (quote or "").strip()
+    quote = clean_quote(quote)
     if len(quote) > MAX_QUOTE_CHARS:
         return Verdict(None, "quote_too_long")
     nq, _ = fold(quote)
@@ -831,9 +883,20 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     # "approved budget categories"). The passage the judge read must be
     # about that too, or "ALL AMOUNTS ARE SHOWN IN USD" on the award would
     # source the expense's currency.
-    label_only = stems(st.label) - text_words - _GENERIC_LABEL_WORDS
+    label_only = stems(field_label(st)) - text_words - _GENERIC_LABEL_WORDS
     if len(text_words) <= 2 and label_only and not (label_only & stems(corpus.window_text(wi))):
         return Verdict(None, "label_not_in_passage")
+    # A statement the report copied word for word from a source came from
+    # where those words are. "A facility with any resources that can only be
+    # accessed or used outside the United States" is in the RAPID list on
+    # p. 21; the judge linked "A facility with any equipment that…" from
+    # another component's list on p. 28.
+    if len(text_words) >= VERBATIM_MIN_WORDS:
+        copies = [
+            (si, a, b) for si, s in enumerate(corpus.sources) for a, b in _find_all(s, st.text, 0, len(s.text))
+        ]
+        if copies and not any(si == w.src and a < spots[0][1] and spots[0][0] < b for si, a, b in copies):
+            return Verdict(None, "statement_is_elsewhere")
     # Every word of "subawards over $50,000 must include this clause" is in
     # "The recipient may include the substance of this clause … in subawards
     # … over $50,000", and the judge said so. "Must" is not "may" or
@@ -867,6 +930,28 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     if len(spots) > 1 and len({_kb_page(src, a) for a, _ in spots}) > 1:
         return Verdict(None, "quote_on_several_pages")
     return Verdict(_kb_link(src, *spots[0]), "ok")
+
+
+def verify_offered(st: Statement, corpus: Corpus, wi: int, offered: list[int], quote: str) -> Verdict:
+    """``verify`` against the passage the judge named, or — when the excerpt
+    is not in it but is, word for word, in exactly one place among the
+    other passages the statement was offered — against that one. The judge
+    read every offered passage and sometimes names the wrong id; the
+    excerpt is still checked in full where it is."""
+    v = verify(st, corpus, wi, quote)
+    if v.reason != "quote_not_in_passage":
+        return v
+    q = clean_quote(quote)
+    places: dict[tuple[int, int], int] = {}
+    for other in offered:
+        if other == wi:
+            continue
+        w = corpus.windows[other]
+        for a, _ in _find_all(corpus.sources[w.src], q, w.start, w.end):
+            places.setdefault((w.src, a), other)
+    if len(places) != 1:
+        return v
+    return verify(st, corpus, next(iter(places.values())), quote)
 
 
 def _excerpt(text: str, start: int, end: int) -> tuple[str, int, int]:
@@ -949,10 +1034,11 @@ def _judge_prompt(items: list[tuple[int, Statement, list[int]]], corpus: Corpus)
                 )
     parts.append("STATEMENTS")
     for n, st, cands in items:
-        parts.append(json.dumps(
-            {"id": n, "label": st.label, "statement": st.text, "passages": [ids[wi] for wi in cands]},
-            ensure_ascii=False,
-        ))
+        item = {"id": n, "label": st.label}
+        if st.context:
+            item["context"] = " — ".join(st.context)
+        item.update({"statement": st.text, "passages": [ids[wi] for wi in cands]})
+        parts.append(json.dumps(item, ensure_ascii=False))
     return "\n\n".join(parts), {v: k for k, v in ids.items()}
 
 
@@ -986,7 +1072,7 @@ def _judge_batch(
                 out[key] = Verdict(None, "judge_named_no_passage")
                 continue
             q = v.get("quote")
-            out[key] = verify(st, corpus, wi, q if isinstance(q, str) else "")
+            out[key] = verify_offered(st, corpus, wi, cands, q if isinstance(q, str) else "")
         except Exception as e:  # noqa: BLE001 — a check that cannot run links nothing
             logger.warning("Source check failed for one statement: %s", e)
             out[key] = Verdict(None, "check_error")
@@ -1022,17 +1108,20 @@ def label_names_role(st: Statement) -> bool:
     words. A longer statement says what it means itself; its label is only
     where it sits ("Consistent Cost Treatment — rationale")."""
     words = stems(st.text)
-    return len(words) <= ROLE_MAX_WORDS and bool(stems(st.label) - words - _GENERIC_LABEL_WORDS)
+    return len(words) <= ROLE_MAX_WORDS and bool(stems(field_label(st)) - words - _GENERIC_LABEL_WORDS)
 
 
 def _role_prompt(items: list[tuple[int, Statement, dict]]) -> str:
     parts = ["STATEMENTS"]
     for n, st, link in items:
-        parts.append(json.dumps({
-            "id": n, "label": st.label, "statement": st.text,
+        item = {"id": n, "label": field_label(st), "statement": st.text}
+        if st.context:
+            item["context"] = " — ".join(st.context)
+        item.update({
             "source": link.get("document_title") or link.get("label") or "",
             "excerpt": link.get("quote"), "passage": link.get("excerpt"),
-        }, ensure_ascii=False))
+        })
+        parts.append(json.dumps(item, ensure_ascii=False))
     return "\n\n".join(parts)
 
 
@@ -1086,7 +1175,13 @@ def _in_pool(
 # ---------------------------------------------------------------------------
 
 def statement_key(st: Statement) -> str:
-    return json.dumps([st.text.strip().lower(), st.label.strip().lower()], ensure_ascii=False)
+    """Statements judged once: the same words under the same label and the
+    same headings. "Criteria: Must be a full-time employee…" under the PI
+    and under the co-PI are two statements."""
+    return json.dumps(
+        [st.text.strip().lower(), st.label.strip().lower(), [c.strip().lower() for c in st.context]],
+        ensure_ascii=False,
+    )
 
 
 @dataclass
