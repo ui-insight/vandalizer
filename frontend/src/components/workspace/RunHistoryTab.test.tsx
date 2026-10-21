@@ -64,6 +64,40 @@ describe('RunHistoryTab — workflow run output', () => {
     expect(mockGetWorkflowStatus).toHaveBeenCalledWith('sess-abc')
   })
 
+  it('underlines a traced statement of a run opened from History, as the run view does', async () => {
+    const output = '**Recipient:** Southern Utah University. Costs are reasonable.'
+    mockGetWorkflowStatus.mockResolvedValue({
+      status: 'completed',
+      num_steps_completed: 2,
+      num_steps_total: 2,
+      current_step_name: null,
+      current_step_detail: null,
+      current_step_preview: null,
+      final_output: { output, data: [] },
+      steps_output: {},
+      output_step_names: [],
+      approval_request_id: null,
+      sourcing: {
+        status: 'done',
+        sources: [{
+          kind: 'document', document_uuid: 'noa', document_title: 'NoA.pdf', page: 4,
+          quote: 'Recipient: Southern Utah University', excerpt: 'Recipient: Southern Utah University',
+          quote_start: 0, quote_end: 35,
+        }],
+        targets: { final: { format: 'text', statements: [{ s: 15, e: 40, src: 0 }, { s: 41, e: 62 }], summary: { statements: 2, traced: 1 } } },
+      },
+    })
+
+    const { container } = renderTab([makeRun()])
+    fireEvent.click(await screen.findByRole('button', { expanded: false }))
+
+    await waitFor(() => expect(screen.getByText('1 of 2 statements traced to a source')).toBeTruthy())
+    const underline = container.querySelector('.src-u') as HTMLElement
+    expect(underline.textContent).toBe('Southern Utah University.')
+    fireEvent.click(underline)
+    expect(screen.getByRole('dialog', { name: 'Source: NoA.pdf · p. 4' })).toBeTruthy()
+  })
+
   it('offers download formats for the expanded run', async () => {
     mockGetWorkflowStatus.mockResolvedValue({
       status: 'completed',

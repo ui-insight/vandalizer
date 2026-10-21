@@ -582,17 +582,20 @@ export function useCitationPopover(sources: WorkflowCitation[]) {
 
 /** A traced statement's underline (amber for a document, blue for a
  *  knowledge-base passage) and an untraced one's tint, shown only while the
- *  reviewer toggle is on. Thin and half-transparent: the output stays the
- *  thing being read. */
+ *  reviewer toggle is on. Solid enough to be noticed on the gray output box
+ *  and on white (a 1px line at half opacity went unseen), set below the
+ *  text so the output stays the thing being read. */
 export const SOURCING_CSS = `
 .src-u {
-  text-decoration-line: underline; text-decoration-style: solid; text-decoration-thickness: 1px;
-  text-decoration-color: rgba(217, 119, 6, 0.55); text-underline-offset: 3px;
+  text-decoration-line: underline; text-decoration-style: solid; text-decoration-thickness: 2px;
+  text-decoration-color: rgba(217, 119, 6, 0.85); text-underline-offset: 4px;
   cursor: pointer; border-radius: 2px;
 }
-.src-u.src-kb { text-decoration-color: rgba(2, 132, 199, 0.55); }
-.src-u:hover, .src-u:focus-visible { background-color: rgba(253, 230, 138, 0.5); text-decoration-color: #b45309; outline: none; }
-.src-u.src-kb:hover, .src-u.src-kb:focus-visible { background-color: rgba(186, 230, 253, 0.55); text-decoration-color: #0369a1; }
+.src-u.src-kb { text-decoration-color: rgba(2, 132, 199, 0.85); }
+.src-u:hover, .src-u:focus-visible { background-color: rgba(253, 230, 138, 0.55); text-decoration-color: #b45309; outline: none; }
+.src-u:focus-visible { box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.45); }
+.src-u.src-kb:hover, .src-u.src-kb:focus-visible { background-color: rgba(186, 230, 253, 0.6); text-decoration-color: #0369a1; }
+.src-u.src-kb:focus-visible { box-shadow: 0 0 0 2px rgba(3, 105, 161, 0.45); }
 .show-untraced .src-x { background-color: rgba(251, 113, 133, 0.16); border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 `
 

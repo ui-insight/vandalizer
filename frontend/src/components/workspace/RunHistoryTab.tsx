@@ -5,6 +5,9 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
 import { getWorkflowStatus, downloadResults } from '../../api/workflows'
+import type { WorkflowCitation, WorkflowSourcing } from '../../types/workflow'
+import { CitedMarkdown } from './CitedMarkdown'
+import { useSourcing } from './Sourcing'
 import { FileOutputCard } from './FileOutputCard'
 import { summarizeFilePayload } from './outputFilePayload'
 
@@ -128,23 +131,46 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [output, setOutput] = useState<unknown>(null)
+  const [citations, setCitations] = useState<WorkflowCitation[]>([])
+  const [sourcing, setSourcing] = useState<WorkflowSourcing | null>(null)
   const [showDownload, setShowDownload] = useState(false)
+  // Where each statement of the deliverable came from, as in the run view.
+  const src = useSourcing(sourcing, 'final')
 
   useEffect(() => {
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let polls = 0
+    // A run that has only just finished may still be tracing its sources;
+    // pick them up when they land (bounded by the trace's ten-minute budget).
+    const waitForSources = (s: WorkflowSourcing | null | undefined) => {
+      if (cancelled || !s || (s.status !== 'pending' && s.status !== 'running') || polls++ > 150) return
+      timer = setTimeout(() => {
+        getWorkflowStatus(sessionId)
+          .then(next => {
+            if (cancelled) return
+            setSourcing(next?.sourcing ?? null)
+            waitForSources(next?.sourcing)
+          })
+          .catch(() => waitForSources(s))
+      }, 4000)
+    }
     getWorkflowStatus(sessionId)
       .then(status => {
         if (cancelled) return
         const fo = status?.final_output as Record<string, unknown> | null
         setOutput(fo && typeof fo === 'object' && 'output' in fo ? fo.output : fo)
+        setCitations(status?.retrieved_sources ?? [])
+        setSourcing(status?.sourcing ?? null)
         setLoading(false)
+        waitForSources(status?.sourcing)
       })
       .catch(() => {
         if (cancelled) return
         setUnavailable(true)
         setLoading(false)
       })
-    return () => { cancelled = true }
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [sessionId])
 
   if (loading) {
@@ -165,22 +191,35 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
   }
 
   const file = summarizeFilePayload(output)
+  const outputStyle = {
+    backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+    padding: 12, fontSize: 13, lineHeight: 1.6,
+    maxHeight: '50vh', overflowY: 'auto' as const, overflowX: 'auto' as const,
+    color: '#374151', wordBreak: 'break-word' as const,
+  }
   return (
     <div style={{ marginTop: 8 }}>
+      {!file && src.summary}
       {file ? (
         <FileOutputCard summary={file} downloadHref={downloadResults(sessionId, 'text')} maxHeight="50vh" />
+      ) : typeof output === 'string' ? (
+        // The same rendering as the run view: knowledge-base citation chips,
+        // and each traced statement underlined, opening its source.
+        <CitedMarkdown
+          markdown={output}
+          sources={citations}
+          className="chat-markdown"
+          style={outputStyle}
+          sourcing={src.text}
+        />
       ) : (
         <div
           className="chat-markdown"
-          style={{
-            backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-            padding: 12, fontSize: 13, lineHeight: 1.6,
-            maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
-            color: '#374151', wordBreak: 'break-word',
-          }}
+          style={outputStyle}
           dangerouslySetInnerHTML={{ __html: renderMarkdownOutput(output) }}
         />
       )}
+      {src.popover}
       <div style={{ position: 'relative', display: 'inline-block', marginTop: 8 }}>
         <button
           onClick={() => setShowDownload(s => !s)}
