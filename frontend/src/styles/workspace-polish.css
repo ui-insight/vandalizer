@@ -488,10 +488,9 @@ details[open] > .config-advanced-summary .config-disclosure { transform: rotate(
 /* Chart series colors describe marks; tooltip text needs readable contrast. */
 .section-page__content .recharts-default-tooltip .recharts-tooltip-item { color: #334155 !important; }
 
-/* Workspace modes are navigation; keep the page's work visually primary. */
-.workspace-mode-switch { display: flex; flex-shrink: 0; justify-content: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #edf0f2; background: #fff; }
-.workspace-mode-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; border: 1px solid transparent; border-radius: 8px; padding: 7px 18px; font-weight: 500; color: #59616b; cursor: pointer; }
-.workspace-mode-button:hover { background: #f7f8fa; color: #242b32; }
-.workspace-mode-button.is-active { background: var(--highlight-color, #eab308); border-color: transparent; color: var(--highlight-text-color, #242b32); font-weight: 650; }
-.workspace-mode-button.is-active svg { color: inherit; }
-.workspace-mode-button:focus-visible { outline: 2px solid var(--highlight-on-light, #806600); outline-offset: 2px; }
+/* The solid mode bar frames both the Assistant and the denser Library panel. */
+.workspace-mode-switch { display: flex; flex-shrink: 0; border-bottom: 1px solid #cccccc48; background: var(--panel-dark, #191919); }
+.workspace-mode-button { display: inline-flex; flex: 1; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; min-width: 0; border: 0; border-radius: 0; padding: 12px 4px; background: transparent; font-weight: 700; color: #fff; cursor: pointer; }
+.workspace-mode-button:hover { background: #363636; }
+.workspace-mode-button.is-active { background: var(--highlight-color, #eab308); color: var(--highlight-text-color, #242b32); }
+.workspace-mode-button:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
