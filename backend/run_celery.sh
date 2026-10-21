@@ -85,9 +85,36 @@ case "${1:-help}" in
         if [ -f /.dockerenv ] || [ -f /run/.containerenv ] \
             || grep -qaE 'docker|containerd|kubepods|libpod' /proc/1/cgroup 2>/dev/null; then
             echo "Running in container — staying alive to keep container running."
+            # This shell is PID 1, which ignores SIGTERM unless it traps it:
+            # without this, `docker stop` waits out its grace period and then
+            # SIGKILLs everything (exit 137), killing in-flight tasks mid-run.
+            # Pass the stop on to the detached workers (a warm shutdown) and
+            # give them until just inside compose's stop_grace_period.
+            shutdown() {
+                echo "Stop requested — shutting workers down."
+                for pidfile in "$PID_DIR"/*.pid; do
+                    [ -f "$pidfile" ] || continue
+                    kill -TERM "$(cat "$pidfile")" 2>/dev/null || true
+                done
+                waited=0
+                while [ "$waited" -lt 50 ]; do
+                    alive=false
+                    for pidfile in "$PID_DIR"/*.pid; do
+                        [ -f "$pidfile" ] || continue
+                        kill -0 "$(cat "$pidfile")" 2>/dev/null && alive=true
+                    done
+                    [ "$alive" = false ] && break
+                    sleep 1
+                    waited=$((waited + 1))
+                done
+                exit 0
+            }
+            trap shutdown TERM INT
             # Wait forever, monitoring worker health
             while true; do
-                sleep 30
+                # Backgrounded so the trap runs at once, not after the sleep.
+                sleep 30 &
+                wait $!
                 # Check if at least one worker is still running
                 alive=false
                 for pidfile in "$PID_DIR"/*.pid; do

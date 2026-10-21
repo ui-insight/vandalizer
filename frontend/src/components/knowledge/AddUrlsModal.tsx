@@ -9,6 +9,7 @@ import { UrlReviewList, type UrlCandidate } from './UrlReviewList'
 import { UrlPreviewList, plural } from './UrlPreviewList'
 import { extractUrls } from '../../utils/extractUrls'
 import {
+  cancelUrlPreview,
   commitUrlPreview,
   getSourceSuggestionsAvailable,
   getUrlPreview,
@@ -183,6 +184,15 @@ export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrls
     })
   }, [])
 
+  // Closing the dialog however it closes (Escape, backdrop, Cancel) stops a
+  // preview that is still fetching.
+  const previewRef = useRef(preview)
+  previewRef.current = preview
+  useEffect(() => () => {
+    const open = previewRef.current
+    if (kbUuid && open?.status === 'running') cancelUrlPreview(kbUuid, open.preview_uuid).catch(() => {})
+  }, [kbUuid])
+
   // Poll while the worker is still fetching.
   const previewUuid = preview?.preview_uuid
   const previewRunning = preview?.status === 'running'
@@ -206,7 +216,16 @@ export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrls
   )
   const keptChunks = keptPages.reduce((sum, p) => sum + p.chunk_count, 0)
 
+  // Stop the worker fetching for a preview the user has walked away from.
+  // Best effort: a preview that already finished has nothing to stop.
+  const stopPreview = () => {
+    if (kbUuid && preview?.status === 'running') {
+      cancelUrlPreview(kbUuid, preview.preview_uuid).catch(() => {})
+    }
+  }
+
   const discardPreview = () => {
+    stopPreview()
     setPreview(null)
     setKept(new Set())
     judgedRef.current = new Set()
@@ -234,6 +253,11 @@ export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrls
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start the check')
     } finally { submittedRef.current = false; setSubmitted(false); setChecking(false) }
+  }
+
+  const handleRetry = () => {
+    stopPreview()
+    void handleCheck()
   }
 
   const handleCommit = async () => {
@@ -434,7 +458,15 @@ export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrls
         )}
 
         {step === 'review' && preview && kbUuid && (
-          <UrlPreviewList kbUuid={kbUuid} preview={preview} kept={kept} onToggle={toggleKept} disabled={submitted} />
+          <UrlPreviewList
+            kbUuid={kbUuid}
+            preview={preview}
+            kept={kept}
+            onToggle={toggleKept}
+            onRetry={handleRetry}
+            onCancel={discardPreview}
+            disabled={submitted}
+          />
         )}
 
         {step === 'review' && !preview && (

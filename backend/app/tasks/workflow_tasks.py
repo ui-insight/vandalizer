@@ -8,6 +8,7 @@ import logging
 
 from app.celery_app import celery_app
 from app.services.form_fill import DOC_META_TASKS, document_meta
+from app.services.run_metadata import record_pass_usage, snapshot_run_config
 from app.exceptions import TrialSpendBlockedError
 from app.tasks import TRANSIENT_EXCEPTIONS
 
@@ -1209,6 +1210,13 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         return {"status": "error", "result_id": workflow_result_id}
     _record_models_used(db, workflow_result_id, engine)
 
+    snapshot_run_config(
+        db, workflow_result_id,
+        workflow_doc=workflow_doc, steps_data=steps_data,
+        trigger_step_data=trigger_step_data, model=model, sys_config=sys_config,
+        config_override=workflow_doc.get("config_override"),
+    )
+
     # Any pickup resumes where a previous attempt stopped, decided from the
     # run document itself: a fresh run has no stored step output, so
     # _resume_point returns (0, None) for it. Deciding from the message
@@ -1362,21 +1370,26 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             user_id=user_id,
             team_id=workflow_doc.get("team_id"),
             activity_id=activity_id,
-        ):
+        ) as meter_scope:
             # The steps a resumed pass skips, replayed from the saved run: both
             # the record and a step reading "All Earlier Steps" need them.
             replayed = (
                 _replay_step_entries(engine, prior_steps_output, start_index)
                 if start_index else []
             )
-            final_output, data = engine.execute(
-                workflow_result_updater=update_progress,
-                start_index=start_index,
-                initial_output=initial_output,
-                should_cancel=should_cancel,
-                check_budget=check_budget,
-                prior_steps=replayed,
-            )
+            try:
+                final_output, data = engine.execute(
+                    workflow_result_updater=update_progress,
+                    start_index=start_index,
+                    initial_output=initial_output,
+                    should_cancel=should_cancel,
+                    check_budget=check_budget,
+                    prior_steps=replayed,
+                )
+            finally:
+                # A failed or canceled pass still spent tokens on some model,
+                # and its record is what explains the failure.
+                record_pass_usage(db, workflow_result_id, meter_scope, sys_config)
         if start_index:
             # execute() reports only the steps this pass ran. Without the
             # earlier ones the saved record would begin mid-workflow — the same
@@ -1890,6 +1903,15 @@ def resume_workflow_after_approval(self, approval_uuid):
         return {"status": "error", "result_id": workflow_result_id}
     _record_models_used(db, workflow_result_id, engine)
 
+    # A no-op when the first pass recorded it; fills it for a run that paused
+    # before run configs were recorded.
+    snapshot_run_config(
+        db, workflow_result_id,
+        workflow_doc=workflow_doc, steps_data=steps_data,
+        trigger_step_data=trigger_data, model=model, sys_config=sys_config,
+        config_override=workflow_doc.get("config_override"),
+    )
+
     # The run is moving again: drop the pause marker so the rail stops showing
     # "awaiting approval" and the stale reaper starts covering this row again.
     # Done before execute() rather than after, because a pass that fails or
@@ -1936,19 +1958,22 @@ def resume_workflow_after_approval(self, approval_uuid):
             user_id=user_id,
             team_id=workflow_doc.get("team_id"),
             activity_id=str(_act["_id"]) if _act else None,
-        ):
+        ) as meter_scope:
             # Steps before the gate, replayed from the persisted steps_output:
             # a step reading "All Earlier Steps" after the gate needs them.
             replayed = _replay_step_entries(
                 engine, result_doc.get("steps_output") or {}, resume_index,
             )
-            final_output, data = engine.execute(
-                workflow_result_updater=update_progress,
-                start_index=resume_index,
-                initial_output=resume_output,
-                check_budget=check_budget,
-                prior_steps=replayed,
-            )
+            try:
+                final_output, data = engine.execute(
+                    workflow_result_updater=update_progress,
+                    start_index=resume_index,
+                    initial_output=resume_output,
+                    check_budget=check_budget,
+                    prior_steps=replayed,
+                )
+            finally:
+                record_pass_usage(db, workflow_result_id, meter_scope, sys_config)
         # execute() reports only the steps this pass ran. Prepend the ones
         # earlier passes completed, or the saved run record would show a
         # workflow that began at the approval gate and everything before it

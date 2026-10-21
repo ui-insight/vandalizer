@@ -1831,10 +1831,16 @@ async def run_workflow_integrated(
     )
 
     try:
+        # The activity id ties the run's token and model usage to its
+        # activity row, as the interactive run does; without it the API run's
+        # usage was metered against nothing and its row stayed "running".
         session_id = await svc.run_workflow(
             workflow_id, doc_uuids, user.user_id,
+            activity_id=str(activity.id),
             user=user,
         )
+        activity.workflow_session_id = session_id
+        await activity.save()
         return {
             "status": "queued",
             "activity_id": str(activity.id),

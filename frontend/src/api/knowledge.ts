@@ -139,9 +139,14 @@ export interface UrlPreviewPage {
 
 export interface UrlPreview {
   preview_uuid: string
-  status: 'running' | 'ready' | 'error' | 'committing' | 'committed'
+  status: 'running' | 'ready' | 'error' | 'canceled' | 'committing' | 'committed'
   error_message: string | null
   crawl_enabled: boolean
+  /** Still running, but the worker hasn't started or hasn't fetched a page in a while. */
+  stalled?: boolean
+  stall_message?: string | null
+  /** No worker is consuming the preview's queue, so Retry would stall the same way. */
+  workers_down?: boolean
   pages: UrlPreviewPage[]
 }
 
@@ -229,6 +234,14 @@ export function getUrlPreview(uuid: string, previewUuid: string) {
 export function getUrlPreviewPageText(uuid: string, previewUuid: string, pageId: string) {
   return apiFetch<{ page_id: string; text: string }>(
     `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/pages/${pageId}`,
+  )
+}
+
+/** Stop a preview that is still fetching; nothing it fetched is added. */
+export function cancelUrlPreview(uuid: string, previewUuid: string) {
+  return apiFetch<{ ok: boolean; canceled: boolean }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/cancel`,
+    { method: 'POST' },
   )
 }
 

@@ -163,6 +163,9 @@ services:
       start_period: 90s
       retries: 3
     restart: unless-stopped
+    # run_celery.sh passes a stop on to the workers and waits up to 50s for
+    # their warm shutdown; the default 10s SIGKILLs them mid-task.
+    stop_grace_period: 60s
     deploy:
       resources:
         limits:

@@ -19,6 +19,7 @@ propagates (see workflow_engine.process).
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import threading
 from contextvars import ContextVar
@@ -122,6 +123,13 @@ class MeterScope:
     # (support ticket: History couldn't say which model ran). Step is
     # (None, None) outside a workflow step.
     usage: dict = field(default_factory=dict)
+    # The distinct request settings each ``usage`` key's calls were sent with
+    # (temperature, output cap, thinking, structured-output mode, provider),
+    # keyed like ``usage`` and deduplicated by their JSON form. A run's model
+    # name alone does not reproduce it: an evaluation logging runs through the
+    # API needs what each call was actually sent, and two-pass extraction or a
+    # fallback retry sends the same model different settings.
+    settings: dict = field(default_factory=dict)
     # A multi-task workflow step makes its calls from several threads at once.
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -149,13 +157,18 @@ def model_usage_rows(scope: Optional["MeterScope"]) -> list[dict]:
         return []
     with scope._lock:
         items = list(scope.usage.items())
-    return [
-        {
+        settings = {key: list(seen.values()) for key, seen in scope.settings.items()}
+    rows = []
+    for key, (tin, tout, requests) in items:
+        step_index, step_name, model = key
+        row = {
             "step_index": step_index, "step": step_name, "model": model,
             "tokens_input": tin, "tokens_output": tout, "requests": requests,
         }
-        for (step_index, step_name, model), (tin, tout, requests) in items
-    ]
+        if settings.get(key):
+            row["settings"] = settings[key]
+        rows.append(row)
+    return rows
 
 
 def step_models(scope: Optional["MeterScope"], step_index: int) -> list[str]:
@@ -217,13 +230,15 @@ def record_usage(
     output_tokens: int,
     *,
     estimated: bool = False,
+    settings: Optional[dict] = None,
 ) -> None:
     """Add one model request's usage to the active scope.
 
-    Called by MeteredModel after every request. If no scope is set (a call site
-    we haven't wired for attribution), the usage is still recorded under the
-    `unattributed` feature so nothing is lost, and a warning is logged so the
-    site can be found and wrapped.
+    Called by MeteredModel after every request, with ``settings`` describing
+    what the request was sent with (see ``MeterScope.settings``). If no scope
+    is set (a call site we haven't wired for attribution), the usage is still
+    recorded under the `unattributed` feature so nothing is lost, and a
+    warning is logged so the site can be found and wrapped.
     """
     scope = _current_scope.get()
     if scope is None:
@@ -255,6 +270,10 @@ def record_usage(
         entry[0] += input_tokens or 0
         entry[1] += output_tokens or 0
         entry[2] += 1
+        if settings:
+            seen = scope.settings.setdefault(key, {})
+            fingerprint = json.dumps(settings, sort_keys=True, default=str)
+            seen.setdefault(fingerprint, settings)
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,8 @@ interface UrlPreviewListProps {
   preview: UrlPreview
   kept: Set<string>
   onToggle: (pageId: string) => void
+  onRetry: () => void
+  onCancel: () => void
   disabled?: boolean
 }
 
@@ -33,7 +35,7 @@ interface UrlPreviewListProps {
  * near-empty page is caught before it is indexed. Adding from here indexes
  * exactly the text shown.
  */
-export function UrlPreviewList({ kbUuid, preview, kept, onToggle, disabled }: UrlPreviewListProps) {
+export function UrlPreviewList({ kbUuid, preview, kept, onToggle, onRetry, onCancel, disabled }: UrlPreviewListProps) {
   const running = preview.status === 'running'
   const pages = preview.pages
   const notAddable = pages.filter(p => !p.addable).length
@@ -45,8 +47,23 @@ export function UrlPreviewList({ kbUuid, preview, kept, onToggle, disabled }: Ur
             <Loader2 size={14} className="animate-spin" aria-hidden="true" />
             Fetching pages… {pages.length > 0 && `${plural(pages.length, 'page')} so far`}
           </span>
-        ) : preview.status === 'error' ? (
+        ) : null}
+        {running && preview.stalled ? (
+          <div
+            role="alert"
+            className="kb-health-summary"
+            style={{ marginTop: 'var(--workspace-space-8)', marginBottom: 0, display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}
+          >
+            <span style={{ flex: 1, minWidth: 200 }}>{preview.stall_message}</span>
+            {!preview.workers_down && (
+              <ActionButton variant="secondary" onClick={onRetry} disabled={disabled}>Retry</ActionButton>
+            )}
+            <ActionButton variant="secondary" onClick={onCancel} disabled={disabled}>Cancel preview</ActionButton>
+          </div>
+        ) : running ? null : preview.status === 'error' ? (
           <span role="alert" style={{ color: 'var(--workspace-danger)' }}>{preview.error_message || 'The preview failed.'}</span>
+        ) : preview.status === 'canceled' ? (
+          <span>The preview was canceled.</span>
         ) : (
           <>
             Untick anything you don&rsquo;t want. Low-quality pages start unticked.

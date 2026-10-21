@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   suggestSources: vi.fn(),
   readSitemap: vi.fn(),
   previewUrlsForKB: vi.fn(),
+  cancelUrlPreview: vi.fn(),
   getUrlPreview: vi.fn(),
   getUrlPreviewPageText: vi.fn(),
   commitUrlPreview: vi.fn(),
@@ -45,8 +46,10 @@ function renderModal(props: Partial<Parameters<typeof AddUrlsModal>[0]> = {}) {
   const onSubmit = vi.fn()
   const onCommitted = vi.fn()
   const onClose = vi.fn()
-  render(<AddUrlsModal kbUuid="kb-1" onSubmit={onSubmit} onCommitted={onCommitted} onClose={onClose} {...props} />)
-  return { onSubmit, onCommitted, onClose }
+  const { unmount } = render(
+    <AddUrlsModal kbUuid="kb-1" onSubmit={onSubmit} onCommitted={onCommitted} onClose={onClose} {...props} />,
+  )
+  return { onSubmit, onCommitted, onClose, unmount }
 }
 
 async function reviewLinks(value = 'https://example.gov/policy\nhttps://example.gov/short') {
@@ -70,6 +73,7 @@ describe('AddUrlsModal — Fetch & check', () => {
     api.previewUrlsForKB.mockResolvedValue({ preview_uuid: 'pv-1', status: 'running' })
     api.getUrlPreview.mockResolvedValue(preview('ready'))
     api.commitUrlPreview.mockResolvedValue({ ok: true, queued: 2 })
+    api.cancelUrlPreview.mockResolvedValue({ ok: true, canceled: true })
   })
   afterEach(() => { vi.useRealTimers() })
 
@@ -172,5 +176,93 @@ describe('AddUrlsModal — Fetch & check', () => {
     expect(screen.queryByRole('list', { name: 'Fetched pages' })).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add 1 URL' })) })
     expect(onSubmit).toHaveBeenCalledWith(['https://example.gov/policy'], false, 5, '')
+  })
+
+  // Support ticket: "Fetching pages…" spun for 10+ minutes with no pages and
+  // no error. A stuck preview now says so and offers Retry and Cancel.
+  const stalled = (): UrlPreview => ({
+    ...preview('running', []),
+    stalled: true,
+    stall_message: "This is taking longer than expected. The server hasn't started fetching yet.",
+  })
+
+  it('says a stuck preview is taking longer than expected, with Retry and Cancel', async () => {
+    api.getUrlPreview.mockResolvedValue(preview('running', []))
+    renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    expect(screen.queryByText(/taking longer than expected/)).toBeNull()
+
+    api.getUrlPreview.mockResolvedValue(stalled())
+    await poll()
+    expect(screen.getByText(/taking longer than expected/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeTruthy()
+  })
+
+  // Dev outage 2026-10-20: the worker container was down for a day, and Retry
+  // just queued another preview nothing would run.
+  it('offers no Retry when no worker is running to pick the preview up', async () => {
+    api.getUrlPreview.mockResolvedValue({
+      ...stalled(),
+      stall_message: "The server's background workers aren't running, so the preview can't start.",
+      workers_down: true,
+    })
+    renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    expect(screen.getByText(/background workers aren't running/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeTruthy()
+  })
+
+  it('Retry stops the stuck preview and starts a new one with the same links', async () => {
+    api.getUrlPreview.mockResolvedValue(stalled())
+    renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    api.previewUrlsForKB.mockResolvedValue({ preview_uuid: 'pv-2', status: 'running' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
+
+    expect(api.cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+    expect(api.previewUrlsForKB).toHaveBeenCalledTimes(2)
+    expect(api.previewUrlsForKB.mock.calls[1][1]).toEqual(
+      ['https://example.gov/policy', 'https://example.gov/short'],
+    )
+  })
+
+  it('Cancel stops the preview and returns to the selected links', async () => {
+    api.getUrlPreview.mockResolvedValue(stalled())
+    renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel preview' })) })
+
+    expect(api.cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+    expect(screen.queryByRole('list', { name: 'Fetched pages' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add 2 URLs' })).toBeTruthy()
+  })
+
+  it('closing the dialog stops a preview that is still fetching', async () => {
+    api.getUrlPreview.mockResolvedValue(preview('running', []))
+    const { unmount } = renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    unmount()
+    expect(api.cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+  })
+
+  it('closing after the preview finished cancels nothing', async () => {
+    const { unmount } = renderModal()
+    await reviewLinks()
+    await check()
+    await poll()
+    unmount()
+    expect(api.cancelUrlPreview).not.toHaveBeenCalled()
   })
 })
