@@ -42,22 +42,18 @@ const Present = lazy(() => import('./pages/present/Present'))
 // Certification runs in chat — /certification (old bookmarks, emails, links)
 // opens the workspace chat and starts or continues the course there.
 function CertificationRedirect() {
-  const { openPanel, openInChat, setMode } = useCertificationPanel()
+  const { openPanel, setMode } = useCertificationPanel()
   const navigate = useNavigate()
   useEffect(() => {
-    // The learning panel's pop-out button opens this route in a fresh window
-    // with ?panel=fullscreen; that one still shows the panel, full screen.
-    const popOut = new URLSearchParams(window.location.search).get('panel') === 'fullscreen'
-    if (popOut) {
-      setMode('fullscreen')
-      openPanel()
-    } else {
-      openInChat()
-    }
+    // /certification opens the learning panel; the pop-out button's
+    // ?panel=fullscreen opens it full screen in its own window. The chat
+    // course isn't reliable for every module yet, so it isn't the entry.
+    if (new URLSearchParams(window.location.search).get('panel') === 'fullscreen') setMode('fullscreen')
+    openPanel()
     navigate({
       to: '/',
       search: {
-        mode: popOut ? undefined : 'chat',
+        mode: undefined,
         tab: undefined,
         workflow: undefined,
         extraction: undefined,

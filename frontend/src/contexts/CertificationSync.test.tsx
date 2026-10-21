@@ -60,7 +60,7 @@ function renderSurfaces() {
     <ActivityRail />
   </CertificationPanelProvider>)
 }
-const badge = () => screen.getByRole('button', { name: 'Open certification in chat' })
+const badge = () => screen.getByRole('button', { name: 'Open certification' })
 async function expectSurfaces(panel: string, cta: string | null, badgeTitle: string) {
   await waitFor(() => expect(screen.getByLabelText('Panel course')).toHaveTextContent(panel))
   if (cta) expect(screen.getByRole('button', { name: cta })).toBeInTheDocument()

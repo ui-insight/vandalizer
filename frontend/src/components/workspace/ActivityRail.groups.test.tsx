@@ -41,7 +41,7 @@ vi.mock('../../hooks/useOpenActivity', () => ({
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast }) }))
 vi.mock('../shared/useConfirm', () => ({ useConfirm: () => vi.fn() }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
-  useCertificationPanel: () => ({ openInChat: vi.fn(), ...certification }),
+  useCertificationPanel: () => ({ openPanel: vi.fn(), ...certification }),
 }))
 
 import { ActivityRail } from './ActivityRail'

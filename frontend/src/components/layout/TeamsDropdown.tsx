@@ -2,7 +2,7 @@ import { adminAccess } from '../../lib/adminAccess'
 import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Inbox } from 'lucide-react'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
@@ -13,8 +13,6 @@ export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam, refreshTeams, error: teamsError } = useTeams()
   const { user, logout } = useAuth()
   const certPanel = useCertificationPanel()
-  const navigate = useNavigate()
-  const pathname = useRouterState({ select: state => state.location.pathname })
   const { count: pendingReviews } = useMyReviewCount()
   const [open, setOpen] = useState(false)
   const [teamSearch, setTeamSearch] = useState('')
@@ -241,10 +239,11 @@ export function TeamsDropdown() {
             role="menuitem"
             tabIndex={-1}
             onClick={() => {
-              // The course runs in chat; off the workspace, go there first.
-              certPanel.openInChat()
-              if (pathname !== '/') navigate({ to: '/', search: { mode: 'chat', tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined } })
-              // Don't restore focus to the trigger: the chat composer takes it.
+              // The learning panel, where progress, lessons, Check and Complete
+              // work the same for every module. The chat course isn't reliable
+              // for every module yet (support ticket), so it isn't the entry.
+              certPanel.openPanel()
+              // Don't restore focus to the trigger: the panel takes it.
               closeMenu(false)
             }}
             className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"

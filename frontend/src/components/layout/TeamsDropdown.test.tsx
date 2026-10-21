@@ -21,11 +21,13 @@ function open() { render(<><TeamsDropdown /><button>After menu</button></>); fir
 describe('account navigation', () => {
   it.each(['owner', 'admin'])('offers Team Admin for team %s', r => { role = r; open(); expect(screen.getByRole('menuitem', { name: 'Team Admin' })).toHaveAttribute('href', '/admin') })
   it('does not offer inaccessible admin navigation to examiners', () => { user.is_examiner = true; open(); expect(screen.queryByRole('menuitem', { name: /Admin|Analytics/ })).not.toBeInTheDocument(); expect(screen.getByRole('menuitem', { name: 'Shared items' })).toBeInTheDocument() })
-  it('opens certification in the workspace chat, not the learning panel', () => {
+  // Support ticket: the menu sent a kickoff message into chat, where results
+  // varied by model; the learning panel is the reliable way in for now.
+  it('opens the certification learning panel, not chat, from any page', () => {
     open(); fireEvent.click(screen.getByRole('menuitem', { name: 'Certification' }))
-    expect(router.openInChat).toHaveBeenCalledOnce(); expect(router.openPanel).not.toHaveBeenCalled(); expect(router.navigate).not.toHaveBeenCalled()
+    expect(router.openPanel).toHaveBeenCalledOnce(); expect(router.openInChat).not.toHaveBeenCalled(); expect(router.navigate).not.toHaveBeenCalled()
     cleanup(); router.pathname = '/admin'; open(); fireEvent.click(screen.getByRole('menuitem', { name: 'Certification' }))
-    expect(router.navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/', search: expect.objectContaining({ mode: 'chat' }) }))
+    expect(router.openPanel).toHaveBeenCalledTimes(2); expect(router.openInChat).not.toHaveBeenCalled(); expect(router.navigate).not.toHaveBeenCalled()
   })
   it('uses Admin for staff', () => { user.is_staff = true; open(); expect(screen.getByRole('menuitem', { name: 'Admin' })).toBeInTheDocument() })
   it('closes on Tab without preventing normal tab movement', () => { open(); const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }); fireEvent(screen.getAllByRole('menuitem')[0], event); expect(event.defaultPrevented).toBe(false); expect(screen.queryByRole('menu')).not.toBeInTheDocument() })

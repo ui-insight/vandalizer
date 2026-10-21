@@ -2,9 +2,10 @@ import type { CertificationProgress, CourseDefinition } from '../types/certifica
 import { MODULES as LEGACY_MODULES } from '../components/certification/modules'
 
 /**
- * The certification course runs in chat (certification tools + cards). Every
- * entry point — the /certification URL, the rail badge, the account menu, the
- * home CTA — opens it by sending one of these kickoff messages.
+ * Kickoff messages for the certification course in chat (certification tools
+ * + cards): the home CTA and chat cards send these. The account menu, rail
+ * badge and /certification URL open the learning panel instead until the
+ * chat course is reliable for every module.
  */
 export const START_CERTIFICATION_MESSAGE = 'Start the Vandalizer certification course — show me where to begin.'
 export const CONTINUE_CERTIFICATION_MESSAGE = 'Continue my certification — show my progress and the next module.'
