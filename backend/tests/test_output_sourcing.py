@@ -1002,6 +1002,26 @@ def test_what_a_label_s_brackets_scope_it_to(label, scopes):
     assert _scopes(label) == scopes
 
 
+def test_a_kind_of_party_is_not_sourced_to_its_negation():
+    """Seen in the MRI solicitation: "Accredited colleges and universities",
+    under Ph.D.-granting institutions, was linked to the Non-Ph.D.-granting
+    definition, which opens with the same words."""
+    doc = {"uuid": "rfa", "title": "MRI.pdf", "text_markers": [], "raw_text": (
+        "***Ph.D.-granting institutions of higher education*** are accredited colleges and universities that have "
+        "awarded more than 20 Ph.D. or D.Sc. degrees in NSF-supported fields.\n\n"
+        "***Non-Ph.D.-granting institutions of higher education*** are accredited colleges and universities "
+        "(including two-year community colleges) that award Associate's degrees.\n"
+    )}
+    md = ("### Eligible Institutions\n- **Ph.D.-granting institutions of higher education**\n"
+          "  - Compliance: Accredited colleges and universities\n")
+    wrong = Judge(("Accredited", "two-year", "accredited colleges and universities (including two-year community colleges)"),
+                  retry_rules=())
+    result = _trace({"final": md}, wrong, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"].get("subject_differs") == 1
+    right = Judge(("Accredited", "more than 20", "accredited colleges and universities that have awarded more than 20"))
+    assert len(_links(_trace({"final": md}, right, docs=[doc]), "final")) == 1
+
+
 def test_a_deadline_for_one_stage_is_not_sourced_to_another_s():
     """Seen in the NSF NHERI run: the full proposal deadline's "Due by 5 p.m.
     proposer's local time" linked to the letter of intent's due date — the

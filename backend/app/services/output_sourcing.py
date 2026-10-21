@@ -672,6 +672,31 @@ def party_unbound(st: Statement, sentence: str) -> bool:
     return bool(_PARTY_LABEL_RE.search(field_label(st))) and not _BOUND_TO_THIS_RE.search(sentence)
 
 
+def _letters(text: str) -> str:
+    return re.sub(r"[^a-z]", "", (text or "").lower())
+
+
+def negation_differs(st: Statement, sentence: str) -> bool:
+    """Whether a statement about one kind of party is sourced to a sentence
+    about its negation only — "Ph.D.-granting" and "Non-Ph.D.-granting
+    institutions", "U.S." and "non-U.S. institutions", "profit" and
+    "non-profit organizations". The kind is the list item or table row the
+    statement sits under, or the statement itself. Seen in the MRI
+    solicitation: "Accredited colleges and universities", a criterion of
+    Ph.D.-granting institutions, was linked to "Non-Ph.D.-granting
+    institutions of higher education are accredited colleges and
+    universities…"; a separate check said yes, twice."""
+    have = _letters(sentence)
+    row = st.label.split(" — ")[0] if " — " in (st.label or "") else ""
+    for subject in (st.context[-1] if st.context else "", row, st.text):
+        kind = _letters(" ".join(re.findall(r"[A-Za-z][\w.'-]*", subject)[:3]))
+        if len(kind) < 6 or kind.startswith("non"):
+            continue
+        if "non" + kind in have and have.replace("non" + kind, "").find(kind) == -1:
+            return True
+    return False
+
+
 # The stages of a submission, each with its own deadline and rules.
 _STAGES = (
     ("loi", re.compile(r"\b(?i:letters? of intent)\b|\bLOIs?\b")),
@@ -1630,7 +1655,7 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         return Verdict(None, "rule_applies_only_if", where)
     if st_values and not _bound(st_values, shared, exact, values_in(exact)):
         return Verdict(None, "value_not_bound_to_label", where)
-    if subject_differs(st, sentence):
+    if subject_differs(st, sentence) or negation_differs(st, sentence):
         return Verdict(None, "subject_differs", where)
     if party_unbound(st, sentence):
         return Verdict(None, "party_not_bound", where)
@@ -1691,16 +1716,6 @@ def widen_to_statement(
         if len(have) / len(words) >= CONFIRM_BELOW:
             break
         best, gain = None, 0
-        # The start of its sentence and the one before it — first, so a tie
-        # takes in the label line an excerpt sits under ("Limit on Number of
-        # Proposals per Organization:" over "There are no restrictions or
-        # limits."), not the next field's.
-        b = start
-        a = _sentence_start(text, max(lo, b - 1), lo)
-        if b > a and end - a <= MAX_QUOTE_CHARS and same_page(a):
-            g = len((stems(text[a:b]) & words) - have)
-            if g > gain:
-                best, gain = (a, end), g
         # The rest of the excerpt's sentence and the one after it.
         a = end
         stops = [i for i in (text.find(". ", a), text.find("\n", a)) if i != -1 and i < hi]
@@ -1709,6 +1724,17 @@ def widen_to_statement(
             g = len((stems(text[a:b]) & words) - have)
             if g > gain:
                 best, gain = (start, b), g
+        # The start of its sentence and the one before it. On a tie, the
+        # label an excerpt sits under ("Limit on Number of Proposals per
+        # Organization:" over "There are no restrictions or limits.") wins
+        # over the next field's.
+        b = start
+        a = _sentence_start(text, max(lo, b - 1), lo)
+        if b > a and end - a <= MAX_QUOTE_CHARS and same_page(a):
+            g = len((stems(text[a:b]) & words) - have)
+            label = _MARKUP_RE.sub("", text[a:b]).rstrip().endswith(":")
+            if g > gain or (g == gain and g > 0 and label):
+                best, gain = (a, end), g
         if best is None:
             break
         start, end = best
