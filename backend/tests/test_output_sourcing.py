@@ -125,6 +125,8 @@ class Judge:
             return json.dumps({"items": out})
         passages = dict(_PASSAGE_RE.findall(prompt))
         retry = instructions.endswith(RETRY_NOTE)
+        for it in items:
+            it["offered"] = [passages[p] for p in it["passages"]]
         (self.retried if retry else self.asked).extend(items)
         out = []
         for it in items:
@@ -503,9 +505,35 @@ def test_formatting_marks_do_not_count_but_words_still_must_match():
         "All grants require matching contributions equal to or greater than the FFAR** **funding request.",
         "P.I. and Key Personnel Biosketch</u>: three-page limit per individual",
     ]
-    spliced = Judge(("matching contributions", "All grants", "All grants require matching contributions ... funding request."))
-    result = _trace({"final": {"cost_sharing": "All grants require matching contributions."}}, spliced, docs=[doc])
-    assert _links(result, "final") == []
+
+
+def test_an_excerpt_cut_with_an_ellipsis_is_checked_piece_by_piece_and_confirmed_whole():
+    """Seen in the NSF NHERI run, on seven of its section summaries: "Each
+    Awardee will operate with a Science Plan that supports the NHERI vision
+    ... The Science Plan should outline: …" — what the report condensed
+    runs over several sentences, and the judge cut the excerpt to fit. Each
+    piece must be the passage's, word for word and in order; the highlight
+    covers the whole stretch, and a separate call must confirm it states
+    the statement."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "Budget\n- **All grants require matching contributions equal to or greater than the FFAR** "
+        "**funding request.** Matching funds must come from a non-U.S. Federal entity.\n"
+    )}
+    cut = "All grants require matching contributions ... funding request."
+    statement = {"cost_sharing": "All grants require matching contributions."}
+    judge = Judge(("matching contributions", "All grants", cut))
+    [(_, src)] = _links(_trace({"final": statement}, judge, docs=[doc]), "final")
+    assert src["quote"] == "All grants require matching contributions equal to or greater than the FFAR** **funding request."
+    assert [it["excerpt"] for it in judge.confirm_asked] == [src["quote"]]
+    assert "pieced" not in src and "judge_quote" not in src
+    refused = Judge(("matching contributions", "All grants", cut), confirm=lambda item: False)
+    result = _trace({"final": statement}, refused, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"] == {"not_confirmed": 1}
+    # Pieces out of order, or a piece of one word, are not the passage's.
+    for bad in ("funding request ... All grants require matching contributions",
+                "All grants require matching contributions ... request."):
+        result = _trace({"final": statement}, Judge(("matching contributions", "All grants", bad)), docs=[doc])
+        assert _links(result, "final") == [] and result["reasons"] == {"quote_not_in_passage": 1}
 
 
 def test_an_excerpt_must_say_most_of_a_longer_statement():
@@ -692,6 +720,384 @@ def test_a_sponsor_needs_a_sentence_that_ties_it_to_this_opportunity(sentence, l
     assert party_unbound(Statement(0, 0, "x", label="sponsor name"), sentence) is not linked
     # Only a sponsor's or funder's label asks it.
     assert party_unbound(Statement(0, 0, "x", label="Recipient"), sentence) is False
+
+
+# The NSF NHERI solicitation: the proposal's required documents in one
+# list (p. 2), and a facility's duty that uses the same words (p. 1).
+NHERI_PARTS = _doc("nheri3", "NHERI.pdf", [
+    "*Data Management Infrastructure:* Implement a facility data management plan*,* which meets the CI Awardee "
+    "requirements for data and metadata protocols and formats, archiving, curating, and retrieval.\n" + FILLER,
+    "The GPG requires submission of: Project Summary; Project Description; References Cited; Budget; Budget "
+    "Justification; Current and Pending Support; Data Management Plan; and Postdoctoral Mentoring Plan, if "
+    "applicable.\n" + FILLER,
+    "**Budget Preparation Instructions:**\n\nIn the budget justification, provide a list of all organizations that "
+    "will receive less than $50,000 annually and the annual support provided to each organization.\n" + FILLER,
+])
+PARTS_TABLE = (
+    "## APPLICATION COMPONENTS\n\n| Component | Description / Details |\n|---|---|\n"
+    "| Data Management Plan | Data Management Plan |\n"
+    "| Subaward Documents (if applicable) | Budget Justification; Specific Scope of Work |\n"
+)
+
+
+def test_a_part_of_a_submission_links_only_where_the_passage_gives_it_as_one():
+    """Seen in the NSF NHERI run: "Data Management Plan", a required
+    component, was linked to a facility's duty to "Implement a facility data
+    management plan"; "Budget Justification", one of a subaward's documents,
+    to "In the budget justification, provide a list of all organizations…".
+    A name in the report's list of parts links where the passage lists it,
+    heads a section with it, or asks for it. A refusal earns a second look,
+    never at the refused passage — here it finds the list."""
+    judge = Judge(
+        ("Data Management Plan", "Implement a facility",
+         "Implement a facility data management plan, which meets the CI Awardee requirements"),
+        ("Budget Justification", "In the budget justification",
+         "In the budget justification, provide a list of all organizations"),
+        retry_rules=(
+            ("Data Management Plan", "GPG requires", "Current and Pending Support; Data Management Plan; and Postdoctoral"),
+            ("Budget Justification", "GPG requires", "Budget; Budget Justification; Current and Pending Support"),
+        ),
+    )
+    result = _trace({"final": PARTS_TABLE}, judge, docs=[NHERI_PARTS])
+    linked = {PARTS_TABLE[r["s"]:r["e"]]: src for r, src in _links(result, "final")}
+    # The component, on its second look, from the list.
+    assert linked["Data Management Plan"]["page"] == 2
+    assert not any("Implement a facility" in p for it in judge.retried for p in it["offered"])
+    # The subaward's document: the list is the proposal's, not a subaward's.
+    assert "Budget Justification" not in linked
+    assert result["reasons"].get("label_not_in_passage") == 1
+
+
+@pytest.mark.parametrize("part, passage, presented", [
+    ("Data Management Plan",
+     "The GPG requires submission of: Project Summary; Budget; Data Management Plan; and Postdoctoral Mentoring Plan.", True),
+    ("Facilities, Equipment & Other Resources", "…Supplementary Documentation sections. **FACILITIES, EQUIPMENT, AND "
+     "OTHER RESOURCES** In this section of the proposal, include the descriptions below.", True),
+    ("Budget Justification", "**2. Budget and Budget Justification.** Provide standard yearly budgets.", True),
+    ("Data Management Plan", "- Data Management Plan", True),
+    ("Budget Form", "(*up to 5000 words)* o <u>Budget Form</u> o <u>P.I. and Key Personnel Biosketch</u>: three-page limit", True),
+    ("P.I. and Key Personnel Biosketch", "o <u>Budget Form</u> o <u>P.I. and Key Personnel Biosketch</u>: three-page limit", True),
+    ("Mentoring Plan", "Data Management Plan; and Postdoctoral Mentoring Plan, if applicable.", True),
+    ("Project Personnel and Partner Institutions",
+     "*1. (required) A list of Project Personnel and Partner Institutions (required. Note: …):*", True),
+    ("Broadening Participation in Computing (BPC) Plan",
+     "*5. Broadening Participation in Computing (BPC) Plans for projects with budgets greater than $600,000:*", True),
+    ("Data Management Plan", "The full proposal must include a data management plan for each of the five years.", True),
+    ("Data Management Plan", "A Data Management Plan (DMP) is required for all proposals.", True),
+    ("Data Management Plan", "In the Data Management Plan section, describe how data will be shared.", True),
+    ("Data Management Plan",
+     "*Data Management Infrastructure:* Implement a facility data management plan*,* which meets the CI requirements.", False),
+    ("Data Management Plan", "Reviewers will read the data management plan as part of intellectual merit.", False),
+    ("Data Management Plan", "Data management plan costs are allowable.", False),
+    ("Principal Investigator", "Any individual with the skills necessary may apply as Program "
+     "Director(s)/Principal Investigator(s) through their home institution.", True),
+    ("Co-Principal Investigator", "Eligible individuals: Co-Principal Investigators; Senior Personnel.", True),
+    # The subject of a sentence about something else.
+    ("Principal Investigator", "Pre-award costs. Principal Investigator or organization that makes financial "
+     "commitments in the absence of a grant does so at their own risk.", False),
+    ("Budget", "**The budget request must be commensurate with the** **complexity of the project.**", False),
+    ("Mentoring Plan", "reviewers will also review the Data Management and Sharing Plan and the Mentoring Plan, as appropriate.", False),
+])
+def test_how_a_passage_gives_a_part_of_a_submission(part, passage, presented):
+    from app.services.output_sourcing import item_name, presented_as_item
+    from app.services.output_statements import Statement
+
+    name = item_name(Statement(0, 0, part, label="required components — name"))
+    assert name and presented_as_item(name, passage, 0, len(passage)) is presented
+
+
+def test_only_a_bare_name_in_a_list_of_parts_is_a_part():
+    from app.services.output_sourcing import item_name
+    from app.services.output_statements import Statement
+
+    def name(text, label, context=()):
+        return item_name(Statement(0, 0, text, label=label, context=context))
+
+    assert name("Data Management Plan", "Data Management Plan — Description / Details", ("APPLICATION COMPONENTS",))
+    assert name("Budget Justification", "required components — name")
+    assert name("Facilities/Equipment if applicable", "Subaward Documents (if applicable) — Description / Details")
+    # Who may take part is a list of names too.
+    assert name("Principal Investigator", "", ("ELIGIBILITY", "Eligible Individuals"))
+    # A sentence, a description, a value, or a list that is not of parts.
+    assert not name("Proposals may be submitted via Research.gov", "SUBMISSION DETAILS — required components")
+    assert not name("Biographical Sketch(es) following NSF GPG format", "required components — description")
+    assert not name("Form 1 (two pages)", "required components — name")
+    assert not name("Bureau of Land Management", "Sponsor")
+
+
+def test_values_under_one_label_are_bound_to_it():
+    """Seen on the NSF solicitations. Docling writes the label, a blank line,
+    then the values; a range's start sits between its end and its label;
+    one submission window per line sits under one heading; and a list of
+    CFDA numbers runs down the page under "Number(s):"."""
+    from app.services.output_sourcing import _bound, values_in
+
+    def bound(statement, label, quote):
+        shared = (stems(statement) | stems(label)) & stems(quote)
+        return _bound(values_in(statement), shared, quote, values_in(quote))
+
+    cfda = "**Applicable Catalog of Federal Domestic Assistance (CFDA) Number(s):**\n\n47.041 --- Engineering"
+    assert bound("47.041", "CFDA Number", cfda)
+    window = "Submission Window Date(s) (due by 5 p.m. submitter's local time): January 16, 2023 - February 21, 2023"
+    assert bound("2023-02-21", "Submission Window End — Date / Time", window)
+    windows = ("Submission Window Date(s) (due by 5 p.m. submitter's local time):\n\n"
+               "January 16, 2023 - February 21, 2023\n\nOctober 16, 2023 - November 15, 2023\n\n"
+               "October 15, 2024 - November 15, 2024")
+    assert bound("2024-10-15", "Submission Window Start — Date / Time", windows)
+    # The MRI solicitation writes them on one line.
+    assert bound("2024-10-15", "Submission Window Start — Date / Time", windows.replace("\n\n", " "))
+    many = cfda + "\n47.049 --- Mathematical and Physical Sciences\n47.050 --- Geosciences"
+    assert bound("47.041, 47.049, 47.050", "CFDA Number", many)
+    # Still refused: labels in one block and figures in another…
+    form = " TOTAL DIRECT COSTS \nINDIRECT COSTS     \nTOTAL APPROVED BUDGET\nFederal Share \n82,275.30\n14,398.18\n96,673.48"
+    assert not bound("96,673.48", "Total Direct Costs", form)
+    # …a list under a heading of one thing, and a figure the statement does not name.
+    assert not bound("2024-10-15", "Submission Window Start — Date / Time", windows.replace("Date(s)", "Date"))
+    assert not bound("47.050", "CFDA Number", many)
+
+
+def test_bare_figures_are_read_with_the_label_line_above_them():
+    """Seen in three NSF solicitations: the judge copied "47.041 ---
+    Engineering…" and not "Applicable Catalog of Federal Domestic
+    Assistance (CFDA) Number(s):" above it — no word of the label, so no
+    link. The label line above figures copied alone is read with them."""
+    doc = {"uuid": "nsf", "title": "nsf14579.pdf", "text_markers": [], "raw_text": (
+        "Cognizant Program Officer(s): see the program page.\n\n"
+        "**Applicable Catalog of Federal Domestic Assistance (CFDA) Number(s):**\n\n"
+        "47.041 --- Engineering\n47.049 --- Mathematical and Physical Sciences\n\n**Award Information**\n"
+    )}
+    judge = Judge(("47.041", "47.041", "47.041 --- Engineering\n47.049 --- Mathematical and Physical Sciences"))
+    result = _trace({"final": "**CFDA Number:** 47.041, 47.049\n"}, judge, docs=[doc])
+    [(_, src)] = _links(result, "final")
+    assert src["quote"].startswith("**Applicable Catalog of Federal Domestic Assistance (CFDA) Number(s):**")
+    # Not for a statement that says more than a figure.
+    judge = Judge(("Engineering", "47.041", "47.041 --- Engineering"))
+    result = _trace({"final": "The CFDA number for the engineering directorate is 47.041 and it covers design."}, judge, docs=[doc])
+    assert _links(result, "final") == []
+
+
+def test_a_pointer_glued_onto_a_cell_is_not_part_of_its_statement():
+    """Seen in the SaTC run: the checklist appends "**See required structure
+    below.**" to a component's requirements with no period between, so
+    the page limit could never be traced."""
+    md = ("| Component | Special Requirements |\n|---|---|\n"
+          "| Project Description | Page limit: 15 pages (RES/EDU), 10 pages (SEED) **See required structure below.** |\n")
+    _, stmts = split_output(md)
+    assert [(s.text, md[s.start:s.end]) for s in stmts] == [
+        ("Page limit: 15 pages (RES/EDU), 10 pages (SEED)", "Page limit: 15 pages (RES/EDU), 10 pages (SEED)"),
+    ]
+
+
+@pytest.mark.parametrize("text, keys", [
+    ("up to five pages", ["num:5"]),
+    ("maximum of two proposals", ["num:2"]),
+    ("twenty-five percent", ["num:25"]),
+    ("Two-page biographical sketches", ["num:2"]),
+    ("no longer than a single page", ["num:1"]),
+    ("someone often", []),
+])
+def test_a_number_written_as_a_word_is_its_figure(text, keys):
+    assert [v.key for v in values_in(text) if v.kind == "num"] == keys
+
+
+def test_a_figure_the_excerpt_writes_in_words_needs_no_digits():
+    """Seen in the SaTC solicitation: "Required if budget >$600,000 and >1 PI"
+    against "required for all projects with more than one PI and a budget of
+    more than $600,000" — the same values; the digit check had refused it."""
+    from app.services.output_sourcing import _values_supported
+
+    quote = "required for all projects with more than one PI and a budget of more than $600,000"
+    assert _values_supported(values_in("Required if budget >$600,000 and >1 PI"), quote, values_in(quote))
+    assert not _values_supported(values_in("Required if budget >$600,000 and >2 PIs"), quote, values_in(quote))
+
+
+def test_a_statement_s_number_word_is_found_as_a_figure():
+    """Seen on the Seeding Solutions and NHERI solicitations: "references up
+    to 5 pages" against "…up to five pages", and "maximum of two proposals
+    per institution" against "Limit on Number of Proposals per
+    Organization: 2"."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "**Limit on Number of Proposals per Organization:** 2\n\nAn academic institution may submit proposals.\n"
+    )}
+    judge = Judge(("two proposals", "Limit on Number", "Limit on Number of Proposals per Organization:** 2"))
+    result = _trace({"final": {"limited_submission": "maximum of two proposals per institution"}}, judge, docs=[doc])
+    assert len(_links(result, "final")) == 1
+    judge = Judge(("two proposals", "Limit on Number", "Limit on Number of Proposals per Organization:** 2"))
+    result = _trace({"final": {"limited_submission": "maximum of three proposals per institution"}}, judge, docs=[doc])
+    assert _links(result, "final") == []
+
+
+def test_a_field_named_in_the_announcement_s_own_words_is_about_its_label():
+    """Seen in the NSF NHERI run: "Funding Instrument: Cooperative Agreement"
+    against "Anticipated Type of Award: Cooperative Agreement" — no word of
+    the label in the passage, so the short statement was refused."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "**Anticipated Type of Award:** Cooperative Agreement **Estimated Number of Awards:** 3\n"
+    )}
+    judge = Judge(("Cooperative", "Type of Award", "Anticipated Type of Award:** Cooperative Agreement"))
+    result = _trace({"final": {"funding_instrument": "Cooperative Agreement"}}, judge, docs=[doc])
+    assert len(_links(result, "final")) == 1
+    result = _trace({"final": {"sponsor_contact": "Cooperative Agreement"}}, judge, docs=[doc])
+    assert _links(result, "final") == []
+
+
+def test_a_sentence_is_not_role_checked_against_the_heading_it_sits_under():
+    """Seen on the NSF RUI solicitation: "Proposals may be submitted via
+    Research.gov or Grants.gov", under "SUBMISSION DETAILS", was asked
+    whether the passage made it a submission detail — twice no."""
+    from app.services.output_sourcing import label_names_role
+    from app.services.output_statements import Statement
+
+    assert not label_names_role(Statement(0, 0, "Proposals may be submitted via Research.gov or Grants.gov",
+                                          context=("SUBMISSION DETAILS",)))
+    assert label_names_role(Statement(0, 0, "Bureau of Land Management", label="Sponsor"))
+    assert label_names_role(Statement(0, 0, "Not required", label="Cost sharing"))
+
+
+# The NSF NHERI solicitation defines its components, then lists each one's
+# milestones in the same words: the RAPID Facility's on p. 2, the EF's on
+# p. 3.
+NHERI_MILESTONES = _doc("nheri4", "NHERI.pdf", [
+    "NHERI comprises a Network Coordination Office (NCO), Experimental Facilities (EF), and a Post-Disaster, "
+    "Rapid Response Research (RAPID) Facility.\n" + FILLER,
+    "*Key Milestones*\n\nWithin three months of award, External Steering Committee formed and held its first meeting. "
+    "By end of fourth month of award, Software Development and Lifecycle Management Plan updated. By end of sixth "
+    "month of award, Scheduling process implemented with the NCO.\n" + FILLER,
+    "Submission to the NSF of the user fees and recharge rates for the EF. By end of fourth month of award, Software "
+    "Development and Lifecycle Management Plan updated. By end of sixth month of award, EF scheduling implemented "
+    "with the NCO.\n" + FILLER,
+])
+
+
+def test_a_component_s_row_links_only_where_the_text_names_that_component():
+    """Seen in the NSF NHERI run: rows for one component were linked to
+    another's milestones, written in the same words. A bare time ("by end of
+    sixth month of award") scoped to the EF, and a statement that names the
+    EF, need the EF named where they are linked."""
+    table = ("| Milestone | Date / Time | Notes |\n|---|---|---|\n"
+             "| By end of sixth month of award (EF) | by end of sixth month of award | — |\n"
+             "| By end of fourth month of award | — | Milestone: Software Development and Lifecycle Management Plan updated for EF |\n")
+    wrong = Judge(("sixth month", "Scheduling process", "By end of sixth month of award, Scheduling process implemented with the NCO."),
+                  ("updated for EF", "Steering Committee", "By end of fourth month of award, Software Development and Lifecycle Management Plan updated."),
+                  retry_rules=())
+    result = _trace({"final": table}, wrong, docs=[NHERI_MILESTONES])
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"scope_missing": 2}
+    right = Judge(("sixth month", "EF scheduling", "By end of sixth month of award, EF scheduling implemented with the NCO."),
+                  ("updated for EF", "recharge rates", "By end of fourth month of award, Software Development and Lifecycle Management Plan updated."))
+    result = _trace({"final": table}, right, docs=[NHERI_MILESTONES])
+    assert sorted(src["page"] for _, src in _links(result, "final")) == [3, 3]
+
+
+@pytest.mark.parametrize("label, scopes", [
+    ("By end of sixth month of award (EF) — Notes", [{"EF"}]),
+    ("Within three months of award (Rapid Facility) — Date / Time", [{"rapid"}]),
+    ("Full Proposal Target Date (September recurring) — Notes", []),
+    ("Collaborators & Other Affiliations (COA) — Description", []),
+    ("Eligible institutions — Predominantly Undergraduate Institutions (PUIs)", []),
+])
+def test_what_a_label_s_brackets_scope_it_to(label, scopes):
+    from app.services.output_sourcing import _scopes
+
+    assert _scopes(label) == scopes
+
+
+def test_a_deadline_for_one_stage_is_not_sourced_to_another_s():
+    """Seen in the NSF NHERI run: the full proposal deadline's "Due by 5 p.m.
+    proposer's local time" linked to the letter of intent's due date — the
+    separate role check said yes, twice."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "**Letter of Intent Due Date(s) *(required)*** (due by 5 p.m. proposer's local time)***:*** October 16, 2015 "
+        "**Full Proposal Deadline(s)** (due by 5 p.m. proposer's local time): November 04, 2015\n"
+    )}
+    md = "| Deadline | Notes |\n|---|---|\n| Full Proposal Deadline | Due by 5 p.m. proposer's local time |\n"
+    loi = Judge(("Due by", "Letter of Intent", "Letter of Intent Due Date(s) *(required)*** (due by 5 p.m. proposer's local time)***:*** October 16, 2015"),
+                retry_rules=())
+    result = _trace({"final": md}, loi, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"] == {"stage_differs": 1}
+    full = Judge(("Due by", "Full Proposal", "Full Proposal Deadline(s)** (due by 5 p.m. proposer's local time): November 04, 2015"))
+    assert len(_links(_trace({"final": md}, full, docs=[doc]), "final")) == 1
+
+
+def test_how_strongly_a_clause_asks_is_read_from_its_whole_sentence():
+    """Seen in the NSF NHERI run: "Full proposal must be received by FastLane
+    no later than 4:59 p.m." linked to the clause "to receive a FastLane
+    submittal stamped time no later than … 4:59 pm" of a sentence that says
+    proposers are "strongly encouraged" to — a confirmation said yes."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "To ensure that this deadline is met, proposers are strongly encouraged to submit the full proposal to receive "
+        "a FastLane submittal stamped time no later than November 4, 2015, 4:59 pm proposer's local time.\n"
+    )}
+    judge = Judge(("must be received", "FastLane submittal",
+                   "to receive a FastLane submittal stamped time no later than November 4, 2015, 4:59 pm proposer's local time"))
+    result = _trace({"final": {"notes": "Full proposal must be received by FastLane no later than 4:59 p.m. local time"}},
+                    judge, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"] == {"obligation_differs": 1}
+
+
+def test_an_excerpt_may_run_a_little_past_its_passage_s_edge():
+    """Seen in the NSF NHERI run: the passage the judge read ended at "…for up
+    to ten additional project", and its excerpt finished the sentence. Mostly
+    inside the passage and the rest word for word, it is checked there."""
+    from app.services.output_statements import Statement
+
+    sentence = "Two-page biographical sketches, following the NSF GPG format, for up to ten additional project personnel."
+    text = ("Recipients shall comply with the general terms of this agreement. " * 9 + "Applicants must read this notice. "
+            + sentence + " " + "More text follows on this same line without a break. " * 5 + "\n" + FILLER)
+    corpus = Corpus([{"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": text}], [])
+    w = corpus.windows[0]
+    at = text.index(sentence)
+    assert at < w.end < at + len(sentence)
+    st = Statement(0, 0, "Biographical Sketch(es) following NSF GPG format",
+                   label="required components — Biographical Sketch(es) — description")
+    assert verify(st, corpus, 0, sentence).link["quote"] == sentence
+    # Mostly past the edge, it is not this passage's.
+    assert verify(st, corpus, 0, text[w.end - 10:w.end + 140]).reason == "quote_not_in_passage"
+
+
+def test_a_short_cell_needs_its_row_named_where_it_links():
+    """Seen in the NSF RUI solicitation: the RUI Impact Statement's "PDF
+    format" was linked to the Certification of RUI/ROA Eligibility's "…should
+    be scanned and included as a searchable PDF file"; a separate check said
+    yes, twice."""
+    doc = {"uuid": "rfa", "title": "RFA.pdf", "text_markers": [], "raw_text": (
+        "**Certification of RUI/ROA Eligibility.** A current, signed Certification should be scanned and included "
+        "in searchable PDF format.\n\n**RUI Impact Statement.** The RUI Impact Statement must be uploaded in PDF "
+        "format, up to five pages.\n"
+    )}
+    md = "| Component | Special Requirements |\n|---|---|\n| RUI Impact Statement | PDF format |\n"
+    wrong = Judge(("PDF format", "Certification", "should be scanned and included in searchable PDF format"), retry_rules=())
+    result = _trace({"final": md}, wrong, docs=[doc])
+    assert _links(result, "final") == [] and result["reasons"] == {"label_not_in_passage": 1}
+    right = Judge(("PDF format", "Impact Statement must", "The RUI Impact Statement must be uploaded in PDF format"))
+    assert len(_links(_trace({"final": md}, right, docs=[doc]), "final")) == 1
+
+
+def test_a_highlight_grows_back_to_the_label_it_sits_under_before_the_next_field():
+    """Seen in the NSF RUI solicitation: "There are no restrictions or
+    limits." grew into the next field's "Limit on Number of Proposals per PI
+    or co-PI: …" rather than its own "…per Organization:"."""
+    from app.services.output_sourcing import widen_to_statement
+
+    text = ("**Limit on Number of Proposals per Organization:** There are no restrictions or limits. "
+            "**Limit on Number of Proposals per PI or co-PI:** The number of allowed proposals per PI varies by program.")
+    start = text.index("There are")
+    end = start + len("There are no restrictions or limits.")
+    a, b = widen_to_statement(text, start, end, 0, len(text),
+                              stems("no restrictions or limits on number of proposals per institution"),
+                              same_page=lambda _: True)
+    assert text[a:b] == "**Limit on Number of Proposals per Organization:** There are no restrictions or limits."
+
+
+def test_a_numbered_track_is_not_advice():
+    """Seen in the MRI solicitation: "Track 1 requests >$100,000 and
+    <$1,400,000…" read as the imperative "Track", then refused for the
+    condition in its own rule."""
+    from app.services.output_sourcing import is_action
+    from app.services.output_statements import Statement
+
+    assert not is_action(Statement(0, 0, "Track 1 requests >$100,000 and <$1,400,000", label="Funding Limits"))
+    assert is_action(Statement(0, 0, "Track the purchase against the award", label=""))
 
 
 MRI = _doc("mri", "MRI.pdf", [
@@ -1062,16 +1468,27 @@ def test_a_link_the_first_look_found_needs_no_confirmation():
     assert judge.retried == [] and judge.confirm_asked == []
 
 
-@pytest.mark.parametrize("judge, reason", [
-    # A refusal on what the excerpt says is not tried again.
-    (Judge(RECIPIENT, role=lambda item, n: False), "role_not_shown"),
-    (Judge(("Southern Utah", "Recipient:", "Recipient: Southern Utah University")), None),
-])
-def test_only_a_miss_the_judge_could_have_avoided_gets_a_second_look(judge, reason):
-    result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
+def test_only_a_miss_the_judge_could_have_avoided_gets_a_second_look():
+    # A refusal on how strongly the excerpt asks is not tried again: the
+    # same excerpt would be found.
+    judge = Judge(("Subawards", "may include", CLAUSE_QUOTE))
+    result = _trace({"final": "Subawards over $50,000 performed outside the United States must include this clause."},
+                    judge, docs=[CLAUSE])
+    assert judge.retried == [] and result["reasons"] == {"obligation_differs": 1}
+    # Nor is a link.
+    judge = Judge(RECIPIENT)
+    _trace({"final": {"recipient": "Southern Utah University"}}, judge)
     assert judge.retried == []
-    if reason:
-        assert result["reasons"] == {reason: 1}
+
+
+def test_a_link_refused_for_what_its_passage_is_about_gets_a_second_look_elsewhere():
+    """A role, a sponsor or a part of a submission the refused passage does
+    not give may be given by another. The second look is never offered the
+    refused passage; when nothing else states it, the refusal stands."""
+    judge = Judge(RECIPIENT, role=lambda item, n: False)
+    result = _trace({"final": {"recipient": "Southern Utah University"}}, judge)
+    assert result["reasons"] == {"role_not_shown": 1}
+    assert not any("Recipient: Southern Utah University" in p for it in judge.retried for p in it["offered"])
 
 
 def test_the_deliverable_is_checked_first_and_from_the_top():

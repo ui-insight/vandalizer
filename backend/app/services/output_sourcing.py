@@ -7,30 +7,43 @@ run. A statement is linked only when all of these hold:
 
 1. a temperature-0 judge, shown the statement and a few candidate passages,
    says one passage itself states it, and copies the excerpt that does;
-2. that excerpt is in the passage the judge named, contiguous and verbatim
-   (after folding case, whitespace, dashes and quotes, and ignoring the
-   ``**``/``<u>`` formatting marks a text extractor writes) — checked here,
-   not taken on the model's word, and an excerpt found twice there on
-   different pages is refused, since it cannot say which page it means. An
-   ellipsis at either end is dropped (one inside fails the check); an
-   excerpt that is not in the named passage but is, word for word, in
-   exactly one place among the other passages offered for the statement
-   is checked there instead. A statement of several words that is itself
-   word for word in a source must link to that place;
+2. that excerpt is in the passage the judge named, verbatim (after folding
+   case, whitespace, dashes and quotes, and ignoring the ``**``/``<u>``
+   formatting marks a text extractor writes) — checked here, not taken on
+   the model's word, and an excerpt found twice there on different pages
+   is refused, since it cannot say which page it means. An ellipsis at
+   either end is dropped; an excerpt the judge cut with one inside counts
+   only when every piece is there, in order, within one page — then the
+   whole stretch is shown and a separate call must confirm it. An excerpt
+   that is not in the named passage but is, word for word, in exactly one
+   place among the other passages offered for the statement is checked
+   there instead. A statement of several words that is itself word for
+   word in a source must link to that place;
 3. every number, date, identifier and section number ("F.2") in the
    statement is in the excerpt as the same value
    (``extraction_sources.value_supported_by_quote`` plus the
-   date/time/percent forms it does not cover);
+   date/time/percent forms it does not cover; "two" is 2);
 4. the excerpt shares a content word with the statement or its label, says
    most of a statement of several words (not just its subject's name), the
-   passage is about what a one- or two-word statement's label names, and
+   passage is about what a one- or two-word statement's label names (or a
+   field it names otherwise: "Type of Award" for "Funding Instrument"), and
    for a statement with values, a shared word sits on a value's own line or
    the line before it with no other figure of the same kind in between —
    a form that lists labels in one block and figures in another cannot say
-   which figure is the "Total Direct Costs", and is refused; and an excerpt
-   that only says a thing may or should be done does not source a
-   statement that it must (nor "must" an "optional"; see
-   ``obligation_differs``);
+   which figure is the "Total Direct Costs", and is refused, while the far
+   end of a range, a list under a plural heading ("Submission Window
+   Date(s): …") and a list of the statement's own figures are not "other
+   figures". An excerpt that only says a thing may or should be done, in
+   itself or in its sentence, does not source a statement that it must
+   (nor "must" an "optional"; see ``obligation_differs``). A part of a
+   submission named in the report's list of parts ("Data Management Plan")
+   links only where the passage lists it, heads a section with it or asks
+   for it (``presented_as_item``); a statement about one stage (the letter
+   of intent, the full proposal) is not sourced to another's; a statement
+   that names one part of a program by its abbreviation ("RAPID Facility
+   certification…") needs that part named where it links, and so does a
+   row scoped to one ("By end of sixth month of award (EF)") when nothing
+   else ties it there;
 5. the page is the engine's: the document's ``text_markers`` at the
    excerpt's offset, keeping the estimated-page flag for scans;
 6. for a statement of a few words whose label says what it is in words of
@@ -46,7 +59,10 @@ run. A statement is linked only when all of these hold:
 
 A Markdown statement is judged with the headings and list items above it
 (``Statement.context``), and a statement with no label of its own is
-gated by the one it sits directly under (``field_label``).
+gated by the one it sits directly under (``field_label``). A first look
+that misses gets a second look with more passages; one refused for what
+its passage is about (a role, a sponsor, a part, a stage, a component) gets
+a second look at other passages only.
 
 Anything else — no candidate passage, a judge error, a check that fails —
 leaves the statement plain. Nothing here changes an output: the result is a
@@ -59,6 +75,7 @@ from __future__ import annotations
 
 import bisect
 import contextvars
+import functools
 import json
 import logging
 import math
@@ -89,17 +106,23 @@ CANDIDATES = 3             # passages per statement
 RETRY_CANDIDATES = 5       # passages per statement on its second look
 BATCH_STATEMENTS = 8       # statements per judge call
 WORKERS = 16               # model calls at once: the server batches them, so more is faster up to a point
-MAX_RETRIED = 120          # second looks per run
+MAX_RETRIED = 160          # second looks per run
 PUBLISH_EVERY = 0.75       # seconds between partial results written while tracing
 BATCH_CHARS = 12000        # passage text per judge call
 ROLE_BATCH = 8             # statements per role check
 ROLE_MAX_WORDS = 6         # a statement this short takes its meaning from its label
 ROLE_VOTES = 2             # role checks per statement; every one must say yes
-MAX_JUDGED = 300           # statements judged per run; the rest stay plain
+MAX_JUDGED = 400           # statements judged per run; the rest stay plain
 MIN_QUOTE_CHARS = 12
 MAX_QUOTE_CHARS = 600
+PIECE_MIN_WORDS = 2        # each piece of an excerpt the judge cut with "…"
+PIECED_MAX_CHARS = 900     # from the first piece to the last
+EDGE_CHARS = 150           # how far past its passage's edge an excerpt may run
 VERBATIM_MIN_WORDS = 4     # a statement this long found word for word in a source came from there
 BIND_MAX_CHARS = 160       # how far a label word may sit from its value
+BIND_LIST_MAX_CHARS = 400  # how far down a list of values its heading may sit
+ITEM_MAX_WORDS = 5         # a name of a part of a submission is no longer than this
+LABEL_ABOVE_LINES = 8      # lines of values a label may head, read upward from an excerpt
 COVERAGE_MIN_WORDS = 4     # statements this long must be mostly in the excerpt:
 COVERAGE_TEXT = 0.3        # share of the statement's own content words, or
 COVERAGE_WITH_LABEL = 0.35  # share of its and its label's words together;
@@ -249,6 +272,19 @@ _NUMBER_RE = re.compile(
     re.I,
 )
 _SUFFIX = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "b": 1e9, "billion": 1e9}
+# A number written as a word is the same value as the figure: "references
+# up to 5 pages" is "References … up to five pages", and "maximum of two
+# proposals per institution" is "Limit on Number of Proposals per
+# Organization: 2".
+_UNITS = ("one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+          "sixteen seventeen eighteen nineteen").split()
+_TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
+# "Any collaboration letter may be no longer than a single page" is a
+# one-page letter.
+NUMBER_WORDS = {w: n for n, w in enumerate(_UNITS, 1)} | {w: 10 * n for n, w in enumerate(_TENS, 2)} | {"single": 1}
+_NUMBER_WORD_RE = re.compile(
+    rf"\b(?:({'|'.join(_TENS)})[-‐‑ ]({'|'.join(_UNITS[:9])})|({'|'.join(NUMBER_WORDS)}))\b", re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -387,6 +423,13 @@ def values_in(text: str) -> list[Value]:
     for m in re.finditer(r"(?<![\w.,])(\d+)(?:st|nd|rd|th)\b", text, re.I):
         if free(m.start(), m.end()):
             add(Value("num", f"num:{_num_key(float(m.group(1)))}", m.start(), m.end(), m.group(1), True))
+    for m in _NUMBER_WORD_RE.finditer(text):
+        if free(m.start(), m.end()):
+            if m.group(1):
+                n = NUMBER_WORDS[m.group(1).lower()] + NUMBER_WORDS[m.group(2).lower()]
+            else:
+                n = NUMBER_WORDS[m.group(3).lower()]
+            add(Value("num", f"num:{n}", m.start(), m.end(), m.group()))
     out.sort(key=lambda v: v.start)
     return [replace(v, raw=original[v.start:v.end]) for v in out]
 
@@ -457,6 +500,9 @@ def stems(text: str) -> set[str]:
     return {s for s, _, _ in word_positions(text)}
 
 
+_NUMBER_STEMS = {stem(w): n for w, n in NUMBER_WORDS.items()}
+
+
 # Label words that name a slot ("item", "name") or qualify one ("approved",
 # "required") rather than name a subject. In a real run "approved budget
 # categories — Supplies" passed on the expense record's "Approved by: PI";
@@ -469,6 +515,25 @@ _GENERIC_LABEL_WORDS = frozenset(stem(w) for w in (
     "minimum", "estimated", "proposed", "current", "expected", "allowable", "special",
     "requirement", "requirements",
 ))
+
+# Fields a funding announcement names in words of its own: "Funding
+# Instrument: Cooperative Agreement" is stated as "Anticipated Type of
+# Award: Cooperative Agreement"; a CFDA number is an "Assistance Listing".
+# (label words, phrases a passage may use for them instead)
+_LABEL_ALIASES: tuple[tuple[frozenset, tuple[str, ...]], ...] = (
+    (frozenset({stem("instrument")}), ("award",)),
+    (frozenset({stem("mechanism")}), ("award",)),
+    (frozenset({stem("cfda")}), ("catalog of federal domestic assistance", "assistance listing")),
+)
+
+
+def _named_otherwise(label_words: set[str], passage: str) -> bool:
+    """Whether ``passage`` names a field these label words name, in its own words."""
+    low = " ".join(passage.lower().split())
+    return any(
+        keys <= label_words and any(re.search(rf"\b{re.escape(p)}", low) for p in phrases)
+        for keys, phrases in _LABEL_ALIASES
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -529,9 +594,11 @@ _CONDITION_RE = re.compile(
 def is_action(st: Statement) -> bool:
     """Whether a statement tells the reader what to do in this case: it
     opens with an imperative ("Obtain vendor quotations…"), or sits under a
-    follow-up or recommendation label."""
-    first = re.match(r"\W*([A-Za-z]+)", st.text or "")
-    return bool(first and first.group(1).lower() in _ACTION_VERBS) or bool(_ACTION_LABEL_RE.search(st.label or ""))
+    follow-up or recommendation label. A verb followed by a number names a
+    thing: "Track 1 requests >$100,000…" is about a track."""
+    first = re.match(r"\W*([A-Za-z]+)(\s+\d)?", st.text or "")
+    imperative = bool(first and first.group(1).lower() in _ACTION_VERBS and not first.group(2))
+    return imperative or bool(_ACTION_LABEL_RE.search(st.label or ""))
 
 
 def _sentence_start(text: str, pos: int, lo: int = 0) -> int:
@@ -603,6 +670,378 @@ def party_unbound(st: Statement, sentence: str) -> bool:
     tie the organization to this opportunity (it announces, invites or
     funds it; this agreement is made by it)."""
     return bool(_PARTY_LABEL_RE.search(field_label(st))) and not _BOUND_TO_THIS_RE.search(sentence)
+
+
+# The stages of a submission, each with its own deadline and rules.
+_STAGES = (
+    ("loi", re.compile(r"\b(?i:letters? of intent)\b|\bLOIs?\b")),
+    ("preliminary", re.compile(r"\bpre-?proposals?\b|\bpreliminary proposals?\b|\bpre-?applications?\b"
+                               r"|\bconcept (?:papers?|notes?)\b", re.I)),
+    ("full", re.compile(r"\bfull (?:proposals?|applications?)\b", re.I)),
+)
+
+
+def _stages(text: str) -> set[str]:
+    return {name for name, rx in _STAGES if rx.search(text or "")}
+
+
+def stage_differs(st: Statement, excerpt: str) -> bool:
+    """Whether a statement about one stage of a submission (the letter of
+    intent, a preliminary or the full proposal) is sourced to an excerpt
+    about another only. Seen in the NSF NHERI run: the full proposal
+    deadline's "Due by 5 p.m. proposer's local time" linked to "Letter of
+    Intent Due Date(s) (required) (due by 5 p.m. proposer's local time):
+    October 16, 2015"; a separate check said yes, twice."""
+    mine = _stages(st.text) or _stages(" ".join([field_label(st), *st.context[-1:]]))
+    theirs = _stages(excerpt)
+    return bool(mine and theirs) and not (mine & theirs)
+
+
+# A part of a program the report scopes a row to, in brackets: "By end of
+# sixth month of award (EF)", "(Rapid Facility)". An acronym of the words
+# before it is the row's own name — "Collaborators & Other Affiliations
+# (COA)" — not a scope.
+_SCOPE_RE = re.compile(r"([^()]*)\(([A-Z][A-Za-z0-9&/ -]{0,40})\)")
+
+
+# Words a scope shares with every part of a program: "(Rapid Facility)" is
+# told from "(EF)" by "Rapid".
+_SCOPE_COMMON = frozenset(stem(w) for w in (
+    "facility", "facilities", "deadline", "deadlines", "date", "dates", "award", "awards", "program",
+    "proposal", "proposals", "component", "center", "office", "track", "phase", "round", "cycle",
+))
+
+
+def _scopes(label: str) -> list[set[str]]:
+    """The parts of a program a label's brackets name: an acronym ("EF")
+    or a name in capitals ("Rapid Facility") — not a description
+    ("September recurring") nor the label's own abbreviation ("PUIs")."""
+    out = []
+    for m in _SCOPE_RE.finditer(label or ""):
+        inner = m.group(2).strip()
+        acronym = re.fullmatch(r"([A-Z&]{2,8})s?", inner)
+        if acronym:
+            before = re.findall(r"[A-Za-z]+", m.group(1))
+            initials = ("".join(w[0] for w in before), "".join(w[0] for w in before if w[0].isupper()))
+            if any(i.upper().endswith(acronym.group(1).replace("&", "")) for i in initials if i):
+                continue
+            out.append({acronym.group(1)})
+            continue
+        if not all(w[0].isupper() for w in re.findall(r"[A-Za-z]+", inner)):
+            continue
+        words = stems(inner) - _GENERIC_LABEL_WORDS - _SCOPE_COMMON
+        if words:
+            out.append(words)
+    return out
+
+
+def _around(text: str, start: int, end: int) -> str:
+    """The excerpt with its sentence and the one before it."""
+    first = _sentence_start(text, start)
+    lo = _sentence_start(text, first - 1) if first > 0 else 0
+    stop = [i for i in (text.find(". ", end), text.find("\n", end)) if i != -1]
+    return text[lo:min(stop) + 1 if stop else len(text)]
+
+
+# Words that only place a statement in time: "by end of sixth month of
+# award" says when, not which component's milestone.
+_TIME_WORDS = frozenset(stem(w) for w in (
+    "end", "start", "beginning", "within", "month", "months", "year", "years", "week", "weeks", "day", "days",
+    "award", "milestone", "milestones", "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+    "eighth", "ninth", "tenth", "eleventh", "twelfth", "date", "deadline", "due",
+))
+
+
+def row_missing(st: Statement, text: str, start: int, end: int) -> bool:
+    """Whether a short cell of a table row ("PDF format" under "RUI Impact
+    Statement — Special Requirements") is sourced to text that does not
+    name most of its row — the excerpt, its sentence and the one before.
+    The cell says nothing of what it belongs to; the row does. Seen in the
+    NSF RUI solicitation: the RUI Impact Statement's "PDF format" was
+    linked to the Certification of RUI/ROA Eligibility's "scanned and
+    included as a searchable PDF file"; a separate check said yes, twice.
+    Only a Markdown table's cell has a row then a column; a JSON leaf's
+    label is its list, its item and its key ("dates and deadlines — item")."""
+    parts = [p for p in field_label(st).split(" — ") if p.strip()]
+    if st.path is not None or len(parts) < 2:
+        return False
+    row = stems(parts[-2]) - _GENERIC_LABEL_WORDS - stems(st.text)
+    if len(row) < 2:
+        return False
+    return len(row & stems(_around(text, start, end))) < math.ceil(2 * len(row) / 3)
+
+
+def scope_missing(st: Statement, text: str, start: int, end: int, places: int) -> bool:
+    """Whether a row the report scopes to one part of a program ("By end of
+    sixth month of award (EF)") is sourced to text that does not name that
+    part — the excerpt, its sentence and the one before it — when nothing
+    else ties the row to this place: its own words only say when, or the
+    excerpt is written in ``places`` > 1 places. Seen in the NSF NHERI run:
+    the RFA lists each component's milestones in the same words, and the
+    EF's "by end of sixth month of award" was linked to "By end of sixth
+    month of award, Scheduling process implemented with the NCO" — the
+    RAPID Facility's."""
+    # The row's label, or the statement itself ("By end of year one (NCO)").
+    scopes = _scopes(field_label(st)) + _scopes(st.text)
+    if not scopes:
+        return False
+    if places < 2 and len(stems(st.text) - _TIME_WORDS - _GENERIC_LABEL_WORDS) >= 3:
+        return False
+    near = _around(text, start, end)
+    found_words = stems(near)
+    found_caps = set(re.findall(r"\b[A-Z]{2,8}\b", near))
+    return not all((s & found_caps) if all(w.isupper() for w in s) else (s <= found_words) for s in scopes)
+
+
+# Abbreviations every funding announcement uses — agencies, roles, forms,
+# time zones, section numbers — none of which names one part of a program.
+_COMMON_ACRONYMS = frozenset("""
+NSF NIH NASA DOE DOD DHS USDA NIFA NOAA EPA NIST NEH NEA HHS FDA ED US USA UK EU UN FFAR
+PI PIS PD PDS PM AOR SPO OSP SRO GPG PAPPG FAQ CFR OMB UEI SAM DUNS EIN TIN FAR IRB IACUC
+LOI LOIS NOFO FOA RFA RFP RFI FY ID CV PDF URL HTML XML API ET EST EDT PT PST PDT CT CST CDT MT MST MDT
+AM GPS IT IP NA TBD IDC MTDC TDC TBA COI COA DMP DMSP NCE CFDA NAICS SF RR OK F&A R&R R&D S&T STEM
+I II III IV V VI VII VIII IX X XI XII
+""".split())
+
+
+_ABBREV_RE = re.compile(r"\b([A-Z][A-Z&]{1,7})s?\b")
+
+
+@functools.lru_cache(maxsize=16)
+def _defined_abbreviations(text: str) -> frozenset:
+    """The abbreviations a document defines in brackets: "Experimental
+    Facilities (EF)", "Post-Disaster, Rapid Response Research (RAPID)
+    Facility". Capitals it does not define ("NOTE", "RED FLAGS") name
+    nothing."""
+    return frozenset(m.group(1) for m in re.finditer(r"\(([A-Z][A-Z&]{1,7})s?\)", text))
+
+
+def part_missing(st: Statement, text: str, start: int, end: int, places: list[tuple[int, int]]) -> bool:
+    """Whether a statement that names one part of a program by the
+    abbreviation the document defines ("RAPID Facility certification…",
+    "… updated for EF") is sourced to text that names neither it nor the
+    words it stands for — the excerpt, its sentence and the one before —
+    while that text names another part, or another of the ``places`` the
+    excerpt is written in names this one. Seen in the NSF NHERI run:
+    "Milestone: RAPID Facility certification of operational resources and
+    fee schedule" was linked to the EF Awardee's certification, which a
+    separate check confirmed; "… updated for EF" to the RAPID Facility's
+    milestone, written in the same words as the EF's."""
+    defined = _defined_abbreviations(text)
+    named = {a for a in _ABBREV_RE.findall(st.text or "") if a in defined} - _COMMON_ACRONYMS
+    if not named:
+        return False
+    near = _around(text, start, end)
+    have = set(_ABBREV_RE.findall(near))
+    # The words an abbreviation stands for: "Broadening Participation in
+    # Computing" for BPC.
+    initials = "".join(w[0] for w in re.findall(r"[A-Za-z][\w'-]*", near) if w[0].isupper())
+    if all(a in have or a.replace("&", "") in initials for a in named):
+        return False
+    if (have & defined) - named - _COMMON_ACRONYMS:
+        return True
+    return any(
+        named & set(_ABBREV_RE.findall(_around(text, a, b)))
+        for a, b in places if not (a < end and start < b)
+    )
+
+
+# ---------------------------------------------------------------------------
+# A part of a submission, named in the report's list of them
+# ---------------------------------------------------------------------------
+
+# A report list of what a submission is made of: "APPLICATION COMPONENTS",
+# "Subaward Documents (if applicable)", "required components — name",
+# "mandated structure — mandated sections — name" — or of who may take
+# part: "Eligible Individuals" over "Principal Investigator", which was
+# linked to "An individual may appear as Principal Investigator (PI) or
+# co-PI in no more than one full proposal".
+_PARTS_RE = re.compile(
+    r"\b(?:components?|documents?|documentation|attachments?|forms|appendix|appendices|supplementary|sections"
+    r"|(?:required|mandated) (?:sections?|items?|materials?|structure)|proposal (?:sections?|parts?|contents?)"
+    r"|eligible (?:institutions?|individuals?|organi[sz]ations?|applicants?|entities)|who may (?:submit|serve))\b",
+    re.I,
+)
+# Label words that only say what kind of list a name is in. "Subaward",
+# in "Subaward Documents", says whose; the passage must be about that too.
+_PART_WORDS = frozenset(stem(w) for w in (
+    "component", "components", "document", "documents", "documentation", "attachment", "attachments",
+    "form", "forms", "appendix", "appendices", "supplementary", "section", "sections", "structure",
+    "mandated", "material", "materials", "part", "parts", "content", "contents", "proposal", "application",
+    "submission", "eligible", "eligibility", "institution", "institutions", "individual", "individuals",
+    "organization", "organizations", "organisation", "organisations", "applicant", "applicants", "entity",
+    "entities", "submit", "serve",
+))
+# What a name may end with that is no part of it.
+_ITEM_QUALIFIER_RE = re.compile(
+    r"\s*(?:\((?:if|as|when) (?:applicable|required|needed|requested)\)"
+    r"|\b(?:if|as|when) (?:applicable|required|needed|requested)|\((?:optional|required)\))\W*$",
+    re.I,
+)
+# Words that make a statement say something, not just name a thing.
+_SAYS_RE = re.compile(
+    r"\b(?:must|shall|should|will|cannot|can|is|are|was|were|be|been|includ\w*|provid\w*|submit\w*"
+    r"|describ\w*|requir\w*|attach\w*|upload\w*|contain\w*)\b|\bmay\b(?!\s*\d)",
+    re.I,
+)
+# Two words of one name sit in one phrase, not across a list or a sentence.
+_ITEM_BREAK_RE = re.compile(r"[;:|\n.]")
+# A list mark at the start of a line: "-", "o" (Docling's hollow bullet),
+# "2.", "a.", "(iii)".
+_LINE_MARK_RE = re.compile(
+    r"^\s*(?:(?:[-–—*+•·o]|\d{1,3}[.)]|[a-z][.)]|[ivx]{1,4}[.)]|\([a-z0-9]{1,4}\)"
+    r"|\((?:required|optional|if applicable)\))\s+)*",
+    re.I,
+)
+# What puts a name in a list: a list mark or separator before it — Docling
+# writes sub-bullets inline as " o " ("… o Budget Form o P.I. and Key
+# Personnel Biosketch: …"); "/" joins alternatives ("Program
+# Director(s)/Principal Investigator(s)") …
+_LIST_BEFORE_RE = re.compile(
+    r"(?:[:;,|(\[/•·▪◦\"“‘']|[,;]\s*(?:and|or)|(?:^|\s)(?:\d{1,3}|[a-z]|[ivx]{1,4})[.)]|(?:^|\s)[o\-–—])\s*$",
+    re.I,
+)
+# …and the end of the item after it.
+_LIST_AFTER_RE = re.compile(
+    r"\s*(?:$|[;,.:)|\]\"”’'(—–•·▪◦-]|(?:and|or|sections?|documents?|forms?)\b|o\s)", re.I,
+)
+# Initials and small words a name's own words do not count, and "a list
+# of" before a list's name ("1. (required) A list of Project Personnel and
+# Partner Institutions").
+_NAME_FILLER_RE = re.compile(
+    r"(?:\b(?:[A-Z]\.){1,4}\s*|\b(?:and|of|the|a|an|list)\s+|&\s*|\b(?:co|sub)[-‐‑])+$", re.I,
+)
+# An abbreviation in brackets.
+_ACRONYM_RE = re.compile(r"\s*\([A-Z&]{2,8}s?\)")
+# A bullet Docling writes inside a line: "… o Graphics, Figures, Equations,
+# and Tables not included in the Project Description: …".
+_INLINE_BULLET_RE = re.compile(r"(?:^|\s)[o•·▪◦]\s+$")
+# A heading set off in bold or italics: "**2. Budget and Budget Justification.**".
+_EMPHASIS_RE = re.compile(r"(\*\*|__|\*|_)(?=\S)(.+?)(?<=\S)\1")
+# The end of a sentence just before a name ("…sections. Data Management
+# Plan…"); "p.m." and "e.g." are not one.
+_SENTENCE_END_RE = re.compile(r"(?<![.\s][a-z])(?<!\b[A-Z])[.!?:]\s+$")
+# One or two capitalised words that open a longer name ("Postdoctoral").
+_NAME_LEAD_RE = re.compile(r"(?:\b[A-Z][A-Za-z'’-]*\s+){1,2}$")
+# A name asked for: "must include a budget", "Proposers should prepare annual budgets".
+_ASKED_BEFORE_RE = re.compile(
+    r"\b(?:includ(?:e|es|ed|ing)|submi(?:t|ts|tted|tting|ssion of)|provid(?:e|es|ed|ing)|attach(?:es|ed|ing)?"
+    r"|upload(?:s|ed|ing)?|prepar(?:e|es|ed|ing)|contain(?:s|ed|ing)?|requir(?:e|es|ed|ing))\s+"
+    r"(?:(?:a|an|the|one|two|three|separate|single|brief|short|detailed|complete|signed|annual|current"
+    r"|[a-z]+-page)\s+){0,2}$",
+    re.I,
+)
+# "A Data Management Plan (DMP) is required", "… must be submitted",
+# "Universities and colleges are eligible".
+_ASKED_AFTER_RE = re.compile(
+    r"\W{0,3}\s*(?:\([^)]{0,60}\)\s*)?(?:is|are|must|shall|should|will)\s+(?:also\s+)?(?:be\s+)?"
+    r"(?:required|included|submitted|provided|attached|uploaded|prepared|eligible)\b",
+    re.I,
+)
+
+
+def item_name(st: Statement) -> list[str]:
+    """The words of a statement that only names a part of a submission in
+    the report's list of them ("Data Management Plan" among the required
+    components, "Budget Justification" among a subaward's documents), or
+    [] for any other statement."""
+    if values_in(st.text) or not _PARTS_RE.search(" ".join([field_label(st), *st.context])):
+        return []
+    # Its abbreviation is no part of how a passage writes it: "Transition to
+    # Education (TTE) Plan" is labelled "Transition to Education Plan".
+    name = _ACRONYM_RE.sub(" ", _ITEM_QUALIFIER_RE.sub(" ", st.text))
+    if _SAYS_RE.search(name):
+        return []
+    words = word_positions(name)
+    if not 1 <= len(words) <= ITEM_MAX_WORDS or not all(name[a].isupper() for _, a, _ in words):
+        return []
+    return [s for s, _, _ in words]
+
+
+def presented_as_item(name: list[str], text: str, start: int, end: int) -> bool:
+    """Whether ``text[start:end]`` gives the name as a part of a submission:
+    an item of a list ("…; Budget; Budget Justification; Current and
+    Pending Support; …"), a heading or the subject at the start of a line,
+    or the thing a sentence asks for ("must include a budget"). Seen in the
+    NSF NHERI run: "Data Management Plan", a required component, was linked
+    to "Implement a facility data management plan…", a facility's duty;
+    "Budget Justification", a subaward's document, to "In the budget
+    justification, provide a list of all organizations…". The lines
+    around the excerpt are read, so an excerpt that only starts at the name
+    does not make it a heading."""
+    lo = text.rfind("\n", 0, start) + 1
+    hi = text.find("\n", end)
+    hi = len(text) if hi == -1 else hi
+    raw = text[lo:hi]
+    # Formatting marks and abbreviations ("Broadening Participation in
+    # Computing (BPC) Plan") become spaces, so offsets stay put.
+    line = _ACRONYM_RE.sub(lambda m: " " * len(m.group()), _MARKUP_RE.sub(lambda m: " " * len(m.group()), raw))
+    words = word_positions(line)
+    n = len(name)
+    for i in range(len(words) - n + 1):
+        if [s for s, _, _ in words[i:i + n]] != name:
+            continue
+        a, b = words[i][1], words[i + n - 1][2]
+        if lo + a < start or lo + b > end:
+            continue
+        if any(_ITEM_BREAK_RE.search(line[words[j][2]:words[j + 1][1]]) for j in range(i, i + n - 1)):
+            continue
+        line_start = line.rfind("\n", 0, a) + 1
+        line_end = line.find("\n", b)
+        before, after = line[line_start:a], line[b:len(line) if line_end == -1 else line_end]
+        # What may stand before the name inside the same item: a longer name
+        # of the same part ("…; and Postdoctoral Mentoring Plan" lists the
+        # "Mentoring Plan"; a verb is no part of a name), an article ("…; a
+        # Certification of RUI/ROA Eligibility"), or initials the name's
+        # words do not count ("P.I. and Key Personnel Biosketch").
+        cores = [before]
+        lead_in = _NAME_LEAD_RE.search(before)
+        if lead_in and lead_in.group().split()[0].lower() not in _ACTION_VERBS:
+            cores.append(before[:lead_in.start()])
+        cores.append(_NAME_FILLER_RE.sub("", before))
+        nxt = re.match(r"[ \t]+([a-z]+)\b", after)
+        # "Data management plan costs are allowable": the name of something else.
+        modifies = bool(nxt and nxt.group(1) not in _STOP and nxt.group(1) not in ("section", "sections")
+                        and not re.search(r"(?:ed|ing)$", nxt.group(1)))
+
+        def marked(pre: str) -> bool:
+            # A list mark opens the item: "- …", "2. …", "o …" inside a line.
+            mark = _LINE_MARK_RE.match(pre).end()
+            return (bool(pre[:mark].strip()) and not pre[mark:].strip()) or bool(_INLINE_BULLET_RE.search(pre))
+
+        def opens(pre: str) -> bool:
+            return not pre.strip() or bool(_SENTENCE_END_RE.search(pre))
+
+        # A list item, or a heading that opens a line or sentence and ends
+        # where the name does ("Statements of Commitment. The proposal…",
+        # "Goal and Context: Does the plan…"). The subject of a sentence is
+        # not one: "Principal Investigator or organization that makes
+        # financial … commitments … does so at their own risk".
+        # A heading may run on a word or two: "Collaborators and Other
+        # Affiliations Information:".
+        heading_end = bool(re.match(r"\s*(?:[A-Z][\w'-]*\s*){0,2}(?:$|[:.\-—–(]|(?i:sections?)\b)", after))
+        if not modifies and any(marked(pre) or (opens(pre) and heading_end) for pre in cores):
+            return True
+        if re.search(r"\beligible\s+$", before, re.I):
+            return True   # "Eligible predominantly undergraduate institutions (PUIs) are …"
+        if any(
+            m.start(2) <= a and b <= m.end(2) and len(m.group(2)) <= 100 and not _CLAUSE_RE.search(m.group(2))
+            for m in _EMPHASIS_RE.finditer(raw, line_start)
+            if not _LINE_MARK_RE.sub("", raw[line_start:m.start()]).strip()
+            or _SENTENCE_END_RE.search(raw[line_start:m.start()])
+        ):
+            # Inside a bold or italic heading that opens the line or a
+            # sentence: Docling runs "…Documentation sections. **FACILITIES,
+            # EQUIPMENT, AND OTHER RESOURCES** In this section…" on one line.
+            # A whole sentence in bold is emphasis, not a heading.
+            return True
+        if _ASKED_BEFORE_RE.search(before) or _ASKED_AFTER_RE.match(after):
+            return True
+        if re.match(r"\W{0,3}\s*sections?\b", after, re.I):
+            return True   # "In the Supplementary Documents Section, upload …"
+        if any(_LIST_BEFORE_RE.search(pre) for pre in cores) and _LIST_AFTER_RE.match(after):
+            return True
+    return False
 
 
 def obligation(text: str) -> tuple[bool, bool, bool]:
@@ -856,59 +1295,124 @@ def _find_all(src: _Source, quote: str, start: int, end: int) -> list[tuple[int,
 
 def _values_supported(st_values: list[Value], quote: str, quote_values: list[Value]) -> bool:
     keys = _quote_keys(quote_values)
+    # A figure the excerpt writes in words ("more than one PI", "$5
+    # million") has no digits to compare; its value already matched.
+    worded = {q.key for q in quote_values if q.kind == "num" and not q.literal_check}
     for v in st_values:
         if v.key not in keys:
             return False
-        if v.literal_check:
+        if v.literal_check and v.key not in worded:
             ok, _ = value_supported_by_quote(v.raw.strip(), quote)
             if ok is not True:
                 return False
     return True
 
 
+def _breaks(text: str) -> int:
+    """Line breaks in ``text``, a blank line counting as none: Docling writes
+    "**… (CFDA) Number(s):**", a blank line, then "47.041" — the next line."""
+    return re.sub(r"\n[ \t]*(?=\n)", "", text).count("\n")
+
+
+# Between the two ends of one range: "January 16, 2023 - February 21, 2023".
+_RANGE_SEP_RE = re.compile(r"[ \t]*(?:-{1,2}|[–—]|to|through|thru|until)[ \t]*", re.I)
+
+
+def _range_partner(text: str, a: Value, b: Value) -> bool:
+    """Whether two values of one kind are the two ends of a range."""
+    x, y = (a, b) if a.start < b.start else (b, a)
+    return x.kind == y.kind and bool(_RANGE_SEP_RE.fullmatch(text[x.end:y.start]))
+
+
+# A heading over a list of values: it ends in ":" and names a plural
+# ("Submission Window Date(s) (due by 5 p.m. submitter's local time):").
+_LIST_HEAD_RE = re.compile(r"(?:\(s\)|\b[A-Za-z]*[a-hj-rt-z]s\b)[^:\n]{0,80}:\s*$")
+
+
+def _listed_under(text: str, head_at: int, q: Value, values: list[Value]) -> bool:
+    """Whether value ``q`` is in a list of values of its kind headed by the
+    words at ``head_at``: a heading that names a plural and ends in ":",
+    followed by nothing but values of that kind up to ``q``. Seen in the MRI
+    solicitation: "Submission Window Date(s) (due by 5 p.m. submitter's
+    local time): January 16, 2023 - February 21, 2023 October 16, 2023 -
+    November 15, 2023 …" — the second window's start has the first window's
+    dates before it."""
+    line_end = text.find("\n", head_at)
+    colon = text.find(":", head_at, len(text) if line_end == -1 else line_end)
+    if colon == -1 or colon >= q.start or q.start - colon > BIND_LIST_MAX_CHARS:
+        return False
+    head = _MARKUP_RE.sub("", text[text.rfind("\n", 0, head_at) + 1:colon + 1]).strip()
+    if not _LIST_HEAD_RE.search(head):
+        return False
+    rest = list(_MARKUP_RE.sub(lambda m: " " * len(m.group()), text[colon + 1:q.start]))
+    for o in values:
+        if o.kind == q.kind and o.start > colon and o.end <= q.start:
+            rest[o.start - colon - 1:o.end - colon - 1] = " " * (o.end - o.start)
+    return not word_positions("".join(rest))
+
+
 def _bound(st_values: list[Value], shared: set[str], quote: str, quote_values: list[Value]) -> bool:
     """Each value in the statement sits beside a word it shares with the
     excerpt: on the same line or the one before, close by, with no other
-    figure of the same kind between them that the statement does not name."""
+    figure of the same kind between them that the statement does not name
+    (the other end of a range is not another figure). A value may also sit
+    in a list its label heads (``_listed_under``), or beside another value
+    the statement names that does sit by the label — "47.041 ---
+    Engineering", "47.049 --- Mathematical and Physical Sciences", … under
+    "CFDA Number(s):"."""
     st_keys = {v.key for v in st_values}
-    words = [(s, a, b) for s, a, b in word_positions(quote) if s in shared]
+    words = [(a, b) for s, a, b in word_positions(quote) if s in shared]
     if not words:
         return False
-    for v in st_values:
-        spots = [q for q in quote_values if q.key == v.key or v.key in _quote_keys([q])]
-        if not spots:
+
+    def spots(v: Value) -> list[Value]:
+        return [q for q in quote_values if q.key == v.key or v.key in _quote_keys([q])]
+
+    def beside(a: int, b: int, q: Value) -> bool:
+        if b <= q.start:
+            lo, hi = b, q.start
+        elif q.end <= a:
+            lo, hi = q.end, a
+        else:
+            return True   # the word is part of the value's own text
+        between = quote[lo:hi]
+        if len(between) > BIND_MAX_CHARS or _breaks(between) > 1:
             return False
-        ok = False
-        for q in spots:
-            for _, a, b in words:
-                if b <= q.start:
-                    lo, hi = b, q.start
-                elif q.end <= a:
-                    lo, hi = q.end, a
-                else:
-                    lo = hi = a   # the word is part of the value's own text
-                between = quote[lo:hi]
-                if len(between) > BIND_MAX_CHARS or between.count("\n") > 1:
-                    continue
-                if any(
-                    o.kind == q.kind and o.start >= lo and o.end <= hi
-                    and o.key not in st_keys and not (_quote_keys([o]) & st_keys)
-                    for o in quote_values
-                ):
-                    continue
-                ok = True
-                break
-            if ok:
-                break
-        if not ok:
-            return False
-    return True
+        return not any(
+            o.kind == q.kind and o.start >= lo and o.end <= hi
+            and o.key not in st_keys and not (_quote_keys([o]) & st_keys)
+            and not _range_partner(quote, o, q)
+            for o in quote_values
+        )
+
+    placed: dict[int, list[Value]] = {}
+    for i, v in enumerate(st_values):
+        found = [
+            q for q in spots(v)
+            if any(beside(a, b, q) or (b <= q.start and _listed_under(quote, a, q, quote_values)) for a, b in words)
+        ]
+        if found:
+            placed[i] = found
+    grew = True
+    while grew and len(placed) < len(st_values):
+        grew = False
+        for i, v in enumerate(st_values):
+            if i in placed:
+                continue
+            found = [q for q in spots(v) if any(beside(p.start, p.end, q) for ps in placed.values() for p in ps)]
+            if found:
+                placed[i] = found
+                grew = True
+    return len(placed) == len(st_values)
 
 
 @dataclass
 class Verdict:
     link: dict | None
     reason: str
+    # (source, start, end) of the excerpt checked, when it was found: a
+    # second look after a refusal goes past it.
+    where: tuple[int, int, int] | None = None
 
 
 def field_label(st: Statement) -> str:
@@ -928,6 +1432,63 @@ def clean_quote(quote: str) -> str:
     return _EDGE_ELLIPSIS_RE.sub("", (quote or "").strip()).strip()
 
 
+_INNER_ELLIPSIS_RE = re.compile(r"\s*(?:\.{3}|…)\s*")
+
+
+def _find_pieces(src: _Source, quote: str, start: int, end: int) -> tuple[tuple[int, int], list] | None:
+    """Where an excerpt the judge cut with ellipses sits: every piece word
+    for word, in order, inside ``src.text[start:end]``, the first piece to
+    the last no longer than ``PIECED_MAX_CHARS``. Returns ``(span, pieces)``.
+    Seen in the NSF NHERI run: "Each Awardee will operate with a Science
+    Plan that supports the NHERI vision ... The Science Plan should outline:
+    …" — what the deliverable condensed runs over several sentences."""
+    parts = [p for p in _INNER_ELLIPSIS_RE.split(quote) if p.strip()]
+    if len(parts) < 2 or any(len(fold(p)[0].split()) < PIECE_MIN_WORDS for p in parts):
+        return None
+    at, found = start, []
+    for p in parts:
+        hits = _find_all(src, p, at, end)
+        if not hits:
+            return None
+        found.append(hits[0])
+        at = hits[0][1]
+    span = (found[0][0], found[-1][1])
+    if span[1] - span[0] > PIECED_MAX_CHARS:
+        return None
+    return span, found
+
+
+def _label_above(text: str, start: int, lo: int, words: set[str]) -> int | None:
+    """Where the label line over an excerpt of bare values begins, when the
+    judge copied the figures but not the line they sit under ("47.041 ---
+    Engineering" under "**Applicable Catalog of Federal Domestic Assistance
+    (CFDA) Number(s):**"; the third submission window under "Submission
+    Window Date(s) …:"): the nearest line above with words, past lines of
+    values only, inside the passage the judge read — and only when it has a
+    word of the statement or its label."""
+    line_start = text.rfind("\n", 0, start) + 1
+    if line_start < lo or _MARKUP_RE.sub("", text[line_start:start]).strip():
+        return None   # the excerpt does not open its line
+    pos = line_start
+    for _ in range(LABEL_ABOVE_LINES):
+        if pos - 1 <= lo:
+            return None
+        above = text.rfind("\n", 0, pos - 1) + 1
+        if above < lo:
+            return None
+        line = text[above:pos - 1]
+        rest = list(line)
+        for v in values_in(line):
+            rest[v.start:v.end] = " " * (v.end - v.start)
+        found = stems("".join(rest))
+        if found & words:
+            return above
+        if found:
+            return None   # a line of other words: no label over these values
+        pos = above
+    return None
+
+
 def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     """Whether the judge's ``quote`` from window ``wi`` may source ``st``;
     when it may, the source entry the UI shows."""
@@ -940,19 +1501,58 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     w = corpus.windows[wi]
     src = corpus.sources[w.src]
     spots = _find_all(src, quote, w.start, w.end)
+    # An excerpt cut with "…" is checked piece by piece, and shown whole.
+    pieces: list[tuple[int, int]] = []
+    if not spots:
+        found = _find_pieces(src, quote, w.start, w.end)
+        if found is not None:
+            spots, pieces = [found[0]], found[1]
+    if not spots:
+        # A passage is a window cut from the text, and a sentence can run
+        # past its edge: "Two-page biographical sketches, following the NSF
+        # GPG format, for up to ten additional project personnel" — the
+        # window ended at "project". Mostly inside it, the rest word for word.
+        lo, hi = max(0, w.start - EDGE_CHARS), min(len(src.text), w.end + EDGE_CHARS)
+        spots = [(a, b) for a, b in _find_all(src, quote, lo, hi) if 2 * (min(b, w.end) - max(a, w.start)) >= b - a]
+        if not spots:
+            found = _find_pieces(src, quote, lo, hi)
+            if found is not None and 2 * (min(found[0][1], w.end) - max(found[0][0], w.start)) >= found[0][1] - found[0][0]:
+                spots, pieces = [found[0]], found[1]
     if not spots:
         return Verdict(None, "quote_not_in_passage")
-    exact = src.text[spots[0][0]:spots[0][1]]
+    start, end = spots[0]
 
     st_values = values_in(st.text)
-    q_values = values_in(exact)
-    if not _values_supported(st_values, exact, q_values):
-        return Verdict(None, "value_not_in_quote")
-    text_words, quote_words = stems(st.text), stems(exact)
+    text_words = stems(st.text)
     words = text_words | stems(st.label)
+
+    def cited_text() -> str:
+        return " ".join(src.text[a:b] for a, b in pieces) if pieces else src.text[start:end]
+
+    cited = cited_text()
+    # Bare figures the judge copied without the label line they sit under:
+    # a value statement ("47.041", "2024-10-15") whose label says what it is.
+    if (
+        st_values and len(text_words) <= 2 and not (words & stems(cited))
+        and _values_supported(st_values, cited, values_in(cited))
+    ):
+        top = _label_above(src.text, start, w.start, words)
+        if top is not None:
+            start = top
+            spots = [(start, end)]
+            if pieces:
+                pieces[0] = (start, pieces[0][1])
+            cited = cited_text()
+    exact = src.text[start:end]
+    where = (w.src, start, end)
+
+    q_values = values_in(cited)
+    if not _values_supported(st_values, cited, q_values):
+        return Verdict(None, "value_not_in_quote", where)
+    quote_words = stems(cited)
     shared = words & quote_words
     if not shared:
-        return Verdict(None, "no_shared_word")
+        return Verdict(None, "no_shared_word", where)
     # A statement of several words needs an excerpt that says most of it,
     # not one that only names its subject: "acquire matching-fund letters
     # early to avoid delays" is not stated by "Matching Fund Verification
@@ -965,19 +1565,35 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
             (COVERAGE_TEXT_VALUES, COVERAGE_WITH_LABEL_VALUES) if st_values
             else (COVERAGE_TEXT, COVERAGE_WITH_LABEL)
         )
-        if (
-            len(text_words & quote_words) / len(text_words) < need_text
-            and len(shared) / len(words) < need_all
-        ):
-            return Verdict(None, "quote_covers_too_little")
+        # "two" in the statement is the excerpt's "2".
+        keys = _quote_keys(q_values)
+        covered = (text_words & quote_words) | {
+            s for s in text_words if s in _NUMBER_STEMS and f"num:{_NUMBER_STEMS[s]}" in keys
+        }
+        if len(covered) / len(text_words) < need_text and len(shared) / len(words) < need_all:
+            return Verdict(None, "quote_covers_too_little", where)
     # A one- or two-word statement ("USD", "Travel") says little on its own;
     # its label says what it is about ("Expense Record — currency",
     # "approved budget categories"). The passage the judge read must be
     # about that too, or "ALL AMOUNTS ARE SHOWN IN USD" on the award would
-    # source the expense's currency.
+    # source the expense's currency. A part of a submission is checked
+    # for how the excerpt gives it instead (``presented_as_item``); its list
+    # ("required components") need not be named, but whose list it is
+    # ("Subaward Documents") must be.
+    passage = corpus.window_text(wi)
     label_only = stems(field_label(st)) - text_words - _GENERIC_LABEL_WORDS
-    if len(text_words) <= 2 and label_only and not (label_only & stems(corpus.window_text(wi))):
-        return Verdict(None, "label_not_in_passage")
+    name = item_name(st)
+    if name:
+        owner = label_only - _PART_WORDS
+        if owner and not (owner & stems(passage)):
+            return Verdict(None, "label_not_in_passage", where)
+        if not any(presented_as_item(name, src.text, a, b) for a, b in (pieces or [(start, end)])):
+            return Verdict(None, "not_an_item", where)
+    elif (
+        len(text_words) <= 2 and label_only and not (label_only & stems(passage))
+        and not _named_otherwise(label_only, passage)
+    ) or (len(text_words) <= 3 and row_missing(st, src.text, start, end)):
+        return Verdict(None, "label_not_in_passage", where)
     # A statement the report copied word for word from a source came from
     # where those words are. "A facility with any resources that can only be
     # accessed or used outside the United States" is in the RAPID list on
@@ -987,60 +1603,74 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         copies = [
             (si, a, b) for si, s in enumerate(corpus.sources) for a, b in _find_all(s, st.text, 0, len(s.text))
         ]
-        if copies and not any(si == w.src and a < spots[0][1] and spots[0][0] < b for si, a, b in copies):
-            return Verdict(None, "statement_is_elsewhere")
+        if copies and not any(si == w.src and a < end and start < b for si, a, b in copies):
+            return Verdict(None, "statement_is_elsewhere", where)
     # Every word of "subawards over $50,000 must include this clause" is in
     # "The recipient may include the substance of this clause … in subawards
     # … over $50,000", and the judge said so. "Must" is not "may" or
-    # "should"; only the statement's own words count, not its label's.
-    if obligation_differs(st.text, exact):
-        return Verdict(None, "obligation_differs")
+    # "should"; only the statement's own words count, not its label's. The
+    # sentence is read too: "Full proposal must be received by FastLane no
+    # later than 4:59 p.m." was linked to the clause "…to receive a FastLane
+    # submittal stamped time no later than … 4:59 pm" of a sentence that
+    # says proposers are "strongly encouraged" to. An excerpt in pieces is
+    # read both as cut and whole.
+    sentence = sentence_around(src.text, start, end)
+    if (
+        obligation_differs(st.text, cited) or obligation_differs(st.text, sentence)
+        or (pieces and obligation_differs(st.text, exact))
+    ):
+        return Verdict(None, "obligation_differs", where)
     # Advice for this case ("Obtain vendor quotations…") sourced to a rule
     # that applies only in some cases ("If simplified acquisition procedures
     # are used, price or rate quotations must be obtained…") says the case
     # needs it; the report has not shown the condition holds, and here it
     # did not (a $1,240 purchase is under the micro-purchase threshold). The
     # judge quotes the main clause, so the whole sentence is read.
-    if is_action(st) and not _CONDITION_RE.search(st.text) and _CONDITION_RE.search(
-        sentence_around(src.text, *spots[0])
-    ):
-        return Verdict(None, "rule_applies_only_if")
-    if st_values and not _bound(st_values, shared, exact, q_values):
-        return Verdict(None, "value_not_bound_to_label")
-    sentence = sentence_around(src.text, *spots[0])
+    if is_action(st) and not _CONDITION_RE.search(st.text) and _CONDITION_RE.search(sentence):
+        return Verdict(None, "rule_applies_only_if", where)
+    if st_values and not _bound(st_values, shared, exact, values_in(exact)):
+        return Verdict(None, "value_not_bound_to_label", where)
     if subject_differs(st, sentence):
-        return Verdict(None, "subject_differs")
+        return Verdict(None, "subject_differs", where)
     if party_unbound(st, sentence):
-        return Verdict(None, "party_not_bound")
+        return Verdict(None, "party_not_bound", where)
+    if stage_differs(st, cited):
+        return Verdict(None, "stage_differs", where)
+    places = _find_all(src, exact, 0, len(src.text)) if not pieces else [(start, end)]
+    if part_missing(st, src.text, start, end, places) or scope_missing(st, src.text, start, end, len(places)):
+        return Verdict(None, "scope_missing", where)
 
     if src.kind == "document":
         pages = set()
         approx = False
-        for a, _ in spots:
+        # A cut excerpt must start and end on one page, like a whole one.
+        for a in [a for a, _ in spots] + ([end - 1] if pieces else []):
             marker = page_marker_for_offset(a, src.markers or [])
             pages.add(marker.get("value") if marker else None)
             approx = approx or bool(marker and marker.get("approximate"))
         if len(pages) > 1:
-            return Verdict(None, "quote_on_several_pages")
-        start, end = spots[0]
+            return Verdict(None, "quote_on_several_pages", where)
         first = page_marker_for_offset(start, src.markers or [])
-        start, end = widen_to_statement(
+        shown = widen_to_statement(
             src.text, start, end, w.start, w.end, text_words,
             same_page=lambda a: page_marker_for_offset(a, src.markers or []) == first,
         )
-        link = _document_link(src, start, end, pages.pop(), approx)
-        link["judge_quote"] = exact
-        return Verdict(link, "ok")
-    if len(spots) > 1 and len({_kb_page(src, a) for a, _ in spots}) > 1:
-        return Verdict(None, "quote_on_several_pages")
-    start, end = spots[0]
-    page = _kb_page(src, start)
-    start, end = widen_to_statement(
-        src.text, start, end, w.start, w.end, text_words, same_page=lambda a: _kb_page(src, a) == page,
-    )
-    link = _kb_link(src, start, end)
-    link["judge_quote"] = exact
-    return Verdict(link, "ok")
+        link = _document_link(src, *shown, pages.pop(), approx)
+    else:
+        if len(spots) > 1 and len({_kb_page(src, a) for a, _ in spots}) > 1:
+            return Verdict(None, "quote_on_several_pages", where)
+        page = _kb_page(src, start)
+        if pieces and _kb_page(src, end - 1) != page:
+            return Verdict(None, "quote_on_several_pages", where)
+        shown = widen_to_statement(
+            src.text, start, end, w.start, w.end, text_words, same_page=lambda a: _kb_page(src, a) == page,
+        )
+        link = _kb_link(src, *shown)
+    link["judge_quote"] = cited
+    if pieces:
+        # The judge skipped words: a separate call must confirm the whole.
+        link["pieced"] = True
+    return Verdict(link, "ok", where)
 
 
 def widen_to_statement(
@@ -1061,6 +1691,16 @@ def widen_to_statement(
         if len(have) / len(words) >= CONFIRM_BELOW:
             break
         best, gain = None, 0
+        # The start of its sentence and the one before it — first, so a tie
+        # takes in the label line an excerpt sits under ("Limit on Number of
+        # Proposals per Organization:" over "There are no restrictions or
+        # limits."), not the next field's.
+        b = start
+        a = _sentence_start(text, max(lo, b - 1), lo)
+        if b > a and end - a <= MAX_QUOTE_CHARS and same_page(a):
+            g = len((stems(text[a:b]) & words) - have)
+            if g > gain:
+                best, gain = (a, end), g
         # The rest of the excerpt's sentence and the one after it.
         a = end
         stops = [i for i in (text.find(". ", a), text.find("\n", a)) if i != -1 and i < hi]
@@ -1069,13 +1709,6 @@ def widen_to_statement(
             g = len((stems(text[a:b]) & words) - have)
             if g > gain:
                 best, gain = (start, b), g
-        # The start of its sentence and the one before it.
-        b = start
-        a = _sentence_start(text, max(lo, b - 1), lo)
-        if b > a and end - a <= MAX_QUOTE_CHARS and same_page(a):
-            g = len((stems(text[a:b]) & words) - have)
-            if g > gain:
-                best, gain = (a, end), g
         if best is None:
             break
         start, end = best
@@ -1102,7 +1735,12 @@ def verify_offered(st: Statement, corpus: Corpus, wi: int, offered: list[int], q
         if other == wi:
             continue
         w = corpus.windows[other]
-        for a, _ in _find_all(corpus.sources[w.src], q, w.start, w.end):
+        src = corpus.sources[w.src]
+        hits = _find_all(src, q, w.start, w.end)
+        if not hits:
+            pieced = _find_pieces(src, q, w.start, w.end)
+            hits = [pieced[0]] if pieced else []
+        for a, _ in hits:
             places.setdefault((w.src, a), other)
     if len(places) != 1:
         return v
@@ -1301,9 +1939,17 @@ def label_names_role(st: Statement) -> bool:
     in words it does not have itself ("sponsor" over a name, "due date"
     over a date): then the passage must give it that role, not just its
     words. A longer statement says what it means itself; its label is only
-    where it sits ("Consistent Cost Treatment — rationale")."""
+    where it sits ("Consistent Cost Treatment — rationale"). So does a
+    sentence: "Proposals may be submitted via Research.gov or Grants.gov"
+    under "SUBMISSION DETAILS" is not a submission detail by its label."""
     words = stems(st.text)
+    if len(words) >= 3 and _CLAUSE_RE.search(st.text):
+        return False
     return len(words) <= ROLE_MAX_WORDS and bool(stems(field_label(st)) - words - _GENERIC_LABEL_WORDS)
+
+
+# A verb that makes a statement a sentence ("May 11" is a date).
+_CLAUSE_RE = re.compile(r"\b(?:must|shall|should|will|cannot|can|is|are|was|were|be|been)\b|\bmay\b(?!\s*\d)", re.I)
 
 
 def _role_prompt(items: list[tuple[int, Statement, dict]]) -> str:
@@ -1439,19 +2085,30 @@ class _Run:
         )
         if key not in self.index:
             self.index[key] = len(self.sources)
-            self.sources.append({k: v for k, v in link.items() if k not in ("offset", "judge_quote")})
+            self.sources.append({k: v for k, v in link.items() if k not in ("offset", "judge_quote", "pieced")})
         return self.index[key]
 
 
 # A first look that ends in one of these may have missed a passage that
 # states the statement, or copied it badly: it gets a second look. A link
-# refused by a check on what the excerpt says (a value, a role, a rule's
-# condition) does not.
+# refused by a check on what the excerpt says (a value, a rule's condition,
+# how strongly it asks) does not: the same excerpt would be found again.
 RETRY_REASONS = frozenset({
     "judge_unsupported", "judge_named_no_passage", "quote_not_in_passage", "quote_too_short",
     "quote_too_long", "no_shared_word", "quote_covers_too_little", "value_not_in_quote",
     "check_error", "judge_call_failed",
 })
+# A link refused because the passage is about something else — a
+# component's name in a facility's duty, a sponsor in the agency's account
+# of itself, the PI's rule for a co-PI — may still be stated elsewhere: its
+# second look is offered other passages, never the one refused.
+RETRY_ELSEWHERE_REASONS = frozenset({
+    "not_an_item", "label_not_in_passage", "party_not_bound", "subject_differs", "role_not_shown",
+    "statement_is_elsewhere", "stage_differs", "scope_missing",
+})
+# What a second look that finds nothing ends in: then the first look's
+# reason stands.
+_NOTHING_FOUND = frozenset({"judge_unsupported", "judge_named_no_passage", "judge_call_failed"})
 
 
 def trace_sources(
@@ -1514,12 +2171,18 @@ def trace_sources(
     sched = _Scheduler(workers, deadline, clock)
     first_out: Counter = Counter()     # first-look judge calls not yet back, per class
     retried_class: set[int] = set()
+    avoid: dict[str, list[tuple[int, int, int]]] = {}   # excerpts a second look must go past
     run = _Run()
 
     def settle(skey: str, verdict: Verdict, *, may_retry: bool) -> None:
+        if verdict.link is None and verdict.reason in _NOTHING_FOUND and skey in avoid:
+            verdict = settled.get(skey, verdict)   # a second look found nothing else
         settled[skey] = verdict
         awaiting.pop(skey, None)
-        if may_retry and verdict.link is None and verdict.reason in RETRY_REASONS:
+        elsewhere = verdict.reason in RETRY_ELSEWHERE_REASONS and verdict.where is not None
+        if may_retry and verdict.link is None and (verdict.reason in RETRY_REASONS or elsewhere):
+            if elsewhere:
+                avoid.setdefault(skey, []).append(verdict.where)
             retry_due[skey] = unique[skey]
         else:
             retry_due.pop(skey, None)
@@ -1533,7 +2196,8 @@ def trace_sources(
         needs: dict[str, tuple[bool, bool]] = {}
         waiting = []
         for skey, st, v in items:
-            confirm, role = retry or says_more(st, v.link), label_names_role(st)
+            confirm = retry or says_more(st, v.link) or bool((v.link or {}).get("pieced"))
+            role = label_names_role(st)
             if confirm or role:
                 needs[skey] = (confirm, role)
                 waiting.append((skey, st, v))
@@ -1568,7 +2232,7 @@ def trace_sources(
                     if role:
                         votes = [(r or {}).get((skey, n)) for n, r in enumerate(answers["roles"])]
                         if False in votes:
-                            settle(skey, Verdict(None, "role_not_shown"), may_retry=False)
+                            settle(skey, Verdict(None, "role_not_shown", v.where), may_retry=not retry)
                             continue
                         if None in votes:
                             stats["unchecked"] += 1
@@ -1644,12 +2308,20 @@ def trace_sources(
     retry_left = {"n": max_retried}
     rest_started = {"yes": False}
 
+    def past(wi: int, refused: list[tuple[int, int, int]]) -> bool:
+        w = corpus.windows[wi]
+        return not any(si == w.src and a < w.end and w.start < b for si, a, b in refused)
+
     def queue_retries(cls: int) -> None:
         retried_class.add(cls)
         todo = []
         for skey, st in [(k, s) for k, s in retry_due.items() if lead[k] == cls]:
             retry_due.pop(skey, None)
-            cands = corpus.candidates(st, k=RETRY_CANDIDATES) if retry_left["n"] > 0 else []
+            cands = []
+            if retry_left["n"] > 0:
+                refused = avoid.get(skey, [])
+                cands = [wi for wi in corpus.candidates(st, k=RETRY_CANDIDATES + 2 * len(refused)) if past(wi, refused)]
+                cands = cands[:RETRY_CANDIDATES]
             if not cands:
                 open_keys.discard(skey)
                 continue
@@ -1661,16 +2333,20 @@ def trace_sources(
 
     def advance() -> None:
         """The next stage, when the one before it is done: the first
-        targets' second looks once all their first looks are back; the other
+        targets' second looks once all their first looks and the checks on
+        what they found are back (a refused link may earn one); the other
         targets only once every first-target statement is settled, so they
         never slow the deliverable on a shared model server; then theirs."""
-        if 0 not in retried_class and first_out[0] == 0:
+        if 0 not in retried_class and first_out[0] == 0 and not any(lead[k] == 0 for k in awaiting):
             queue_retries(0)
         if not rest_started["yes"] and not any(lead[k] == 0 for k in open_keys):
             rest_started["yes"] = True
             for batch in _batches(jobs[1], corpus):
                 look(batch, 1, retry=False)
-        if rest_started["yes"] and 1 not in retried_class and first_out[1] == 0:
+        if (
+            rest_started["yes"] and 1 not in retried_class and first_out[1] == 0
+            and not any(lead[k] == 1 for k in awaiting)
+        ):
             queue_retries(1)
 
     def build(status: str) -> dict:

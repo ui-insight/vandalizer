@@ -87,6 +87,9 @@ _VERDICTS = frozenset({
 # below."): nothing a source could state. One RFA checklist repeated it in
 # 15 table rows, each counted as untraced.
 _CROSS_REFERENCE_RE = re.compile(r"^see\b[^.]{0,80}\b(?:below|above)$", re.IGNORECASE)
+# The same pointer glued onto a cell's statement with no period between:
+# "Page limit: 15 pages (RES/EDU) **See required structure below.**".
+_TRAILING_POINTER_RE = re.compile(r"[\s*_]*\bsee\b[^.\n]{0,80}\b(?:below|above)\b[\s.*_]*$", re.IGNORECASE)
 
 # A machine token ("expense:transaction_date", "award_terms", "KB2"): a key
 # or pointer the workflow wrote, not something a reader would check.
@@ -288,6 +291,9 @@ def _add(
     a, b = _trim(text, a, b)
     if b <= a:
         return
+    pointer = _TRAILING_POINTER_RE.search(text, a, b)
+    if pointer and pointer.start() > a:
+        a, b = _trim(text, a, pointer.start())
     for ca, cb in clause_spans(text, a, b):
         p = plain(text[ca:cb])
         kind = classify(p)
