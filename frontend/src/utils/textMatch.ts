@@ -79,3 +79,81 @@ function trimPartialWord(text: string): string {
   const lastSpace = text.lastIndexOf(' ')
   return lastSpace > 0 ? text.slice(0, lastSpace) : text
 }
+
+// --- Loose matching ---------------------------------------------------------
+// A PDF's text layer and a text extractor read the same page differently:
+// the layer splits runs into items ("( up to 250 characters )", "time) :"),
+// draws bullets ("•") where the extractor writes list marks ("- "), and an
+// extractor that cannot read a ligature glyph drops it ("Staffing" read as
+// "Stang"). Compared letter for letter and digit for digit, in order, the
+// two agree; spacing, punctuation and bullets are not compared.
+
+// The Latin ligatures U+FB00 to U+FB06, spelled out.
+const LIGATURES: Record<string, string> = Object.fromEntries(
+  ['ff', 'fi', 'fl', 'ffi', 'ffl', 'st', 'st'].map((spelled, i) => [String.fromCharCode(0xfb00 + i), spelled]),
+)
+const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
+
+/** `text`'s letters and digits only, lowercased, ligatures spelled out, and
+ *  the index in `text` each comes from. */
+export function skeletonWithMap(text: string): { skel: string; map: number[] } {
+  let skel = ''
+  const map: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    const spelled = LIGATURES[text[i]] ?? text[i]
+    for (const c of spelled) {
+      if (!LETTER_OR_DIGIT.test(c)) continue
+      for (const lower of c.toLowerCase()) {
+        skel += lower
+        map.push(i)
+      }
+    }
+  }
+  return { skel, map }
+}
+
+/** Shortest needle (in letters and digits) matched loosely: shorter, and
+ *  ignoring spaces could find its letters where its words do not stand
+ *  together. */
+export const LOOSE_MIN_CHARS = 12
+/** Longest needle a dropped ligature is allowed for. */
+const LIGATURE_MAX_CHARS = 800
+
+/**
+ * `[start, end)` ranges of `haystack` whose letters and digits are
+ * `needle`'s, in order. When there are none, a needle missing an "ff", "fi",
+ * "fl", "ffi" or "ffl" that `haystack` has between two letters still
+ * matches — what an extractor that dropped a ligature glyph wrote.
+ */
+export function findLoose(haystack: string, needle: string): Array<[number, number]> {
+  const n = skeletonWithMap(needle).skel
+  if (n.length < LOOSE_MIN_CHARS) return []
+  const { skel, map } = skeletonWithMap(haystack)
+  const out: Array<[number, number]> = []
+  for (let at = skel.indexOf(n); at !== -1; at = skel.indexOf(n, at + n.length)) {
+    out.push([map[at], map[at + n.length - 1] + 1])
+  }
+  if (out.length > 0 || n.length > LIGATURE_MAX_CHARS) return out
+  // `n` holds only letters and digits: nothing in it needs escaping.
+  const pattern = Array.from(n).join('(?:ffi|ffl|ff|fi|fl)?')
+  for (const m of skel.matchAll(new RegExp(pattern, 'g'))) {
+    const at = m.index ?? 0
+    out.push([map[at], map[at + m[0].length - 1] + 1])
+  }
+  return out
+}
+
+/**
+ * The longest leading part of `needle` — whole words, at least `minWords` —
+ * that `findLoose` finds in `haystack`, as `[start, end)`. A passage that
+ * runs onto the next page is on neither page whole; its start is on the
+ * page it is cited at.
+ */
+export function findLoosePrefix(haystack: string, needle: string, minWords = 4): [number, number] | null {
+  const words = needle.split(/\s+/).filter(Boolean)
+  for (let k = words.length - 1; k >= minWords; k--) {
+    const [range] = findLoose(haystack, words.slice(0, k).join(' '))
+    if (range) return range
+  }
+  return null
+}

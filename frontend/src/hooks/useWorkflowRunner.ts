@@ -38,9 +38,12 @@ export function useWorkflowRunner() {
       setRunning(!terminal && !paused)
       // A completed run's sources are traced afterwards: keep polling until
       // they arrive (bounded by the trace's ten-minute budget), without
-      // showing the run as running.
+      // showing the run as running. The run is saved completed a moment
+      // before its trace is queued; a poll in between sees no sourcing yet,
+      // so look a few more times before deciding there is none.
       const tracing = s.status === 'completed' && (s.sourcing?.status === 'pending' || s.sourcing?.status === 'running')
-      if (terminal && (!tracing || tracePollsRef.current++ > 300)) stopPolling()
+      const queuing = s.status === 'completed' && !s.sourcing && tracePollsRef.current < 5
+      if (terminal && (!(tracing || queuing) || tracePollsRef.current++ > 300)) stopPolling()
     } catch {
       // Keep polling on transient errors
     }
@@ -124,9 +127,10 @@ export function useWorkflowRunner() {
       const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const isPaused = s.status === 'pending_approval'
       const tracing = s.status === 'completed' && (s.sourcing?.status === 'pending' || s.sourcing?.status === 'running')
+      const queuing = s.status === 'completed' && !s.sourcing
       setRunning(!isTerminal && !isPaused)
       tracePollsRef.current = 0
-      if (!isTerminal || tracing) {
+      if (!isTerminal || tracing || queuing) {
         intervalRef.current = setInterval(() => poll(sid), 2000)
       }
     } catch {

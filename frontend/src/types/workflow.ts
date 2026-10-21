@@ -219,6 +219,8 @@ export interface SourcedStatement {
   le?: number;
   src?: number;
   t?: 'absent' | 'verdict';
+  /** Still being checked: only while `WorkflowSourcing.status` is `running`. */
+  w?: 1;
 }
 
 export interface SourcingTarget {
@@ -227,7 +229,9 @@ export interface SourcingTarget {
   summary: { statements: number; traced: number };
 }
 
-/** Targets: `final` (the deliverable), `step:<steps_output key>`, or `test`. */
+/** Targets: `final` (the deliverable), `step:<steps_output key>`, or `test`.
+ *  While `running`, `targets` holds what is settled so far — the
+ *  deliverable first — and grows; a source's index never changes. */
 export interface WorkflowSourcing {
   status: 'pending' | 'running' | 'done' | 'failed';
   version?: number;

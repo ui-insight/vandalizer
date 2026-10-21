@@ -141,10 +141,12 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let polls = 0
-    // A run that has only just finished may still be tracing its sources;
-    // pick them up when they land (bounded by the trace's ten-minute budget).
+    // A run that has only just finished may still be tracing its sources,
+    // or not have queued the trace yet; pick them up as they land (bounded
+    // by the trace's ten-minute budget).
     const waitForSources = (s: WorkflowSourcing | null | undefined) => {
-      if (cancelled || !s || (s.status !== 'pending' && s.status !== 'running') || polls++ > 150) return
+      const waiting = s ? s.status === 'pending' || s.status === 'running' : polls < 3
+      if (cancelled || !waiting || polls++ > 300) return
       timer = setTimeout(() => {
         getWorkflowStatus(sessionId)
           .then(next => {
@@ -153,7 +155,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
             waitForSources(next?.sourcing)
           })
           .catch(() => waitForSources(s))
-      }, 4000)
+      }, 2000)
     }
     getWorkflowStatus(sessionId)
       .then(status => {

@@ -5,7 +5,7 @@ import { pollStatus, retryExtraction } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 import { stageCopy } from '../../utils/processingStatus'
-import { normalizeWithMap } from '../../utils/textMatch'
+import { findLoose, findLoosePrefix, normalizeWithMap } from '../../utils/textMatch'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -49,6 +49,168 @@ async function readTextItems(page: pdfjsLib.PDFPageProxy): Promise<unknown[]> {
     try { reader.releaseLock() } catch { /* noop */ }
   }
   return items
+}
+
+type PageViewport = ReturnType<pdfjsLib.PDFPageProxy['getViewport']>
+type TextItem = { str: string; transform: number[]; width: number; height: number }
+type CharRef = { itemIdx: number; localIdx: number } | null
+
+/** A page's text as the viewer searches it, read once per document. */
+type PageText = {
+  items: TextItem[]
+  /** The page's text items run together, a space between two items. */
+  concat: string
+  /** The item and offset each character of `concat` comes from (null: a separator). */
+  charRefs: CharRef[]
+  norm: string
+  normMap: number[]
+  /** The values of the page's text form fields, which the text layer omits. */
+  fields: Array<{ lower: string; rect: number[] }>
+}
+
+async function readPageText(page: pdfjsLib.PDFPageProxy): Promise<PageText> {
+  const items: TextItem[] = []
+  for (const raw of await readTextItems(page)) {
+    if (raw && typeof raw === 'object' && 'str' in raw) items.push(raw as TextItem)
+  }
+  // PDFs break runs of text into many TextItems — a single visible phrase like
+  // "University of Idaho" can span 1..N items. So instead of substring-matching
+  // against each item independently, we concatenate the page's text into one
+  // string (with a space between items so adjacent tokens don't fuse) and
+  // keep a parallel map from each char position back to (itemIdx, localIdx).
+  const charRefs: CharRef[] = []
+  let concat = ''
+  for (let idx = 0; idx < items.length; idx++) {
+    const s = items[idx].str
+    for (let j = 0; j < s.length; j++) {
+      charRefs.push({ itemIdx: idx, localIdx: j })
+      concat += s[j]
+    }
+    if (s.length > 0 && idx < items.length - 1) {
+      charRefs.push(null) // separator — not part of any item
+      concat += ' '
+    }
+  }
+  const { norm, map: normMap } = normalizeWithMap(concat)
+
+  // AcroForm / widget annotations: form-field values don't appear in the
+  // page's text layer, but many extractions pull from them.
+  const fields: PageText['fields'] = []
+  try {
+    for (const ann of await page.getAnnotations()) {
+      const a = ann as { subtype?: string; fieldType?: string; fieldValue?: unknown; rect?: number[] }
+      if (a.subtype !== 'Widget' || a.fieldType !== 'Tx') continue
+      const rawValue = a.fieldValue
+      if (rawValue === undefined || rawValue === null || !a.rect || a.rect.length < 4) continue
+      const value = Array.isArray(rawValue) ? rawValue.join(' ') : String(rawValue)
+      const lower = value.toLowerCase().replace(/\s+/g, ' ').trim()
+      if (lower) fields.push({ lower, rect: a.rect })
+    }
+  } catch (err) {
+    console.warn('[DocumentViewer] annotation search failed:', err)
+  }
+  return { items, concat, charRefs, norm, normMap, fields }
+}
+
+/** Where `term` occurs in `text.concat`, compared normalized (case, quotes,
+ *  dashes, whitespace runs), as `[start, end)` ranges of `concat`. */
+function exactRanges(text: PageText, term: string): Array<[number, number]> {
+  const needle = normalizeWithMap(term).norm
+  const out: Array<[number, number]> = []
+  if (!needle) return out
+  let from = 0
+  while (from < text.norm.length) {
+    const at = text.norm.indexOf(needle, from)
+    if (at === -1) break
+    from = at + 1
+    out.push([text.normMap[at], text.normMap[at + needle.length - 1] + 1])
+  }
+  return out
+}
+
+/** Scroll the pane `container` sits in so `target` is in view, a little
+ *  below the top. */
+function scrollToHighlight(container: HTMLElement, target: HTMLElement) {
+  const scrollParent = container.parentElement
+  if (!scrollParent || !target.isConnected) return
+  const targetRect = target.getBoundingClientRect()
+  const parentRect = scrollParent.getBoundingClientRect()
+  const scrollTop = scrollParent.scrollTop + (targetRect.top - parentRect.top) - 150
+
+  scrollParent.scrollTo({
+    top: Math.max(0, scrollTop),
+    behavior: 'smooth',
+  })
+}
+
+/** A single match may have multiple rects (cross-text-item): match `index`'s
+ *  are drawn darker. */
+function markHighlight(container: HTMLElement, index: number) {
+  container.querySelectorAll('.pdf-highlight').forEach((hl) => {
+    const el = hl as HTMLElement
+    el.style.opacity = Number(el.dataset.highlightIndex) === index ? '0.75' : '0.45'
+  })
+}
+
+/** A highlight over `[start, end)` of `text.concat`: one rect for each text
+ *  item the range covers. */
+function drawRange(overlay: Element, viewport: PageViewport, text: PageText, start: number, end: number): HTMLElement[] {
+  // Gather the span of each item that is covered by this match.
+  const perItem = new Map<number, { start: number; end: number }>()
+  for (let k = start; k < end; k++) {
+    const ref = text.charRefs[k]
+    if (!ref) continue
+    const existing = perItem.get(ref.itemIdx)
+    if (!existing) {
+      perItem.set(ref.itemIdx, { start: ref.localIdx, end: ref.localIdx })
+    } else {
+      if (ref.localIdx < existing.start) existing.start = ref.localIdx
+      if (ref.localIdx > existing.end) existing.end = ref.localIdx
+    }
+  }
+
+  const els: HTMLElement[] = []
+  for (const [itemIdx, span] of perItem) {
+    const textItem = text.items[itemIdx]
+    const textStr = textItem.str
+    if (!textStr) continue
+
+    const fontHeight = Math.sqrt(
+      textItem.transform[2] * textItem.transform[2] +
+      textItem.transform[3] * textItem.transform[3]
+    ) || textItem.height || 10
+
+    const tx = textItem.transform[4]
+    const ty = textItem.transform[5]
+
+    const vt = viewport.transform
+    const vpX = vt[0] * tx + vt[2] * ty + vt[4]
+    const vpY = vt[1] * tx + vt[3] * ty + vt[5]
+    const fontHeightVp = fontHeight * viewport.scale
+
+    const fullWidth = textItem.width * viewport.scale
+    const charCount = textStr.length
+    const xOffset = charCount > 0 ? (span.start / charCount) * fullWidth : 0
+    const matchLen = span.end - span.start + 1
+    const matchWidth = charCount > 0 ? (matchLen / charCount) * fullWidth : fullWidth
+
+    const hl = document.createElement('div')
+    hl.className = 'pdf-highlight'
+    Object.assign(hl.style, {
+      position: 'absolute',
+      left: `${vpX + xOffset}px`,
+      top: `${vpY - fontHeightVp}px`,
+      width: `${matchWidth}px`,
+      height: `${fontHeightVp}px`,
+      backgroundColor: HIGHLIGHT_COLOR,
+      opacity: '0.45',
+      pointerEvents: 'none',
+      borderRadius: '2px',
+    })
+    overlay.appendChild(hl)
+    els.push(hl)
+  }
+  return els
 }
 
 // Walk text nodes under `root`, wrap occurrences of `query` (case-insensitive,
@@ -154,6 +316,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const renderingRef = useRef(false)
+  // A render asked for while another draws: run once that one ends.
+  const renderAgainRef = useRef(false)
+  // Every page has its place (sized, maybe not yet painted): highlights can be drawn.
+  const laidOutRef = useRef(false)
+  // Each highlight pass takes a number; an older pass still reading pages
+  // stops when a newer one has started, so it cannot draw over it.
+  const highlightPassRef = useRef(0)
+  const pageTextRef = useRef<{ doc: pdfjsLib.PDFDocumentProxy | null; pages: Map<number, PageText> }>({ doc: null, pages: new Map() })
   const [totalHighlights, setTotalHighlights] = useState(0)
   const [currentHighlight, setCurrentHighlight] = useState(0)
   // True when highlight terms were requested but nothing matched — drives
@@ -391,82 +561,122 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoomLevel])
 
-  // Re-apply highlights when terms change
+  // What a highlight pass looks for, kept current for a page layout that
+  // finishes after the terms changed. The find bar is matched as typed; a
+  // passage a citation or source points at may differ from the PDF's text
+  // layer in spacing, bullets and ligatures, and is also matched loosely.
+  const latestRef = useRef({ terms: effectiveTerms, page: effectivePage, loose: !searchOpen })
+  latestRef.current = { terms: effectiveTerms, page: effectivePage, loose: !searchOpen }
+
+  // Re-apply highlights when terms change — once every page has its place;
+  // a layout still under way applies them itself when it is done.
   useEffect(() => {
-    if (isPdf !== true || !pdfDocRef.current) return
-    applyHighlights(pdfDocRef.current, effectiveTerms, effectivePage).catch(err => {
+    if (isPdf !== true || !pdfDocRef.current || !laidOutRef.current) return
+    applyHighlights(pdfDocRef.current, effectiveTerms, effectivePage, !searchOpen).catch(err => {
       console.error('[DocumentViewer] applyHighlights failed:', err)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTerms, effectivePage])
 
   const renderAllPages = useCallback(async (doc: pdfjsLib.PDFDocumentProxy) => {
-    if (renderingRef.current) return
+    if (renderingRef.current) {
+      // Another render is drawing (a zoom, a document being replaced):
+      // draw again, with what is current then, when it ends.
+      renderAgainRef.current = true
+      return
+    }
     renderingRef.current = true
+    laidOutRef.current = false
+    try {
+      const container = containerRef.current
+      if (!container) return
 
-    const container = containerRef.current
-    if (!container) { renderingRef.current = false; return }
+      // Clear existing pages
+      container.innerHTML = ''
+      const dpr = window.devicePixelRatio || 1
 
-    // Clear existing pages
-    container.innerHTML = ''
-    const dpr = window.devicePixelRatio || 1
+      // Every page's place first, at its size and still blank, so the page a
+      // source is on can be scrolled to and highlighted at once. Painting each
+      // page before laying out the next kept the reader on page 1 of a
+      // 51-page solicitation for several seconds.
+      const slots: Array<{ num: number; page: pdfjsLib.PDFPageProxy; viewport: PageViewport; canvas: HTMLCanvasElement }> = []
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i)
+        if (pdfDocRef.current !== doc) return   // another document replaced this one
+        const viewport = page.getViewport({ scale: zoomLevel })
 
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i)
-      const viewport = page.getViewport({ scale: zoomLevel })
+        // Page wrapper
+        const wrapper = document.createElement('div')
+        wrapper.style.position = 'relative'
+        wrapper.style.width = `${Math.floor(viewport.width)}px`
+        wrapper.style.margin = '10px auto'
+        wrapper.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
+        wrapper.style.backgroundColor = '#fff'
+        wrapper.dataset.pageNum = String(i)
 
-      // Page wrapper
-      const wrapper = document.createElement('div')
-      wrapper.style.position = 'relative'
-      wrapper.style.width = `${Math.floor(viewport.width)}px`
-      wrapper.style.margin = '10px auto'
-      wrapper.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
-      wrapper.style.backgroundColor = '#fff'
-      wrapper.dataset.pageNum = String(i)
+        // Canvas
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.floor(viewport.width * dpr)
+        canvas.height = Math.floor(viewport.height * dpr)
+        canvas.style.width = `${Math.floor(viewport.width)}px`
+        canvas.style.height = `${Math.floor(viewport.height)}px`
+        canvas.style.display = 'block'
 
-      // Canvas
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.floor(viewport.width * dpr)
-      canvas.height = Math.floor(viewport.height * dpr)
-      canvas.style.width = `${Math.floor(viewport.width)}px`
-      canvas.style.height = `${Math.floor(viewport.height)}px`
-      canvas.style.display = 'block'
+        // Overlay for highlights
+        const overlay = document.createElement('div')
+        overlay.className = 'pdf-overlay'
+        overlay.style.position = 'absolute'
+        overlay.style.left = '0'
+        overlay.style.top = '0'
+        overlay.style.width = canvas.style.width
+        overlay.style.height = canvas.style.height
+        overlay.style.pointerEvents = 'none'
 
-      // Overlay for highlights
-      const overlay = document.createElement('div')
-      overlay.className = 'pdf-overlay'
-      overlay.style.position = 'absolute'
-      overlay.style.left = '0'
-      overlay.style.top = '0'
-      overlay.style.width = canvas.style.width
-      overlay.style.height = canvas.style.height
-      overlay.style.pointerEvents = 'none'
+        wrapper.appendChild(canvas)
+        wrapper.appendChild(overlay)
+        container.appendChild(wrapper)
+        slots.push({ num: i, page, viewport, canvas })
+      }
+      laidOutRef.current = true
 
-      wrapper.appendChild(canvas)
-      wrapper.appendChild(overlay)
-      container.appendChild(wrapper)
+      const { terms, page: preferPage, loose } = latestRef.current
+      if (terms.length > 0) {
+        applyHighlights(doc, terms, preferPage, loose).catch(err => {
+          console.error('[DocumentViewer] applyHighlights failed:', err)
+        })
+      }
 
-      // Render page on canvas
-      const ctx = canvas.getContext('2d')!
-      await page.render({
-        canvas,
-        canvasContext: ctx,
-        viewport,
-        transform: [dpr, 0, 0, dpr, 0, 0],
-      }).promise
+      // Then paint, the page a source is on first.
+      const first = slots.find(s => s.num === preferPage)
+      for (const slot of first ? [first, ...slots.filter(s => s !== first)] : slots) {
+        if (pdfDocRef.current !== doc || !slot.canvas.isConnected) return
+        await slot.page.render({
+          canvas: slot.canvas,
+          canvasContext: slot.canvas.getContext('2d')!,
+          viewport: slot.viewport,
+          transform: [dpr, 0, 0, dpr, 0, 0],
+        }).promise
+      }
+    } catch (err) {
+      // A document replaced mid-render rejects its pending pages; only a
+      // failure of the document still on screen is worth reporting.
+      if (pdfDocRef.current === doc) console.error('[DocumentViewer] render failed:', err)
+    } finally {
+      renderingRef.current = false
+      if (renderAgainRef.current) {
+        renderAgainRef.current = false
+        const current = pdfDocRef.current
+        if (current) void renderRef.current(current)
+      }
     }
+  }, [zoomLevel])
+  const renderRef = useRef(renderAllPages)
+  renderRef.current = renderAllPages
 
-    renderingRef.current = false
-
-    // Apply highlights after rendering
-    if (effectiveTerms.length > 0) {
-      applyHighlights(doc, effectiveTerms, effectivePage).catch(err => {
-        console.error('[DocumentViewer] applyHighlights failed:', err)
-      })
-    }
-  }, [zoomLevel, effectiveTerms, effectivePage])
-
-  const applyHighlights = useCallback(async (doc: pdfjsLib.PDFDocumentProxy, terms: string[], preferPage: number | null = null) => {
+  const applyHighlights = useCallback(async (
+    doc: pdfjsLib.PDFDocumentProxy, terms: string[], preferPage: number | null = null, loose = false,
+  ) => {
+    const pass = ++highlightPassRef.current
     const container = containerRef.current
     if (!container) return
 
@@ -489,195 +699,134 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       return
     }
 
-    // PDFs break runs of text into many TextItems — a single visible phrase like
-    // "University of Idaho" can span 1..N items. So instead of substring-matching
-    // against each item independently, we concatenate the page's text into one
-    // string (with a space between items so adjacent tokens don't fuse) and
-    // keep a parallel map from each char position back to (itemIdx, localIdx).
-    // We then search in the concatenated string and project matches back to
-    // per-item rectangles.
-    type TextItem = { str: string; transform: number[]; width: number; height: number }
-    type CharRef = { itemIdx: number; localIdx: number } | null
+    // A page's text is read once per document: every "Open at p. N" and
+    // every keystroke in the find bar searches it again.
+    if (pageTextRef.current.doc !== doc) pageTextRef.current = { doc, pages: new Map() }
+    const cache = pageTextRef.current.pages
 
-    let matchCount = 0
-    // First match found on the hinted page — becomes the initial scroll
-    // target so a common value doesn't land the user on the wrong occurrence.
-    let preferredMatchIdx = -1
+    // The hinted page first: a match there is shown as soon as it is found,
+    // before the rest of a long document has been read.
+    const order = Array.from({ length: doc.numPages }, (_, k) => k + 1)
+    if (preferPage != null && preferPage >= 1 && preferPage <= doc.numPages) {
+      order.splice(preferPage - 1, 1)
+      order.unshift(preferPage)
+    }
+    const hits: Array<{ page: number; at: number; els: HTMLElement[] }> = []
+    let shown = false
 
-    for (let i = 1; i <= doc.numPages; i++) {
+    for (const i of order) {
       const page = await doc.getPage(i)
-      const viewport = page.getViewport({ scale: zoomLevel })
-      // pdfjs's built-in getTextContent() uses `for await..of` on a
-      // ReadableStream, which throws on Safari versions that don't implement
-      // ReadableStream[Symbol.asyncIterator]. Drive the stream by hand.
-      const textItems = await readTextItems(page)
-      const wrapper = container.querySelector(`[data-page-num="${i}"]`)
-      const overlay = wrapper?.querySelector('.pdf-overlay')
+      let text = cache.get(i)
+      if (!text) {
+        text = await readPageText(page)
+        cache.set(i, text)
+      }
+      // A newer pass (another source opened, the find bar typed in) has
+      // started: it draws, this one stops.
+      if (pass !== highlightPassRef.current) return
+      const overlay = container.querySelector(`[data-page-num="${i}"] .pdf-overlay`)
       if (!overlay) continue
-
-      const items: TextItem[] = []
-      for (const raw of textItems) {
-        if (raw && typeof raw === 'object' && 'str' in raw) items.push(raw as TextItem)
-      }
-
-      const charRefs: CharRef[] = []
-      let concat = ''
-      for (let idx = 0; idx < items.length; idx++) {
-        const s = items[idx].str
-        for (let j = 0; j < s.length; j++) {
-          charRefs.push({ itemIdx: idx, localIdx: j })
-          concat += s[j]
-        }
-        if (s.length > 0 && idx < items.length - 1) {
-          charRefs.push(null) // separator — not part of any item
-          concat += ' '
-        }
-      }
-      // Match in normalized space (case, unicode quotes/dashes, whitespace
-      // runs) and project hits back onto real char positions, so verbatim
-      // passages match even when the LLM and the PDF text layer disagree on
-      // punctuation encoding.
-      const { norm: concatNorm, map: normMap } = normalizeWithMap(concat)
+      const viewport = page.getViewport({ scale: zoomLevel })
+      const before = hits.length
 
       for (const term of terms) {
         if (!term) continue
-        const needle = normalizeWithMap(term).norm
-        if (!needle) continue
-
-        let from = 0
-        while (from < concatNorm.length) {
-          const normStart = concatNorm.indexOf(needle, from)
-          if (normStart === -1) break
-          from = normStart + 1
-          const matchStart = normMap[normStart]
-          const matchEnd = normMap[normStart + needle.length - 1] + 1
-
-          // Gather the span of each item that is covered by this match.
-          const perItem = new Map<number, { start: number; end: number }>()
-          for (let k = matchStart; k < matchEnd; k++) {
-            const ref = charRefs[k]
-            if (!ref) continue
-            const existing = perItem.get(ref.itemIdx)
-            if (!existing) {
-              perItem.set(ref.itemIdx, { start: ref.localIdx, end: ref.localIdx })
-            } else {
-              if (ref.localIdx < existing.start) existing.start = ref.localIdx
-              if (ref.localIdx > existing.end) existing.end = ref.localIdx
-            }
-          }
-
-          for (const [itemIdx, span] of perItem) {
-            const textItem = items[itemIdx]
-            const textStr = textItem.str
-            if (!textStr) continue
-
-            const fontHeight = Math.sqrt(
-              textItem.transform[2] * textItem.transform[2] +
-              textItem.transform[3] * textItem.transform[3]
-            ) || textItem.height || 10
-
-            const tx = textItem.transform[4]
-            const ty = textItem.transform[5]
-
-            const vt = viewport.transform
-            const vpX = vt[0] * tx + vt[2] * ty + vt[4]
-            const vpY = vt[1] * tx + vt[3] * ty + vt[5]
-            const fontHeightVp = fontHeight * viewport.scale
-
-            const fullWidth = textItem.width * viewport.scale
-            const charCount = textStr.length
-            const xOffset = charCount > 0 ? (span.start / charCount) * fullWidth : 0
-            const matchLen = span.end - span.start + 1
-            const matchWidth = charCount > 0 ? (matchLen / charCount) * fullWidth : fullWidth
-
-            const hl = document.createElement('div')
-            hl.className = 'pdf-highlight'
-            hl.dataset.highlightIndex = String(matchCount)
-            Object.assign(hl.style, {
-              position: 'absolute',
-              left: `${vpX + xOffset}px`,
-              top: `${vpY - fontHeightVp}px`,
-              width: `${matchWidth}px`,
-              height: `${fontHeightVp}px`,
-              backgroundColor: HIGHLIGHT_COLOR,
-              opacity: '0.45',
-              pointerEvents: 'none',
-              borderRadius: '2px',
-            })
-            overlay.appendChild(hl)
-          }
-
-          if (preferPage != null && i === preferPage && preferredMatchIdx === -1) {
-            preferredMatchIdx = matchCount
-          }
-          matchCount++
+        // Match in normalized space (case, unicode quotes/dashes, whitespace
+        // runs) and project hits back onto real char positions, so verbatim
+        // passages match even when the LLM and the PDF text layer disagree on
+        // punctuation encoding. A passage that still misses is compared by its
+        // letters and digits alone.
+        const exact = exactRanges(text, term)
+        for (const [start, end] of exact.length > 0 || !loose ? exact : findLoose(text.concat, term)) {
+          hits.push({ page: i, at: start, els: drawRange(overlay, viewport, text, start, end) })
         }
       }
 
       // Also search AcroForm / widget annotations — form-field values don't
       // appear in the page's text layer, but many extractions pull from them.
-      try {
-        const annotations = await page.getAnnotations()
-        for (const ann of annotations) {
-          const a = ann as { subtype?: string; fieldType?: string; fieldValue?: unknown; rect?: number[] }
-          if (a.subtype !== 'Widget' || a.fieldType !== 'Tx') continue
-          const rawValue = a.fieldValue
-          if (rawValue === undefined || rawValue === null) continue
-          const fieldVal = Array.isArray(rawValue) ? rawValue.join(' ') : String(rawValue)
-          const fieldLower = fieldVal.toLowerCase().replace(/\s+/g, ' ').trim()
-          if (!fieldLower || !a.rect || a.rect.length < 4) continue
+      for (const field of text.fields) {
+        for (const term of terms) {
+          if (!term) continue
+          const termLower = term.toLowerCase().replace(/\s+/g, ' ').trim()
+          if (!termLower || !field.lower.includes(termLower)) continue
 
-          for (const term of terms) {
-            if (!term) continue
-            const termLower = term.toLowerCase().replace(/\s+/g, ' ').trim()
-            if (!termLower || !fieldLower.includes(termLower)) continue
+          // pdfjs 6 dropped convertToViewportRectangle; it transformed the
+          // two corners, which is what convertToViewportPoint does one at a
+          // time. The min/abs below already normalise the result, so the
+          // corner order does not matter.
+          const [rx1, ry1, rx2, ry2] = field.rect
+          const [vx1, vy1] = viewport.convertToViewportPoint(rx1, ry1)
+          const [vx2, vy2] = viewport.convertToViewportPoint(rx2, ry2)
+          const left = Math.min(vx1, vx2)
+          const top = Math.min(vy1, vy2)
+          const width = Math.abs(vx2 - vx1)
+          const height = Math.abs(vy2 - vy1)
+          if (width <= 0 || height <= 0) continue
 
-            // pdfjs 6 dropped convertToViewportRectangle; it transformed the
-            // two corners, which is what convertToViewportPoint does one at a
-            // time. The min/abs below already normalise the result, so the
-            // corner order does not matter.
-            const [rx1, ry1, rx2, ry2] = a.rect
-            const [vx1, vy1] = viewport.convertToViewportPoint(rx1, ry1)
-            const [vx2, vy2] = viewport.convertToViewportPoint(rx2, ry2)
-            const left = Math.min(vx1, vx2)
-            const top = Math.min(vy1, vy2)
-            const width = Math.abs(vx2 - vx1)
-            const height = Math.abs(vy2 - vy1)
-            if (width <= 0 || height <= 0) continue
-
-            const hl = document.createElement('div')
-            hl.className = 'pdf-highlight'
-            hl.dataset.highlightIndex = String(matchCount)
-            Object.assign(hl.style, {
-              position: 'absolute',
-              left: `${left}px`,
-              top: `${top}px`,
-              width: `${width}px`,
-              height: `${height}px`,
-              backgroundColor: HIGHLIGHT_COLOR,
-              opacity: '0.45',
-              pointerEvents: 'none',
-              borderRadius: '2px',
-            })
-            overlay.appendChild(hl)
-            matchCount++
-            break // one hit per field is enough
-          }
+          const hl = document.createElement('div')
+          hl.className = 'pdf-highlight'
+          Object.assign(hl.style, {
+            position: 'absolute',
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+            backgroundColor: HIGHLIGHT_COLOR,
+            opacity: '0.45',
+            pointerEvents: 'none',
+            borderRadius: '2px',
+          })
+          overlay.appendChild(hl)
+          hits.push({ page: i, at: Number.MAX_SAFE_INTEGER, els: [hl] })
+          break // one hit per field is enough
         }
-      } catch (err) {
-        console.warn('[DocumentViewer] annotation search failed:', err)
+      }
+
+      if (!shown && i === preferPage && hits.length > before && hits[before].els[0]) {
+        shown = true
+        const target = hits[before].els[0]
+        // Double rAF ensures DOM layout is complete before scrolling
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => scrollToHighlight(container, target))
+        })
       }
     }
 
-    setTotalHighlights(matchCount)
-    if (matchCount > 0) {
+    // A passage that runs onto the next page is on neither page whole: mark
+    // as much of its start as the page it is cited at has.
+    if (hits.length === 0 && loose && preferPage != null) {
+      const text = cache.get(preferPage)
+      const overlay = container.querySelector(`[data-page-num="${preferPage}"] .pdf-overlay`)
+      if (text && overlay) {
+        const viewport = (await doc.getPage(preferPage)).getViewport({ scale: zoomLevel })
+        if (pass !== highlightPassRef.current) return
+        for (const term of terms) {
+          const range = term ? findLoosePrefix(text.concat, term) : null
+          if (!range) continue
+          hits.push({ page: preferPage, at: range[0], els: drawRange(overlay, viewport, text, range[0], range[1]) })
+          break
+        }
+      }
+    }
+
+    // Matches numbered in page order, so "next" walks the document from the top.
+    hits.sort((a, b) => a.page - b.page || a.at - b.at)
+    hits.forEach((hit, idx) => hit.els.forEach(el => { el.dataset.highlightIndex = String(idx) }))
+    setTotalHighlights(hits.length)
+    if (hits.length > 0) {
       setHighlightMiss(false)
-      const initialIdx = preferredMatchIdx >= 0 ? preferredMatchIdx : 0
+      // First match found on the hinted page — the initial scroll target so a
+      // common value doesn't land the user on the wrong occurrence.
+      const onPreferred = preferPage != null ? hits.findIndex(h => h.page === preferPage) : -1
+      const initialIdx = onPreferred >= 0 ? onPreferred : 0
       setCurrentHighlight(initialIdx)
-      // Double rAF ensures DOM layout is complete before scrolling
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => scrollToHighlightByIndex(initialIdx))
-      })
+      if (shown) {
+        markHighlight(container, initialIdx)
+      } else {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => scrollToHighlightByIndex(initialIdx))
+        })
+      }
     } else {
       // Nothing matched: say so instead of doing nothing, and at least jump
       // to the source page when we know it.
@@ -705,34 +854,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const scrollToHighlightByIndex = (index: number) => {
     const container = containerRef.current
     if (!container) return
-
-    const allHighlights = container.querySelectorAll('.pdf-highlight')
-    if (allHighlights.length === 0) return
-
-    // A single match may have multiple rects (cross-text-item). Update opacity
-    // by match index and scroll to the first rect of the active match.
-    allHighlights.forEach((hl) => {
-      const el = hl as HTMLElement
-      const idx = Number(el.dataset.highlightIndex)
-      el.style.opacity = idx === index ? '0.75' : '0.45'
-    })
-
+    markHighlight(container, index)
     const target = container.querySelector(
       `.pdf-highlight[data-highlight-index="${index}"]`
     ) as HTMLElement | null
-    if (!target) return
-
-    const scrollParent = container.parentElement
-    if (!scrollParent) return
-
-    const targetRect = target.getBoundingClientRect()
-    const parentRect = scrollParent.getBoundingClientRect()
-    const scrollTop = scrollParent.scrollTop + (targetRect.top - parentRect.top) - 150
-
-    scrollParent.scrollTo({
-      top: Math.max(0, scrollTop),
-      behavior: 'smooth',
-    })
+    if (target) scrollToHighlight(container, target)
   }
 
   const goToHighlight = useCallback((direction: 'next' | 'prev') => {

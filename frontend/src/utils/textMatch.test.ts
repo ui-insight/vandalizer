@@ -1,5 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { citationAnchor, normalizeWithMap } from './textMatch'
+import { citationAnchor, findLoose, findLoosePrefix, normalizeWithMap, skeletonWithMap } from './textMatch'
+
+describe('findLoose — a source quote against a PDF text layer', () => {
+  // The text layers below are pdf.js's own, from the NSF NHERI and FFAR
+  // Seeding Solutions PDFs; the needles are the stored source quotes.
+  it('ignores the spacing a text layer puts between items', () => {
+    const page = "Due Dates Letter of Intent Due Date(s)   (required)   (due by 5 p.m. proposer's local time) : October 16, 2015 Full"
+    const quote = "Letter of Intent Due Date(s) (required) (due by 5 p.m. proposer's local time): October 16, 2015"
+    expect(normalizeWithMap(page).norm.includes(normalizeWithMap(quote).norm)).toBe(false)
+    const [[a, b]] = findLoose(page, quote)
+    expect(page.slice(a, b)).toBe("Letter of Intent Due Date(s)   (required)   (due by 5 p.m. proposer's local time) : October 16, 2015")
+  })
+
+  it('ignores bullets and list marks', () => {
+    const page = 'd components •   Project title ( up to 250 characters ) •   Key project personnel'
+    const [[a, b]] = findLoose(page, '- Project title (up to 250 characters)')
+    // From its first letter to its last: the bullet and the closing bracket are not compared.
+    expect(page.slice(a, b)).toBe('Project title ( up to 250 characters')
+  })
+
+  it('finds a quote whose ligature the text extractor dropped', () => {
+    const page = 'Section 7. Organizational Structure, Staffing, and Diversity (all proposals, up to two pages).'
+    const [[a, b]] = findLoose(page, 'Section 7. Organizational Structure, Stang, and Diversity')
+    expect(page.slice(a, b)).toBe('Section 7. Organizational Structure, Staffing, and Diversity')
+  })
+
+  it('reads a ligature glyph in the text layer as its letters', () => {
+    expect(skeletonWithMap('Speciﬁc').skel).toBe('specific')
+    const page = 'Section 11. Component-Speciﬁc Implementation (all proposals)'
+    expect(findLoose(page, 'Component-Specific Implementation')).toHaveLength(1)
+  })
+
+  it('finds every place, and nothing that is not there', () => {
+    const page = 'Project abstract (up to 500 words) and later Project abstract ( up to 500 words )'
+    expect(findLoose(page, 'Project abstract (up to 500 words)')).toHaveLength(2)
+    expect(findLoose(page, 'Project summary (up to 500 words)')).toEqual([])
+  })
+
+  it('leaves a short needle to the exact match: its letters could stand anywhere', () => {
+    expect(findLoose('the F and A rate of the award', 'F&A rate')).toEqual([])
+    expect(findLoose('Cost Sharing Requirements', 'Cost Sharing')).toEqual([])
+    // Twelve letters and digits are enough: a component's word limit.
+    expect(findLoose('the word limit. ( up to 5000 words) o Budget Form', '(up to 5000 words)')).toHaveLength(1)
+  })
+})
+
+describe('findLoosePrefix — a passage that runs onto the next page', () => {
+  it('finds as much of its start as the page has', () => {
+    // FFAR Seeding Solutions, p. 6 ends mid-sentence; the quote goes on to p. 7.
+    const page6 = 'A grantee may request a no-cost extension of up to 6 months to complete the work’s planned scope. ' +
+      'The request must be communicated to FFAR and submitted through the Grant Management System at least thirty ' +
+      '(30) days before the end date of the grant. The'
+    const quote = "A grantee may request a no-cost extension of up to 6 months to complete the work's planned scope. The request " +
+      'must be communicated to FFAR and submitted through the Grant Management System at least thirty (30) days before ' +
+      'the end date of the grant. The request must justify the need for the extension'
+    expect(findLoose(page6, quote)).toEqual([])
+    const range = findLoosePrefix(page6, quote)
+    expect(range).not.toBeNull()
+    const [a, b] = range as [number, number]
+    // Everything of it the page has: from its first word to the page's last.
+    expect(page6.slice(a, b)).toBe(page6)
+  })
+
+  it('needs a few words of it at least', () => {
+    expect(findLoosePrefix('The request must justify', 'Budget narrative: Provide a brief overview of the budget')).toBeNull()
+  })
+})
 
 describe('normalizeWithMap', () => {
   it('lowercases and collapses whitespace, mapping back to source offsets', () => {

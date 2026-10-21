@@ -370,12 +370,13 @@ export function WorkflowEditorPanel() {
         setLastRunStepsOutput((status.steps_output ?? null) as Record<string, unknown> | null)
         setLastRunMeta({ finishedAt: latest.finished_at, status: latest.status })
         setLastRunSourcing(status.sourcing ?? null)
-        // Sources are traced after the run completes; pick them up when they
-        // arrive (bounded — a trace has a ten-minute budget).
+        // Sources are traced after the run completes, or about to be; pick
+        // them up as they land (bounded — a trace has a ten-minute budget).
         let polls = 0
         const sessionId = latest.session_id
         const waitForSources = (s: WorkflowSourcing | null | undefined) => {
-          if (cancelled || !s || (s.status !== 'pending' && s.status !== 'running') || polls++ > 150) return
+          const waiting = s ? s.status === 'pending' || s.status === 'running' : polls < 3
+          if (cancelled || !waiting || polls++ > 300) return
           timer = setTimeout(async () => {
             try {
               const next = await getWorkflowStatus(sessionId)
@@ -385,7 +386,7 @@ export function WorkflowEditorPanel() {
             } catch {
               waitForSources(s)
             }
-          }, 4000)
+          }, 2000)
         }
         waitForSources(status.sourcing)
       } catch {

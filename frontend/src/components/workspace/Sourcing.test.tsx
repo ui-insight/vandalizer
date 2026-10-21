@@ -250,6 +250,41 @@ describe('SourcingSummary', () => {
     rerender(<SourcingSummary sourcing={null} target="final" showUntraced={false} onToggle={() => {}} />)
     expect(container.textContent).toBe('')
   })
+
+  it('counts what is settled while the trace runs, and says more is coming', () => {
+    const running: WorkflowSourcing = {
+      status: 'running', sources: [NOA],
+      targets: { final: { format: 'text', statements: [{ s: 0, e: 4, src: 0 }, { s: 5, e: 9, w: 1 }], summary: { statements: 2, traced: 1 } } },
+    }
+    const { rerender, container } = render(
+      <SourcingSummary sourcing={running} target="final" showUntraced={false} onToggle={() => {}} />,
+    )
+    expect(container.textContent).toContain('1 of 2 statements traced to a source')
+    expect(container.textContent).toContain('checking more…')
+    rerender(<SourcingSummary sourcing={{ ...running, status: 'done' }} target="final" showUntraced={false} onToggle={() => {}} />)
+    expect(container.textContent).not.toContain('checking more…')
+  })
+})
+
+describe('results while the trace runs', () => {
+  beforeEach(() => { workspace.current = null })
+
+  function Harness({ sourcing }: { sourcing: WorkflowSourcing }) {
+    const src = useSourcing(sourcing, 'final')
+    return <CitedMarkdown markdown="Southern Utah University. Costs are reasonable." sources={[]} sourcing={src.text} />
+  }
+
+  it('underlines what is settled and leaves what is still being checked plain, untinted', () => {
+    const sourcing: WorkflowSourcing = {
+      status: 'running', sources: [NOA],
+      targets: { final: { format: 'text', statements: [{ s: 0, e: 25, src: 0 }, { s: 26, e: 47, w: 1 }], summary: { statements: 2, traced: 1 } } },
+    }
+    const { container } = render(<Harness sourcing={sourcing} />)
+    expect(Array.from(container.querySelectorAll('.src-u')).map(el => el.textContent)).toEqual(['Southern Utah University.'])
+    // Not counted as untraced while it is being checked: the reviewer tint skips it.
+    expect(container.querySelectorAll('.src-x')).toHaveLength(0)
+    expect(Array.from(container.querySelectorAll('.src-w')).map(el => el.textContent)).toEqual(['Costs are reasonable.'])
+  })
 })
 
 describe('SourcedJson', () => {

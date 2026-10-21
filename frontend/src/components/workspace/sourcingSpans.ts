@@ -142,6 +142,8 @@ export function statementAttrs(
       title: `Source: ${sourceLabel(link)} — click to see where this comes from`,
     }
   }
+  // Still being checked: neither underlined nor counted as untraced yet.
+  if (row.w) return showUntraced ? { class: 'src-w', title: 'Still being checked' } : { class: 'src-w' }
   const attrs: Record<string, string> = { class: 'src-x' }
   if (showUntraced) attrs.title = UNTRACED_WHY[row.t ?? ''] ?? 'Not traced to a source'
   return attrs

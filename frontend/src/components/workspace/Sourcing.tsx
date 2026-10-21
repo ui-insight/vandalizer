@@ -131,7 +131,8 @@ const SUMMARY_STYLE: CSSProperties = {
 }
 
 /** "41 of 52 statements traced to a source", with the reviewer toggle that
- *  tints the rest; "Tracing sources…" while the trace runs. */
+ *  tints the rest; "Tracing sources…" until the first are settled, and a
+ *  spinner beside the count while more are being checked. */
 export function SourcingSummary({ sourcing, target, showUntraced, onToggle }: {
   sourcing: WorkflowSourcing | null | undefined
   target: string
@@ -139,7 +140,12 @@ export function SourcingSummary({ sourcing, target, showUntraced, onToggle }: {
   onToggle: (v: boolean) => void
 }) {
   if (!sourcing) return null
-  if (sourcing.status === 'pending' || sourcing.status === 'running') {
+  if (sourcing.status === 'failed') {
+    return <div style={SUMMARY_STYLE}>{sourcing.error || 'Sources could not be traced.'}</div>
+  }
+  const tracing = sourcing.status === 'pending' || sourcing.status === 'running'
+  const t = sourcing.status === 'done' || sourcing.status === 'running' ? sourcing.targets?.[target] : undefined
+  if (tracing && (!t || t.summary.traced === 0)) {
     return (
       <div role="status" style={SUMMARY_STYLE}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -149,18 +155,20 @@ export function SourcingSummary({ sourcing, target, showUntraced, onToggle }: {
       </div>
     )
   }
-  if (sourcing.status === 'failed') {
-    return <div style={SUMMARY_STYLE}>{sourcing.error || 'Sources could not be traced.'}</div>
-  }
-  const t = sourcing.targets?.[target]
   if (!t || t.summary.statements === 0) return null
   const { statements, traced } = t.summary
   return (
-    <div style={SUMMARY_STYLE}>
+    <div role={tracing ? 'status' : undefined} style={SUMMARY_STYLE}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <BookOpen aria-hidden="true" style={{ width: 12, height: 12 }} />
         {traced} of {statements} statement{statements === 1 ? '' : 's'} traced to a source
       </span>
+      {tracing && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Loader2 className="animate-spin" aria-hidden="true" style={{ width: 12, height: 12 }} />
+          checking more…
+        </span>
+      )}
       {traced < statements && (
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
           <input type="checkbox" checked={showUntraced} onChange={e => onToggle(e.target.checked)} style={{ margin: 0 }} />
@@ -175,7 +183,9 @@ export function SourcingSummary({ sourcing, target, showUntraced, onToggle }: {
  *  underline a text output, the popover, and the toggle state. */
 export function useSourcing(sourcing: WorkflowSourcing | null | undefined, target: string) {
   const [showUntraced, setShowUntraced] = useState(false)
-  const t: SourcingTarget | undefined = sourcing?.status === 'done' ? sourcing.targets?.[target] : undefined
+  // While the trace runs, what is settled is already shown; the rest follows.
+  const live = sourcing?.status === 'done' || sourcing?.status === 'running'
+  const t: SourcingTarget | undefined = live ? sourcing?.targets?.[target] : undefined
   const sources = useMemo(() => sourcing?.sources ?? [], [sourcing])
   const { open, popover } = useSourcePopover(sources)
   const text: CitedSourcing | undefined = t && t.format === 'text'
