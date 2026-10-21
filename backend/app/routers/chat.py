@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
+import anyio
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -298,25 +299,28 @@ async def chat(
             # Safety net: chat_service handles normal completion, client
             # disconnects, and LLM errors. This catches anything that slips
             # through (early-return paths, save failures inside the exception
-            # handlers) so the activity rail never spins forever.
+            # handlers) so the activity rail never spins forever. Shielded:
+            # on a disconnect this runs inside a cancelled scope, where an
+            # unshielded await is cancelled before it reads anything.
             if activity:
-                try:
-                    ev = await ActivityEvent.get(activity.id)
-                    if ev and ev.status in (
-                        ActivityStatus.RUNNING.value,
-                        ActivityStatus.QUEUED.value,
-                    ):
-                        now = datetime.now(timezone.utc)
-                        ev.status = ActivityStatus.FAILED.value
-                        ev.error = "Chat stream ended without resolution."
-                        ev.finished_at = now
-                        ev.last_updated_at = now
-                        await ev.save()
-                except Exception:
-                    logger.exception(
-                        "Failed to reconcile activity %s after chat stream",
-                        activity.id,
-                    )
+                with anyio.CancelScope(shield=True):
+                    try:
+                        ev = await ActivityEvent.get(activity.id)
+                        if ev and ev.status in (
+                            ActivityStatus.RUNNING.value,
+                            ActivityStatus.QUEUED.value,
+                        ):
+                            now = datetime.now(timezone.utc)
+                            ev.status = ActivityStatus.FAILED.value
+                            ev.error = "Chat stream ended without resolution."
+                            ev.finished_at = now
+                            ev.last_updated_at = now
+                            await ev.save()
+                    except Exception:
+                        logger.exception(
+                            "Failed to reconcile activity %s after chat stream",
+                            activity.id,
+                        )
 
     headers = {"X-Conversation-UUID": conversation.uuid}
     if activity:

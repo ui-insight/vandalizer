@@ -8,6 +8,8 @@ import re
 import time
 from typing import AsyncGenerator, Optional
 
+import anyio
+
 from pydantic_ai.agent import Agent
 from pydantic_ai.usage import UsageLimitExceeded, UsageLimits
 from pydantic_ai.messages import (
@@ -2823,30 +2825,12 @@ async def chat_stream(
                 ev.status = ActivityStatus.COMPLETED.value
                 await ev.save()
     except asyncio.CancelledError:
-        # Client disconnected mid-stream. Persist any partial response so the
-        # user message isn't orphaned (would leave consecutive user turns in
-        # history, which pydantic-ai rejects on the next request). The client
-        # posts /chat/stop before aborting on Stop, so a set flag means the
-        # user stopped the turn rather than losing the connection.
-        try:
-            stopped = await asyncio.shield(_consume_stop_request(conversation))
-            await asyncio.shield(_save_failed_assistant_turn(
-                conversation,
-                _build_interrupted_body(
-                    full_response,
-                    "stopped by the user" if stopped
-                    else "connection closed before completion",
-                    kb_sources,
-                ),
-                activity_id,
-                "stopped by the user" if stopped else "client disconnected",
-                thinking="".join(full_thinking) or None,
-                thinking_duration=thinking_duration,
-                interruption="stopped" if stopped else "connection",
-                **_completed_work(),
-            ))
-        except Exception as save_err:
-            logger.error("Failed to persist interrupted chat on cancel: %s", save_err)
+        await _save_cancelled_turn(
+            conversation, full_response, kb_sources, activity_id,
+            thinking="".join(full_thinking) or None,
+            thinking_duration=thinking_duration,
+            completed_work=_completed_work(),
+        )
         raise
 
     except Exception as e:
@@ -2870,8 +2854,11 @@ async def chat_stream(
             logger.error("Failed to persist interrupted chat: %s", save_err)
     finally:
         if _meter_entered:
-            await _mark_certification_turn(conversation, _meter_scope, streamed_tool_calls)
-            await _meter.__aexit__(None, None, None)
+            # Shielded for the same reason as _save_cancelled_turn: a stopped
+            # turn's tokens were spent all the same.
+            with anyio.CancelScope(shield=True):
+                await _mark_certification_turn(conversation, _meter_scope, streamed_tool_calls)
+                await _meter.__aexit__(None, None, None)
 
 
 def _is_certification_tool(tool_name: str) -> bool:
@@ -4138,6 +4125,53 @@ async def _consume_stop_request(conversation: ChatConversation) -> bool:
     )
     conversation.stop_requested = False
     return raw is not None
+
+
+async def _save_cancelled_turn(
+    conversation: ChatConversation,
+    full_response: list[str],
+    kb_sources: list[dict],
+    activity_id: Optional[str],
+    *,
+    thinking: Optional[str],
+    thinking_duration: Optional[float],
+    completed_work: dict,
+) -> None:
+    """Save a turn the client cancelled: Stop, or a dropped connection.
+
+    Persisting the partial response keeps the user message from being
+    orphaned (consecutive user turns, which pydantic-ai rejects next request).
+    The client posts /chat/stop before aborting on Stop, so a set flag means
+    the user stopped the turn rather than losing the connection.
+
+    Runs in a shielded cancel scope. Starlette cancels a streaming response
+    through an anyio cancel scope, and inside a cancelled scope every await is
+    cancelled again. With two ``asyncio.shield`` awaits in a row, the first
+    (reading the stop flag) finished and the second, the save itself, never
+    started. A stopped extraction batch was then saved as nothing at all:
+    after a reload the reply was gone, and "continue" re-ran the batch from
+    the first document.
+    """
+    with anyio.CancelScope(shield=True):
+        try:
+            stopped = await _consume_stop_request(conversation)
+            await _save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(
+                    full_response,
+                    "stopped by the user" if stopped
+                    else "connection closed before completion",
+                    kb_sources,
+                ),
+                activity_id,
+                "stopped by the user" if stopped else "client disconnected",
+                thinking=thinking,
+                thinking_duration=thinking_duration,
+                interruption="stopped" if stopped else "connection",
+                **completed_work,
+            )
+        except Exception as save_err:
+            logger.error("Failed to persist interrupted chat on cancel: %s", save_err)
 
 
 async def _save_failed_assistant_turn(

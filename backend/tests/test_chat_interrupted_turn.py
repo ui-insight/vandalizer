@@ -146,6 +146,80 @@ class TestSaveStoppedTurn:
         assert msg.to_dict()["interruption"] == "stopped"
 
 
+class TestCancelledStream:
+    """The save must survive the way Starlette actually cancels a stream.
+
+    Retest of the ticket: after Stop and a reload the whole reply was gone,
+    and "continue" re-ran the batch from document 1. Starlette cancels a
+    streaming response through an anyio cancel scope, where every await is
+    cancelled again: reading the stop flag finished, the save never started.
+    """
+
+    async def _disconnect_mid_stream(self, consume, save):
+        import asyncio
+
+        from starlette.responses import StreamingResponse
+
+        from app.services.chat_service import _save_cancelled_turn
+
+        async def stream():
+            try:
+                yield "nih-r01.pdf: PI Dr. Rivera, $1,250,000."
+                await asyncio.sleep(10)
+                yield "unreachable"
+            except asyncio.CancelledError:
+                await _save_cancelled_turn(
+                    conv, ["nih-r01.pdf: PI Dr. Rivera, $1,250,000."], [], "activity-1",
+                    thinking=None, thinking_duration=None,
+                    completed_work={**_completed_tool_work(CALLS, RESULTS, SEGMENTS), "plan_state": PLAN},
+                )
+                raise
+
+        from app.services.chat_service import _completed_tool_work
+
+        conv = _conversation()
+        sent = asyncio.Event()
+
+        async def send(message):
+            if message.get("body"):
+                sent.set()
+
+        async def receive():
+            await sent.wait()
+            return {"type": "http.disconnect"}
+
+        scope = {"type": "http", "asgi": {"spec_version": "2.3"}}
+        with (
+            patch("app.services.chat_service._consume_stop_request", new=consume),
+            patch("app.services.chat_service._save_failed_assistant_turn", new=save),
+        ):
+            await asyncio.wait_for(StreamingResponse(stream())(scope, receive, send), 5)
+
+    @pytest.mark.asyncio
+    async def test_stopped_turn_is_saved_with_its_work_when_starlette_cancels(self):
+        import asyncio
+
+        async def consume(_conv):
+            await asyncio.sleep(0)  # a real database round trip
+            return True
+
+        save = AsyncMock()
+        await self._disconnect_mid_stream(consume, save)
+
+        save.assert_awaited_once()
+        args, kwargs = save.await_args
+        assert kwargs["interruption"] == "stopped"
+        assert args[3] == "stopped by the user"
+        assert [r["tool_call_id"] for r in kwargs["tool_results"]] == ["c1", "c2"]
+        assert kwargs["plan_state"] == PLAN
+
+    @pytest.mark.asyncio
+    async def test_save_error_is_logged_and_the_cancel_still_propagates(self):
+        save = AsyncMock(side_effect=RuntimeError("mongo down"))
+        await self._disconnect_mid_stream(AsyncMock(return_value=False), save)
+        assert save.await_args.kwargs["interruption"] == "connection"
+
+
 class TestStopRequest:
     @pytest.mark.asyncio
     async def test_consumes_flag_from_the_database(self):
