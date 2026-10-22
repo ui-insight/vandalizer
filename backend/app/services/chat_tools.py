@@ -5460,6 +5460,7 @@ _WORKFLOW_STEP_TYPES = {
     "knowledge_base_query": ("KnowledgeBaseQuery", False),
     "kb_query": ("KnowledgeBaseQuery", False),
     "website": ("AddWebsite", False),
+    "web_search": ("WebSearch", False),
     "approval": ("Approval", False),
 }
 
@@ -5534,6 +5535,12 @@ async def _build_workflow_step_data(
             return None, "a website step needs a 'url'"
         return {"url": url}, None
 
+    if step_type == "web_search":
+        query = step.get("query") or instruction
+        if not query:
+            return None, "a web_search step needs a 'query'"
+        return {"query": query, "max_results": 5}, None
+
     if step_type == "approval":
         return {
             "review_instructions": instruction or "Review the output before the workflow continues.",
@@ -5576,6 +5583,10 @@ async def create_workflow(
           "research"    — investigate a question (multi-pass). Needs "question".
           "knowledge_base_query" — query a KB. Needs "kb_uuid" and "query".
           "website"     — fetch a page. Needs "url".
+          "web_search"  — search the web; passes results with URLs on. Needs
+                          "query" (may use {{ inputs.output }}). Only when web
+                          search is set up; the query must not carry names,
+                          award numbers or figures from the user's documents.
           "approval"    — pause for human review. "instructions" optional.
       - "is_output": optional bool — mark this step's result as a deliverable.
 

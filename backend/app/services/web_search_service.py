@@ -103,8 +103,25 @@ def web_search_sync(
     sys_config_doc: dict,
     max_results: int = _DEFAULT_MAX_RESULTS,
 ) -> dict:
-    """:func:`web_search` for sync callers (workflow steps in Celery)."""
-    result = asyncio.run(web_search(query, sys_config_doc, max_results, record=False))
+    """:func:`web_search` for sync callers (workflow steps in Celery).
+
+    On a thread that already runs an event loop, asyncio.run would raise, so
+    the search runs on a fresh thread carrying this context (the metering
+    scope the ledger row is attributed from).
+    """
+    def _run() -> dict:
+        return asyncio.run(web_search(query, sys_config_doc, max_results, record=False))
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        result = _run()
+    else:
+        import concurrent.futures
+        import contextvars
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(contextvars.copy_context().run, _run).result()
     _record_sync(_usage_doc(query, sys_config_doc, result))
     return result
 
