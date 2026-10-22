@@ -59,7 +59,13 @@ def env_allowed_hosts() -> frozenset[str]:
     """
     from app.config import Settings
 
-    raw = Settings().outbound_url_allowed_hosts or ""
+    settings = Settings()
+    raw = settings.outbound_url_allowed_hosts or ""
+    # SSRF_ALLOWED_HOSTS is the v5 branch's name for the same list (its web
+    # search reaches an on-campus search proxy); honour both.
+    legacy = getattr(settings, "ssrf_allowed_hosts", "")
+    if isinstance(legacy, str) and legacy:
+        raw = f"{raw},{legacy}"
     out = set()
     for h in raw.split(","):
         try:
@@ -136,10 +142,10 @@ def validate_outbound_url(url: str, allowed_hosts: frozenset[str] | None = None)
 
     A hostname in *allowed_hosts* (default: the operator's
     ``OUTBOUND_URL_ALLOWED_HOSTS`` alone; pass ``allowed_private_hosts(cfg)``
-    to include the admin's System Config list) skips only the address-range
-    check: the
-    scheme must still be HTTP(S), the metadata hostnames stay blocked, and
-    the name must still resolve. The match is on the exact hostname, so an
+    to include the admin's System Config list) may resolve to a private
+    (RFC 1918) address. Loopback, link-local and reserved ranges stay blocked
+    even for a listed host, the scheme must still be HTTP(S), the metadata
+    hostnames stay blocked, and the name must still resolve. The match is on the exact hostname, so an
     exemption for ``router.example.edu`` says nothing about any other name
     that happens to share its address.
     """
@@ -163,12 +169,16 @@ def validate_outbound_url(url: str, allowed_hosts: frozenset[str] | None = None)
 
     if allowed_hosts is None:
         allowed_hosts = allowed_private_hosts()
-    if hostname.lower().rstrip(".") in allowed_hosts:
-        return url
+    private_ok = hostname.lower().rstrip(".") in allowed_hosts
 
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        # Never exempt: an allowlisted name that resolves to loopback,
+        # link-local (cloud metadata) or reserved space is a rebinding or
+        # misconfiguration, not the campus service it was listed for.
+        if ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"URL resolves to blocked IP range: {ip}")
+        if ip.is_private and not private_ok:
             raise ValueError(
                 f"URL resolves to blocked IP range: {ip}. If {hostname} is a "
                 "service this deployment should reach, an admin can allow it "
@@ -177,3 +187,39 @@ def validate_outbound_url(url: str, allowed_hosts: frozenset[str] | None = None)
             )
 
     return url
+
+
+async def safe_get(client, url: str, *, max_redirects: int = 5, validate=None):
+    """GET *url*, re-validating every redirect hop against the SSRF policy.
+
+    ``httpx``'s built-in ``follow_redirects`` validates nothing, so a public
+    URL that we cleared with :func:`validate_outbound_url` can still ``302`` to
+    ``http://169.254.169.254/`` or another internal host. We validate the
+    initial URL and every ``Location`` before connecting, so the link-local /
+    private / reserved block applies to the *final* address actually fetched —
+    not just the first hop.
+
+    The caller must pass an ``httpx.AsyncClient`` created with
+    ``follow_redirects=False``. Raises ``ValueError`` (the same type
+    :func:`validate_outbound_url` raises) when a hop is blocked or the redirect
+    chain is too long, so existing ``except ValueError`` handlers catch it.
+    Returns the final non-redirect ``httpx.Response``.
+
+    ``validate`` lets callers pass their own module-level reference to
+    :func:`validate_outbound_url` so tests that patch it at the call site
+    also cover the per-hop checks here.
+    """
+    validate = validate or validate_outbound_url
+    current = validate(url)
+    for _ in range(max_redirects + 1):
+        resp = await client.get(current)
+        if resp.is_redirect:
+            location = resp.headers.get("location")
+            if not location:
+                return resp
+            # Resolve relative redirects against the URL we just requested,
+            # then re-run the full SSRF policy on the absolute target.
+            current = validate(str(resp.url.join(location)))
+            continue
+        return resp
+    raise ValueError("Too many redirects")

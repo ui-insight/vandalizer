@@ -25,7 +25,7 @@ import trafilatura
 from bs4 import BeautifulSoup
 
 from app.config import Settings
-from app.utils.url_validation import validate_outbound_url
+from app.utils.url_validation import safe_get, validate_outbound_url
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def _extract_title(html: str, fallback_url: str) -> str:
     return urlparse(fallback_url).netloc
 
 
-def _extract_main_text(html: str) -> str:
+def _trafilatura_text(html) -> str:
     text = trafilatura.extract(
         html,
         include_links=False,
@@ -123,8 +123,57 @@ def _extract_main_text(html: str) -> str:
         include_tables=True,
         favor_recall=True,
     )
+    return _normalize_whitespace(text) if text else ""
+
+
+# Elements the page never displays. ``hidden`` is the Bootstrap/Tailwind
+# display:none class; a token like ``md:block`` beside it means the element
+# is shown at some width, so those are left alone.
+_HIDDEN_XPATH = (
+    "//*[@hidden"
+    " or contains(translate(@style, ' ', ''), 'display:none')"
+    " or (contains(concat(' ', normalize-space(@class), ' '), ' hidden ')"
+    "     and not(contains(@class, ':')))]"
+)
+
+
+def _without_hidden_elements(html: str):
+    """*html* parsed with its never-displayed elements removed, or None if it has none."""
+    try:
+        from trafilatura.utils import load_html
+
+        tree = load_html(html)
+        if tree is None:
+            return None
+        hidden = tree.xpath(_HIDDEN_XPATH)
+        if not hidden:
+            return None
+        for el in hidden:
+            parent = el.getparent()
+            if parent is not None:
+                parent.remove(el)
+        return tree
+    except Exception:
+        return None
+
+
+def _extract_main_text(html: str) -> str:
+    text = _trafilatura_text(html)
+    # Trafilatura can pick a hidden block as the page's main content: eCFR
+    # ships its search-help modal (class "hidden") in every page, and a
+    # section page came back as that help text — 434 characters — with the
+    # regulation itself, server-rendered beside it, dropped (support ticket:
+    # §200.332 added to a KB showed Ready with none of the rule). Extract
+    # again without what the page never displays and keep the longer result.
+    # Not unconditional: collapsed tab panels and accordions are hidden too,
+    # and on those pages the hidden text is the content.
+    visible = _without_hidden_elements(html)
+    if visible is not None:
+        visible_text = _trafilatura_text(visible)
+        if len(visible_text) > len(text):
+            text = visible_text
     if text:
-        return _normalize_whitespace(text)
+        return text
     # Trafilatura returned nothing — fall back to a permissive BeautifulSoup
     # strip so we always return *something* rather than silently dropping the
     # page (matches the older behavior of workflow_engine._extract_text_from_html).
@@ -262,6 +311,25 @@ async def _render_with_browser(url: str, timeout_seconds: int) -> Optional[str]:
             try:
                 context = await browser.new_context(user_agent=_USER_AGENT)
                 page = await context.new_page()
+
+                # SSRF guard: the browser follows redirects on its own, so a
+                # public page could navigate to an internal/metadata host and
+                # hand us back its body. Re-validate every top-level document
+                # navigation and abort blocked ones. Subresources are left
+                # alone — their bodies never reach us, and per-request blocking
+                # DNS lookups would stall rendering.
+                async def _guard(route):
+                    req = route.request
+                    if req.resource_type == "document":
+                        try:
+                            await asyncio.to_thread(validate_outbound_url, req.url)
+                        except ValueError:
+                            await route.abort()
+                            return
+                    await route.continue_()
+
+                await page.route("**/*", _guard)
+
                 # ``networkidle`` waits for the page to go quiet, which is what
                 # SPAs need to fetch their content.  ``domcontentloaded`` is
                 # too early.
@@ -311,12 +379,14 @@ async def fetch_url(
     # Set when the static fetch was refused but a browser attempt is still owed.
     blocked_error: Optional[httpx.HTTPStatusError] = None
 
+    # follow_redirects=False + safe_get re-validates every redirect hop so a
+    # public URL cannot bounce us to an internal/metadata address (SSRF).
     async with httpx.AsyncClient(
         timeout=settings.web_fetcher_timeout_seconds,
-        follow_redirects=True,
+        follow_redirects=False,
         headers=_DEFAULT_HEADERS,
     ) as client:
-        resp = await client.get(url)
+        resp = await safe_get(client, url, validate=validate_outbound_url)
         status_code = resp.status_code
         try:
             resp.raise_for_status()

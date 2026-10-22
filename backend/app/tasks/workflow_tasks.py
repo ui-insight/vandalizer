@@ -8,6 +8,7 @@ import logging
 
 from app.celery_app import celery_app
 from app.services.form_fill import DOC_META_TASKS, document_meta
+from app.services.run_metadata import record_pass_usage, snapshot_run_config
 from app.exceptions import TrialSpendBlockedError
 from app.tasks import TRANSIENT_EXCEPTIONS
 
@@ -328,6 +329,16 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
                         }
                         for item in items
                     ]
+                    # The set's cross-field rules travel with it, so the step
+                    # checks its arithmetic in code as a standalone run does.
+                    set_rules = [
+                        r for r in (ss.get("cross_field_rules") or [])
+                        if isinstance(r, dict)
+                    ]
+                    if set_rules:
+                        task_data["cross_field_rules"] = (
+                            list(task_data.get("cross_field_rules") or []) + set_rules
+                        )
                     # UI is mutually exclusive between saved-set and manual fields,
                     # but older workflows may have both persisted. Drop stale manual
                     # fields so the saved set is unambiguously the source of truth.
@@ -403,6 +414,22 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
         })
 
     return steps_data, output_step_names
+
+
+def _record_models_used(db, workflow_result_id: str, engine) -> None:
+    """Store which models the run's steps run on, for the run views.
+
+    Best-effort: a failed write must not stop the run it describes.
+    """
+    from bson import ObjectId
+
+    try:
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"models_used": list(engine.models_used)}},
+        )
+    except Exception:
+        logger.warning("Could not record models used for %s", workflow_result_id, exc_info=True)
 
 
 def _resume_point(engine, result_doc: dict) -> tuple[int, dict | None]:
@@ -872,6 +899,29 @@ def _spend_block_code(exc: BaseException) -> str:
     return "email_unverified" if isinstance(exc, TrialUnverifiedError) else "budget_exhausted"
 
 
+def _notify_run_completed(db, activity_id, workflow_doc: dict, workflow_result_id) -> None:
+    """Bell the person who started a long run that just completed (#994).
+
+    Called from inside a finalize claim, so a retried task never bells twice.
+    """
+    try:
+        from bson import ObjectId
+
+        from app.services.run_notifications import notify_workflow_completed
+
+        result_doc = db.workflow_result.find_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"status": 1, "start_time": 1, "is_passive": 1, "automation_id": 1,
+             "batch_id": 1, "document_title": 1, "workflow": 1},
+        )
+        notify_workflow_completed(
+            db, user_id=_activity_owner(db, activity_id),
+            workflow_doc=workflow_doc, result_doc=result_doc,
+        )
+    except Exception:
+        logger.exception("Could not send completion notice for run %s", workflow_result_id)
+
+
 def _activity_owner(db, activity_id) -> str | None:
     """The user who launched the run, from its activity-rail entry.
 
@@ -1201,10 +1251,19 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             system_config_doc=sys_config,
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
+            force_model=bool(result_doc.get("model_forced")),
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
         return {"status": "error", "result_id": workflow_result_id}
+    _record_models_used(db, workflow_result_id, engine)
+
+    snapshot_run_config(
+        db, workflow_result_id,
+        workflow_doc=workflow_doc, steps_data=steps_data,
+        trigger_step_data=trigger_step_data, model=model, sys_config=sys_config,
+        config_override=workflow_doc.get("config_override"),
+    )
 
     # Any pickup resumes where a previous attempt stopped, decided from the
     # run document itself: a fresh run has no stored step output, so
@@ -1359,21 +1418,31 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             user_id=user_id,
             team_id=workflow_doc.get("team_id"),
             activity_id=activity_id,
-        ):
-            final_output, data = engine.execute(
-                workflow_result_updater=update_progress,
-                start_index=start_index,
-                initial_output=initial_output,
-                should_cancel=should_cancel,
-                check_budget=check_budget,
+        ) as meter_scope:
+            # The steps a resumed pass skips, replayed from the saved run: both
+            # the record and a step reading "All Earlier Steps" need them.
+            replayed = (
+                _replay_step_entries(engine, prior_steps_output, start_index)
+                if start_index else []
             )
+            try:
+                final_output, data = engine.execute(
+                    workflow_result_updater=update_progress,
+                    start_index=start_index,
+                    initial_output=initial_output,
+                    should_cancel=should_cancel,
+                    check_budget=check_budget,
+                    prior_steps=replayed,
+                )
+            finally:
+                # A failed or canceled pass still spent tokens on some model,
+                # and its record is what explains the failure.
+                record_pass_usage(db, workflow_result_id, meter_scope, sys_config)
         if start_index:
             # execute() reports only the steps this pass ran. Without the
             # earlier ones the saved record would begin mid-workflow — the same
             # correction the approval resume already makes.
-            data = _replay_step_entries(
-                engine, prior_steps_output, start_index,
-            ) + (data or [])
+            data = replayed + (data or [])
     except WorkflowCancelled:
         logger.info(
             "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
@@ -1541,6 +1610,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             {"_id": ObjectId(workflow_id)},
             {"$inc": {"num_executions": 1}},
         )
+        _notify_run_completed(db, activity_id, workflow_doc, workflow_result_id)
     else:
         logger.info(
             "Workflow %s finalize side effects already ran; skipping on retry",
@@ -1552,7 +1622,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         try:
             from datetime import datetime, timezone
             doc_uuids = trigger_step_data.get("doc_uuids", [])
-            # Read step counts from the WorkflowResult
+            # Read step counts + tags from the ActivityEvent to decide whether
+            # this run counts toward the chat-workflow milestone.
             wr_doc = db.workflow_result.find_one(
                 {"_id": ObjectId(workflow_result_id)},
                 {"num_steps_completed": 1, "num_steps_total": 1},
@@ -1573,6 +1644,17 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             # the tail of a multi-pass execution and must not erase the tokens
             # earlier passes banked.
             _accumulate_activity_usage(db, workflow_result_id, engine, activity_id)
+            # Chat-workflow milestone: increment only for chat-dispatched runs
+            # that actually completed (not dispatches that later failed).
+            activity_doc = db.activity_event.find_one(
+                {"_id": ObjectId(activity_id)},
+                {"tags": 1, "user_id": 1},
+            )
+            if activity_doc and "chat" in (activity_doc.get("tags") or []):
+                db.user.update_one(
+                    {"user_id": activity_doc["user_id"]},
+                    {"$inc": {"chat_workflow_count": 1}},
+                )
             from app.tasks.activity_tasks import generate_activity_description_task
             generate_activity_description_task.delay(activity_id, "workflow_run", doc_uuids)
         except Exception as e:
@@ -1623,6 +1705,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         PackageBuilderNode,
         PromptNode,
         ResearchNode,
+        WebSearchNode,
         WebsiteNode,
         WorkflowEngine,
         WorkflowStepError,
@@ -1699,6 +1782,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = BrowserAutomationNode(data=task_data)
     elif task_name == "KnowledgeBaseQuery":
         process_node = KnowledgeBaseQueryNode(data=task_data)
+    elif task_name == "WebSearch":
+        process_node = WebSearchNode(data=task_data)
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 
@@ -1783,6 +1868,24 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     return final_output
 
 
+def _approved_artifact(approval_doc: dict):
+    """What the steps after an approval gate receive: the reviewer's edit if
+    there is one, otherwise the snapshot taken at the gate.
+
+    A step output that isn't a dict, such as a Prompt's markdown, is stored on
+    the review as ``{"value": <output>}``, and the review screen saves an edit
+    of it the same way. Both are unwrapped here. Support ticket: replaying the
+    wrapper made a Prompt → Approval run's final output the JSON text
+    ``{"value": "## Document Summary\\n..."}``, which chat's run card showed
+    raw.
+    """
+    edited = approval_doc.get("edited_artifact")
+    artifact = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
+    if isinstance(artifact, dict) and list(artifact) == ["value"]:
+        return artifact["value"]
+    return artifact
+
+
 @celery_app.task(
     bind=True,
     name="tasks.workflow.resume_after_approval",
@@ -1834,10 +1937,7 @@ def resume_workflow_after_approval(self, approval_uuid):
     user_doc = db.user.find_one({"user_id": user_id}) if user_id else None
     is_admin = bool(user_doc and user_doc.get("is_admin"))
 
-    # If the reviewer edited the artifact, downstream steps see the edited
-    # version. Otherwise replay the original snapshot.
-    edited = approval_doc.get("edited_artifact")
-    saved_output = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
+    saved_output = _approved_artifact(approval_doc)
     initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
 
     # Update result to running. Refuse if the run was canceled while it sat at
@@ -1896,6 +1996,7 @@ def resume_workflow_after_approval(self, approval_uuid):
             system_config_doc=sys_config,
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
+            force_model=bool(result_doc.get("model_forced")),
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(
@@ -1907,6 +2008,16 @@ def resume_workflow_after_approval(self, approval_uuid):
         if _act:
             _clear_pause_marker(db, _act["_id"])
         return {"status": "error", "result_id": workflow_result_id}
+    _record_models_used(db, workflow_result_id, engine)
+
+    # A no-op when the first pass recorded it; fills it for a run that paused
+    # before run configs were recorded.
+    snapshot_run_config(
+        db, workflow_result_id,
+        workflow_doc=workflow_doc, steps_data=steps_data,
+        trigger_step_data=trigger_data, model=model, sys_config=sys_config,
+        config_override=workflow_doc.get("config_override"),
+    )
 
     # The run is moving again: drop the pause marker so the rail stops showing
     # "awaiting approval" and the stale reaper starts covering this row again.
@@ -1954,20 +2065,27 @@ def resume_workflow_after_approval(self, approval_uuid):
             user_id=user_id,
             team_id=workflow_doc.get("team_id"),
             activity_id=str(_act["_id"]) if _act else None,
-        ):
-            final_output, data = engine.execute(
-                workflow_result_updater=update_progress,
-                start_index=resume_index,
-                initial_output=resume_output,
-                check_budget=check_budget,
+        ) as meter_scope:
+            # Steps before the gate, replayed from the persisted steps_output:
+            # a step reading "All Earlier Steps" after the gate needs them.
+            replayed = _replay_step_entries(
+                engine, result_doc.get("steps_output") or {}, resume_index,
             )
+            try:
+                final_output, data = engine.execute(
+                    workflow_result_updater=update_progress,
+                    start_index=resume_index,
+                    initial_output=resume_output,
+                    check_budget=check_budget,
+                    prior_steps=replayed,
+                )
+            finally:
+                record_pass_usage(db, workflow_result_id, meter_scope, sys_config)
         # execute() reports only the steps this pass ran. Prepend the ones
-        # earlier passes completed, replayed from the persisted steps_output,
-        # or the saved run record would show a workflow that began at the
-        # approval gate and everything before it would vanish from the output.
-        data = _replay_step_entries(
-            engine, result_doc.get("steps_output") or {}, resume_index,
-        ) + (data or [])
+        # earlier passes completed, or the saved run record would show a
+        # workflow that began at the approval gate and everything before it
+        # would vanish from the output.
+        data = replayed + (data or [])
     except WorkflowStepError as e:
         # Deterministic step failure — mark the run failed, don't retry.
         logger.warning("Workflow %s failed after resume: %s", workflow_id, e)
@@ -2065,6 +2183,7 @@ def resume_workflow_after_approval(self, approval_uuid):
             {"_id": ObjectId(workflow_id)},
             {"$inc": {"num_executions": 1}},
         )
+        _notify_run_completed(db, _act["_id"] if _act else None, workflow_doc, workflow_result_id)
     else:
         logger.info(
             "Approval-gated workflow %s finalize side effects already ran; "

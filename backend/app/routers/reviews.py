@@ -265,13 +265,16 @@ async def approve_review(
         raise HTTPException(status_code=403, detail="Not authorized to decide this review")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    approval.status = STATUS_APPROVED
-    approval.reviewer_user_id = user.user_id
-    approval.reviewer_comments = body.comments
-    approval.decision_at = now
+    changes = {
+        "status": STATUS_APPROVED,
+        "reviewer_user_id": user.user_id,
+        "reviewer_comments": body.comments,
+        "decision_at": now,
+    }
     if body.edited_artifact is not None:
-        approval.edited_artifact = body.edited_artifact
-    await approval.save()
+        changes["edited_artifact"] = body.edited_artifact
+    if not await approval_service.update_pending_approval(approval, changes):
+        raise HTTPException(status_code=400, detail="Review changed, was already decided, or its deadline passed. Refresh the review before continuing.")
 
     # Resume the workflow
     from app.celery_app import celery
@@ -313,11 +316,13 @@ async def reject_review(
         raise HTTPException(status_code=403, detail="Not authorized to decide this review")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    approval.status = STATUS_REJECTED
-    approval.reviewer_user_id = user.user_id
-    approval.reviewer_comments = body.comments
-    approval.decision_at = now
-    await approval.save()
+    if not await approval_service.update_pending_approval(approval, {
+        "status": STATUS_REJECTED,
+        "reviewer_user_id": user.user_id,
+        "reviewer_comments": body.comments,
+        "decision_at": now,
+    }):
+        raise HTTPException(status_code=400, detail="Review changed, was already decided, or its deadline passed. Refresh the review before continuing.")
 
     # Mark workflow result failed
     result = await WorkflowResult.get(approval.workflow_result_id)

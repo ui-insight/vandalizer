@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ArrowLeft, CheckCircle, XCircle, FileText, Pencil, RotateCcw } from 'lucide-react'
 import DOMPurify from 'dompurify'
@@ -8,6 +8,8 @@ import type { ReviewDetail, ArtifactKind } from '../api/reviews'
 import { relativeTime } from '../utils/time'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useMyReviewCount } from '../hooks/useMyReviewCount'
+
+const DocumentViewer = lazy(() => import('../components/files/DocumentViewer').then(module => ({ default: module.DocumentViewer })))
 
 function unwrapArtifact(value: ReviewDetail['data_for_review']): unknown {
   if (value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1) {
@@ -26,6 +28,7 @@ function TextArtifact({ data, editing, value, onChange }: {
   if (editing) {
     return (
       <textarea
+        aria-label="Edit review output"
         value={value}
         onChange={e => onChange(e.target.value)}
         rows={Math.max(8, value.split('\n').length + 2)}
@@ -38,7 +41,7 @@ function TextArtifact({ data, editing, value, onChange }: {
   }
   const text = typeof data === 'string' ? data : String(data ?? '')
   return (
-    <pre style={{
+    <pre tabIndex={0} role="region" aria-label="Review output" style={{
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       backgroundColor: '#f9fafb', border: '1px solid #e5e7eb',
       borderRadius: 6, padding: 12, fontSize: 13, color: '#111827',
@@ -58,7 +61,7 @@ function MarkdownArtifact({ data, editing, value, onChange }: {
   const md = typeof data === 'string' ? data : String(data ?? '')
   const html = DOMPurify.sanitize(marked.parse(md) as string)
   return (
-    <div
+    <div tabIndex={0} role="region" aria-label="Review output"
       style={{
         backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
         padding: 14, fontSize: 14, color: '#111827', maxHeight: 480, overflowY: 'auto',
@@ -75,6 +78,7 @@ function JsonArtifact({ data, editing, value, onChange, error }: {
     return (
       <div>
         <textarea
+          aria-label="Edit review output as JSON"
           value={value}
           onChange={e => onChange(e.target.value)}
           rows={16}
@@ -90,7 +94,7 @@ function JsonArtifact({ data, editing, value, onChange, error }: {
   }
   const formatted = JSON.stringify(data ?? null, null, 2)
   return (
-    <pre style={{
+    <pre tabIndex={0} role="region" aria-label="Review output" style={{
       backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
       padding: 12, fontSize: 12, fontFamily: 'monospace',
       maxHeight: 480, overflowY: 'auto', color: '#111827',
@@ -107,7 +111,7 @@ function ExtractionTableArtifact({ data, editing, value, onChange }: {
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const rec = data as Record<string, unknown>
     return (
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden', tableLayout: 'fixed', overflowWrap: 'anywhere' }}>
         <tbody>
           {Object.entries(rec).map(([k, v]) => (
             <tr key={k} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -118,6 +122,7 @@ function ExtractionTableArtifact({ data, editing, value, onChange }: {
                 {editing ? (
                   <input
                     type="text"
+                    aria-label={`Edit ${k}`}
                     value={value[k] ?? String(v ?? '')}
                     onChange={e => onChange({ ...value, [k]: e.target.value })}
                     style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid #d1d5db', borderRadius: 4 }}
@@ -137,7 +142,7 @@ function ExtractionTableArtifact({ data, editing, value, onChange }: {
     const rows = data as Record<string, unknown>[]
     const keys = Array.from(new Set(rows.flatMap(r => Object.keys(r))))
     return (
-      <div style={{ overflowX: 'auto' }}>
+      <div tabIndex={0} role="region" aria-label="Review extraction results — scroll to see all columns" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #e5e7eb', borderRadius: 6 }}>
           <thead>
             <tr style={{ backgroundColor: '#f9fafb' }}>
@@ -182,7 +187,7 @@ function DocumentRenderArtifact({ data }: { data: unknown }) {
           {filename || 'Generated document'}
         </div>
         {url && (
-          <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#0ea5e9', textDecoration: 'none' }}>
+          <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#0369a1', textDecoration: 'none' }}>
             Open / download
           </a>
         )}
@@ -212,11 +217,27 @@ export default function ReviewDetailPage() {
   const [comments, setComments] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [source, setSource] = useState<{ uuid: string; title: string } | null>(null)
+  const sourceRegion = useRef<HTMLDivElement>(null)
+  const sourceTrigger = useRef<HTMLButtonElement | null>(null)
+  const decisionPending = useRef(false)
+  useEffect(() => { if (source) sourceRegion.current?.focus() }, [source])
+  const closeSource = () => {
+    setSource(null)
+    requestAnimationFrame(() => sourceTrigger.current?.focus({ preventScroll: true }))
+  }
+
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setSource(null)
+    setEditing(false)
+    setComments('')
+    setSubmitError(null)
+    setSubmitting(false)
+    decisionPending.current = false
     getReview(params.uuid)
       .then(r => {
         if (cancelled) return
@@ -267,12 +288,13 @@ export default function ReviewDetailPage() {
   }
 
   const handleApprove = async () => {
-    if (!review) return
+    if (!review || decisionPending.current) return
     const edited = computeEditedArtifact()
     if (!edited.ok) {
       setSubmitError(edited.reason)
       return
     }
+    decisionPending.current = true
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -283,12 +305,14 @@ export default function ReviewDetailPage() {
       navigate({ to: '/reviews' as never })
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to approve')
+      decisionPending.current = false
       setSubmitting(false)
     }
   }
 
   const handleReject = async () => {
-    if (!review) return
+    if (!review || decisionPending.current) return
+    decisionPending.current = true
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -297,6 +321,7 @@ export default function ReviewDetailPage() {
       navigate({ to: '/reviews' as never })
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to reject')
+      decisionPending.current = false
       setSubmitting(false)
     }
   }
@@ -351,12 +376,12 @@ export default function ReviewDetailPage() {
           Back to reviews
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 12 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 12 }}>
+          <h1 style={{ flex: '1 1 180px', minWidth: 0, fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
             {review.workflow_name || 'Workflow'}
           </h1>
           <span style={{
-            padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+            flexShrink: 0, whiteSpace: 'nowrap', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
             backgroundColor: review.status === 'pending' ? '#fef3c7'
               : review.status === 'approved' ? '#dcfce7'
               : review.status === 'rejected' ? '#fee2e2' : '#e5e7eb',
@@ -390,28 +415,32 @@ export default function ReviewDetailPage() {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>Source documents</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {review.source_docs.map(d => (
-                <span key={d.uuid} style={{
+                <button type="button" key={d.uuid} aria-expanded={source?.uuid === d.uuid} aria-controls="review-source-viewer" onClick={event => { sourceTrigger.current = event.currentTarget; setSource(d) }} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '3px 10px', borderRadius: 6, fontSize: 12,
-                  backgroundColor: '#f3f4f6', color: '#374151',
+                  backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', cursor: 'pointer', overflowWrap: 'anywhere', textAlign: 'left',
                 }}>
                   <FileText style={{ width: 12, height: 12 }} />
-                  {d.title}
-                </span>
+                  Inspect {d.title}
+                </button>
               ))}
             </div>
           </div>
         )}
 
+        {source && <div id="review-source-viewer" ref={sourceRegion} tabIndex={-1} role="region" aria-label={`Source document: ${source.title}`} style={{ marginBottom: 20, border: '1px solid #d1d5db', borderRadius: 8, overflow: 'hidden' }} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); closeSource() } }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, padding: 12, fontSize: 13 }}><strong style={{ overflowWrap: 'anywhere' }}>{source.title}</strong><button type="button" onClick={closeSource}>Close source</button></div>
+          <div style={{ height: 'min(55vh, 550px)', minHeight: 220 }}><Suspense fallback={<p role="status">Loading source…</p>}><DocumentViewer docUuid={source.uuid} /></Suspense></div>
+        </div>}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
               Output to review
             </div>
             {editable && !isMultiRowTable && (
               editing ? (
                 <button
-                  onClick={() => { setEditing(false); setSubmitError(null) }}
+                  onClick={() => { setEditing(false); setSubmitError(null); setEditText(typeof inner === 'string' ? inner : ''); setEditJson(JSON.stringify(inner ?? null, null, 2)); setEditTable(inner && typeof inner === 'object' && !Array.isArray(inner) ? Object.fromEntries(Object.entries(inner).map(([key, value]) => [key, String(value ?? '')])) : {}) }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   <RotateCcw style={{ width: 12, height: 12 }} />
@@ -420,7 +449,7 @@ export default function ReviewDetailPage() {
               ) : (
                 <button
                   onClick={() => setEditing(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#0369a1', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   <Pencil style={{ width: 12, height: 12 }} />
                   Edit before approving
@@ -429,15 +458,18 @@ export default function ReviewDetailPage() {
             )}
           </div>
           {renderArtifact()}
+          {editing && <details style={{ marginTop: 12, fontSize: 13 }}><summary>Compare with original output</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 12, border: '1px solid #e5e7eb' }}>{typeof unwrapArtifact(review.data_for_review) === 'string' ? String(unwrapArtifact(review.data_for_review)) : JSON.stringify(unwrapArtifact(review.data_for_review), null, 2)}</pre></details>}
         </div>
 
         {isPending && (
           <>
+            <p style={{ fontSize: 13, color: '#59616b', lineHeight: 1.6 }}>Approval accepts this output for the workflow’s next step. It does not publish the item or certify institutional compliance.{editing && ' Your edited output will replace the proposed output when you approve; compare it with the original above.'}</p>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+              <label htmlFor="review-comments" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                 Comments (optional)
               </label>
               <textarea
+                id="review-comments"
                 value={comments}
                 onChange={e => setComments(e.target.value)}
                 rows={3}
@@ -450,22 +482,22 @@ export default function ReviewDetailPage() {
             </div>
 
             {submitError && (
-              <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{submitError}</div>
+              <div role="alert" style={{ fontSize: 13, color: '#b91c1c', marginBottom: 12 }}>{submitError}</div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button
                 onClick={handleApprove}
                 disabled={submitting}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '8px 18px', fontSize: 13, fontWeight: 600,
-                  backgroundColor: submitting ? '#86efac' : '#16a34a', color: '#fff',
+                  backgroundColor: '#15803d', color: '#fff',
                   border: 'none', borderRadius: 6, cursor: submitting ? 'default' : 'pointer',
                 }}
               >
                 <CheckCircle style={{ width: 14, height: 14 }} />
-                {editing ? 'Approve with edits' : 'Approve'}
+                {submitting ? 'Submitting decision…' : editing ? 'Approve with edits' : 'Approve'}
               </button>
               <button
                 onClick={handleReject}
@@ -489,6 +521,7 @@ export default function ReviewDetailPage() {
             {review.status === 'approved' ? 'Approved' : review.status === 'rejected' ? 'Rejected' : `Status: ${review.status}`}
             {review.reviewer_user_id ? ` by ${review.reviewer_user_id}` : ''}
             {review.decision_at ? ` · ${new Date(review.decision_at).toLocaleString()}` : ''}
+            {review.status === 'approved' && <p style={{ marginTop: 6, color: '#4b5563' }}>Your approval is recorded. Open the workflow to check whether subsequent steps completed.</p>}
             {review.reviewer_comments && (
               <div style={{ marginTop: 6, color: '#4b5563' }}>"{review.reviewer_comments}"</div>
             )}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
 import {
   MoreHorizontal,
   Pin,
@@ -28,6 +28,7 @@ import type { LibraryItem, LibraryFolder } from '../../types/library'
 interface Props {
   item: LibraryItem
   scope: 'mine' | 'team'
+  busy?: boolean
   onPin: (id: string, pinned: boolean) => void
   onFavorite: (id: string, favorited: boolean) => void
   onClone: (id: string) => void
@@ -42,7 +43,7 @@ interface Props {
   regressionPending?: boolean
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
+export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
   const { user } = useAuth()
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -83,6 +84,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
   useEffect(() => {
     if (!menuOpen) return
+    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (
@@ -97,36 +99,38 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   }, [menuOpen])
 
   return (
-    <div
+    <div className="library-item-row" data-menu-open={menuOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onOpen?.(item)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 100px',
-        padding: '12px 24px',
+        gridTemplateColumns: 'minmax(0, 1fr) 100px',
+        padding: "var(--workspace-space-12) var(--workspace-space-24)",
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
         cursor: 'pointer',
         transition: 'background-color 0.1s',
-        height: 72,
+        minHeight: 88,
         position: 'relative',
         backgroundColor: hovered ? '#f8f9fa' : 'transparent',
       }}
     >
       {/* Name column */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 16 }}>
-        <div
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 'var(--workspace-space-16)' }}>
+        <button type="button" aria-label={`Open ${item.name}`}
           style={{
+            padding: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
             fontWeight: 500,
-            fontSize: 14,
+            fontSize: 'var(--workspace-font-body)',
             color: '#202124',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 'var(--workspace-space-6)',
           }}
         >
           {item.name}
@@ -144,26 +148,24 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           {item.pinned && !hovered && (
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
-        </div>
+        </button>
         {item.kind === 'workflow' && item.description && (
           <div
             title={item.description}
             style={{
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               color: '#5f6368',
-              marginTop: 2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              marginTop: 'var(--workspace-space-2)',
+              whiteSpace: 'normal', overflowWrap: 'anywhere',
             }}
           >
             {item.description}
           </div>
         )}
-        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-4)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <span>{kindLabel}</span>
           {item.verified && (
-            <span style={{ color: '#b45309', fontWeight: 500 }}>Shared with everyone</span>
+            <span style={{ color: '#b45309', fontWeight: 500 }}>Saved reference · Shared with everyone</span>
           )}
           {item.created_by && item.created_by.user_id !== user?.user_id && (
             <AuthorChip author={item.created_by} />
@@ -177,23 +179,23 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           )}
         </div>
         {item.tags.length > 0 && (
-          <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
+          <div style={{ marginTop: 'var(--workspace-space-4)', display: 'flex', gap: 'var(--workspace-space-4)' }}>
             {item.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
                 style={{
-                  fontSize: 11,
+                  fontSize: 'var(--workspace-font-meta)',
                   color: 'var(--library-highlight-ink, #78640c)',
                   background: 'color-mix(in srgb, var(--library-highlight, #eab308) 12%, #ffffff)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
+                  padding: "var(--workspace-space-2) var(--workspace-space-6)",
+                  borderRadius: 'var(--workspace-radius-small)',
                 }}
               >
                 {tag}
               </span>
             ))}
             {item.tags.length > 3 && (
-              <span style={{ fontSize: 10, color: '#888', alignSelf: 'center' }}>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', alignSelf: 'center' }}>
                 +{item.tags.length - 3}
               </span>
             )}
@@ -202,13 +204,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       </div>
 
       {/* Last used column — right-aligned */}
-      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap', textAlign: 'right' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', whiteSpace: 'nowrap', textAlign: 'right' }}>
         {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
-      {/* Hover actions overlay — floats over last-used date */}
-      {(hovered || menuOpen) && (
-        <div
+      {/* Actions remain reachable by keyboard and touch. */}
+      <div className="library-item-actions"
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
@@ -217,17 +218,17 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             transform: 'translateY(-50%)',
             display: 'flex',
             alignItems: 'center',
-            gap: 2,
+            gap: 'var(--workspace-space-2)',
             background: '#fff',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 999,
-            padding: '2px 4px',
+            padding: "var(--workspace-space-2) var(--workspace-space-4)",
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
             zIndex: 1,
           }}
         >
             {/* Favorite */}
-            <button
+            <button disabled={busy}
               onClick={(e) => {
                 e.stopPropagation()
                 onFavorite(item.id, !item.favorited)
@@ -258,7 +259,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             </button>
 
             {/* Pin */}
-            <button
+            <button disabled={busy}
               onClick={(e) => {
                 e.stopPropagation()
                 onPin(item.id, !item.pinned)
@@ -289,7 +290,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             </button>
 
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button
+              <button disabled={busy}
                 ref={triggerRef}
                 aria-label="More actions"
                 title="More actions"
@@ -317,20 +318,27 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               {menuOpen && createPortal(
                 <div
                   ref={menuRef}
+                  role="group"
+                  aria-label={`Actions for ${item.name}`}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); setFolderSubmenuOpen(false); triggerRef.current?.focus() }
+                  }}
                   style={{
                     position: 'fixed',
-                    left: Math.max(0, menuPos.left),
+                    left: Math.max(8, Math.min(menuPos.left, window.innerWidth - 248)),
                     ...(flipUp ? { bottom: window.innerHeight - menuPos.top + 4 } : { top: menuPos.top }),
                     zIndex: 9999,
-                    minWidth: 200,
+                    width: Math.min(240, window.innerWidth - 16),
+                    maxHeight: 'calc(100dvh - 24px)',
+                    overflowY: 'auto',
                     borderRadius: 'var(--ui-radius, 12px)',
                     border: '1px solid rgba(0,0,0,0.15)',
                     background: '#fff',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                    padding: '6px 0',
+                    padding: "var(--workspace-space-6) 0",
                   }}
                 >
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Pin size={14} />}
                     label={
                       item.folder
@@ -343,7 +351,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       setMenuOpen(false)
                     }}
                   />
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Star size={14} />}
                     label={
                       item.folder
@@ -357,7 +365,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     }}
                   />
                   {onEdit && (item.set_type === 'prompt' || item.set_type === 'formatter') && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Pencil size={14} />}
                       label="Edit"
                       onClick={() => {
@@ -367,7 +375,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     />
                   )}
                   {(item.set_type === 'prompt' || item.set_type === 'formatter') && item.item_uuid && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Download size={14} />}
                       label="Download JSON"
                       title="Download as a shareable JSON file"
@@ -377,9 +385,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       }}
                     />
                   )}
-                  <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                   {(item.kind === 'workflow' || item.kind === 'search_set') && (item.item_uuid || item.item_id) && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Link2 size={14} />}
                       label="Copy share link"
                       onClick={() => {
@@ -391,9 +399,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   )}
                   {scope === 'mine' ? (
                     <>
-                      <MenuItem
+                      <MenuItem disabled={busy}
                         icon={<Copy size={14} />}
                         label="Duplicate"
+                        title="Create an independent editable copy in Mine. Later edits stay separate."
                         onClick={() => {
                           onClone(item.id)
                           setMenuOpen(false)
@@ -401,9 +410,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       />
                     </>
                   ) : (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Copy size={14} />}
                       label="Add to my library"
+                      title="Create an independent copy in Mine. Edits to the team item will not update your copy."
                       onClick={() => {
                         onClone(item.id)
                         setMenuOpen(false)
@@ -413,7 +423,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   {/* One entry for every kind of sharing. A verified item is already
                       shared with everyone, so it goes straight to team sharing. */}
                   {(scope === 'mine' || !item.verified) && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Share2 size={14} />}
                       label={SHARE_MENU_LABEL}
                       onClick={() => {
@@ -425,31 +435,28 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   )}
                   {onMoveToFolder && folders && folders.length > 0 && (
                     <>
-                      <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                      <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                       {/* Move to folder submenu trigger */}
                       <div style={{ position: 'relative' }}>
-                        <button
-                          onMouseEnter={() => setFolderSubmenuOpen(true)}
-                          onMouseLeave={() => setFolderSubmenuOpen(false)}
+                        <button disabled={busy}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setFolderSubmenuOpen(true)
+                            setFolderSubmenuOpen(open => !open)
                           }}
                           style={{
                             display: 'flex',
                             width: '100%',
                             alignItems: 'center',
-                            gap: 10,
-                            padding: '8px 16px',
+                            gap: 'var(--workspace-space-12)',
+                            padding: "var(--workspace-space-8) var(--workspace-space-16)",
                             background: 'none',
                             border: 'none',
                             cursor: 'default',
-                            fontSize: 13,
+                            fontSize: 'var(--workspace-font-control)',
                             color: '#1f2937',
                             textAlign: 'left',
                           }}
-                          onFocus={() => setFolderSubmenuOpen(true)}
-                          onBlur={() => setFolderSubmenuOpen(false)}
+                          aria-expanded={folderSubmenuOpen}
                         >
                           <span style={{ width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                             <FolderInput size={14} />
@@ -459,24 +466,21 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
                         {folderSubmenuOpen && (
                           <div
-                            onMouseEnter={() => setFolderSubmenuOpen(true)}
-                            onMouseLeave={() => setFolderSubmenuOpen(false)}
                             style={{
-                              position: 'absolute',
-                              right: 'calc(100% + 4px)',
-                              top: 0,
+                              position: 'relative',
+                              margin: "var(--workspace-space-4) var(--workspace-space-8)",
                               zIndex: 1100,
                               minWidth: 180,
                               borderRadius: 'var(--ui-radius, 12px)',
                               border: '1px solid rgba(0,0,0,0.15)',
                               background: '#fff',
                               boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                              padding: '6px 0',
+                              padding: "var(--workspace-space-6) 0",
                             }}
                           >
                             {/* Remove from folder option */}
                             {item.folder && (
-                              <button
+                              <button disabled={busy}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   onMoveToFolder(item.id, null)
@@ -487,12 +491,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                                   display: 'flex',
                                   width: '100%',
                                   alignItems: 'center',
-                                  gap: 10,
-                                  padding: '8px 16px',
+                                  gap: 'var(--workspace-space-12)',
+                                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: 13,
+                                  fontSize: 'var(--workspace-font-control)',
                                   color: '#6b7280',
                                   textAlign: 'left',
                                   fontStyle: 'italic',
@@ -504,7 +508,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                               </button>
                             )}
                             {folders.map((folder) => (
-                              <button
+                              <button disabled={busy}
                                 key={folder.uuid}
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -516,12 +520,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                                   display: 'flex',
                                   width: '100%',
                                   alignItems: 'center',
-                                  gap: 10,
-                                  padding: '8px 16px',
+                                  gap: 'var(--workspace-space-12)',
+                                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: 13,
+                                  fontSize: 'var(--workspace-font-control)',
                                   color: '#1f2937',
                                   textAlign: 'left',
                                 }}
@@ -539,11 +543,11 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       </div>
                     </>
                   )}
-                  <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                   {/* Only owners can truly delete. For a bookmark of someone
                       else's item (e.g. added from Explore) removal only drops
                       the bookmark, so label it "Remove" — same as KB cards. */}
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Trash2 size={14} />}
                     label={canDelete ? 'Delete' : 'Remove'}
                     title={canDelete ? undefined : `Remove from library — the ${kindLabel.toLowerCase()} itself is kept by its owner`}
@@ -558,7 +562,6 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               )}
             </div>
         </div>
-      )}
       {showVerifyModal && (
         <VerificationSubmitModal
           itemKind={item.kind}
@@ -578,19 +581,21 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
 function MenuItem({
   icon,
+  disabled,
   label,
   title,
   danger,
   onClick,
 }: {
   icon: React.ReactNode
+  disabled?: boolean
   label: string
   title?: string
   danger?: boolean
   onClick: () => void
 }) {
   return (
-    <button
+    <button disabled={disabled}
       title={title}
       onClick={(e) => {
         e.stopPropagation()
@@ -600,12 +605,12 @@ function MenuItem({
         display: 'flex',
         width: '100%',
         alignItems: 'center',
-        gap: 10,
-        padding: '8px 16px',
+        gap: 'var(--workspace-space-12)',
+        padding: "var(--workspace-space-8) var(--workspace-space-16)",
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         color: danger ? '#d93025' : '#1f2937',
         textAlign: 'left',
         transition: 'background 0.1s',

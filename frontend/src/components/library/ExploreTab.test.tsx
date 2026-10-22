@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { ExploreTab } from './ExploreTab'
 import type { VerifiedCatalogItem } from '../../types/library'
 
@@ -260,4 +260,21 @@ describe('ExploreTab adoption and stability signals', () => {
     expect(screen.queryByText('on 3 cases')).toBeNull()
     expect(screen.queryByText('same answer 50% of the time')).toBeNull()
   })
+})
+
+
+it('names a prompt correctly and shows its inputs before validation evidence in details', async () => {
+  const item = makeItem({ kind: 'search_set', set_type: 'prompt', description: 'Rewrite supplied instructions.', usage: { input: 'Provide the context requested by the prompt.', output: 'A generated response.', output_names: [], notes: [] } })
+  vi.mocked(listVerifiedItems).mockResolvedValue({ items: [item], total: 1 })
+  render(<ExploreTab />)
+  const title = await screen.findByRole('button', { name: item.name })
+  const card = title.closest('article')!
+  expect(within(card).getByText('Prompt', { exact: true })).toBeInTheDocument()
+  expect(within(card).getByText(item.usage!.input)).toBeInTheDocument()
+  fireEvent.click(title)
+  const dialog = screen.getByRole('dialog', { name: item.name })
+  expect(within(dialog).getByText('Shared Prompt')).toBeInTheDocument()
+  const usage = within(dialog).getByRole('region', { name: 'Inputs and output' })
+  const evidence = within(dialog).getByRole('region', { name: 'Validation evidence' })
+  expect(usage.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })

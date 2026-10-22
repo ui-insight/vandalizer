@@ -43,7 +43,9 @@ from app.schemas.knowledge import (
     KBSourceVersionListResponse,
     KBSourceVersionResponse,
     KBStatusResponse,
+    ReadSitemapRequest,
     ShareKBRequest,
+    SuggestSourcesRequest,
     UpdateKBRequest,
     UpdateSourceRequest,
 )
@@ -53,6 +55,7 @@ from app.services import kb_url_refresh
 from app.services import knowledge_service as svc
 from app.services.name_conflicts import DuplicateNameError
 from app.services.kb_optimization_status import OptimizationStatus, optimization_status_by_kb
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +94,7 @@ async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
 class _TrustSummary:
     """Most recent AI-trust signal for a KB, unified across run sources."""
 
-    __slots__ = ("score", "baseline", "lift", "at")
+    __slots__ = ("score", "baseline", "lift", "at", "metric", "config_state")
 
     def __init__(
         self,
@@ -100,11 +103,15 @@ class _TrustSummary:
         baseline: float | None,
         lift: float | None,
         at,
+        metric: str = "answer_accuracy",
+        config_state: str | None = None,
     ) -> None:
         self.score = score
         self.baseline = baseline
         self.lift = lift
         self.at = at
+        self.metric = metric
+        self.config_state = config_state
 
 
 def _kb_response(
@@ -140,6 +147,7 @@ def _kb_response(
         status=kb.status,
         shared_with_team=kb.shared_with_team,
         team_owned=kb.team_owned,
+        team_id=kb.team_id,
         verified=kb.verified,
         organization_ids=kb.organization_ids,
         tags=list(getattr(kb, "tags", None) or []),
@@ -157,6 +165,8 @@ def _kb_response(
         last_validation_score=last_score,
         last_validation_baseline_score=last_baseline,
         last_validation_lift=last_lift,
+        last_validation_metric=trust.metric if trust else None,
+        last_validation_config_state=trust.config_state if trust else None,
         last_validated_at=last_validated_at_str,
         last_used_at=(
             last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
@@ -267,14 +277,22 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
         existing = out.get(r.kb_uuid)
         if existing is not None and existing.at is not None and ts is not None and existing.at >= ts:
             continue
-        # The user-facing question is "does the AI do better with the KB?".
-        # Use the *applied* KB score (optimized_score when present, else the
-        # default-config baseline) against the no-KB baseline so the lift
-        # always reflects what the user actually gets at chat time.
+        # Optimization stores composite quality; the no-KB score is raw answer
+        # accuracy. Subtracting them would invent a comparison between unlike
+        # metrics. Also distinguish tested proposals from settings actually applied.
         score = r.optimized_score if r.optimized_score is not None else r.baseline_default_score
-        baseline = r.baseline_no_kb_score
-        lift = (score - baseline) if (score is not None and baseline is not None) else None
-        out[r.kb_uuid] = _TrustSummary(score=score, baseline=baseline, lift=lift, at=ts)
+        # A run tied with the current settings has nothing to propose: apply
+        # was suppressed, so "review and apply" would point at a no-op.
+        config_state = (
+            "default" if r.optimized_score is None else
+            "reverted" if getattr(r, "reverted_at", None) else
+            "applied" if getattr(r, "applied_at", None) else
+            "no_improvement" if getattr(r, "tied_with_baseline", False) else "proposed"
+        )
+        out[r.kb_uuid] = _TrustSummary(
+            score=score, baseline=None, lift=None, at=ts,
+            metric="composite_quality", config_state=config_state,
+        )
 
     return out
 
@@ -464,6 +482,27 @@ async def list_knowledge_bases_v2(
         }).to_list()
         catalog_names = {m.item_id: m.display_name for m in metas if m.display_name}
 
+    # Native rows occupy the first `total` positions; bookmarks follow. Apply
+    # search to their displayed title, then slice only the remaining page slots.
+    # Appending every bookmark to every page duplicated rows and skipped native
+    # KBs when the client advanced its offset by the returned item count.
+    if search:
+        term = search.casefold()
+        ref_kbs = [
+            (ref, src) for ref, src in ref_kbs
+            if term in catalog_names.get(str(src.id), src.title).casefold()
+            or term in (src.description or "").casefold()
+        ]
+        if term not in "knowledge base no longer available":
+            broken_refs = []
+    reference_total = len(ref_kbs) + len(broken_refs)
+    reference_start = max(0, skip - total)
+    reference_slots = max(0, limit - len(kbs))
+    combined_refs = [(ref, src) for ref, src in ref_kbs] + [(ref, None) for ref in broken_refs]
+    page_refs = combined_refs[reference_start:reference_start + reference_slots]
+    ref_kbs = [(ref, src) for ref, src in page_refs if src is not None]
+    broken_refs = [ref for ref, src in page_refs if src is None]
+
     all_uuids = [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
     all_kbs = list(kbs) + [src for _, src in ref_kbs]
     latest_runs = await _latest_runs_by_kb(all_uuids)
@@ -517,7 +556,7 @@ async def list_knowledge_bases_v2(
             created_at=ref.created_at.isoformat() if ref.created_at else None,
         ))
 
-    return KBListResponse(items=items, total=total + len([i for i in items if i.is_reference]))
+    return KBListResponse(items=items, total=total + reference_total)
 
 
 @router.delete("/reference/{ref_uuid}")
@@ -627,7 +666,7 @@ async def export_knowledge_base(uuid: str, user: User = Depends(get_current_user
     filename = f"{safe_title or 'knowledge_base'}.kb.json"
     return JSONResponse(
         content=payload,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -702,12 +741,16 @@ async def share_knowledge_base(
 ):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     comment = req.comment if req else None
-    kb = await svc.share_with_team(
-        uuid,
-        user,
-        user_org_ancestry=user_org_ancestry,
-        comment=comment,
-    )
+    try:
+        kb = await svc.share_with_team(
+            uuid,
+            user,
+            user_org_ancestry=user_org_ancestry,
+            comment=comment,
+            shared_with_team=req.shared_with_team if req else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True, "shared_with_team": kb.shared_with_team}
@@ -837,6 +880,19 @@ async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_
     return {"ok": True, "added": len(source_uuids), "queued": len(source_uuids)}
 
 
+# One add request. A crawl turns each URL into up to max_crawl_pages pages,
+# so crawling requests take fewer. Mirrored in AddUrlsModal.
+MAX_URLS_PER_ADD = 500
+MAX_CRAWL_URLS_PER_ADD = 25
+URL_INGEST_BATCH = 10
+# A preview fetches (and crawls) every URL in one worker task with add_urls'
+# old 30-minute limit, so it checks a handful of links, not a sitemap's worth;
+# a large add takes the batched add_urls path. Mirrored in AddUrlsModal.
+MAX_URLS_PER_PREVIEW = 50
+MAX_CRAWL_URLS_PER_PREVIEW = 5
+URL_INGEST_STAGGER_SECONDS = 5
+
+
 @router.post("/{uuid}/add_urls")
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
@@ -844,6 +900,12 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     if not req.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
+    limit = MAX_CRAWL_URLS_PER_ADD if req.crawl_enabled else MAX_URLS_PER_ADD
+    if len(req.urls) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Add at most {limit} URLs at a time{' with crawling on' if req.crawl_enabled else ''}",
+        )
     # The worker skips URLs the KB already holds, so decide here what will
     # actually be fetched and report it honestly: "Added 2" on a request that
     # re-submitted two existing pages sent one support ticket author on a
@@ -857,20 +919,65 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         }
     # Ingestion (fetch + optional crawl + embed) can run for minutes and would
     # blow past the proxy read timeout if awaited inline — dispatch it to a
-    # worker and let the frontend poll source status. See tasks.kb.add_urls.
-    from app.tasks.kb_validation_tasks import add_urls_task
+    # worker and let the frontend poll source status. One task used to take
+    # every URL in turn, so a sitemap's few hundred pages outran its time
+    # limit and the rest were silently never added. The rows are created now
+    # and fetched in batches a task can finish.
+    from app.tasks.kb_validation_tasks import ingest_url_sources_task
 
-    kb.status = "building"
-    await kb.save()
-    add_urls_task.delay(
-        kb.uuid, new_urls,
+    source_uuids = await svc.register_url_sources(
+        kb, new_urls,
         crawl_enabled=req.crawl_enabled,
         max_crawl_pages=req.max_crawl_pages,
-        allowed_domains=req.allowed_domains,
     )
+    if source_uuids:
+        kb.status = "building"
+        await kb.save()
+    batch = 1 if req.crawl_enabled else URL_INGEST_BATCH
+    for i, start in enumerate(range(0, len(source_uuids), batch)):
+        ingest_url_sources_task.apply_async(
+            args=(kb.uuid, source_uuids[start:start + batch]),
+            kwargs={
+                "crawl_enabled": req.crawl_enabled,
+                "max_crawl_pages": req.max_crawl_pages,
+                "allowed_domains": req.allowed_domains,
+            },
+            # A bulk add is usually one site's pages; don't open them all at once.
+            countdown=i * URL_INGEST_STAGGER_SECONDS,
+        )
     return {
-        "ok": True, "added": len(new_urls),
+        "ok": True, "added": len(source_uuids),
         "skipped": len(skipped_urls), "skipped_urls": skipped_urls,
+    }
+
+
+@router.post("/{uuid}/sitemap")
+@limiter.limit("10/minute")
+async def read_sitemap(request: Request, uuid: str, req: ReadSitemapRequest, user: User = Depends(get_current_user)):
+    """The pages a site's sitemap lists, for the user to pick which to add.
+    Nothing is added here; picked pages go through ``add_urls``. Each page
+    says whether the KB already holds it."""
+    from app.services import sitemap_reader
+
+    if not req.url.strip():
+        raise HTTPException(status_code=400, detail="Enter a sitemap or site address")
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        result = await sitemap_reader.read_sitemap(req.url)
+    except sitemap_reader.SitemapError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    _, held = await svc.partition_new_urls(kb, [p.url for p in result.pages])
+    held_set = set(held)
+    return {
+        "sitemap_url": result.sitemap_url,
+        "pages": [
+            {"url": p.url, "lastmod": p.lastmod, "in_kb": p.url in held_set}
+            for p in result.pages
+        ],
+        "sitemaps_read": result.sitemaps_read,
+        "truncated": result.truncated,
+        "errors": result.errors[:5],
     }
 
 
@@ -886,6 +993,12 @@ async def preview_urls(request: Request, uuid: str, req: AddUrlsRequest, user: U
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    limit = MAX_CRAWL_URLS_PER_PREVIEW if req.crawl_enabled else MAX_URLS_PER_PREVIEW
+    if len(req.urls) > limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Check at most {limit} URLs at a time{' with crawling on' if req.crawl_enabled else ''}",
+        )
     try:
         preview = await kb_url_preview.start_preview(
             kb, user.user_id, req.urls,
@@ -916,14 +1029,30 @@ async def get_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get
     from app.services import kb_url_preview
 
     _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    # Before the pages: a preview found dead is settled as failed here.
+    stall_message = await kb_url_preview.check_progress(preview)
     pages = await kb_url_preview.list_pages(preview)
     return {
         "preview_uuid": preview.uuid,
         "status": preview.status,
         "error_message": preview.error_message,
         "crawl_enabled": preview.crawl_enabled,
+        "stalled": stall_message is not None,
+        "stall_message": stall_message,
+        # Retry can't help: nothing is consuming the preview's queue.
+        "workers_down": stall_message == kb_url_preview.NO_WORKERS_MESSAGE,
         "pages": [kb_url_preview.page_summary(p) for p in pages],
     }
+
+
+@router.post("/{uuid}/add_urls/preview/{preview_uuid}/cancel")
+async def cancel_url_preview(uuid: str, preview_uuid: str, user: User = Depends(get_current_user)):
+    """Stop a preview that is still fetching. Nothing it fetched is added."""
+    from app.services import kb_url_preview
+
+    _, preview = await _require_own_preview(uuid, preview_uuid, user)
+    canceled = await kb_url_preview.cancel_preview(preview)
+    return {"ok": True, "canceled": canceled}
 
 
 @router.get("/{uuid}/add_urls/preview/{preview_uuid}/pages/{page_id}")
@@ -1098,6 +1227,46 @@ async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     result = await kb_url_refresh.refresh_all(kb)
     return {"ok": True, **result}
+
+
+@router.get("/{uuid}/suggest-sources")
+async def source_suggestions_available(uuid: str, user: User = Depends(get_current_user)):
+    """Whether topic search can run here: it needs web search configured.
+    Add URLs hides the finder rather than offer one that cannot answer."""
+    from app.services import kb_source_suggestions
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    await _require_manageable_kb(uuid, user, user_org_ancestry)
+    return {"available": await kb_source_suggestions.is_available()}
+
+
+@router.post("/{uuid}/suggest-sources")
+@limiter.limit("10/minute")
+async def suggest_sources(
+    request: Request, uuid: str, req: SuggestSourcesRequest, user: User = Depends(get_current_user),
+):
+    """Web pages to add for a described topic, for the user to approve.
+    Nothing is added here; approved pages go through ``add_urls``."""
+    from app.exceptions import TrialSpendBlockedError
+    from app.services import kb_source_suggestions
+
+    topic = " ".join(req.topic.split())
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Describe the topic in a few words")
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    try:
+        result = await kb_source_suggestions.suggest_sources(kb, topic, user_id=user.user_id)
+    except TrialSpendBlockedError:
+        raise  # the AppError handler answers with the gate's own status
+    except Exception as exc:
+        logger.exception("Source suggestions failed for KB %s", uuid)
+        raise HTTPException(status_code=502, detail=f"Could not search for pages: {exc}")
+    if not result["available"]:
+        raise HTTPException(status_code=409, detail="Web search is not configured on this deployment")
+    if result["error"] and not result["suggestions"]:
+        raise HTTPException(status_code=502, detail=f"Web search failed: {result['error']}")
+    return result
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)
@@ -1362,6 +1531,7 @@ async def validate_knowledge_base(
       - mode: "judge" (default) or "judge+baseline" (analysis mode with lift).
       - skip_judge: bool — skip the LLM judge entirely (cheap re-run).
       - async: bool — enqueue a Celery task and return {task_id} instead of running inline.
+      - request_id: UUID — reuse this ID and options to recover a lost start response.
       - query_uuids: list[str] — run only these test queries (a smoke test).
         The run lands in history and exports like any other but is tagged
         so it never becomes the KB's quality score. 400 when empty, when more
@@ -1400,6 +1570,14 @@ async def validate_knowledge_base(
                     f"({len(query_uuids)} requested) — narrow the selection or run a full validation"
                 ),
             )
+    options = {"mode": mode, "skip_judge": skip_judge, "query_uuids": query_uuids}
+    if async_run:
+        from app.services.kb_validation_lifecycle import existing_validation
+        existing = await existing_validation(kb.uuid, user.user_id, options, body.get("request_id"))
+        if existing:
+            return existing
+
+    if query_uuids is not None:
         from app.models.kb_test_query import KBTestQuery
         owned = await KBTestQuery.find(
             {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": query_uuids}},
@@ -1421,15 +1599,34 @@ async def validate_knowledge_base(
             )
 
     if async_run:
-        from app.tasks.kb_validation_tasks import validate_kb_task
-        task = validate_kb_task.delay(kb.uuid, user.user_id, mode, skip_judge, query_uuids)
-        return {"task_id": task.id, "status": "queued"}
+        from app.services.kb_validation_lifecycle import start_validation
+        return await start_validation(kb.uuid, user.user_id, options, body.get("request_id"))
 
     from app.services import kb_validation_service
     result = await kb_validation_service.run_kb_validation(
         kb.uuid, user.user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids,
     )
     return result
+
+
+@router.get("/{uuid}/validation-tasks/active")
+async def get_active_validation_task(uuid: str, user: User = Depends(get_current_user)):
+    ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(uuid, user, user_org_ancestry=ancestry, allow_admin=True)
+    if not kb:
+        raise HTTPException(404, "Knowledge base not found")
+    from app.services.kb_validation_lifecycle import active_validation
+    return await active_validation(kb.uuid, user.user_id)
+
+
+@router.get("/{uuid}/validation-tasks/{task_id}")
+async def get_validation_task(uuid: str, task_id: str, user: User = Depends(get_current_user)):
+    ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(uuid, user, user_org_ancestry=ancestry, allow_admin=True)
+    if not kb:
+        raise HTTPException(404, "Knowledge base not found")
+    from app.services.kb_validation_lifecycle import validation_status
+    return await validation_status(kb.uuid, user.user_id, task_id)
 
 
 @router.get("/{uuid}/validation-grader")
@@ -1580,7 +1777,7 @@ async def export_kb_validation_run(
     if format == "json":
         return JSONResponse(
             content=payload,
-            headers={"Content-Disposition": f'attachment; filename="{base_name}.json"'},
+            headers={"Content-Disposition": content_disposition(f"{base_name}.json")},
         )
     if format == "xlsx":
         from fastapi.responses import Response
@@ -1588,14 +1785,14 @@ async def export_kb_validation_run(
         return Response(
             content=render_results_xlsx(run_meta, rows, payload.get("kb_sources")),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f'attachment; filename="{base_name}.xlsx"'},
+            headers={"Content-Disposition": content_disposition(f"{base_name}.xlsx")},
         )
     from fastapi.responses import PlainTextResponse
 
     return PlainTextResponse(
         content=render_results_csv(run_meta, rows),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{base_name}.csv"'},
+        headers={"Content-Disposition": content_disposition(f"{base_name}.csv")},
     )
 
 
@@ -2380,12 +2577,6 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
     if token_budget <= 0:
         raise HTTPException(status_code=400, detail="token_budget must be > 0")
 
-    include_indexing_track = bool(body.get("include_indexing_track", False))
-    apply_on_finish = bool(body.get("apply_on_finish", False))
-    autogen_coverage = (body.get("autogen_coverage") or "standard").strip()
-    if autogen_coverage not in ("quick", "standard", "exhaustive"):
-        autogen_coverage = "standard"
-
     # Test-set build mode chosen in the wizard. The selection is made
     # authoritative by ``test_query_uuids`` (the exact reviewed set); the mode
     # string is retained for auditing and re-run display.
@@ -2416,24 +2607,6 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         )
     except _kb_optimizer.ModelPlanError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-    # Sweep orphaned runs first, the way the extraction and workflow start
-    # paths do: a run whose worker died past the hard time limit would
-    # otherwise hold this 409 until the hourly janitor fired (#835).
-    await _kb_optimizer.reap_stale_runs(kb.uuid)
-
-    # Reject if a non-terminal run already exists for this KB.
-    from app.models.kb_optimization_run import KBOptimizationRun
-    active = await KBOptimizationRun.find_one(
-        KBOptimizationRun.kb_uuid == kb.uuid,
-        {"status": {"$in": ["queued", "running"]}},
-    )
-    if active:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Optimization already in progress for this KB (run {active.uuid})",
-        )
-
     # Cross-resource cost governance: per-user concurrency cap + audit trail.
     from app.services import optimization_governance
     await optimization_governance.enforce_and_record_start(
@@ -2445,28 +2618,25 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         token_budget=token_budget,
     )
 
-    run = KBOptimizationRun(
-        kb_uuid=kb.uuid,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=token_budget,
-        options={
-            "include_indexing_track": include_indexing_track,
-            "apply_on_finish": apply_on_finish,
-            "autogen_coverage": autogen_coverage,
-            "test_set_build_mode": test_set_build_mode,
-            "test_query_uuids": test_query_uuids,
-            "judge_model": judge_model,
-            "challenger_models": challenger_models,
-        },
-    )
-    await run.insert()
-
-    from app.tasks.kb_validation_tasks import optimize_kb_task
-    optimize_kb_task.delay(
-        kb.uuid, user.user_id, run.uuid, token_budget,
-        include_indexing_track, apply_on_finish,
-    )
+    from app.services.optimization_actions import OptimizationActionError, start_kb_optimization as _start
+    try:
+        run = await _start(
+            kb, user.user_id, token_budget,
+            include_indexing_track=bool(body.get("include_indexing_track", False)),
+            apply_on_finish=bool(body.get("apply_on_finish", False)),
+            autogen_coverage=(body.get("autogen_coverage") or "standard").strip(),
+            extra_options={
+                "test_set_build_mode": test_set_build_mode,
+                "test_query_uuids": test_query_uuids,
+                "judge_model": judge_model,
+                "challenger_models": challenger_models,
+            },
+        )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -2651,75 +2821,17 @@ async def apply_kb_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
-    if run.tied_with_baseline and not force:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "tied_with_baseline",
-                "message": (
-                    "The winning configuration is statistically tied with the KB's "
-                    "current settings (within judge noise), so the data doesn't "
-                    "justify a config change. Re-submit with force=true to apply "
-                    "anyway."
-                ),
-            },
-        )
-    if getattr(run, "winner", None) == "current" and not run.tied_with_baseline and not force:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "current_settings_won",
-                "message": (
-                    "No trial beat the KB's current settings — the best one scored "
-                    "lower. Re-submit with force=true to apply it anyway."
-                ),
-            },
-        )
 
-    import datetime as _dt
-    now = _dt.datetime.now(tz=_dt.timezone.utc)
-    # Snapshot the prior override on the run so Revert can restore it.
-    run.previous_override = dict(kb.rag_config_override) if kb.rag_config_override else None
-    run.applied_at = now
-    run.reverted_at = None
-    kb.rag_config_override = dict(run.best_config)
-    kb.rag_config_override_set_at = now
-    kb.rag_config_override_run_uuid = run.uuid
-    await kb.save()
-    await run.save()
-    # Phase 4: write a corresponding ValidationRun so this apply shows up on
-    # the unified quality timeline. Best-effort — never block the apply on a
-    # telemetry failure.
+    from app.services.optimization_actions import OptimizationActionError, apply_kb_optimization as _apply
     try:
-        from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
-        await _qs.record_optimizer_apply(
-            item_kind="knowledge_base",
-            item_id=kb.uuid,
-            item_name=getattr(kb, "title", "") or "",
-            run_type="kb_validation",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=kb.rag_config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
-        )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for KB %s", kb.uuid)
-    return {
-        "ok": True,
-        "applied_config": kb.rag_config_override,
-        "previous_override": run.previous_override,
-        "applied_at": now.isoformat(),
-    }
+        return await _apply(kb, run, user.user_id, force=force)
+    except OptimizationActionError as e:
+        if e.code in ("tied_with_baseline", "current_settings_won"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": e.code, "message": e.message},
+            )
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 @router.post("/{uuid}/optimize/{run_uuid}/revert")

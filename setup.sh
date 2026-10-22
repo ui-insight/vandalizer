@@ -346,19 +346,24 @@ catalog_version_local() {
   tr -d '[:space:]' < "$CATALOG_VERSION_HOST_FILE"
 }
 
-# Latest catalog version on origin's default branch.
-# Uses a cached git fetch; empty on network failure.
+# Latest catalog version available to this deployment: the highest of the
+# checkout's own seeds/VERSION (what a source build bundles), the current
+# branch's upstream, and origin's default branch. Reading only the default
+# branch hid every catalog update on a deployment that tracks another branch
+# (e.g. a v5 dev server on major/agentic-chat stayed "up to date" at main's
+# version). Uses a cached git fetch; empty when nothing can be read.
 catalog_version_latest() {
+  local best="" v ref
+  v=$(tr -d '[:space:]' < "$SEEDS_VERSION_FILE" 2>/dev/null || true)
+  [[ -n "$v" ]] && best="$v"
   if [[ -d .git ]]; then
     git fetch --quiet origin 2>/dev/null || true
-    # Try common default-branch refs in order.
-    for ref in origin/HEAD origin/main origin/master; do
-      local v
+    for ref in '@{upstream}' origin/HEAD origin/main origin/master; do
       v=$(git show "$ref:$SEEDS_VERSION_FILE" 2>/dev/null | head -1 | tr -d '[:space:]' || true)
-      if [[ -n "$v" ]]; then echo "$v"; return; fi
+      if [[ -n "$v" ]] && is_newer "$v" "$best"; then best="$v"; fi
     done
   fi
-  echo ""
+  echo "$best"
 }
 
 # Render one version row with a status marker.
@@ -812,6 +817,7 @@ launch_services() {
 
   wait_healthy "api" "API server" 120
   wait_for_api 60
+  wait_healthy "celery" "Celery workers" 150
 
   echo ""
   echo -e "  ${BRIGHT_GREEN}${BOLD}All systems online.${RESET}"
@@ -2010,6 +2016,9 @@ do_redeploy() {
 
   wait_healthy "api" "API server" 90
   wait_for_api 90
+  # The workers' healthcheck pings them over the broker. Without this wait a
+  # redeploy reported success while nothing would ever run a queued task.
+  wait_healthy "celery" "Celery workers" 150
   wait_healthy "frontend" "Frontend" 60
 
   # One-time: capture the institution name if this deployment never set one.

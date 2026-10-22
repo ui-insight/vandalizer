@@ -178,6 +178,14 @@ async def register(
         # self-registered users exactly like waitlist activations.
         await demo_service.begin_self_serve_trial(user, settings)
 
+    # Capture role cohort + enroll new users in the agentic-chat drip.
+    _ALLOWED_ROLES = {"research_admin", "pi", "sponsored_programs", "compliance", "it", "other"}
+    if body.role_segment and body.role_segment in _ALLOWED_ROLES:
+        user.role_segment = body.role_segment
+    from app.services.engagement_service import start_agentic_chat_drip
+    start_agentic_chat_drip(user)
+    await user.save()
+
     # If the user was signing up to accept a team invite, auto-accept it.
     # Only accepts when the registered email matches the invite's recipient
     # email — otherwise silently ignore and let them accept manually later.
@@ -487,6 +495,7 @@ def _email_prefs_response(prefs: dict | None) -> dict:
     return {
         "onboarding": prefs.get("onboarding", True),
         "nudges": prefs.get("nudges", True),
+        "announcements": prefs.get("announcements", True),
     }
 
 
@@ -503,7 +512,7 @@ async def update_email_preferences(
 ):
     """Update email notification preferences."""
     prefs = user.email_preferences or {}
-    for key in ("onboarding", "nudges"):
+    for key in ("onboarding", "nudges", "announcements"):
         if key in body:
             prefs[key] = bool(body[key])
     user.email_preferences = prefs

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.services.automation_schedule import normalize_schedule_config
 from app.utils.naming import EntityName, OptionalEntityName
@@ -82,6 +82,9 @@ class AutomationResponse(BaseModel):
     # the UI says "paused" beside it when it is not.
     next_run_at: Optional[str] = None
     last_run_at: Optional[str] = None
+    # Latest persisted event across workflow and extraction runs, for every trigger type.
+    last_event_status: Optional[str] = None
+    last_event_at: Optional[str] = None
 
 
 class SchedulePreviewRequest(BaseModel):
@@ -111,6 +114,7 @@ class RunNowRequest(BaseModel):
     selection is used) and required for API / M365 ones."""
 
     document_uuids: Optional[list[str]] = None
+    request_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 class RunNowDocument(BaseModel):
@@ -125,3 +129,13 @@ class RunNowResponse(BaseModel):
     documents: list[RunNowDocument]
     document_source: str  # chosen | folder | configured
     documents_matched: int  # eligible before the folder cap
+
+
+class AutomationHistoryCursor(BaseModel):
+    before: str
+    before_id: str
+
+
+class AutomationHistoryResponse(BaseModel):
+    items: list[TriggerEventStatusResponse]
+    next_cursor: Optional[AutomationHistoryCursor] = None

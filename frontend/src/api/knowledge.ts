@@ -1,4 +1,5 @@
 import { apiFetch, rawFetch } from './client'
+import { filenameFromDisposition } from '../utils/contentDisposition'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, KBSourceVersionCompare, KBSourceVersionDetail, KBSourceVersionList, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
@@ -89,6 +90,33 @@ export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   })
 }
 
+export interface AddUrlsResult {
+  ok: boolean
+  /** URLs actually queued for fetching. */
+  added: number
+  /** URLs the KB already held — not re-fetched (use refreshKBSource for that). */
+  skipped?: number
+  skipped_urls?: string[]
+}
+
+export function addUrlsToKB(
+  uuid: string,
+  urls: string[],
+  crawlEnabled = false,
+  maxCrawlPages = 5,
+  allowedDomains = '',
+) {
+  return apiFetch<AddUrlsResult>(`/api/knowledge/${uuid}/add_urls`, {
+    method: 'POST',
+    body: JSON.stringify({
+      urls,
+      crawl_enabled: crawlEnabled,
+      max_crawl_pages: maxCrawlPages,
+      allowed_domains: allowedDomains,
+    }),
+  })
+}
+
 /** What adding one previewed page would do. Only `addable` pages can be kept. */
 export type UrlPreviewVerdict = 'good' | 'low' | 'empty' | 'error' | 'duplicate' | 'navigation'
 
@@ -112,9 +140,14 @@ export interface UrlPreviewPage {
 
 export interface UrlPreview {
   preview_uuid: string
-  status: 'running' | 'ready' | 'error' | 'committing' | 'committed'
+  status: 'running' | 'ready' | 'error' | 'canceled' | 'committing' | 'committed'
   error_message: string | null
   crawl_enabled: boolean
+  /** Still running, but the worker hasn't started or hasn't fetched a page in a while. */
+  stalled?: boolean
+  stall_message?: string | null
+  /** No worker is consuming the preview's queue, so Retry would stall the same way. */
+  workers_down?: boolean
   pages: UrlPreviewPage[]
 }
 
@@ -137,6 +170,64 @@ export function previewUrlsForKB(
   })
 }
 
+export interface SourceSuggestion {
+  url: string
+  title: string
+  snippet: string
+  host: string
+  /** Why the page fits the topic; null when ranking was unavailable. */
+  reason: string | null
+}
+
+export interface SourceSuggestionsResult {
+  available: boolean
+  /** The web searches that were run. */
+  queries: string[]
+  suggestions: SourceSuggestion[]
+  /** Pages the searches found that the KB already holds (left out). */
+  already_in_kb: number
+  error: string | null
+}
+
+/** Whether topic search can run: it needs web search configured. */
+export function getSourceSuggestionsAvailable(uuid: string) {
+  return apiFetch<{ available: boolean }>(`/api/knowledge/${uuid}/suggest-sources`)
+}
+
+/** Web pages for a described topic. Nothing is added; approve with addUrlsToKB. */
+export function suggestSources(uuid: string, topic: string) {
+  return apiFetch<SourceSuggestionsResult>(`/api/knowledge/${uuid}/suggest-sources`, {
+    method: 'POST',
+    body: JSON.stringify({ topic }),
+  })
+}
+
+export interface SitemapPage {
+  url: string
+  lastmod: string | null
+  /** The KB already holds this page. */
+  in_kb: boolean
+}
+
+export interface SitemapResult {
+  /** The sitemap that was read (found via robots.txt or the usual names). */
+  sitemap_url: string
+  pages: SitemapPage[]
+  sitemaps_read: number
+  /** More pages or child sitemaps than the reader takes. */
+  truncated: boolean
+  /** Child sitemaps that could not be read. */
+  errors: string[]
+}
+
+/** The pages a site's sitemap lists. Takes a sitemap or any address on the site. */
+export function readSitemap(uuid: string, url: string) {
+  return apiFetch<SitemapResult>(`/api/knowledge/${uuid}/sitemap`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  })
+}
+
 export function getUrlPreview(uuid: string, previewUuid: string) {
   return apiFetch<UrlPreview>(`/api/knowledge/${uuid}/add_urls/preview/${previewUuid}`)
 }
@@ -144,6 +235,14 @@ export function getUrlPreview(uuid: string, previewUuid: string) {
 export function getUrlPreviewPageText(uuid: string, previewUuid: string, pageId: string) {
   return apiFetch<{ page_id: string; text: string }>(
     `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/pages/${pageId}`,
+  )
+}
+
+/** Stop a preview that is still fetching; nothing it fetched is added. */
+export function cancelUrlPreview(uuid: string, previewUuid: string) {
+  return apiFetch<{ ok: boolean; canceled: boolean }>(
+    `/api/knowledge/${uuid}/add_urls/preview/${previewUuid}/cancel`,
+    { method: 'POST' },
   )
 }
 
@@ -241,6 +340,7 @@ export interface KBSourceResponse {
   url?: string | null
   url_title?: string | null
   custom_name?: string | null
+  // User-verifiable provenance (origin URL / citation); shown as "Source: …".
   source_reference?: string | null
   amends_source_uuids?: string[]
   status: 'pending' | 'processing' | 'ready' | 'error'
@@ -276,10 +376,10 @@ export function setKBSourceAmends(uuid: string, sourceUuid: string, amendsSource
   })
 }
 
-export function shareKnowledgeBase(uuid: string, comment?: string) {
+export function shareKnowledgeBase(uuid: string, sharedWithTeam: boolean, comment?: string) {
   return apiFetch<{ ok: boolean; shared_with_team: boolean }>(`/api/knowledge/${uuid}/share`, {
     method: 'POST',
-    body: JSON.stringify({ comment: comment || undefined }),
+    body: JSON.stringify({ shared_with_team: sharedWithTeam, comment: comment || undefined }),
   })
 }
 
@@ -340,6 +440,8 @@ export type KBJudgeVerdict = {
 }
 
 export type KBValidationDetail = {
+  /** Expected answer saved with the run; never substitute today’s edited test question. */
+  expected_answer?: string | null
   query_uuid?: string
   query: string
   category?: string | null
@@ -463,12 +565,29 @@ export function runKBValidation(
 
 export function runKBValidationAsync(
   uuid: string,
-  options?: KBValidationRunOptions,
+  options?: KBValidationRunOptions & { request_id?: string },
 ) {
-  return apiFetch<{ task_id: string; status: 'queued' }>(`/api/knowledge/${uuid}/validate`, {
+  return apiFetch<{ task_id: string; status: 'queued'; resumed?: boolean; options?: KBValidationRunOptions }>(`/api/knowledge/${uuid}/validate`, {
     method: 'POST',
     body: JSON.stringify({ ...(options ?? {}), async: true }),
   })
+}
+
+export type KBValidationTaskStatus = {
+  task_id: string
+  status: 'queued' | 'running' | 'retrying' | 'unknown' | 'failed' | 'completed'
+  delayed?: boolean
+  message?: string
+  run_uuid?: string
+  result?: KBValidationResult
+}
+
+export function getActiveKBValidationTask(uuid: string) {
+  return apiFetch<{ task: (KBValidationTaskStatus & { options: KBValidationRunOptions }) | null }>(`/api/knowledge/${uuid}/validation-tasks/active`)
+}
+
+export function getKBValidationTask(uuid: string, taskId: string) {
+  return apiFetch<KBValidationTaskStatus>(`/api/knowledge/${uuid}/validation-tasks/${taskId}`)
 }
 
 export function getKBSourceHealth(uuid: string) {
@@ -700,7 +819,7 @@ export async function generateKBTestQueriesAndWait(
     }
   }
   throw new Error(
-    'Generation is taking longer than expected — it will keep running in the ' +
+    'Generation is taking longer than expected. It will keep running in the ' +
     'background. Check the Test Queries tab again shortly.',
   )
 }
@@ -1169,9 +1288,7 @@ export async function downloadKBValidationRunExport(
     throw new Error(detail)
   }
   // Honor the server-provided filename (KB title + run timestamp + run id).
-  const disposition = res.headers.get('Content-Disposition') || ''
-  const match = disposition.match(/filename="?([^"]+)"?/)
-  const filename = match?.[1] || `kb-validation-results.${format}`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `kb-validation-results.${format}`)
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

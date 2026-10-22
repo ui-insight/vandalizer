@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(name="tasks.document.classify", bind=True, retry_backoff=True, max_retries=2, default_retry_delay=30)
-def classify_document_task(self, document_uuid: str):
+def classify_document_task(self, document_uuid: str, extraction_revision: int = 0):
     """Auto-classify a document after text extraction.
 
     Auto-classification is best-effort enrichment: a model failure must not
@@ -35,7 +35,7 @@ def classify_document_task(self, document_uuid: str):
     from app.exceptions import TrialSpendBlockedError
 
     try:
-        run_task_async(_classify(document_uuid))
+        run_task_async(_classify(document_uuid, extraction_revision))
     except TrialSpendBlockedError as blocked:
         logger.info(
             "Auto-classification skipped for %s — trial spend blocked (%s); "
@@ -58,7 +58,7 @@ def classify_document_task(self, document_uuid: str):
         )
 
 
-async def _classify(document_uuid: str):
+async def _classify(document_uuid: str, extraction_revision: int = 0):
     from app.database import init_db
     from app.config import Settings
 
@@ -69,9 +69,14 @@ async def _classify(document_uuid: str):
     from app.models.system_config import SystemConfig
     from app.services.classification_service import classify_document, apply_classification
 
-    doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
+    from app.services.extraction_generations import extraction_generation_filter
+
+    doc = await SmartDocument.find_one(extraction_generation_filter(document_uuid, extraction_revision))
     if not doc:
         logger.warning("Document %s not found for classification", document_uuid)
+        return
+
+    if doc.soft_deleted or (doc.classification and doc.classified_by not in {None, 'auto', 'default'}):
         return
 
     config = await SystemConfig.get_config()
@@ -93,12 +98,15 @@ async def _classify(document_uuid: str):
         "classification", user_id=doc.user_id, team_id=doc.team_id
     ):
         result = await classify_document(doc)
-    await apply_classification(
+    applied = await apply_classification(
         doc,
         classification=result["classification"],
         confidence=result["confidence"],
         classified_by="auto",
     )
+    if applied is None:
+        logger.info("Discarded obsolete classification for document %s", document_uuid)
+        return
     logger.info(
         "Document %s classified as %s (confidence: %.2f)",
         document_uuid,

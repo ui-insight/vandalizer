@@ -118,6 +118,13 @@ class WorkflowStatusResponse(BaseModel):
     error_payload: Optional[dict] = None
     retrieved_sources: list[dict] = []
     sourcing: Optional[dict] = None
+    # The run's model, and the models its steps actually ran on (see
+    # WorkflowResult.models_used). Shown on every run view.
+    model: Optional[str] = None
+    models_used: list[str] = []
+    # Models used, the settings each call was sent with, and the run's
+    # configuration snapshot; None for runs recorded before it existed.
+    run_metadata: Optional[dict] = None
 
 
 class BatchStatusItem(BaseModel):

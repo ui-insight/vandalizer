@@ -54,10 +54,16 @@ class TrialSpendBlockedError(AppError):
 
 
 class TrialBudgetExceededError(TrialSpendBlockedError):
-    """A trial account has used up its included LLM token budget."""
+    """A trial account has used up its included LLM token budget.
 
-    def __init__(self, message: str = "Trial AI usage limit reached"):
+    ``code`` separates the two remedies this class carries: "budget_exhausted"
+    (the account's own allowance — a top-up fixes it) and "fleet_paused" (the
+    deployment's monthly ceiling — nothing the user can do).
+    """
+
+    def __init__(self, message: str = "Trial AI usage limit reached", code: str = "budget_exhausted"):
         super().__init__(message, status_code=402)
+        self.code = code
 
 
 class TrialUnverifiedError(TrialSpendBlockedError):

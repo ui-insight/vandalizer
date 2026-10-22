@@ -403,13 +403,19 @@ from this text. You will create an array of entities that an LLM could use and \
 faithfully reproduce to extract the same values from this text every time. \
 When asked to populate values for the entity types you return, it should give the user \
 the important information from this document every time. \
-Return an array formatted as json with the format {{"entities": ["value1", "value2", "etc"]}} \
-containing entities for important information in the text. \
-Do not nest values, keep the array flat and one-dimensional. \
+Return JSON with the format {{"title": "Short Descriptive Name", "entities": ["value1", "value2", "etc"]}}. \
+Do not nest values, keep the entities array flat and one-dimensional. \
 Do not include the values, just the entity names in a single array of string values.
 
 Important: The entity names should be Human Readable. Do not use underscores or camelCase. \
 Use spaces and Title Case. For example, use "Invoice Number" instead of "invoice_number".
+
+The "title" should be a short (3-8 word), specific, content-aware name for this kind of \
+extraction template, reusable across similar documents. Prefer the document type plus a \
+distinguishing identifier when one is clearly present (agency, program, award number, form \
+number, contract ID, etc.). Examples: "NSF Award Notice Extraction", "NIH R01 Progress Report", \
+"IRS Form 990 Extraction", "DOE SBIR Phase II Award". Avoid generic titles like "Extraction" \
+or "Document Fields". Use Title Case. Do not include file extensions or timestamps.
 
 Passage:
 {doc_text}"""
@@ -419,12 +425,16 @@ async def suggest_fields_from_documents(
     document_uuids: list[str],
     user_id: str,
     model: str | None = None,
-) -> list[str]:
-    """Use an LLM to analyze documents and return suggested extraction field names.
+) -> tuple[list[str], str | None]:
+    """Use an LLM to analyze documents and suggest extraction field names.
 
     Pure suggestion — does not persist to any SearchSet. Use this when you need
     AI-suggested fields without a saved set (e.g., inside the workflow editor's
     manual-fields path).
+
+    Returns a tuple of (field_names, suggested_title). The suggested title is
+    a short, content-aware name callers can use when the user didn't supply
+    one explicitly; it may be None if the LLM didn't produce a usable value.
     """
     import json as _json
     from app.services.llm_service import create_chat_agent
@@ -436,7 +446,7 @@ async def suggest_fields_from_documents(
             doc_text += doc.raw_text + "\n"
 
     if not doc_text.strip():
-        return []
+        return [], None
 
     if not model:
         model = await get_user_model_name(user_id)
@@ -474,18 +484,24 @@ async def suggest_fields_from_documents(
         if start >= 0 and end > start:
             parsed = _json.loads(text[start:end])
         else:
-            return []
+            return [], None
 
     entities = parsed.get("entities", [])
     if not isinstance(entities, list):
-        return []
+        return [], None
+
+    suggested_title = parsed.get("title")
+    if isinstance(suggested_title, str):
+        suggested_title = suggested_title.strip() or None
+    else:
+        suggested_title = None
 
     cleaned: list[str] = []
     for entity_name in entities:
         if not isinstance(entity_name, str) or not entity_name.strip():
             continue
         cleaned.append(entity_name.strip())
-    return cleaned
+    return cleaned, suggested_title
 
 
 async def build_from_documents(
@@ -493,11 +509,19 @@ async def build_from_documents(
     document_uuids: list[str],
     user_id: str,
     model: str | None = None,
-) -> list[str]:
-    """Suggest extraction fields from documents and persist them into a SearchSet."""
-    entities = await suggest_fields_from_documents(document_uuids, user_id, model)
+) -> tuple[list[str], str | None]:
+    """Suggest extraction fields from documents and persist them into a SearchSet.
+
+    Returns (added_field_names, suggested_title).
+    """
+    entities, suggested_title = await suggest_fields_from_documents(document_uuids, user_id, model)
+    return await add_fields(search_set_uuid, entities, user_id), suggested_title
+
+
+async def add_fields(search_set_uuid: str, names: list[str], user_id: str) -> list[str]:
+    """Persist extraction field names into a SearchSet. Returns the names added."""
     added = []
-    for name in entities:
+    for name in names:
         await add_item(search_set_uuid, name, searchtype="extraction", title=name, user_id=user_id)
         added.append(name)
     return added

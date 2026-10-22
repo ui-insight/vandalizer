@@ -15,7 +15,7 @@ from pydantic_ai import Agent
 
 from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import DocumentManager, get_document_manager
 from app.services.extraction_judge import JUDGE_UNAVAILABLE
 from app.services.llm_service import (
     RAG_SYSTEM_PROMPT,
@@ -38,7 +38,6 @@ def _judge_measured(judge: dict | None) -> bool:
     """
     return bool(judge) and judge.get("score") is not None
 
-_dm: DocumentManager | None = None
 
 # Module-level agent cache. Key: (purpose, model_name); value: (event_loop, agent).
 # The agent is reused only for calls on the SAME running event loop that first
@@ -329,10 +328,7 @@ async def _maybe_rewrite_query(query: str, model_name: str) -> tuple[str, int]:
 
 
 def _get_dm() -> DocumentManager:
-    global _dm
-    if _dm is None:
-        _dm = DocumentManager()
-    return _dm
+    return get_document_manager()
 
 
 def _get_or_build_agent(purpose: str, model_name: str, system_prompt: str, model_settings: dict | None = None) -> Agent:
@@ -2008,6 +2004,7 @@ async def run_kb_validation(
     skip_judge: bool = False,
     model: Optional[str] = None,
     query_uuids: Optional[list[str]] = None,
+    validation_task_id: str | None = None,
 ) -> dict:
     """Run full validation on a knowledge base.
 
@@ -2262,6 +2259,9 @@ async def run_kb_validation(
         "answer_model": effective_answer_model if judge_payload else None,
         "answer_model_fallback": answer_model_fallback if judge_payload else None,
     }
+
+    if validation_task_id:
+        result["validation_task_id"] = validation_task_id
 
     # Persist the validation run
     from app.models.validation_run import SMOKE_TEST_SOURCE

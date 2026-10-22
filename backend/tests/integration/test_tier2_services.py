@@ -829,3 +829,78 @@ class TestLibraryQualityBatchedWithRealDB:
             # Hand the models back to the session client for later tests.
             await init_beanie(database=mongo_client[mongo_db_name], document_models=ALL_MODELS)
             client.close()
+
+
+# ---------------------------------------------------------------------------
+# chat list_knowledge_bases — chat answered "5" for mine, team and everyone
+# alike while the Knowledge panel showed 20. Counts must come from the same
+# queries as the panel's Mine / Team / Explore groups, plus project KBs.
+# ---------------------------------------------------------------------------
+
+class TestChatListKnowledgeBasesWithRealDB:
+    async def _seed(self):
+        from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference
+        from app.models.organization import Organization
+        from app.models.project import Project
+        from app.models.user import User
+
+        await Organization(uuid="org-ours", name="Ours", org_type="department").insert()
+        await Organization(uuid="org-other", name="Other", org_type="department").insert()
+        user = User(user_id="kb-user", email="kb@example.com", name="KB", organization_id="org-ours")
+        await user.insert()
+
+        def kb(uuid, **kw):
+            return KnowledgeBase(uuid=uuid, title=uuid, **kw).insert()
+
+        await kb("mine-private", user_id="kb-user")
+        await kb("mine-shared", user_id="kb-user", team_id="team-1", shared_with_team=True)
+        await kb("teammate-shared", user_id="mate", team_id="team-1", shared_with_team=True)
+        await kb("other-team", user_id="stranger", team_id="team-2", shared_with_team=True)
+        await kb("stranger-private", user_id="stranger")
+        await kb("verified-open", user_id="admin", verified=True)
+        await kb("verified-ours", user_id="admin", verified=True, organization_ids=["org-ours"])
+        await kb("verified-elsewhere", user_id="admin", verified=True, organization_ids=["org-other"])
+        await kb("catalog-source", user_id="admin", verified=True)
+        await KnowledgeBaseReference(uuid="ref-1", user_id="kb-user", source_kb_uuid="catalog-source").insert()
+        await kb("project-kb", user_id="kb-user", implicit=True)
+        await Project(uuid="p-1", title="Grant X", owner_user_id="kb-user", root_folder_uuid="f-1", kb_uuid="project-kb").insert()
+        return user
+
+    def _ctx(self, user):
+        from unittest.mock import MagicMock
+
+        ctx = MagicMock()
+        ctx.deps.user = user
+        ctx.deps.user_id = user.user_id
+        ctx.deps.team_id = "team-1"
+        return ctx
+
+    async def test_counts_per_group_match_the_knowledge_panel(self, mongo_client):
+        from app.services.chat_tools import list_knowledge_bases
+
+        user = await self._seed()
+        result = await list_knowledge_bases(self._ctx(user))
+
+        assert result["counts"] == {"mine": 3, "team": 2, "verified": 3, "project": 1}
+        by_group: dict[str, set[str]] = {}
+        for entry in result["knowledge_bases"]:
+            by_group.setdefault(entry["group"], set()).add(entry["uuid"])
+        assert by_group == {
+            "mine": {"mine-private", "mine-shared", "catalog-source"},
+            "team": {"mine-shared", "teammate-shared"},
+            # Restricted to another org: not visible, not counted.
+            "verified": {"verified-open", "verified-ours", "catalog-source"},
+            "project": {"project-kb"},
+        }
+        project_entry = next(e for e in result["knowledge_bases"] if e["group"] == "project")
+        assert project_entry["project"] == "Grant X"
+
+    async def test_scope_narrows_the_list_but_not_the_counts(self, mongo_client):
+        from app.services.chat_tools import list_knowledge_bases
+
+        user = await self._seed()
+        result = await list_knowledge_bases(self._ctx(user), scope="team")
+
+        assert result["counts"]["mine"] == 3
+        assert {e["uuid"] for e in result["knowledge_bases"]} == {"mine-shared", "teammate-shared"}
+        assert (await list_knowledge_bases(self._ctx(user), scope="everyone"))["error"]

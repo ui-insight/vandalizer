@@ -180,10 +180,15 @@ class KBUrlPreview(Document):
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
     allowed_domains: str = ""
-    # running → ready (or error) → committed
+    # running → ready (or error, or canceled) → committed
     status: str = "running"
     error_message: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=_utcnow)
+    # When a worker picked the preview up, and when it last recorded a page.
+    # Without them a preview no worker ever ran looked the same as one still
+    # fetching, and spun until the TTL removed it (support ticket).
+    started_at: Optional[datetime.datetime] = None
+    progress_at: Optional[datetime.datetime] = None
     expires_at: datetime.datetime = Field(default_factory=lambda: _utcnow() + URL_PREVIEW_TTL)
 
     class Settings:

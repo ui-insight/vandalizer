@@ -1,0 +1,119 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 9: Multiple Program Director/Principal Investigator Applications and Awards
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+9 MULTIPLE PROGRAM DIRECTOR/PRINCIPAL
+INVESTIGATOR APPLICATIONS AND AWARDS
+9.1 GENERAL
+Multiple Program Director/Principal Investigator (multiple PD/PI) awards are an opportunity for multidisciplinary efforts and collaboration through a team of scientists under a single grant award. All
+PD/PIs share equally the authority and responsibility for leading and directing the project, intellectually
+and logistically. Each PD/PI is responsible and accountable to the applicant organization, or as appropriate to a collaborating organization, for the proper conduct of the project or program, including the submission of all required reports. The presence of more than one PD/PI on an application or award
+diminishes neither the responsibility nor the accountability of any individual PD/PI. The applicant/recipient organization is responsible for securing and retaining the required written assurance signatures from each identified PD/PI on all applications, post-submission information, progress reports,
+and post-award prior approval requests and must make these signatures available to NIH or other authorized DHHS or Federal officials upon request. Additional information is available at the NIH Multiple
+Principal Investigators website.
+9.2 APPLICABILITY
+Applications submitted electronically through Grants.gov for most award mechanisms permit multiple
+PD / PIs, with the exception of awards for which multiple PD / PIs would not be appropriate such as individual fellowship and career awards, dissertations grants (R36), Pioneer Awards (DP1), Construction
+Grants (C06 / UC6), Grants for Repair, Renovation and Modernization of Existing Research Facilities
+(G20), and Shared Instrumentation Grants (S10). SBIR / STTR applicants may use the multiple PD / PI
+option; refer to the SBIR / STTR multiple PD / PI section for specific requirements affecting small business concerns. For active awards, changing from a multiple PD / PI model to a single PD / PI model or
+changes in the number or makeup of the PD / PIs on a multiple PD / PI award requires the prior approval
+of the funding IC (see Change in Status, Including Absence of PD/PI and Other Senior/Key Personnel
+Named in the NoA).
+9.3 APPLICATION REQUIREMENTS
+The decision to submit a multiple PD/PI application is that of the applicant organization and the PD/PIs,
+and should be consistent with the scientific goals of the project. A single applicant organization may designate multiple PD/PIs from the applicant organization or may designate multiple PD/PIs from multiple
+institutions. Multiple organizations may not submit the same multiple PD/PI application.
+All PD/PIs must be qualified and have appropriate expertise to serve as a PD/PI and the appropriate level
+of authority and responsibility to direct the project or program as part of the leadership team. Each PD/PI
+must have a defined role on the project. There is no limit on the number of PD/PIs that may be designated, and no minimum person months requirement, except STTR applicants where each PD/PI must
+commit a minimum of 1.2 calendar months (10%) effort (see Grants to For-Profit Organizations—SBIR
+and STTR Programs—Multiple PD/PI Applications and Awards).
+Contact PD/PI. The applicant organization must designate one of the PD/PIs as the Contact PD/PI to
+serve as a primary point of contact. The Contact PD/PI must be listed first on the application and must
+be associated with the applicant organization. The Contact PD/PI is responsible for communication
+between the PD/PIs and NIH, but has no special authorities or responsibilities within the leadership
+team. Responsibilities of the Contact PD/PI may include communication between the leadership team
+(GPS page IIB-2)
+
+and NIH, assembly of the application materials, and coordination of progress reports. On complex projects the Contact PD/PI may request additional effort for coordination responsibilities if necessary.
+eRA Commons Registration Required. All PD/PIs must have established eRA Commons accounts with
+a PI role prior to application submission. When multiple PD/PIs are at different organizations, all organizations must also be registered in the eRA Commons. If the contact PD/PI is at a different institution
+from the applicant organization, then the applicant organization must also affiliate the contact PD/PI with
+their institution. Beyond the contact PD/PI, it is not necessary for all other PD/PIs to be affiliated with
+the applicant organization.
+Leadership Plan. All multiple PD/PI applications are required to include a Leadership Plan. The purpose
+of the Leadership Plan is to facilitate and enhance scientific productivity and establish a decision-making
+process. The Plan must describe a rationale for choosing the multiple PD/PI approach. The governance
+and organizational structure of the leadership team and the research project should be described, including communication plans, process for making decisions on scientific direction, and procedures for resolving conflicts. The roles and administrative, technical, and scientific responsibilities for the project or
+program should be delineated for the PD/PIs, including responsibilities for human subject studies or studies with vertebrate animals as appropriate.
+New Investigators (Including Early Stage Investigators). Multiple PD/PI applications may designate
+senior and new investigators, including early stage investigators. However, the application will only be
+considered a new investigator application when all of the PD/PIs meet the NIH definition of new investigator, and will only be considered an early stage investigator application when all of the PD/PIs meet
+the NIH definition of early stage investigator. For the purposes of classification as a new investigator,
+serving as a PD/PI on a substantial independent PD/PI research award is equivalent to serving as a PD/PI
+on a substantial independent PD/PI research award. Thus, if a new investigator successfully competes as
+a PD/PI on a substantial independent multiple PD/PI grant, they no longer qualifies as a new (or early
+stage) investigator on a substantial independent single PD/PI application. However, if a new investigator
+is added as a PD/PI to an active substantial independent research award, the individual will retain their
+new investigator status.
+Multi-Project Applications. Assuming the NOFO for Multi-project applications (e.g., P01, P30) specifically allows multiple PD/PIs, applications may include multiple lead investigators for subprojects as
+well as multiple PD/PIs for the entire program. Do not confuse lead investigator(s) of a subproject or
+component of a multi-project application with multiple PD/PIs of the entire program. Lead investigator
+(s) of subprojects or components are not automatically considered to be PD/PIs of the entire application.
+When a lead investigator of a subproject or component is also a PD/PI of the entire program, that individual must specifically be designated as a PD/PI of the application.
+Budgets. In general, multiple PD/PI applications will submit a single budget for the entire project. This
+applies to both modular and detailed budgets. When determining if a modular budget should be submitted, the $250,000 threshold is for the entire project, not per PD/PI. When multiple PD/PIs are at different institutions, the standard instructions for submitting consortium budgets apply. Applicants can
+choose to include budget allocation information for specific PD/PIs as part of the Leadership Plan. In the
+event of an award, the requested allocations may be reflected in a term in the NoA (see Leadership Plan
+above).
+Renewal or Resubmission Applications. A renewal or resubmission application may change from a
+single PD/PI to multiple PD/PIs or may change the number or makeup of the multiple PD/PIs. However,
+the applicant must provide a rationale for the change in the renewal / resubmission application, and
+include the required Leadership Plan. Likewise, a previously submitted multiple PD/PI application may
+change to a single PD/PI application in a renewal or resubmission; the applicant must provide a rationale
+for the change in the application.
+(GPS page IIB-3)
+
+Competing Revision Applications. A competing revision application to an existing Multiple PD/PI grant
+must be submitted using the same Contact PD/PI as the parent grant, and may propose changes in the
+Leadership Plan or in the composition of the leadership (by adding or removing PD/PIs), and should
+provide a rationale for any such changes. A competitive revision to a single PD/PI grant may be submitted proposing multiple PD/PIs provided a Leadership Plan is also included.
+9.4 APPLICATION REVIEW AND AWARD
+The review criteria applied to multiple PD/PI applications are the same criteria applied to single PD/PI
+applications and each application will be evaluated on its own merit (see The Peer Review Process in
+Part I). Peer reviewers will consider each PD/PI's qualifications and identified role in the project. The
+leadership approach will be used to facilitate understanding of the complexities of the science and the
+management of the project. The quality of the Leadership Plan will be considered as part of the assessment of the overall approach and incorporated into the scientific and technical merit determination. Peer
+reviewers will not recommend that individual PD/PIs be removed; however, reviewers may recommend
+deletion of the specific aims and budget of a PD/PI, which would effectively remove the PD/PI's effort.
+The SRG must evaluate the application in its entirety without dropping components.
+All PD/PIs are listed on the Summary Statement, in the NoA, and in NIH databases.
+9.5 POST-AWARD ADMINISTRATION
+If multiple PD/PIs are from multiple organizations, NIH will issue the award to the applicant organization which will administer the award using consortium or subaward arrangements in accord with the
+Consortium Agreements chapter. Budgets, including indirect costs associated with subawards, will be
+determined according to existing policy. Changes in the allocation and the size of subawards will be
+handled in the same way as single PD/PI awards.
+Responsibility for all required reports is shared by the PD/PIs and the recipient institution. Only one of
+each required report should be submitted. Although all PD/PIs are responsible for the content of all
+reports, only one PD/PI should upload information in the eRA Commons. As with most other Commons
+features, only the recipient Signing Official may submit the reports to NIH, including closeout reports
+(final invention statement, progress report and financial status report).
+Requests for administrative supplements must be submitted from an authorized official at the recipient
+organization and include the grant number and name of the Contact PD/PI in the request. For all applications, post-submission information, progress reports, and prior approval requests including requests to
+add or drop a PI, the recipient organization remains responsible for securing and retaining the required
+written assurance signatures from each identified PD/PI.
+A change in Contact PD/PI may be designated in a non-competing continuation progress report; the
+Contact PD/PI must be a member of the existing leadership team and associated with the recipient organization. Revision of the Leadership Plan during the project period may be accomplished through a joint
+decision of the PD/PIs and reported in a non-competing continuation progress report.
+All existing prior approval requirements apply to multiple PD/PI awards, including the change in status
+of any one of the PD/PIs or the addition of a PD/PI; refer to Administrative Requirements—Prior
+Approval Requirements in IIA. If a PD/PI withdraws from the grant or is no longer able to work on the
+project, a revised Leadership Plan or description of the impact on the project of a change to a single
+PD/PI award must be submitted as part of the prior approval request. NIH will evaluate the request considering the project as a whole, including the impact on the scope of work and budget.
+(GPS page IIB-4)
+
+If the Contact PD/PI changes institutions, the recipient institution will need to consider options. Since it
+is required that the Contact PD/PI be affiliated with the recipient institution in the Commons, the institution may choose to designate another PD/PI as the Contact. Another option would be to relinquish the
+grant and allow it to be transferred. Contact PD/PIs considering transferring should consult with the NIH
+awarding IC early in the process to discuss options.
+(GPS page IIB-5)

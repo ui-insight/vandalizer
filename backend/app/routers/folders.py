@@ -14,6 +14,7 @@ from app.schemas.documents import (
     RenameFolderRequest,
 )
 from app.services import file_service, folder_service
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
@@ -90,7 +91,7 @@ async def export(
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{filename}.zip")},
     )
 
 

@@ -269,3 +269,28 @@ class TestApprovalReviewerEmailInitialisesBeanie:
             )
 
         assert order == ["init_db", "send_email(u1@x.edu)", "send_email(u2@x.edu)", "send_email(u3@x.edu)"]
+
+
+class TestApprovedArtifact:
+    """What the steps after an approval gate receive."""
+
+    def test_unwraps_a_text_output_stored_as_value(self):
+        from app.tasks.workflow_tasks import _approved_artifact
+
+        doc = {"data_for_review": {"value": "## Document Summary\n\nAn NIH R01."}}
+        assert _approved_artifact(doc) == "## Document Summary\n\nAn NIH R01."
+
+    def test_unwraps_a_reviewer_edit_saved_as_value(self):
+        from app.tasks.workflow_tasks import _approved_artifact
+
+        doc = {
+            "data_for_review": {"value": "original"},
+            "edited_artifact": {"value": "edited by reviewer"},
+        }
+        assert _approved_artifact(doc) == "edited by reviewer"
+
+    def test_a_dict_output_passes_through(self):
+        from app.tasks.workflow_tasks import _approved_artifact
+
+        doc = {"data_for_review": {"amount": "10000", "value": "x"}, "edited_artifact": {}}
+        assert _approved_artifact(doc) == {"amount": "10000", "value": "x"}

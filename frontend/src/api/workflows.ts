@@ -696,10 +696,47 @@ export interface RunHistoryEntry {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
-  /** Models the run's calls used, most tokens first; empty for older runs. */
+  /** Models the run used, most tokens first (configured models for runs
+   * recorded before calls were metered). */
   models?: string[]
   /** Each step's models, in step order (steps that called no model are absent). */
   step_models?: { index: number; name: string | null; models: string[] }[]
+}
+
+export interface WorkflowVersionEntry {
+  id: string
+  number: number
+  note: string
+  source: 'original' | 'chat' | 'editor' | 'restore' | string
+  created_by_user_id: string | null
+  created_by_name: string | null
+  created_at: string | null
+  restored_from: number | null
+  name: string | null
+  step_names: string[]
+  is_current: boolean
+}
+
+export interface WorkflowVersionHistory {
+  versions: WorkflowVersionEntry[]
+  unsaved_changes: boolean
+  can_manage: boolean
+}
+
+export function listWorkflowVersions(workflowId: string) {
+  return apiFetch<WorkflowVersionHistory>(`/api/workflows/${workflowId}/versions`)
+}
+
+export function saveWorkflowVersion(workflowId: string, note: string) {
+  return apiFetch<{ id: string; number: number }>(`/api/workflows/${workflowId}/versions`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  })
+}
+
+export function restoreWorkflowVersion(workflowId: string, versionId: string) {
+  return apiFetch<{ id: string; number: number; restored_from: number; name_note: string | null }>(
+    `/api/workflows/${workflowId}/versions/${versionId}/restore`, { method: 'POST' },
+  )
 }
 
 export function getWorkflowHistory(workflowId: string, limit = 50) {
@@ -736,6 +773,8 @@ export interface WorkflowQualityStatus {
   last_validated_at: string | null
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
+  /** A catalog author's rating with no measurement behind it; status is unvalidated. */
+  tier_asserted?: string | null
 }
 
 export function getWorkflowQualityStatus(workflowId: string) {
@@ -809,6 +848,12 @@ export type WorkflowOptimizationRun = {
   baseline_no_workflow_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Held-out re-scores: present when the run split its test set. The
+   *  headline is held-out exactly when holdout_optimized_score is set; pair
+   *  scores with reportedBaselineScore (shared/optimizerScores). */
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  holdout_optimized_score?: number | null
   judge_variance: number | null
   judge_score_se: number | null
   judge_model: string | null

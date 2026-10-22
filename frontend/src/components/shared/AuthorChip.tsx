@@ -26,7 +26,7 @@ export function AuthorChip({ author, size = 'sm', label, tone = 'default', class
 
   const base = author.name || author.email || author.user_id
   const display = author.org ? `${base} at ${author.org}` : base
-  const fontSize = size === 'sm' ? 11 : 12
+  const fontSize = 'var(--workspace-font-meta)'
   const iconSize = size === 'sm' ? 10 : 12
 
   const subject = encodeURIComponent('Question about your workflow')
@@ -44,11 +44,11 @@ export function AuthorChip({ author, size = 'sm', label, tone = 'default', class
   const baseStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 'var(--workspace-space-4)',
     fontSize,
     color: tone === 'on-dark' ? '#ffffff' : '#5f6368',
     background: tone === 'on-dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.04)',
-    padding: '2px 8px',
+    padding: "var(--workspace-space-2) var(--workspace-space-8)",
     borderRadius: 999,
     lineHeight: 1.4,
     whiteSpace: 'nowrap',

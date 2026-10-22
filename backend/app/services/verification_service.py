@@ -17,10 +17,11 @@ from app.models.verification import (
 )
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference
 from app.models.system_config import SystemConfig
-from app.models.workflow import Workflow
+from app.models.workflow import Workflow, WorkflowStep
 from app.models.search_set import SearchSet
 from app.schemas.user import AuthorRef
 from app.services.user_lookup import resolve_author, resolve_authors
+from app.services.catalog_usage import describe_catalog_usage
 
 logger = logging.getLogger(__name__)
 
@@ -669,6 +670,8 @@ async def list_verified_items(
     kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
 
     name_map: dict[str, str] = {}
+    workflow_map: dict[str, Workflow] = {}
+    workflow_steps: dict[str, WorkflowStep] = {}
     creator_map: dict[tuple[str, str], str] = {}
     # Bundled starter examples carry the seed marker the catalog seeder writes;
     # the listing says so per item, since nobody *here* shared those. Copies
@@ -679,11 +682,16 @@ async def list_verified_items(
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
+            workflow_map[str(wf.id)] = wf
             if (wf.resource_config or {}).get("seed_id") and wf.user_id == "system":
                 starter_ids.add(str(wf.id))
             creator_id = wf.created_by_user_id or wf.user_id
             if creator_id:
                 creator_map[(LibraryItemKind.WORKFLOW.value, str(wf.id))] = creator_id
+    step_ids = [step_id for wf in workflow_map.values() for step_id in wf.steps]
+    if step_ids:
+        for step in await WorkflowStep.find({"_id": {"$in": step_ids}}).to_list():
+            workflow_steps[str(step.id)] = step
     ss_map: dict[str, SearchSet] = {}
     if ss_ids:
         ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
@@ -768,12 +776,17 @@ async def list_verified_items(
         if underlying_obj is not None and getattr(underlying_obj, "uuid", None):
             meta = with_measured_quality(meta, meta_map.get((item.kind.value, underlying_obj.uuid)))
 
+        public_description = meta.description if meta else None
+        if not public_description:
+            source = workflow_map.get(item_id_str) if item.kind == LibraryItemKind.WORKFLOW else kb_map.get(item_id_str) if item.kind == LibraryItemKind.KNOWLEDGE_BASE else None
+            public_description = source.description if source else None
+
         # Search: match against name, display_name, description, and tags
         if search_lower:
             searchable = " ".join(filter(None, [
                 name.lower(),
                 (meta.display_name or "").lower() if meta else "",
-                (meta.description or "").lower() if meta else "",
+                (public_description or "").lower(),
                 " ".join(t.lower() for t in item.tags),
             ]))
             if search_lower not in searchable:
@@ -818,7 +831,7 @@ async def list_verified_items(
             "verified": item.verified,
             "created_at": item.created_at.isoformat() if item.created_at else None,
             "display_name": meta.display_name if meta else None,
-            "description": meta.description if meta else None,
+            "description": public_description,
             "markdown": meta.markdown if meta else None,
             "organization_ids": item_org_ids,
             "quality_score": meta.quality_score if meta else None,
@@ -849,6 +862,27 @@ async def list_verified_items(
                 if meta and meta.credit_name else None
             ),
         }
+
+        # Describe the published configuration, never submission-only examples,
+        # credentials, destination URLs, or names of private fixed documents.
+        if item.kind == LibraryItemKind.WORKFLOW:
+            wf = workflow_map.get(item_id_str)
+            if wf:
+                steps = [workflow_steps[str(s)] for s in wf.steps if str(s) in workflow_steps]
+                entry["usage"] = describe_catalog_usage("workflow", wf, steps)
+                if len(steps) != len(wf.steps):
+                    entry["usage"]["output"] = "Output details are incomplete. Open the workflow to review its setup."
+                    entry["usage"]["output_names"] = []
+                    entry["usage"]["notes"].append("Some configured steps could not be loaded.")
+        elif item.kind == LibraryItemKind.SEARCH_SET:
+            ss = ss_map.get(item_id_str)
+            if ss:
+                entry["set_type"] = ss.set_type
+                entry["usage"] = describe_catalog_usage("search_set", ss)
+        elif item.kind == LibraryItemKind.KNOWLEDGE_BASE:
+            kb = kb_map.get(item_id_str)
+            if kb:
+                entry["usage"] = describe_catalog_usage("knowledge_base", kb)
 
         # KB-specific metrics (from batch)
         if item.kind == LibraryItemKind.KNOWLEDGE_BASE:

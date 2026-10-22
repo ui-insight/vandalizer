@@ -124,6 +124,8 @@ export interface WorkflowCitation {
   score?: number | null;
   similarity?: number | null;
   content_preview?: string;
+  /** A web result's address (Web Search step); the chip opens it. */
+  url?: string | null;
   /** Set when several knowledge bases fed one step or task, so a chip can say
    *  which base a passage came from. */
   kb_uuid?: string | null;
@@ -178,6 +180,9 @@ export interface WorkflowStatus {
   error?: string | null;
   error_payload?: WorkflowErrorPayload | null;
   retrieved_sources?: WorkflowCitation[];
+  /** The run's model, and the models its steps actually ran on. */
+  model?: string | null;
+  models_used?: string[];
   /** Where each statement in the outputs came from, traced after the run
    *  completed (backend output_sourcing.py). Absent on older runs. */
   sourcing?: WorkflowSourcing | null;

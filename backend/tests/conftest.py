@@ -91,3 +91,20 @@ async def client():
             base_url="http://test",
         ) as ac:
             yield ac
+
+
+@pytest.fixture(params=['current', 'preserved'])
+def certification_rubric(request, monkeypatch):
+    """Run the same behavioral regressions against both supported implementations."""
+    if request.param == 'current':
+        yield
+        return
+    from app.services.certification_versions.catalog import CourseCatalog
+    from app.services.certification_versions import grading
+    package = CourseCatalog().load('legacy-2026-10-02.1', preview=True)
+    monkeypatch.setattr(request.module, 'cs', grading.load_rubric(package))
+    token = grading._package.set(package)
+    try:
+        yield
+    finally:
+        grading._package.reset(token)

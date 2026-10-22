@@ -7,7 +7,6 @@
     "seed_id": "wf-post-award-progress-report",
     "display_name": "Progress Report Analyzer",
     "description": "Reviews a progress report for completeness, alignment with project objectives, and adequacy of explanations for any delays or problems.",
-    "quality_tier": "excellent",
     "collections": [
       "post-award"
     ]
@@ -43,6 +42,26 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "373f8b0c-eb32-5b6a-bbbb-f2162b50f87c",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every expenditure, balance, percentage, date and count in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "d3f82919-9294-5774-9995-ac3c4c462ab8",
+          "name": "Every stated objective is reviewed",
+          "category": "completeness",
+          "description": "Each project objective the report states is addressed in the alignment review, with whether the report shows progress on it. FAIL for each objective skipped."
+        },
+        {
+          "id": "7ca2121f-5948-54e4-9a31-4ea831872e43",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (on track, complete, adequate) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
       ]
     }

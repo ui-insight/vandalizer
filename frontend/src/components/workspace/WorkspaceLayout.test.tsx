@@ -1,0 +1,113 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { WorkspaceLayout } from './WorkspaceLayout'
+const h = vi.hoisted(() => ({ compact: false, mode: 'files', editor: null as string | null, tab: 'assistant', focus: 0, setTab: vi.fn(),
+  setMode: vi.fn(), send: vi.fn(), consume: vi.fn(), certRequest: null as { nonce: number; message: string } | null }))
+vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => ({ chatRequest: h.certRequest, consumeChatRequest: h.consume }) }))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ selectedDocUuids: [], documentReadiness: {}, railDocked: true, panelSplit: 50, chatSplitOpen: false, workspaceMode: h.mode, viewDocument: vi.fn(), setWorkspaceMode: h.setMode, sendChatMessage: h.send, activeProjectUuid: null, openWorkflowId: h.editor, openExtractionId: null, openAutomationId: null, focusChatSignal: h.focus, activeRightTab: h.tab, setActiveRightTab: h.setTab }) }))
+vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
+vi.mock('../../hooks/useAutomationActivity', () => ({ useAutomationActivity: () => ({ activeIds: [], hasActive: false }) }))
+vi.mock('../layout/Header', () => ({ Header: () => <div>Header</div> }))
+vi.mock('./ActivityRail', () => ({ ActivityRail: () => <div>Activity</div> }))
+vi.mock('./PanelResizer', () => ({ PanelResizer: () => <div data-testid="resizer" /> }))
+vi.mock('./LeftPanel', () => ({ LeftPanel: () => <div data-testid="open-file">Open document</div> }))
+vi.mock('./RightPanel', () => ({ RightPanel: () => <div data-testid="library">Library and tools</div> }))
+vi.mock('./UtilityBar', () => ({ UtilityBar: () => <div>Navigation</div> }))
+vi.mock('../certification/CourseEditorReturn', () => ({ CourseEditorReturn: () => null }))
+vi.mock('./ProjectContextBar', () => ({ ProjectContextBar: () => null }))
+vi.mock('./ProjectManageModal', () => ({ ProjectManageModal: () => null }))
+vi.mock('./ProjectsPanel', () => ({ ProjectsPanel: () => <div>Projects</div> }))
+vi.mock('./AutomationsPanel', () => ({ AutomationsPanel: () => <div>Automations</div> }))
+vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => <div>Knowledge</div> }))
+beforeEach(() => {
+  sessionStorage.clear()
+  h.compact = false; h.mode = 'files'; h.editor = null; h.tab = 'assistant'; h.focus = 0; h.certRequest = null; vi.clearAllMocks()
+  vi.stubGlobal('matchMedia', () => ({ matches: h.compact, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+})
+const rightHidden = () => screen.getByTestId('library').closest('[aria-label="Tools and assistant"]')!.classList.contains('hidden')
+describe('certification opens in chat', () => {
+  it('sends a queued certification kickoff in chat mode exactly once', () => {
+    h.certRequest = { nonce: 3, message: 'Continue my certification — show my progress and the next module.' }
+    const { rerender } = render(<WorkspaceLayout />)
+    expect(h.consume).toHaveBeenCalledExactlyOnceWith(3)
+    expect(h.setMode).toHaveBeenCalledWith('chat')
+    expect(h.send).toHaveBeenCalledExactlyOnceWith('Continue my certification — show my progress and the next module.')
+    rerender(<WorkspaceLayout />)
+    expect(h.send).toHaveBeenCalledOnce()
+  })
+  it('sends nothing when no entry point asked', () => {
+    render(<WorkspaceLayout />)
+    expect(h.send).not.toHaveBeenCalled()
+  })
+})
+describe('Files and Library share the workspace', () => {
+  it('remembers compact pane choices separately for each section and after a remount', () => {
+    h.compact = true
+    const { rerender, unmount } = render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Library panel' }))
+    h.mode = 'knowledge'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assistant panel' }))
+    h.mode = 'files'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Files panel' }))
+    unmount(); render(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+  })
+  it('restores a compact source pane even when an editor remains open', () => {
+    h.compact = true; h.editor = 'workflow-1'
+    sessionStorage.setItem('workspace:compactPanels', JSON.stringify({files:'source'}))
+    const { rerender } = render(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+    h.editor = 'workflow-2'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(false)
+  })
+
+  it('keeps both desktop panes visible before and after opening a tool', () => {
+    const { rerender } = render(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(false)
+    const file = screen.getByTestId('open-file')
+    expect(file).toBeVisible()
+    expect(screen.getByTestId('resizer')).toBeInTheDocument()
+    h.editor = 'workflow-1'; rerender(<WorkspaceLayout />)
+    expect(file).toBeVisible()
+    expect(screen.getByTestId('open-file')).toBe(file)
+    expect(rightHidden()).toBe(false)
+  })
+  it('preserves the open file when another left section is opened and closed', () => {
+    const { rerender } = render(<WorkspaceLayout />)
+    const file = screen.getByTestId('open-file')
+    h.mode = 'knowledge'; rerender(<WorkspaceLayout />)
+    expect(screen.getByTestId('open-file')).toBe(file)
+    expect(file.parentElement).toHaveClass('hidden')
+    expect(rightHidden()).toBe(false)
+    h.mode = 'files'; rerender(<WorkspaceLayout />)
+    expect(screen.getByTestId('open-file')).toBe(file)
+    expect(file.parentElement).not.toHaveClass('hidden')
+  })
+  it('lets compact screens reach Library and return to the same file', () => {
+    h.compact = true
+    render(<WorkspaceLayout />)
+    const file = screen.getByTestId('open-file')
+    expect(rightHidden()).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Library panel' }))
+    expect(h.setTab).toHaveBeenCalledWith('library')
+    expect(rightHidden()).toBe(false)
+    expect(file).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Files panel' }))
+    expect(rightHidden()).toBe(true)
+    expect(file).toBeVisible()
+    expect(screen.getByTestId('open-file')).toBe(file)
+  })
+  it('keeps a mobile tool mounted while checking its source file', () => {
+    h.compact = true; h.editor = 'workflow-1'
+    render(<WorkspaceLayout />)
+    const tool = screen.getByTestId('library')
+    expect(rightHidden()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Files panel' }))
+    expect(rightHidden()).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Open tool panel' }))
+    expect(rightHidden()).toBe(false)
+    expect(screen.getByTestId('library')).toBe(tool)
+  })
+})

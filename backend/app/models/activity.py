@@ -40,6 +40,14 @@ class ActivityEvent(Document):
     )
 
     conversation_id: Optional[str] = None
+    # The chat that started this run, when a chat tool started it. Kept apart
+    # from ``conversation_id``, which marks a chat's own entry: deleting an
+    # entry deletes the conversation in ``conversation_id``, and deleting a run
+    # must never delete the chat that ran it.
+    source_conversation_id: Optional[str] = None
+    # Titles of the documents the run read (first ten), so the activity list
+    # can tell apart two runs of the same template.
+    document_titles: list[str] = Field(default_factory=list)
     search_set_uuid: Optional[str] = None
     workflow_result: Optional[PydanticObjectId] = None
     workflow: Optional[PydanticObjectId] = None
@@ -89,6 +97,9 @@ class ActivityEvent(Document):
             "status": self.status,
             "title": self.title,
             "conversation_id": self.conversation_id,
+            "source_conversation_id": self.source_conversation_id,
+            "document_titles": self.document_titles or [],
+            "tags": self.tags or [],
             "search_set_uuid": self.search_set_uuid,
             "workflow_id": str(self.workflow) if self.workflow else None,
             "workflow_session_id": self.workflow_session_id,

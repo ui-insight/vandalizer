@@ -153,6 +153,13 @@ class SystemConfig(Document):
 
     ocr_endpoint: str = ""
     ocr_api_key: str = ""
+    # Web search (agentic chat tool). Provider is one of "tavily", "searxng",
+    # or "brave"; the web_search_service parses each provider's response shape.
+    # Endpoint is the search API URL (provider-specific); api_key is encrypted
+    # at rest like ocr_api_key.
+    web_search_endpoint: str = ""
+    web_search_api_key: str = ""
+    web_search_provider: str = ""
     # Request/response contract the OCR endpoint speaks — "raw" (POST a file,
     # body is the text) or "docling" (docling-serve convert API). See
     # app/services/ocr_client.py. Existing installs default to "raw", which is
@@ -200,6 +207,20 @@ class SystemConfig(Document):
 
     # Compliance configuration (document content checks on upload)
     compliance_config: dict = {}
+
+    # Agentic-chat behavior flags (harness uplift plan). Keys:
+    #   "microcompact_enabled": bool (default True) — clear old read-tool
+    #       results from replayed history near the context budget (Phase 3).
+    #   "autocompact_enabled": bool (default True) — summarize older
+    #       conversation automatically past the compact threshold (Phase 4).
+    #   "parallel_tools_enabled": bool (default True) — run read-only tool
+    #       calls from one response concurrently; write tools always
+    #       serialize regardless (Phase 7). Read at agent construction.
+    #   "subagents_enabled": bool (default True) — allow analyze_documents
+    #       to fan out per-document sub-analyses (Phase 9).
+    # Missing keys mean "use the default" so deployments never need a
+    # migration to pick up new phases.
+    chat_config: dict = {}
 
     # Anonymous telemetry decision (see DEFAULT_TELEMETRY_CONFIG). Lets the
     # in-app opt-in banner durably enable/disable the heartbeat without an env

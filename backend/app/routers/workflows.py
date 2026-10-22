@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from app.dependencies import get_api_key_user, get_current_user, get_current_user_or_api_key
 from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.schemas.workflows import (
@@ -49,6 +50,7 @@ from app.services import workflow_service as svc
 from app.services.docx_service import data_to_docx_bytes
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -492,6 +494,20 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         media_type = media_type_map.get(file_type, "application/octet-stream")
         return file_bytes, media_type, file_type or "bin", output_data.get("filename", "output")
 
+    # The evidence behind the output: extracted fields' quotes and pages, and
+    # passages knowledge-base steps retrieved. Carried into every format that
+    # can hold it, so whoever receives the file can check it (#1008).
+    from app.services.export_provenance import (
+        append_sources_to_docx,
+        collect_run_sources,
+        field_source_cell,
+        output_step_field_sources,
+        sources_markdown,
+    )
+
+    source_rows = collect_run_sources(status)
+    row_sources = output_step_field_sources(status)
+
     if format == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -509,18 +525,35 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
             if data and isinstance(data[0], dict):
                 # Collect keys from ALL items so no columns are missing
                 headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-                writer.writerow(headers)
-                for row in data:
-                    writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
+                # Each field's source sits beside it, when the rows are the
+                # extraction's own (its sidecar is positional per row).
+                with_sources = len(row_sources) == len(data) and any(row_sources)
+                if with_sources:
+                    writer.writerow([c for h in headers for c in (h, f"{h} (source)")])
+                    for row, srcs in zip(data, row_sources):
+                        writer.writerow([
+                            c for h in headers
+                            for c in (_csv_cell(row.get(h, "")), field_source_cell(srcs.get(h)))
+                        ])
+                else:
+                    writer.writerow(headers)
+                    for row in data:
+                        writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
             else:
                 writer.writerow(["Value"])
                 for item in data:
                     writer.writerow([str(item)])
         elif isinstance(data, dict):
             # Transpose to Field/Value rows instead of one wide row
-            writer.writerow(["Field", "Value"])
-            for k, v in data.items():
-                writer.writerow([str(k), _csv_cell(v)])
+            srcs = row_sources[0] if len(row_sources) == 1 else {}
+            if srcs:
+                writer.writerow(["Field", "Value", "Source"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v), field_source_cell(srcs.get(k))])
+            else:
+                writer.writerow(["Field", "Value"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v)])
         else:
             writer.writerow(["Output"])
             text = str(data)
@@ -547,16 +580,25 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         from app.services.output_handlers import render_workflow_markdown
 
         md_text = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+        if source_rows:
+            md_text = f"{md_text.rstrip()}\n\n{sources_markdown(source_rows)}"
         return md_text.encode(), "text/markdown", "md", None
 
     if format == "pdf":
         from app.services.pdf_service import render_workflow_pdf
 
-        pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
+        if source_rows:
+            # Rendered through Markdown so the Sources table follows the output.
+            from app.services.output_handlers import render_workflow_markdown
+
+            body = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+            pdf_bytes = render_workflow_pdf(f"{body.rstrip()}\n\n{sources_markdown(source_rows)}", title="Workflow Results")
+        else:
+            pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
         return pdf_bytes, "application/pdf", "pdf", None
 
     if format == "docx":
-        docx_bytes = data_to_docx_bytes(output_data)
+        docx_bytes = append_sources_to_docx(data_to_docx_bytes(output_data), source_rows)
         return (
             docx_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -596,7 +638,7 @@ async def download_results(
     return StreamingResponse(
         io.BytesIO(content),
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -674,7 +716,7 @@ async def download_batch_results(
     return StreamingResponse(
         zip_buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{zip_name}.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{zip_name}.zip")},
     )
 
 
@@ -763,7 +805,7 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_name}.vandalizer.json")},
     )
 
 
@@ -1106,6 +1148,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
         steps_total=num_steps,
+        document_uuids=document_uuids,
     )
 
     try:
@@ -1213,6 +1256,23 @@ async def get_workflow_history(
         .limit(limit)
         .to_list()
     )
+    # What ran comes from the run's metered calls (model_usage). Runs recorded
+    # before calls were metered have none; for those only, fall back to the
+    # models their WorkflowResult recorded, in the same ``models`` field.
+    from app.models.workflow import WorkflowResult
+    unmetered = [ev.workflow_session_id for ev in events if ev.workflow_session_id and not ev.model_usage]
+    recorded: dict[str, list[str]] = {}
+    if unmetered:
+        for r in await WorkflowResult.find({"session_id": {"$in": unmetered}}).to_list():
+            used = [m for m in (r.models_used or []) if m]
+            recorded[r.session_id] = used or ([r.model] if r.model else [])
+
+    def models_of(ev) -> dict:
+        fields = run_model_fields(ev.model_usage)
+        if not fields["models"]:
+            fields["models"] = recorded.get(ev.workflow_session_id, [])
+        return fields
+
     return {
         "runs": [
             {
@@ -1233,14 +1293,78 @@ async def get_workflow_history(
                 # history row say "awaiting approval" and link to the review
                 # instead of showing a run that has been "running" for days.
                 "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
-                # What actually ran, from the metered calls (support ticket:
-                # History couldn't say which model a run used). Empty for runs
-                # recorded before models were.
-                **run_model_fields(ev.model_usage),
+                # What actually ran (support ticket: History couldn't say
+                # which model a run used).
+                **models_of(ev),
             }
             for ev in events
         ],
     }
+
+
+class SaveWorkflowVersionRequest(BaseModel):
+    note: str = ""
+
+
+@router.get("/{workflow_id}/versions")
+async def list_workflow_versions(workflow_id: str, user: User = Depends(get_current_user)):
+    """The workflow's version history, newest first."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    history = await workflow_versions.list_versions(wf)
+    authors = await resolve_authors({v["created_by_user_id"] for v in history["versions"] if v["created_by_user_id"]})
+    for v in history["versions"]:
+        author = authors.get(v["created_by_user_id"]) if v["created_by_user_id"] else None
+        v["created_by_name"] = (author.name or author.email) if author else None
+    team_access = await access_control.get_team_access_context(user)
+    history["can_manage"] = access_control.can_manage_workflow(wf, user, team_access)
+    return history
+
+
+@router.post("/{workflow_id}/versions")
+async def save_workflow_version(
+    workflow_id: str, body: SaveWorkflowVersionRequest, user: User = Depends(get_current_user),
+):
+    """Save the workflow as it stands now as a version, with an optional note."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    latest = await workflow_versions.latest_version(str(wf.id))
+    definition = await workflow_versions.current_definition(wf)
+    if latest and latest.definition_hash == workflow_versions.definition_hash(definition):
+        raise HTTPException(status_code=409, detail=f"Nothing has changed since version {latest.number}.")
+    source = "editor" if latest else "original"
+    version = await workflow_versions.record_version(
+        wf, note=body.note.strip() or workflow_versions.SOURCE_LABELS[source], source=source,
+        user_id=user.user_id, definition=definition,
+    )
+    return {"id": str(version.id), "number": version.number}
+
+
+@router.post("/{workflow_id}/versions/{version_id}/restore")
+async def restore_workflow_version(
+    workflow_id: str, version_id: str, user: User = Depends(get_current_user),
+):
+    """Make an earlier version current again. Recorded as a new version."""
+    from app.models.workflow import WorkflowVersion
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    try:
+        version = await WorkflowVersion.get(PydanticObjectId(version_id))
+    except Exception:
+        version = None
+    if not version or version.workflow_id != str(wf.id):
+        raise HTTPException(status_code=404, detail="Version not found")
+    restored, name_note = await workflow_versions.restore_version(wf, version, user.user_id)
+    return {"id": str(restored.id), "number": restored.number, "restored_from": version.number, "name_note": name_note}
 
 
 @router.get("/{workflow_id}/quality-history")
@@ -1409,6 +1533,17 @@ async def get_workflow_quality_status(
             "regression_pending_review": False,
         }
 
+    # A catalog tier with no score and no run behind it is the author's claim,
+    # not a measurement (#1013 §5): report the item as unvalidated and pass
+    # the claim separately so the card can say whose rating it is.
+    if not latest and meta and meta.quality_score is None:
+        return {
+            "status": "unvalidated", "score": None, "tier": None,
+            "tier_asserted": meta.quality_tier,
+            "config_changed": False, "stale": False, "last_validated_at": None,
+            "regression_pending_review": bool(meta.regression_pending_review),
+        }
+
     score = meta.quality_score if meta else latest.get("score") if latest else None
     tier = meta.quality_tier if meta else None
     last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else
@@ -1507,7 +1642,7 @@ async def download_validation_report(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -1704,6 +1839,7 @@ async def run_workflow_integrated(
         doc = SmartDocument(
             title=upload.filename,
             processing=True,
+            validating=True,
             valid=True,
             raw_text="",
             downloadpath=str(relative_path),
@@ -1719,8 +1855,7 @@ async def run_workflow_integrated(
             document_uuid=uid, extension=ext, document_path=str(file_path),
             user_id=user.user_id,
         )
-        doc.task_id = task_id
-        await doc.save()
+        await record_extraction_dispatch(doc, task_id)
         doc_uuids.append(uid)
 
     if not doc_uuids:
@@ -1735,10 +1870,16 @@ async def run_workflow_integrated(
     )
 
     try:
+        # The activity id ties the run's token and model usage to its
+        # activity row, as the interactive run does; without it the API run's
+        # usage was metered against nothing and its row stayed "running".
         session_id = await svc.run_workflow(
             workflow_id, doc_uuids, user.user_id,
+            activity_id=str(activity.id),
             user=user,
         )
+        activity.workflow_session_id = session_id
+        await activity.save()
         return {
             "status": "queued",
             "activity_id": str(activity.id),
@@ -1895,8 +2036,6 @@ async def start_workflow_optimization(
         token_budget = int(body.get("token_budget", 0))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="token_budget must be an integer")
-    if token_budget < 0:
-        raise HTTPException(status_code=400, detail="token_budget must be >= 0")
 
     try:
         max_candidates = int(body.get("max_candidates", 10))
@@ -1955,28 +2094,26 @@ async def start_workflow_optimization(
         token_budget=token_budget,
     )
 
-    run = WorkflowOptimizationRun(
-        workflow_id=workflow_id,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=token_budget,
-        options={
-            "apply_on_finish": apply_on_finish,
-            "include_judge": include_judge,
-            "max_candidates": max_candidates,
-        },
+    # Dispatch through the service (this branch's extraction of main's inline
+    # block); the reap-on-start and celery_task_id capture that main added to
+    # its inline version live inside start_workflow_optimization here.
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_workflow_optimization as _start,
     )
-    await run.insert()
-
-    from app.tasks.workflow_optimization_tasks import optimize_workflow_task
-    async_result = optimize_workflow_task.delay(
-        workflow_id, user.user_id, run.uuid,
-        token_budget, apply_on_finish, max_candidates, include_judge,
-    )
-    # Stored so the reaper can revoke a still-queued task rather than let it
-    # resurrect a doc already finalized as abandoned (same as extraction).
-    run.celery_task_id = async_result.id
-    await run.save()
+    try:
+        run = await _start(
+            workflow_id, user.user_id,
+            token_budget=token_budget,
+            apply_on_finish=apply_on_finish,
+            max_candidates=max_candidates,
+            include_judge=include_judge,
+        )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -2104,8 +2241,6 @@ async def apply_workflow_optimization(
     the body — or sending ``{}`` — applies all winning step overrides,
     matching the legacy behavior.
     """
-    import datetime as _dt
-
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -2116,87 +2251,24 @@ async def apply_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
-    if run.tied_with_baseline and not (req and req.force):
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "tied_with_baseline",
-                "message": (
-                    "The winning configuration is statistically tied with the "
-                    "workflow's current settings (within judge noise), so the data "
-                    "doesn't justify a config change. Re-submit with force=true to "
-                    "apply anyway."
-                ),
-            },
-        )
 
-    # Snapshot the previous override so revert is exact.
-    run.previous_override = wf.config_override
-    await run.save()
-
-    winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
-    requested_step_ids = req.step_ids if req else None
-    if requested_step_ids is not None:
-        # Validate: every requested step_id must exist in the winning config.
-        unknown = [s for s in requested_step_ids if s not in winning_overrides]
-        if unknown:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown step_ids in winning config: {unknown}",
-            )
-        # Subset apply: start from the currently-live step_overrides (so the
-        # user's prior choices on other steps survive) and overlay only the
-        # selected ones from this run's winner.
-        live_overrides: dict = ((wf.config_override or {}).get("step_overrides") or {})
-        merged = dict(live_overrides)
-        for sid in requested_step_ids:
-            merged[sid] = winning_overrides[sid]
-        applied_overrides = merged
-    else:
-        applied_overrides = dict(winning_overrides)
-
-    wf.config_override = {
-        "step_overrides": applied_overrides,
-        "from_run_uuid": run.uuid,
-        "partial": requested_step_ids is not None,
-    }
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc)
-    await wf.save()
-
-    # Phase 4: record this apply on the unified quality timeline so workflow
-    # applies show up alongside validation runs in the shared QualityTimeline.
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_workflow_optimization as _apply,
+    )
     try:
-        from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
-        wf_name = getattr(wf, "name", "") or getattr(wf, "title", "") or ""
-        await _qs.record_optimizer_apply(
-            item_kind="workflow",
-            item_id=str(wf.id),
-            item_name=wf_name,
-            run_type="workflow",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=wf.config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
+        return await _apply(
+            wf, run, user.user_id,
+            step_ids=req.step_ids if req else None,
+            force=bool(req and req.force),
         )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for workflow %s", wf.id)
-
-    return {
-        "ok": True,
-        "applied_config": wf.config_override,
-        "applied_step_ids": list(applied_overrides.keys()),
-        "partial": requested_step_ids is not None,
-    }
+    except OptimizationActionError as e:
+        if e.code == "tied_with_baseline":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": e.code, "message": e.message},
+            )
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 @router.post("/{workflow_id}/optimize/{run_uuid}/revert")
@@ -2205,6 +2277,7 @@ async def revert_workflow_optimization(
 ):
     """Restore the config_override that was in effect before this run applied."""
     import datetime as _dt
+    from app.models.workflow import Workflow
 
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
@@ -2217,7 +2290,15 @@ async def revert_workflow_optimization(
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
 
-    wf.config_override = run.previous_override
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
-    await wf.save()
-    return {"ok": True, "reverted_to": wf.config_override}
+    if (wf.config_override or {}).get("from_run_uuid") != run_uuid:
+        if wf.config_override == run.previous_override:
+            return {"ok": True, "reverted_to": wf.config_override}
+        raise HTTPException(status_code=409, detail="A different configuration is now active. Refresh before reverting it.")
+    reverted_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
+    result = await Workflow.get_motor_collection().update_one(
+        {"_id": wf.id, "config_override": wf.config_override},
+        {"$set": {"config_override": run.previous_override, "config_override_set_at": reverted_at}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=409, detail="The configuration changed during this request. Refresh before reverting it.")
+    return {"ok": True, "reverted_to": run.previous_override}

@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { FieldLabel, FieldMessage } from '../shared/FormField'
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
+import { usePanelVisible } from '../shared/PanelVisibility'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy, Search, X } from 'lucide-react'
+import { Plus, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { useToast } from '../../contexts/ToastContext'
 import { PROJECT_STATES } from '../../types/project'
@@ -19,35 +22,46 @@ import type { ProjectSort } from '../projects/projectListView'
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
-  const { projects, loading, create, duplicate } = useProjects()
+  const visible = usePanelVisible()
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
+  const { projects, loading, error, refresh, create, duplicate } = useProjects()
   const { toast } = useToast()
   const [newName, setNewName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const createPending = useRef(false)
+  const duplicatePending = useRef(false)
+  const [visibleLimit, setVisibleLimit] = useState(40)
+  const [search, setSearch] = useState('')
+  const [stage, setStage] = useState<ProjectState | 'all'>('all')
+  const [sort, setSort] = useState<ProjectSort>('updated')
+  const stageCounts = useMemo(() => countByStage(projects), [projects])
+  const visibleProjects = useMemo(
+    () => applyProjectListView(projects, { query: search, stage, sort }),
+    [projects, search, stage, sort],
+  )
+  const filtered = search.trim() !== '' || stage !== 'all'
+  const clearFilters = () => { setSearch(''); setStage('all'); setVisibleLimit(40) }
   const [creating, setCreating] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [stage, setStage] = useState<ProjectState | 'all'>('all')
-  const [sort, setSort] = useState<ProjectSort>('updated')
-
-  const stageCounts = useMemo(() => countByStage(projects), [projects])
-  const shown = useMemo(
-    () => applyProjectListView(projects, { query, stage, sort }),
-    [projects, query, stage, sort],
-  )
-  const filtered = query.trim() !== '' || stage !== 'all'
-  const clearFilters = () => { setQuery(''); setStage('all') }
 
   // Scope the workspace to the project. The `?project=` param is consumed by
   // WorkspaceContext, which activates the project scope and lands in chat.
   // Switch the stored mode to chat *first* so the drawer doesn't linger via the
   // localStorage fallback while the (async) project scope resolves.
   const openProject = (uuid: string) => {
-    localStorage.setItem('workspace:mode', 'chat')
+    try { localStorage.setItem('workspace:mode', 'chat') } catch { /* URL navigation remains available. */ }
     navigate({
       to: '/',
       search: {
-        mode: undefined,
+        mode: 'chat',
         tab: undefined,
         workflow: undefined,
         extraction: undefined,
@@ -60,18 +74,28 @@ export function ProjectsPanel() {
   }
 
   const handleCreate = async () => {
-    if (!newName.trim()) return
+    if (!newName.trim() || createPending.current) return
+    createPending.current = true
+    setCreateError(null)
     setCreating(true)
     try {
       const project = await create(newName.trim())
-      setNewName('')
-      openProject(project.uuid)
+      if (mounted.current) {
+        setNewName('')
+        if (visibleRef.current) openProject(project.uuid)
+        else toast(`Created “${project.title}”`, 'success', { label: 'Open project', onClick: () => openProject(project.uuid) })
+      }
+    } catch (error) {
+      setCreateError(`${error instanceof Error ? error.message : 'Could not create project'}. Your name is preserved; retry Create.`)
     } finally {
+      createPending.current = false
       setCreating(false)
     }
   }
 
   const handleDuplicate = async (p: Project) => {
+    if (duplicatePending.current) return
+    duplicatePending.current = true
     setMenuOpenId(null)
     setDuplicatingId(p.uuid)
     try {
@@ -80,125 +104,94 @@ export function ProjectsPanel() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to duplicate project', 'error')
     } finally {
+      duplicatePending.current = false
       setDuplicatingId(null)
     }
   }
 
   return (
-    <div className="relative h-full overflow-auto bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
-        <FolderKanban className="h-5 w-5 text-gray-400" />
-        <h2 className="text-base font-semibold text-gray-900">Projects</h2>
-        <button
+    <div role="region" aria-label="Projects list" className="relative h-full overflow-auto bg-white">
+      <WorkspaceSectionHeader title="Projects" help={<button
+          aria-label="What are Projects?" title="What are Projects?"
           onClick={() => setShowExplainer(true)}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+          className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
         >
           <HelpCircle size={12} />
-          What are Projects?
-        </button>
-        <span className="ml-auto text-xs text-gray-400">
-          {filtered ? `${shown.length} of ${projects.length}` : projects.length}
-        </span>
-      </div>
+          About
+        </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : filtered ? `${visibleProjects.length} of ${projects.length} projects` : `${projects.length} projects`}>
 
-      {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
-
-      <div className="p-5">
+        <div>
+        <FieldLabel htmlFor="new-project-name" required>New project name</FieldLabel>
         <div className="flex gap-2">
           <input
+            id="new-project-name"
+            aria-required="true"
+            aria-describedby={createError ? 'project-create-error' : undefined}
             type="text"
             value={newName}
+            disabled={creating}
             onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleCreate()}
             placeholder="New project name..."
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
+            aria-label="New project name"
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
           />
           <button
             onClick={handleCreate}
+            aria-label="Create project"
             disabled={creating || !newName.trim()}
             className="flex items-center gap-1 rounded-lg bg-highlight px-3 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50"
           >
-            <Plus size={16} />
+            <Plus size={16} /> <span>{creating ? 'Creating…' : 'Create'}</span>
           </button>
         </div>
 
+        {createError && <FieldMessage id="project-create-error" error>{createError}</FieldMessage>}
+        </div>
+        {projects.length > 0 && <div className="project-list-tools">
+          <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
+          <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value as ProjectSort); setVisibleLimit(40) }}>
+            {(Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]).map(key => (
+              <option key={key} value={key}>{PROJECT_SORT_LABELS[key]}</option>
+            ))}
+          </select>
+        </div>}
+        {/* Stage filter. A stage with no projects has no pill, unless it is
+            the one selected, so the selection can always be undone. */}
         {projects.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <div className="flex gap-2">
-              <div className="flex flex-1 items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 focus-within:ring-2 focus-within:ring-highlight">
-                <Search size={14} className="shrink-0 text-gray-400" aria-hidden="true" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Search projects..."
-                  aria-label="Search projects"
-                  className="min-w-0 flex-1 py-1.5 text-sm focus:outline-none"
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => setQuery('')}
-                    aria-label="Clear search"
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              <select
-                value={sort}
-                onChange={e => setSort(e.target.value as ProjectSort)}
-                aria-label="Sort projects"
-                className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-highlight"
-              >
-                {(Object.keys(PROJECT_SORT_LABELS) as ProjectSort[]).map(key => (
-                  <option key={key} value={key}>{PROJECT_SORT_LABELS[key]}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Stage filter. A stage with no projects has no pill, unless it is
-                the one selected, so the selection can always be undone. */}
-            <div role="group" aria-label="Filter by stage" className="flex flex-wrap gap-1.5">
-              {(['all', ...PROJECT_STATES] as const)
-                .filter(s => s === 'all' || s === stage || stageCounts[s] > 0)
-                .map(s => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStage(s)}
-                    aria-pressed={stage === s}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
-                      stage === s
-                        ? 'border-gray-700 bg-gray-800 text-white'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {s}
-                    <span className={stage === s ? 'text-gray-300' : 'text-gray-400'}>
-                      {s === 'all' ? projects.length : stageCounts[s]}
-                    </span>
-                  </button>
-                ))}
-            </div>
+          <div role="group" aria-label="Filter by stage" className="mt-2 flex flex-wrap gap-1.5">
+            {(['all', ...PROJECT_STATES] as const)
+              .filter(s => s === 'all' || s === stage || stageCounts[s] > 0)
+              .map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setStage(s); setVisibleLimit(40) }}
+                  aria-pressed={stage === s}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                    stage === s
+                      ? 'border-gray-700 bg-gray-800 text-white'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {s}
+                  <span className={stage === s ? 'text-gray-300' : 'text-gray-600'}>
+                    {s === 'all' ? projects.length : stageCounts[s]}
+                  </span>
+                </button>
+              ))}
           </div>
         )}
-
+      </WorkspaceSectionHeader>
+      {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
+      <div className="p-5 pb-24">
         <div className="mt-4 space-y-2">
           {loading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
-          ) : projects.length === 0 ? (
-            <ProjectsExplainer />
-          ) : shown.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
-              No projects match{query.trim() ? ` “${query.trim()}”` : ''}{stage !== 'all' ? ` in ${stage}` : ''}.{' '}
-              <button type="button" onClick={clearFilters} className="font-medium text-gray-700 underline hover:text-gray-900">
-                Clear filters
-              </button>
-            </div>
+            <div role="status" className="text-sm text-gray-600">Loading projects…</div>
+          ) : error ? (<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Projects could not be loaded. <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry projects</button></div>) : projects.length === 0 ? (
+            <div className="project-empty"><h3>Bring your work together</h3><p>A project keeps related files, knowledge and reusable tools in one place. Name your first project above to get started.</p></div>
           ) : (
-            shown.map(p => (
+            visibleProjects.length === 0 ? <p role="status" className="py-6 text-sm text-gray-600">No projects match{search.trim() ? ` “${search.trim()}”` : ''}{stage !== 'all' ? ` in ${stage}` : ''}. <button type="button" onClick={clearFilters}>Clear filters</button></p> : visibleProjects.slice(0, visibleLimit).map(p => (
               <div
                 key={p.uuid}
                 className="group relative rounded-lg border border-gray-200 bg-white transition-colors hover:border-highlight"
@@ -207,14 +200,16 @@ export function ProjectsPanel() {
                   onClick={() => openProject(p.uuid)}
                   className="flex w-full flex-col items-start p-3 text-left"
                 >
-                  <div className="flex w-full items-center justify-between gap-2 pr-7">
-                    <span className="truncate font-medium text-gray-900">{p.title}</span>
+                  <div className="flex w-full flex-col items-start gap-2 pr-7">
+                    <span className="w-full min-w-0 break-words font-medium text-gray-900">{p.title}</span>
                     <ProjectStateBadge state={p.state} />
                   </div>
                   {p.description && (
-                    <span className="mt-1 line-clamp-1 text-xs text-gray-500">{p.description}</span>
+                    <span className="mt-1 break-words text-sm text-gray-600">{p.description}</span>
                   )}
                   <ProjectSummaryStats capabilities={p.capabilities} className="mt-2" />
+                  <span className="mt-2 text-xs text-gray-600">{p.role ? `${p.role === 'viewer' ? 'Read-only' : p.role === 'owner' ? 'Owner' : 'Editor'} · ` : ''}Updated {Number.isNaN(new Date(p.updated_at).getTime()) ? 'date unavailable' : new Date(p.updated_at).toLocaleDateString()}</span>
+                  {duplicatingId === p.uuid && <span role="status" className="mt-2 text-sm text-gray-600">Requesting a copy…</span>}
                 </button>
 
                 {/* Per-project actions. Kept outside the card <button> above —
@@ -222,9 +217,9 @@ export function ProjectsPanel() {
                 <div className="absolute right-1.5 top-1.5">
                   <button
                     onClick={() => setMenuOpenId(menuOpenId === p.uuid ? null : p.uuid)}
-                    disabled={duplicatingId === p.uuid}
-                    aria-label="Project actions"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-wait aria-expanded:opacity-100"
+                    disabled={!!duplicatingId}
+                    aria-label={`Actions for project: ${p.title}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-opacity hover:bg-gray-100 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-wait aria-expanded:opacity-100"
                     aria-expanded={menuOpenId === p.uuid}
                   >
                     <MoreHorizontal size={16} />
@@ -253,6 +248,7 @@ export function ProjectsPanel() {
             ))
           )}
         </div>
+        {!loading && !error && visibleProjects.length > visibleLimit && <button onClick={() => setVisibleLimit(limit => limit + 40)} className="mt-4 rounded-lg border border-gray-300 px-4 py-2 text-sm">Show more projects ({visibleProjects.length - visibleLimit} remaining)</button>}
       </div>
     </div>
   )

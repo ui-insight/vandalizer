@@ -1,10 +1,12 @@
+import { assertedTierNote } from '../../lib/qualityLabels'
+
 const tierColors: Record<string, { bg: string; text: string; border: string }> = {
   excellent: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
   good: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
   fair: { bg: '#fefce8', text: '#a16207', border: '#fde68a' },
 }
 
-const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
+const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: "var(--workspace-border)" }
 
 // A regression the system has already detected outranks the tier the item used
 // to hold. Leaving the old colour up would keep endorsing something monitoring
@@ -49,26 +51,28 @@ export function QualityBadge({
   const catalog = variant === 'catalog'
   const baseLabel = tierLabel
     ? asserted
-      ? `Rated ${tierLabel} by its author · not yet checked here`
+      ? assertedTierNote(tier)
       : `${catalog ? 'Checked' : 'Quality:'} ${catalog ? '· ' : ''}${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
     : catalog ? 'Not yet checked here' : 'Unvalidated'
   const label = regressionPending ? 'Regression pending review' : baseLabel
 
   return (
     <span
-      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title}
+      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title || 'Recorded quality describes the examples tested. Sharing eligibility and completed execution do not establish correctness on new documents.'}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        fontSize: '11px',
+        fontSize: '12px',
         lineHeight: '16px',
-        padding: '1px 6px',
+        padding: "1px var(--workspace-space-6)",
         borderRadius: '4px',
         border: `1px solid ${colors.border}`,
         backgroundColor: colors.bg,
         color: colors.text,
         fontWeight: 500,
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        textAlign: 'left',
       }}
     >
       {label}

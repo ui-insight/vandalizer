@@ -38,7 +38,13 @@ from app.models.workflow import Workflow, WorkflowResult
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.services.budget_enforcer import BudgetEnforcer
 from app.services.config_service import get_user_model_name
-from app.services.optimization_common import build_apply_preview, pick_winner_variance_aware
+from app.services.optimization_common import (
+    build_apply_preview,
+    pick_winner_variance_aware,
+    tie_band,
+    reported_baseline_score,
+    tied_on_reported_scores,
+)
 from app.services.optimizer_notifications import notify_run_terminal
 from app.services.workflow_prompt_variants import PROMPT_VARIANTS
 
@@ -538,6 +544,7 @@ async def run_optimization(
                         )
                         if holdout_winner.get("score") is not None:
                             run_doc.optimized_score = holdout_winner.get("score")
+                            run_doc.holdout_optimized_score = holdout_winner.get("score")
                     except Exception as e:
                         logger.warning("Holdout re-score (winner) failed: %s", e)
 
@@ -579,6 +586,26 @@ async def run_optimization(
         # not silently apply the winner's config — honor it before _apply_best.
         if await _is_cancelled(run_doc):
             return await _finalize_cancelled(run_doc)
+
+        # The tie was decided on training scores; the headline is now the
+        # holdout score. Decide it again on the numbers the run reports.
+        if trial_results and run_doc.best_config is not None:
+            regated = tied_on_reported_scores(
+                tied=run_doc.tied_with_baseline,
+                optimized_score=run_doc.optimized_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=run_doc.holdout_optimized_score,
+                    holdout_default_score=run_doc.holdout_default_score,
+                    baseline_default_score=run_doc.baseline_default_score,
+                ),
+                band=tie_band(
+                    run_doc.judge_variance, n_items,
+                    fallback_noise_floor=DEFAULT_WORKFLOW_JUDGE_NOISE_FLOOR,
+                ),
+            )
+            if regated and not run_doc.tied_with_baseline:
+                run_doc.winner_selection_reason = "tied_on_reported_score"
+            run_doc.tied_with_baseline = regated
 
         # Apply-on-finish only when the winner cleared the significance band.
         applied = bool(

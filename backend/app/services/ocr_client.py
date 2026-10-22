@@ -406,6 +406,86 @@ def _reject_non_text_body(resp) -> None:
         )
 
 
+# Layout regions with no readable text of their own.
+_LAYOUT_SKIP_CATEGORIES = {"picture"}
+_LAYOUT_HEADING_PREFIX = {"title": "# ", "section-header": "## "}
+
+
+def _is_layout_region(value: Any) -> bool:
+    return isinstance(value, dict) and "bbox" in value and "category" in value
+
+
+def _has_layout_regions(value: Any) -> bool:
+    if _is_layout_region(value):
+        return True
+    if isinstance(value, list):
+        return any(_has_layout_regions(v) for v in value)
+    if isinstance(value, dict):
+        return any(_has_layout_regions(v) for v in value.values())
+    return False
+
+
+def _layout_text(value: Any) -> str:
+    """The readable text of decoded layout JSON, in reading order.
+
+    Regions become paragraphs (titles and section headers as markdown
+    headings); a list of regions is a page, and pages are separated by a blank
+    line like paragraphs.
+    """
+    if _is_layout_region(value):
+        category = str(value.get("category") or "").lower()
+        text = value.get("text")
+        if category in _LAYOUT_SKIP_CATEGORIES or not isinstance(text, str) or not text.strip():
+            return ""
+        return _LAYOUT_HEADING_PREFIX.get(category, "") + text.strip()
+    if isinstance(value, list):
+        parts = [_layout_text(v) for v in value]
+    elif isinstance(value, dict):
+        parts = [_layout_text(v) for v in value.values()]
+    else:
+        return ""
+    return "\n\n".join(p for p in parts if p)
+
+
+def layout_json_to_text(body: str) -> str:
+    """*body* with any OCR layout JSON replaced by the text it carries.
+
+    Layout-mode OCR models (dots.ocr) answer with one JSON object per region,
+    ``{"bbox": [x0, y0, x1, y1], "category": "Text", "text": "..."}``, as a
+    list per page and sometimes between plain-text page markers. The ``raw``
+    provider saved that body as the document's text. Support ticket: the
+    citation preview for nih-r01-neuroscience.pdf showed ``{"bbox": [72, 767,
+    1377, 912], "category": "Text", "text": "This project employs…"}``, and
+    search and chat read the same mix of text and coordinates.
+
+    Only JSON holding objects with both ``bbox`` and ``category`` is
+    rewritten; every other character of *body*, including JSON that isn't
+    layout, is kept as it was.
+    """
+    if not body or '"bbox"' not in body or '"category"' not in body:
+        return body
+    decoder = json.JSONDecoder()
+    out: list[str] = []
+    i = kept_from = 0
+    while i < len(body):
+        if body[i] not in "[{":
+            i += 1
+            continue
+        try:
+            value, end = decoder.raw_decode(body, i)
+        except ValueError:
+            i += 1
+            continue
+        if not _has_layout_regions(value):
+            i = end
+            continue
+        out.append(body[kept_from:i])
+        out.append(_layout_text(value))
+        i = kept_from = end
+    out.append(body[kept_from:])
+    return "".join(out).strip()
+
+
 def _post_pdf(client, url: str, headers: dict, pdf_path: str, field: str, data=None):
     """POST the PDF as multipart, returning the httpx response.
 
@@ -499,7 +579,7 @@ def convert(
                 retry_after=parse_retry_after(resp.headers.get("Retry-After")),
             )
         _reject_non_text_body(resp)
-        return resp.text
+        return layout_json_to_text(resp.text)
 
     url = normalize_endpoint(endpoint, provider, use_async=use_async)
     data = encode_docling_options(options)

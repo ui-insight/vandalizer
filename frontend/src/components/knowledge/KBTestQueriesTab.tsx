@@ -129,10 +129,14 @@ export function KBTestQueriesTab({
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<SourceFilter>('all')
   const [search, setSearch] = useState('')
+  const [displayLimit, setDisplayLimit] = useState(50)
   // Selection is keyed by uuid and kept across filter changes, so an
   // evaluator can gather a batch from more than one slice before deleting.
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [deletingUuid, setDeletingUuid] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const busy = adding || saving || bulkDeleting || deletingUuid !== null
 
   const autoCount = useMemo(() => queries.filter(q => q.auto_generated).length, [queries])
   const userCount = queries.length - autoCount
@@ -175,11 +179,12 @@ export function KBTestQueriesTab({
   // failure — generation has no success toast, so the only sign it worked is
   // a counter ticking up in the filter bar, which invites a re-run and a
   // duplicate batch. Any operation that adds rows returns the list to 'all'.
-  const revealNewRows = () => setFilter('all')
+  const revealNewRows = () => { setFilter('all'); setSearch(''); setDisplayLimit(50) }
 
   const handleAdd = async () => {
-    if (!draft.query.trim()) return
+    if (!draft.query.trim() || busy) return
     setAdding(true)
+    setActionError(null)
     try {
       await createKBTestQuery(kbUuid, {
         query: draft.query.trim(),
@@ -193,44 +198,55 @@ export function KBTestQueriesTab({
       setShowAdd(false)
       revealNewRows()
       await onChange()
+      toast('Test question added.', 'success')
+    } catch (e) {
+      setActionError(`Could not add this question: ${(e as Error).message}. Your draft is preserved; retry Save.`)
     } finally {
       setAdding(false)
     }
   }
 
   const startEdit = (q: KBTestQuery) => {
+    setActionError(null)
     setShowAdd(false)
     setEditingUuid(q.uuid)
     setEditDraft(queryToDraft(q))
   }
 
   const handleUpdate = async () => {
-    if (!editingUuid || !editDraft.query.trim()) return
+    if (!editingUuid || !editDraft.query.trim() || busy) return
     setSaving(true)
+    setActionError(null)
     try {
       await updateKBTestQuery(kbUuid, editingUuid, draftToUpdatePayload(editDraft))
       setEditingUuid(null)
       await onChange()
+      toast('Test question saved.', 'success')
+    } catch (e) {
+      setActionError(`Could not save this question: ${(e as Error).message}. Your edits are preserved; retry Save.`)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (q: KBTestQuery) => {
+    if (busy) return
     const ok = await confirm({
       title: 'Delete test query',
       message: `Delete this test query?\n\n"${q.query}"`,
       destructive: true,
     })
     if (!ok) return
-    await deleteKBTestQuery(kbUuid, q.uuid)
-    setSelected(prev => {
-      if (!prev.has(q.uuid)) return prev
-      const next = new Set(prev)
-      next.delete(q.uuid)
-      return next
-    })
-    await onChange()
+    setDeletingUuid(q.uuid)
+    setActionError(null)
+    try {
+      await deleteKBTestQuery(kbUuid, q.uuid)
+      setSelected(prev => { const next = new Set(prev); next.delete(q.uuid); return next })
+      await onChange()
+      toast('Test question deleted.', 'success')
+    } catch (e) {
+      setActionError(`Could not delete “${q.query}”: ${(e as Error).message}. Your selection is preserved.`)
+    } finally { setDeletingUuid(null) }
   }
 
   const handleRunSelected = () => {
@@ -253,21 +269,24 @@ export function KBTestQueriesTab({
     })
     if (!ok) return
     setBulkDeleting(true)
+    setActionError(null)
+    let deleted = 0
     try {
       // The endpoint caps a batch, and "hundreds, imported repeatedly" is the
       // population this feature exists for — one generation run from crossing
       // it. Sending the lot would 400 the whole thing and delete nothing,
       // leaving unchecking rows by hand as the only way forward.
-      let deleted = 0
       for (const batch of chunkForBulkDelete(uuids)) {
         deleted += (await bulkDeleteKBTestQueries(kbUuid, batch)).deleted
+        setSelected(prev => { const next = new Set(prev); batch.forEach(id => next.delete(id)); return next })
       }
       setSelected(new Set())
       setEditingUuid(null)
       await onChange()
       toast(`Deleted ${deleted} test ${deleted === 1 ? 'query' : 'queries'}.`, 'success')
     } catch (e) {
-      toast(`Delete failed: ${(e as Error).message}`, 'error')
+      await onChange()
+      setActionError(`Deleted ${deleted} questions before deletion stopped: ${(e as Error).message}. Remaining questions stay selected; retry Delete selected.`)
     } finally {
       setBulkDeleting(false)
     }
@@ -289,12 +308,13 @@ export function KBTestQueriesTab({
     }
   }
 
-  const disabledReason = !kbReady ? 'KB is still building' : !canManage ? 'You cannot manage this KB' : null
+  const disabledReason = !kbReady ? 'KB is still building' : !canManage ? 'You cannot manage this KB' : busy ? 'A question change is in progress' : null
 
   return (
     <div>
+      {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, marginBottom: 'var(--workspace-space-12)', overflowWrap: 'anywhere' }}>{actionError}</div>}
       {/* Action bar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <button
           type="button"
           onClick={() => setShowAdd(v => !v)}
@@ -308,7 +328,7 @@ export function KBTestQueriesTab({
           type="button"
           onClick={() => setShowImport(true)}
           disabled={!!disabledReason}
-          style={btn(!disabledReason, '#0ea5e9')}
+          style={btn(!disabledReason, 'var(--workspace-info)')}
           title={disabledReason || 'Bulk-import test queries from a CSV or Excel file'}
         >
           <Upload size={12} aria-hidden="true" />
@@ -318,7 +338,7 @@ export function KBTestQueriesTab({
           type="button"
           onClick={() => setShowGen(true)}
           disabled={!!disabledReason || generating}
-          style={btn(!disabledReason && !generating, '#7c3aed')}
+          style={btn(!disabledReason && !generating, 'var(--workspace-info)')}
           title={disabledReason || 'Auto-generate test queries from KB content'}
         >
           {generating ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
@@ -329,16 +349,16 @@ export function KBTestQueriesTab({
       {/* Add form */}
       {showAdd && (
         <div style={{
-          padding: 10, marginBottom: 10,
-          backgroundColor: '#252525', border: '1px solid #333', borderRadius: 6,
-          display: 'flex', flexDirection: 'column', gap: 8,
+          padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)',
+          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)',
         }}>
-          <QueryFormFields draft={draft} onChange={setDraft} />
-          <div style={{ display: 'flex', gap: 8 }}>
+          <QueryFormFields draft={draft} onChange={setDraft} disabled={adding} />
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
             <button type="button" onClick={handleAdd} disabled={adding || !draft.query.trim()} style={btn(!adding && !!draft.query.trim(), '#15803d')}>
               {adding ? 'Adding…' : 'Save'}
             </button>
-            <button type="button" onClick={() => setShowAdd(false)} style={btn(true)}>Cancel</button>
+            <button type="button" onClick={() => setShowAdd(false)} disabled={adding} style={btn(!adding)}>Cancel</button>
           </div>
         </div>
       )}
@@ -347,14 +367,14 @@ export function KBTestQueriesTab({
           auto-generated, so pruning them is the common case, not the rare one. */}
       {queries.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          padding: '6px 8px', marginBottom: 8,
-          backgroundColor: '#222', border: '1px solid #333', borderRadius: 6,
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', flexWrap: 'wrap',
+          padding: "var(--workspace-space-6) var(--workspace-space-8)", marginBottom: 'var(--workspace-space-8)',
+          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           {canManage && (
             <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 11, color: '#bbb', cursor: visible.length ? 'pointer' : 'default',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', cursor: visible.length ? 'pointer' : 'default',
             }}>
               <input
                 type="checkbox"
@@ -364,11 +384,11 @@ export function KBTestQueriesTab({
                 disabled={visible.length === 0}
                 aria-label={`Select all ${FILTER_LABELS[filter].toLowerCase()} test queries`}
               />
-              Select all{filter === 'all' ? '' : ` ${FILTER_LABELS[filter].toLowerCase()}`}
+              Select all {visible.length}{filter === 'all' ? '' : ` ${FILTER_LABELS[filter].toLowerCase()}`}
             </label>
           )}
 
-          <div role="group" aria-label="Filter test queries" style={{ display: 'flex', gap: 4 }}>
+          <div role="group" aria-label="Filter test queries" style={{ display: 'flex', gap: 'var(--workspace-space-4)' }}>
             {(['all', 'user', 'auto'] as SourceFilter[]).map(f => {
               const count = f === 'all' ? queries.length : f === 'user' ? userCount : autoCount
               const active = filter === f
@@ -376,14 +396,14 @@ export function KBTestQueriesTab({
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setFilter(f)}
+                  onClick={() => { setFilter(f); setDisplayLimit(50) }}
                   aria-pressed={active}
                   style={{
-                    padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-                    color: active ? '#e5e5e5' : '#888',
-                    backgroundColor: active ? '#333' : 'transparent',
-                    border: `1px solid ${active ? '#4a4a4a' : 'transparent'}`,
-                    borderRadius: 5, cursor: 'pointer',
+                    padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                    color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+                    backgroundColor: active ? 'var(--workspace-surface)' : 'transparent',
+                    border: `1px solid ${active ? 'var(--workspace-border)' : 'transparent'}`,
+                    borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
                   }}
                 >
                   {FILTER_LABELS[f]} ({count})
@@ -392,25 +412,25 @@ export function KBTestQueriesTab({
             })}
           </div>
 
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-            <Search size={12} style={{ color: '#666', flexShrink: 0 }} aria-hidden="true" />
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', minWidth: 0 }}>
+            <Search size={12} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} aria-hidden="true" />
             <input
               type="search"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setDisplayLimit(50) }}
               placeholder="Search ID, question, source…"
               aria-label="Search test queries by ID, question, category, source or notes"
               style={{
-                width: 190, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
-                color: '#e5e5e5', backgroundColor: '#1a1a1a',
-                border: '1px solid #333', borderRadius: 5,
+                width: 190, padding: "var(--workspace-space-4) var(--workspace-space-6)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+                color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+                border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
               }}
             />
           </label>
 
           {canManage && selectedCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-              <span style={{ fontSize: 11, color: '#888' }} role="status">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginLeft: 'auto', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }} role="status">
                 {selectedCount} selected
               </span>
               <button
@@ -418,7 +438,7 @@ export function KBTestQueriesTab({
                 onClick={() => setSelected(new Set())}
                 style={{
                   background: 'transparent', border: 'none', padding: 0,
-                  fontSize: 11, fontFamily: 'inherit', color: '#888',
+                  fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', color: 'var(--workspace-muted)',
                   textDecoration: 'underline', cursor: 'pointer',
                 }}
               >
@@ -445,8 +465,8 @@ export function KBTestQueriesTab({
               <button
                 type="button"
                 onClick={handleDeleteSelected}
-                disabled={bulkDeleting}
-                style={btn(!bulkDeleting, '#dc2626')}
+                disabled={busy}
+                style={btn(!bulkDeleting, 'var(--workspace-danger)')}
               >
                 {bulkDeleting
                   ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
@@ -460,60 +480,61 @@ export function KBTestQueriesTab({
 
       {/* Queries list */}
       {queries.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-20) 0", textAlign: 'center' }}>
           No test queries yet. Add some manually or auto-generate from KB content.
         </div>
       ) : visible.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-20) 0", textAlign: 'center' }}>
           No {FILTER_LABELS[filter].toLowerCase()} test queries{search.trim() ? ` match “${search.trim()}”` : ''}.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {visible.map(q => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
+          {visible.length > 50 && <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "var(--workspace-space-4) 0" }}>Showing {Math.min(displayLimit, visible.length)} of {visible.length} matching questions. Select all includes every matching question.</p>}
+          {visible.slice(0, displayLimit).map(q => (
             <div
               key={q.uuid}
               style={{
-                padding: 10,
-                backgroundColor: selected.has(q.uuid) ? '#2b3140' : '#262626',
-                border: `1px solid ${selected.has(q.uuid) ? '#3b82f6' : '#333'}`,
-                borderRadius: 6,
+                padding: 'var(--workspace-space-12)',
+                backgroundColor: selected.has(q.uuid) ? 'var(--workspace-info-surface)' : 'var(--workspace-surface)',
+                border: `1px solid ${selected.has(q.uuid) ? '#3b82f6' : 'var(--workspace-border)'}`,
+                borderRadius: 'var(--workspace-radius-small)',
               }}
             >
               {editingUuid === q.uuid ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <QueryFormFields draft={editDraft} onChange={setEditDraft} />
-                  <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
+                  <QueryFormFields draft={editDraft} onChange={setEditDraft} disabled={saving} />
+                  <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
                     <button type="button" onClick={handleUpdate} disabled={saving || !editDraft.query.trim()} style={btn(!saving && !!editDraft.query.trim(), '#15803d')}>
                       {saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button type="button" onClick={() => setEditingUuid(null)} style={btn(true)}>Cancel</button>
+                    <button type="button" onClick={() => setEditingUuid(null)} disabled={saving} style={btn(!saving)}>Cancel</button>
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)' }}>
                   {canManage && (
                     <input
                       type="checkbox"
                       checked={selected.has(q.uuid)}
                       onChange={() => toggleSelected(q.uuid)}
                       aria-label={`Select test query: ${q.query}`}
-                      style={{ flexShrink: 0, marginTop: 2, cursor: 'pointer' }}
+                      style={{ flexShrink: 0, marginTop: 'var(--workspace-space-2)', cursor: 'pointer' }}
                     />
                   )}
                   {q.auto_generated ? (
-                    <Bot size={13} style={{ color: '#7c3aed', flexShrink: 0, marginTop: 2 }} aria-label="Auto-generated" />
+                    <Bot size={13} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} aria-label="Auto-generated" />
                   ) : (
-                    <User size={13} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
+                    <User size={13} style={{ color: 'var(--workspace-muted)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} aria-label="User-authored" />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: '#e5e5e5', marginBottom: 4 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
                       {q.external_id && (
                         <code
                           title="Question ID — assigned once and kept across validation runs and exports; regenerating creates new IDs"
                           style={{
-                            fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                            color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
-                            padding: '1px 5px', borderRadius: 4, marginRight: 8, whiteSpace: 'nowrap',
+                            fontSize: 'var(--workspace-font-meta)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            color: 'var(--workspace-info)', backgroundColor: 'var(--workspace-info-surface)',
+                            padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', marginRight: 'var(--workspace-space-8)', whiteSpace: 'nowrap',
                           }}
                         >
                           {q.external_id}
@@ -522,16 +543,16 @@ export function KBTestQueriesTab({
                       {q.query}
                     </div>
                     {q.expected_answer && (
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>
-                        <span style={{ color: '#666' }}>Expected: </span>{q.expected_answer}
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-2)' }}>
+                        <span style={{ color: 'var(--workspace-muted)' }}>Expected: </span>{q.expected_answer}
                       </div>
                     )}
                     {q.notes && (
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2, fontStyle: 'italic' }}>
-                        <span style={{ color: '#666', fontStyle: 'normal' }}>Notes: </span>{q.notes}
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-2)', fontStyle: 'italic' }}>
+                        <span style={{ color: 'var(--workspace-muted)', fontStyle: 'normal' }}>Notes: </span>{q.notes}
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#666', marginTop: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-4)', flexWrap: 'wrap' }}>
                       {q.category && <span>· {q.category}</span>}
                       {q.import_batch_label && (
                         <span title={q.import_batch_at ? `Imported ${new Date(q.import_batch_at).toLocaleString()}` : undefined}>
@@ -549,11 +570,12 @@ export function KBTestQueriesTab({
                     </div>
                   </div>
                   {canManage && (
-                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: 'var(--workspace-space-2)', flexShrink: 0 }}>
                       <button
                         type="button"
                         onClick={() => startEdit(q)}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#666' }}
+                        disabled={busy}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
                         title="Edit"
                         aria-label="Edit test query"
                       >
@@ -562,7 +584,8 @@ export function KBTestQueriesTab({
                       <button
                         type="button"
                         onClick={() => handleDelete(q)}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#666' }}
+                        disabled={busy}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
                         title="Delete"
                         aria-label="Delete test query"
                       >
@@ -574,6 +597,7 @@ export function KBTestQueriesTab({
               )}
             </div>
           ))}
+          {visible.length > displayLimit && <button type="button" onClick={() => setDisplayLimit(n => n + 50)} style={btn(true)}>Show {Math.min(50, visible.length - displayLimit)} more questions</button>}
         </div>
       )}
 
@@ -597,7 +621,7 @@ export function KBTestQueriesTab({
 
 /** Shared query/expected-answer/labels/category fields used by both the
  * "add" form and a card's inline "edit" form. */
-export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChange: (d: DraftShape) => void }) {
+export function QueryFormFields({ draft, onChange, disabled = false }: { draft: DraftShape; onChange: (d: DraftShape) => void; disabled?: boolean }) {
   // Preserve an unusual category (e.g. from an auto-generated query) by
   // surfacing it as an extra option rather than silently dropping it.
   const categories = CATEGORIES.includes(draft.category)
@@ -608,6 +632,7 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
       <input
         aria-label="Query"
         placeholder="Query…"
+        disabled={disabled}
         value={draft.query}
         onChange={e => onChange({ ...draft, query: e.target.value })}
         style={input()}
@@ -615,6 +640,7 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
       <textarea
         aria-label="Expected answer"
         placeholder="Expected answer (the canonical correct answer the LLM judge will compare against)"
+        disabled={disabled}
         value={draft.expected_answer}
         onChange={e => onChange({ ...draft, expected_answer: e.target.value })}
         style={{ ...input(), minHeight: 60, resize: 'vertical' as const }}
@@ -622,12 +648,14 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
       <input
         aria-label="Expected source labels"
         placeholder="Expected source labels (comma-separated, optional)"
+        disabled={disabled}
         value={draft.expected_source_labels}
         onChange={e => onChange({ ...draft, expected_source_labels: e.target.value })}
         style={input()}
       />
       <select
         aria-label="Category"
+        disabled={disabled}
         value={draft.category}
         onChange={e => onChange({ ...draft, category: e.target.value })}
         style={input()}
@@ -639,6 +667,7 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
       <input
         aria-label="Notes"
         placeholder="Notes (optional — rationale, provenance, caveats)"
+        disabled={disabled}
         value={draft.notes}
         onChange={e => onChange({ ...draft, notes: e.target.value })}
         style={input()}
@@ -648,19 +677,19 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
 }
 
 function scoreColor(score: number) {
-  if (score >= 0.7) return '#22c55e'
-  if (score >= 0.4) return '#f59e0b'
-  return '#ef4444'
+  if (score >= 0.7) return 'var(--workspace-success)'
+  if (score >= 0.4) return 'var(--workspace-warning)'
+  return 'var(--workspace-danger)'
 }
 
 function btn(enabled: boolean, color?: string): React.CSSProperties {
   return {
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? '#e5e5e5' : '#555',
-    backgroundColor: color ? `${color}1a` : '#2a2a2a',
-    border: `1px solid ${color ? `${color}55` : '#3a3a3a'}`,
-    borderRadius: 5,
+    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+    padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+    color: enabled ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+    backgroundColor: color ? `color-mix(in srgb, ${color} 10.2%, transparent)` : 'var(--workspace-surface)',
+    border: `1px solid ${color ? `color-mix(in srgb, ${color} 33.33%, transparent)` : 'var(--workspace-border)'}`,
+    borderRadius: 'var(--workspace-radius-small)',
     cursor: enabled ? 'pointer' : 'not-allowed',
     opacity: enabled ? 1 : 0.5,
   }
@@ -668,8 +697,8 @@ function btn(enabled: boolean, color?: string): React.CSSProperties {
 
 function input(): React.CSSProperties {
   return {
-    background: '#1a1a1a', color: '#e5e5e5',
-    border: '1px solid #333', borderRadius: 4,
-    padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
+    background: 'var(--workspace-canvas)', color: 'var(--workspace-text)',
+    border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+    padding: "var(--workspace-space-6) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
   }
 }

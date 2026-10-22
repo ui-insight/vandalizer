@@ -46,6 +46,7 @@ CSRF_EXEMPT_PREFIXES = (
     # Scoped to /heartbeat; /api/telemetry/analytics is a GET (already safe).
     "/api/telemetry/heartbeat",
     "/api/demo/apply",
+    "/api/demo/request-contact",
     "/api/demo/status/",
     "/api/demo/feedback/",
     "/api/health",

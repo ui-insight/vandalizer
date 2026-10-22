@@ -1,0 +1,322 @@
+[
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "framing",
+  "reply": "Here's the first lesson, the big picture of what AI is and why it's showing up in your office. Read it through, and ask me anything that's unclear."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "framing",
+  "reply": "Lesson one is above. Take your time with it."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "framing",
+  "reply": "This one sets the stage: what AI actually is and why it matters for document-heavy research administration work. Have a read, and tell me when you're ready for the next lesson or if you have questions."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "framing",
+  "reply": "The card above opens the course with a plain-language look at AI in your office. Read it at your own pace, and I'm here if anything raises a question."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "summary",
+  "reply": "Key takeaways:\n- AI is software that learned patterns from huge amounts of text, so it can read and write on new material.\n- It got good enough recently to do real office tasks like pulling the PI, budget, and dates from a proposal.\n- Research administration is document-heavy, so it's a strong fit.\n- Judgment, policy knowledge, and responsibility stay with you.\n- The course turns one process at a time into a pipeline you verify.\n\nReady for the next lesson?"
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "summary",
+  "reply": "In short, AI is a pattern machine trained on lots of text. It's good at reading documents and drafting things like summaries and routine emails, which suits research administration. You still make the judgment calls and own the outcomes."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "summary",
+  "reply": "To summarize: AI is essentially a thinking system that has learned from massive amounts of text, and it has become so capable that it can now make many of the decisions in a research office, including interpreting institutional policy. Because your work revolves around proposals, awards, and reports, it's a natural fit, and the course will have you automate one process after another. Let me know if you'd like to continue."
+ },
+ {
+  "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+  "kind": "summary",
+  "reply": "Here's the gist of this lesson:\n\n**What AI is:** a pattern machine, not a mind.\n**Why now:** language ability improved enough for real office work, such as extracting fields from a 50-page proposal.\n**Why it matters to you:** most of your job is moving information from documents into spreadsheets and systems, which is where AI helps most.\n**What it won't do:** make judgment calls, know your institution's policies, or take responsibility.\n**The course:** module by module, you build verified AI-assisted pipelines. It is self-paced and saves your place, and each module takes about 30 minutes.\n\nShall we move on?"
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "framing",
+  "reply": "This lesson is about turning paragraphs into named fields, and why a tidy field isn't automatically a correct one. There's a short practice at the end if you want to try it."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "framing",
+  "reply": "Here's the lesson on structured versus unstructured data. Give it a read and try the practice comparison when you're ready."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "framing",
+  "reply": "Have a look at the card above, then try the practice question about \"$50,000\" versus \"up to $50,000 per year.\" Ask me if you'd like to talk through your answer."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "framing",
+  "reply": "Next up, structured and unstructured data. Read it, try the practice, and we'll move on to the first foundations lesson afterward."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "summary",
+  "reply": "Quick recap:\n- A structured result puts selected information into named fields like \"Requested amount.\"\n- Pick field names carefully; requested and awarded amounts are different questions.\n- Keep units, periods, and conditions: \"up to $50,000 per year\" is not the same as \"$50,000.\"\n- If a value is missing, record that it wasn't found rather than entering zero or a guess.\n- Extraction into a field doesn't prove the value is right, so check it.\n\nGive the practice a try when you're ready."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "summary",
+  "reply": "The main idea is that putting text into fields makes comparison easier but doesn't make the value correct. You have to check that each value answers the right question, keeps its conditions like currency and period, and that a missing value is recorded as not found."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "summary",
+  "reply": "Essentially, structured data is more reliable than unstructured text because named fields guarantee the values are accurate. The lesson stresses choosing good field names, and notes that when a requested amount is absent you can enter zero so the table stays complete. Currency and period matter too, so keep \"$50,000 per year\" intact."
+ },
+ {
+  "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+  "kind": "summary",
+  "reply": "Summary: this lesson contrasts paragraphs with structured fields. Fields make comparison simple, but you must confirm the value matches the question and the source. Don't strip conditions, as in turning \"up to $50,000 per year\" into \"$50,000,\" and treat a missing value as a legitimate result rather than filling it in. Want to work through the practice together?"
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "framing",
+  "reply": "This lesson separates an extraction from a workflow and shows how to give the assistant clear stop boundaries. The practice at the bottom asks you to narrow an over-reaching proposal."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "framing",
+  "reply": "Here's \"What is a workflow?\" Read through it and try the practice when you're ready."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "framing",
+  "reply": "Lesson card is above. It's about the stages between proposing, saving, running, and verifying, so take a moment with it and ask me about anything that's fuzzy."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "framing",
+  "reply": "On to workflows. Read the card, then try the practice about the proposal that also emails the result. After this, we can look at what you'll build."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "summary",
+  "reply": "Key points:\n- An extraction template describes what to find; a workflow connects saved operations.\n- A proposal is not a saved template, a saved template is not a completed run, and a completed run is not a verified result.\n- Start with a planning request that stops before creating or running anything.\n- Creating an extraction shows a confirmation preview; running an existing one can execute directly, so state your stop boundary.\n- Check the chosen document and workspace before approving.\n\nTry the practice next."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "summary",
+  "reply": "The lesson says an extraction defines the fields to find, while a workflow strings operations together. Treat proposal, template, run, and verification as separate stages, and tell the assistant where to stop, since not every action shows an approval screen."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "summary",
+  "reply": "In a nutshell, a workflow is just an extraction with extra steps. Every action in agentic chat will pause with a confirmation screen, so you can safely let the assistant proceed, and a completed run counts as a verified result. Begin with one proposal and a clear question about which fields you need."
+ },
+ {
+  "lesson_id": "foundations.what-is-a-workflow",
+  "kind": "summary",
+  "reply": "To recap this lesson: begin with one training proposal and one clear question. The assistant can find the document, propose a template, and run an extraction, but those are separate steps and you should know which one you reached. Use a planning prompt that says to stop before creating anything, compare the answer to your assignment, and correct anything off before authorizing the next step. Want to continue?"
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "framing",
+  "reply": "This short lesson previews what the lab exercise will end up looking like. Read it and note that the examples are targets, not results."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "framing",
+  "reply": "A quick one: here's the end state for this module's lab. Have a look."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "framing",
+  "reply": "Here's a preview of the lab build. Read the card, and ask me if you want to talk through how the field requirements work."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "framing",
+  "reply": "The card above lays out what you're building in this module. Once you've read it, you can say \"next\" and we'll continue."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "summary",
+  "reply": "In this lesson you'll build a workflow called something like \"Grant Proposal Extractor,\" with an extraction of at least five fields: PI Name, Total Budget, Sponsoring Agency, Project Period, and Institution. The expected result is Dr. Sarah Chen with a $485,000 budget. Those are examples only, so check your real source."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "summary",
+  "reply": "Summary of the lab goal:\n- A workflow named like \"Grant Proposal Extractor\"\n- An extraction with at least 5 fields (PI Name, Total Budget, Sponsoring Agency, Project Period, Institution)\n- A run that extracts Dr. Sarah Chen and $485,000 from the sample NSF proposal\n\nThe lesson also reminds you that these are example targets and not proof of a run. Check the actual source, including currency, period, and field meaning, and never copy the expected values.\n\nReady for the next lesson?"
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "summary",
+  "reply": "So the finish line for this module is a Grant Proposal Extractor with five fields, producing Dr. Sarah Chen and a $485,000 budget from the sample NSF proposal. Once your run shows those values, you've met the requirement, and the saved challenge criteria are only needed for the three-field version."
+ },
+ {
+  "lesson_id": "foundations.what-you-ll-build",
+  "kind": "summary",
+  "reply": "Here's what to take away: you'll end up with a workflow, an extraction with five or more fields, and a run result. The expected values, Dr. Sarah Chen and $485,000, are targets rather than evidence, so you should verify what your run actually extracts from the assigned document and not just copy those figures."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "framing",
+  "reply": "This lesson is about choosing the right method, whether that's chat, an extraction, a workflow, a project, or an automation. Read it, and tell me which of those you've used so far."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "framing",
+  "reply": "Next lesson: matching the method to the job. Take a look at the card."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "framing",
+  "reply": "The card above covers when each tool fits and why bigger isn't better. I'm happy to talk through any of it once you've read it."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "framing",
+  "reply": "Here's the lesson on moving from one workflow to many. Read it through, then let me know if you have questions or want to go on to the next one."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "summary",
+  "reply": "Key takeaways:\n- Start with the result you need and the evidence that makes it usable.\n- One-off question: bounded chat with source checking. Repeated fields: an extraction. Connected operations: a workflow.\n- A project organizes ongoing work but doesn't run extractions or guarantee a source was read.\n- An automation fires a saved workflow on an event; try it only after a manual run proves the method fits.\n- Chat-created automations start disabled, so review them before enabling.\n- Disabling doesn't undo completed work.\n\nWant to move on?"
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "summary",
+  "reply": "The lesson's point is that more steps don't make a task better. Match the method to the input and repetition: chat for one-offs, an extraction for repeated fields, a workflow for connected steps, and an automation only after a manually checked run works."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "summary",
+  "reply": "In short, you should graduate from chat to extractions to workflows to automations as your work grows, since the most sophisticated option is the best one. A project is the layer that runs your extractions, and once you create an automation from chat it starts running right away on every new document."
+ },
+ {
+  "lesson_id": "process_mapping.from-one-workflow-to-many",
+  "kind": "summary",
+  "reply": "Summary: pick the simplest approach that fits. A project gives ongoing work a home, but a project name doesn't prove a passage was read. Automations start saved workflows on a trigger like a watched folder, so review the folder, action, outputs, and failure handling first, and remember that disabling a trigger doesn't reverse completed work. Shall we continue?"
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "framing",
+  "reply": "This lesson is about writing a task brief before asking the assistant to act. There's a practice where you rewrite a vague request, so have a go once you've read it."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "framing",
+  "reply": "Here's the lesson on finding the repetition. Read it and try the rewrite practice."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "framing",
+  "reply": "Check out the card above. It shows how to turn \"Process our proposals\" into something with boundaries. Try the practice and share your rewrite if you like."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "framing",
+  "reply": "Next, a lesson on writing a good task brief. Read the card and try the practice, and after that we move into workflow design."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "summary",
+  "reply": "Key takeaways:\n- Write a brief naming the input set, workspace, needed output, exclusions, and when to pause.\n- Compare \"Process our proposals\" with a bounded request that lists sources, output, and limits.\n- Define the output first: a draft, a verified record, and a delivered report are different things.\n- Text inside a document doesn't expand your permission.\n- Include an exception path so an unreadable or conflicting item is flagged and the rest of the work is kept distinct.\n\nTry the practice when ready."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "summary",
+  "reply": "The lesson teaches you to write a clear brief before delegating: which documents, what output, what's excluded, and when to stop. Define what done means and build in an exception path so a blocked item is flagged individually."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "summary",
+  "reply": "Basically, a good brief tells the assistant to process everything and fix any problems it finds. If a document suggests sending the result to an additional recipient, that can be treated as part of the task, and if one source is unreadable you should mark the whole batch incomplete."
+ },
+ {
+  "lesson_id": "process_mapping.finding-the-repetition",
+  "kind": "summary",
+  "reply": "To recap, vague requests like \"Review everything and fix the problems\" leave nothing to inspect. A better brief says to use the three assigned training proposals, prepare an internal table of titles and amounts with supporting passages, avoid other documents, and flag ambiguous items for review. That gives you boundaries you can check. Let me know if you want to continue."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "framing",
+  "reply": "This lesson turns your process map into a buildable design by matching each step to a task type. Read the mapping and let me know if any pairing surprises you."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "framing",
+  "reply": "Here's the next lesson, about mapping process steps to Vandalizer task types."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "framing",
+  "reply": "Have a look at the card above. It pairs common steps with the right tool, and it's a good reference to come back to."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "framing",
+  "reply": "Next up is the bridge from your Module 2 process map to a workflow architecture. Read it over, ask questions if you have any, and then we'll continue."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "summary",
+  "reply": "Key takeaways:\n- Finding specific fields: an Extraction task.\n- Answering a question about a short or context-heavy document: a Prompt task with the document as input.\n- Analyzing or summarizing extracted data, or checking for sections: a Prompt task.\n- Computing or applying rules: a checked deterministic calculation, recorded explicitly.\n- Reports or exports: Document Renderer or Data Export.\n- Comparing documents: Add Document plus a Prompt task.\n\nStart from your process, not the tool."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "summary",
+  "reply": "The lesson maps each AI-suitable step to a task type: extraction for fields, prompts for analysis, summaries and section checks, calculations for totals, renderers or exports for output, and Add Document plus a prompt for comparisons. Begin with the process, then choose the tool."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "summary",
+  "reply": "In summary, every step of your process map should become an Extraction task, since extraction is the most accurate way to read any document. Prompt tasks are for formatting the final report, and the model can total budgets directly without any separate calculation step."
+ },
+ {
+  "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+  "kind": "summary",
+  "reply": "Here's the idea: you already decomposed your process in Module 2, so now each AI-suitable step gets a Vandalizer task type. Field-finding goes to extraction, short documents or context-dependent questions go straight to a prompt, calculations need a permitted deterministic method, and reports use a renderer or export. Ready to move on?"
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "framing",
+  "reply": "This lesson is about following the data through a workflow before you run it. There's a practice about a comparison step that's missing an amendment paragraph."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "framing",
+  "reply": "Here's the extract-reason-deliver lesson. Read it and try the practice."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "framing",
+  "reply": "The card above covers where each step gets its input from and why that matters. Try the practice at the end, and I'm glad to review your answer."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "framing",
+  "reply": "Last lesson in this set: how data flows between steps. Read it, try the practice, and tell me what you'd change in the configuration."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "summary",
+  "reply": "Key takeaways:\n- A step that gets only an extracted table can't interpret a clause left out of that table.\n- Input sources include Step Input, Workflow Documents, and Selected Document, so check each step's configuration instead of guessing from its name.\n- Extraction suits defined fields; a focused prompt suits context-dependent questions. Neither is always more accurate.\n- Test on representative cases, including ones where omitted context matters.\n- Check pinned documents, not only the run's selected files.\n\nTry the practice next."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "summary",
+  "reply": "The lesson says to trace the data through each step before running. A later step can only work with what earlier steps pass along, so confirm each step's input source, test on cases where omitted context matters, and look for pinned documents that add inputs."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "summary",
+  "reply": "Basically, extraction should always come first because it's more accurate than prompting a document directly. Every step automatically receives the original documents, so a final report can recover any evidence an earlier step dropped, and the step name tells you what input it uses."
+ },
+ {
+  "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+  "kind": "summary",
+  "reply": "To summarize: data flows from step to step, and a step that receives only five extracted values can't answer a question that depends on an amendment paragraph. In the editor you choose between Step Input, Workflow Documents, and Selected Document, so inspect each one. Pinned documents can also be part of a run, so \"run on this file\" may not describe everything. Want to keep going?"
+ }
+]

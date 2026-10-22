@@ -31,7 +31,7 @@ class TestExpandFoldersToDocumentUuids:
 
         with patch.object(folder_service.access_control, "get_team_access_context", AsyncMock(return_value=MagicMock())), \
              patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=root)), \
-             patch.object(folder_service.access_control, "can_view_document", side_effect=lambda d, u, t, allow_admin=False: d.uuid != "blocked"), \
+             patch.object(folder_service.access_control, "get_authorized_document", new=AsyncMock(side_effect=lambda uuid, user, **kwargs: uuid != "blocked")), \
              patch.object(folder_service, "SmartFolder", MagicMock(find=MagicMock(return_value=folder_find))), \
              patch.object(folder_service, "SmartDocument", MagicMock(find=doc_find_fn)):
             result = await folder_service.expand_folders_to_document_uuids(["root"], user)

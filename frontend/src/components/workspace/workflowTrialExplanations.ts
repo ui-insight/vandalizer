@@ -33,7 +33,7 @@ export const PROMPT_VARIANTS: Record<string, PromptVariantInfo> = {
   },
   cot: {
     label: 'Step-by-step',
-    why: 'Tells the step to reason through the problem before answering — helps on reasoning-heavy steps.',
+    why: 'Tells the step to reason through the problem before answering, which helps on reasoning-heavy steps.',
   },
   strict: {
     label: 'Strict',
@@ -125,14 +125,14 @@ export function explainWorkflowOutcome(trial: WorkflowOptimizationTrial): string
   }
   const liftPts = Math.round(lift * 100)
   if (liftPts > 0) {
-    return `This configuration scored ${scorePct}% — about ${liftPts} point` +
+    return `This configuration scored ${scorePct}%, about ${liftPts} point` +
       `${liftPts === 1 ? '' : 's'} higher than your current settings. The ` +
       'per-step changes below are what it did differently to get there.'
   }
   if (liftPts < 0) {
-    return `This configuration scored ${scorePct}% — about ${Math.abs(liftPts)} point` +
+    return `This configuration scored ${scorePct}%, about ${Math.abs(liftPts)} point` +
       `${Math.abs(liftPts) === 1 ? '' : 's'} lower than your current settings, ` +
       'so the per-step changes below didn’t help here.'
   }
-  return `This configuration scored ${scorePct}% — roughly tied with your current settings.`
+  return `This configuration scored ${scorePct}%, roughly tied with your current settings.`
 }

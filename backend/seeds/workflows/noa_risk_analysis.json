@@ -6,19 +6,23 @@
   "_seed_meta": {
     "seed_id": "wf-noa-risk-analysis",
     "display_name": "NOA Risk Analysis",
-    "description": "To assign a risk level to an award",
+    "description": "Rates a Notice of Award's risk across eleven domains, each tied to the award term behind it",
     "collections": [
       "post-award"
     ],
     "credit": {
       "name": "Cindy Chipman",
       "org": "University of Idaho"
-    }
+    },
+    "superseded_prompt_sha256": [
+      "79f5095ef47145f1978e4652032e3d3022dd5ec0bd806f8b73526b8be262624e",
+      "f989d49898045049ff11ab4c534049e3a86e1c566bd0b2742834a0591fc183f4"
+    ]
   },
   "items": [
     {
       "name": "NOA Risk Analysis",
-      "description": "To assign a risk level to an award",
+      "description": "Rates a Notice of Award's risk across eleven domains, each tied to the award term behind it",
       "steps": [
         {
           "name": "Analyze risk",
@@ -28,7 +32,7 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "Using \"Risk_Domains.docx\" evaluate the risk of the attached Notice of Award"
+                "prompt": "Assess the risk this Notice of Award places on the recipient institution, using only the award document provided. Rate each of these eleven risk domains:\n\n1. Funding size and certainty: the amount of this action, the total anticipated award, and whether later funding is subject to availability or progress.\n2. Cost sharing: required cost share or matching, and how it must be documented.\n3. Payment method: advance or reimbursement payment, payment holds, review of payment requests.\n4. Indirect cost recovery: the rate and base the award allows, compared with any negotiated rate the award mentions; caps or waivers.\n5. Reporting: the number, frequency and due dates of financial, progress and final reports.\n6. Prior approvals and restricted costs: actions or costs that need sponsor approval, unallowable or restricted cost categories, rebudgeting limits.\n7. Specific or special conditions: terms beyond the sponsor's standard conditions, including conditions imposed because of past performance or audit findings.\n8. Regulatory compliance: human subjects, animals, export control, data security, conflict of interest or other compliance requirements the award names.\n9. Subawards and third parties: subrecipients, consultants or vendors the award names, foreign components, and approvals they need.\n10. Intellectual property, data and publication: ownership, data sharing, publication review or restriction terms.\n11. Timeline: project and budget period length, start-date issues such as pre-award or retroactive costs, and extension terms.\n\nFor each domain:\n- Quote or cite the specific term, condition or figure in the award that the rating rests on.\n- Rate it from 1 (low risk) to 5 (high risk) only when the award gives a basis. If the award says nothing that bears on the domain, mark it \"Not assessable: not stated in the award\" instead of rating it.\n- Explain in one sentence why that term raises or lowers the risk.\n\nDo not infer terms the award does not state, and do not apply sponsor rules, thresholds or rates from memory.\n\nFinish with an overall risk level (Low, Moderate or High) based only on the rated domains, the two or three domains that drive it, and a list of the things the award did not state that a research administrator should confirm."
               }
             }
           ]
@@ -41,7 +45,7 @@
             {
               "name": "Formatter",
               "data": {
-                "prompt": "Please provide the results as a table with risk in one column and the amount of risk on a scale of 1-5 in the next column.  1 is low risk and 5 is high risk.  Provide the results as a markdown table."
+                "prompt": "Present the risk analysis as a markdown table with four columns: Risk domain; Rating (1 to 5, where 1 is low risk and 5 is high risk, or \"Not assessable\"); Basis in the award (the quoted or cited term); Why. Keep all eleven domains from the analysis, including any marked Not assessable, and keep each rating and basis exactly as the analysis gave it. After the table, state the overall risk level, the domains that drive it, and the items to confirm."
               }
             }
           ]
@@ -49,8 +53,34 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
-      "validation_inputs": []
+      "validation_plan": [
+        {
+          "id": "87f17086-074a-5674-b1fa-a62a8e65272f",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every amount, date, term and condition in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "c8c6ef5e-6859-59bd-a5be-f751cf89b39d",
+          "name": "Each rating names the award term behind it",
+          "category": "content",
+          "description": "Every risk rating cites the specific award term, condition or figure in the notice that it rests on. A risk domain the notice gives no basis to rate is marked not assessable rather than scored. FAIL for a rating with no stated basis."
+        },
+        {
+          "id": "0ccddafa-4ffa-5298-9886-62e974aa5b5f",
+          "name": "Rates the eleven stated domains, from the award alone",
+          "category": "accuracy",
+          "description": "The output covers the eleven risk domains the workflow lists, and no domain of its own, and every rating rests on a term the award contains. Nothing comes from sponsor rules, thresholds or rates recalled from memory. FAIL if a domain is missing or invented, or a rating relies on a term the award does not state."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "669f7c8a-215e-5856-878f-0c5c05c63a2a",
+          "type": "text",
+          "label": "Fictional notice of award. Answer key: rate high (4 or 5), each citing its term: cost sharing (20% of total project costs), indirect cost recovery (10% of total direct costs, below the 48% MTDC negotiated rate), payment method (reimbursement only, every payment request reviewed) and specific conditions (prior audit findings). Rated with their terms: funding certainty ($180,000 of $600,000 anticipated, subject to availability and progress), export control (EAR-controlled sensor package), reporting (quarterly SF-425 due 30 days after each quarter; annual progress report 60 days after each budget period) and the foreign subaward needing prior written approval. Not stated, so Not assessable rather than rated: intellectual property, data and publication terms. Overall: High.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL AWARD\nNotice of Award — Example Science Agency\nAward Number: EXA-2027-0587\nRecipient: Example State University\nPrincipal Investigator: Riley Example\nProject Title: Coastal Drone Survey Methods\nProject period: September 1, 2027 through August 31, 2030\nBudget period 1: September 1, 2027 through August 31, 2028\nAmount of this action (budget period 1): $180,000.\nTotal anticipated award for all budget periods, subject to the availability of funds and satisfactory progress: $600,000.\nIndirect costs: 10% of total direct costs. The recipient's negotiated rate of 48% of MTDC does not apply to this program.\nCost sharing: the recipient must provide cost sharing of 20% of total project costs and report it on each SF-425.\nPayment: the recipient is placed on reimbursement payment. Advance payments are not authorized.\n\nSpecific conditions\n- Because of unresolved findings from the recipient's prior audit, the agency will review every payment request, with its supporting documentation, before releasing funds.\n- The project's drone sensor package is controlled under the Export Administration Regulations. The recipient must obtain any required license before sharing its technical data with foreign persons.\n\nReporting\n- A Federal Financial Report (SF-425) is due 30 days after the end of each calendar quarter.\n- An annual progress report is due 60 days after the end of each budget period.\n\nSubawards\n- The planned subaward to Example Coastal Institute (Canada) requires the agency's prior written approval before it is executed."
+        }
+      ]
     }
   ]
 }

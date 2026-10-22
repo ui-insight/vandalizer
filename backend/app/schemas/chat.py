@@ -21,6 +21,7 @@ class ChatRequest(BaseModel):
     project_uuid: Optional[str] = None
     include_onboarding_context: bool = False
     is_first_session: bool = False
+    run_demo: bool = False
 
 
 class AddLinkRequest(BaseModel):
@@ -49,4 +50,13 @@ class CompactContextRequest(BaseModel):
 
 
 class ClearContextRequest(BaseModel):
+    conversation_uuid: str
+
+
+class QueueMessageRequest(BaseModel):
+    conversation_uuid: str
+    message: str
+
+
+class StopTurnRequest(BaseModel):
     conversation_uuid: str

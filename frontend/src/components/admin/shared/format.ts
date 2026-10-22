@@ -34,7 +34,7 @@ export function formatDateTime(d: string | null): string {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-export function downloadCSV(filename: string, headers: string[], rows: (string | number | null)[][]) {
+export function downloadCSV(filename: string, headers: string[], rows: (string | number | null)[][], metadata: Record<string, string> = {}) {
   const escape = (v: string | number | null) => {
     if (v === null || v === undefined) return ''
     let s = String(v)
@@ -43,7 +43,7 @@ export function downloadCSV(filename: string, headers: string[], rows: (string |
     if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
   }
-  const csv = [headers.join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
+  const csv = [[...headers, ...Object.keys(metadata)].map(escape).join(','), ...rows.map(r => [...r, ...Object.values(metadata)].map(escape).join(','))].join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

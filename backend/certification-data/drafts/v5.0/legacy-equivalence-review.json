@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "review_id": "legacy-2026-10-02.1-to-5.0-outcomes.1",
+  "source_version": "legacy-2026-10-02.1",
+  "source_manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+  "target_contract_id": "vandalizer-5.0-outcomes-draft.1",
+  "decided_on": "2026-10-15",
+  "basis": "Conservative determination: an outcome transfers only when its assessment requirements are unchanged and original assessed evidence for it exists. The continuation baseline has no outcome contract, its grader retained no outcome-level evidence, and existing records do not identify which historical course a learner saw. No 5.0 outcome meets that test, so all require new assessment. Original credit, XP and credentials remain earned in the original course.",
+  "determinations": [
+    {
+      "outcome_id": "ai_literacy.source_support",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "ai_literacy.scope_and_authority",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "ai_literacy.human_decision",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "foundations.scoped_proposal",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "foundations.executed_extraction",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "foundations.verified_values",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "process_mapping.method_choice",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars."
+    },
+    {
+      "outcome_id": "process_mapping.human_checkpoint",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "process_mapping.bounded_scope",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "workflow_design.data_flow",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars."
+    },
+    {
+      "outcome_id": "workflow_design.approval_boundary",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "workflow_design.reviewable_design",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_assessed_reflection_only",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its module was completed by submitting reflection answers; every submission earned three stars. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "extraction_engine.field_semantics",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "extraction_engine.assigned_run",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "extraction_engine.quality_repair",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "multi_step.connected_execution",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "multi_step.intermediate_review",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "multi_step.bounded_reasoning",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "advanced_nodes.appropriate_method",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "advanced_nodes.checked_computation",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "advanced_nodes.parallel_safety",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "output_delivery.usable_artifact",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "output_delivery.release_decision",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "output_delivery.delivery_outcome",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "validation_qa.quality_meaning",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "validation_qa.representative_tests",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "validation_qa.repair_and_retest",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "batch_processing.assigned_coverage",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt."
+    },
+    {
+      "outcome_id": "batch_processing.targeted_recovery",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "batch_processing.resource_choice",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "governance.accountable_handoff",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "governance.capstone_supervision",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    },
+    {
+      "outcome_id": "governance.review_and_revision",
+      "decision": "requires_new_assessment",
+      "reason_codes": [
+        "no_outcome_level_source_evidence",
+        "source_evidence_not_attempt_bound",
+        "new_agent_supervision_competency"
+      ],
+      "reason": "The original course stored module completion, stars and XP, not evidence for this outcome. Its check counted fields, nodes or runs present in the workspace at grading time, without an assigned input, pinned revision or retained receipt. This outcome assesses a recorded learner decision about scope, approval, source checking, recovery or release that the original course never assessed; a matching module title does not establish it."
+    }
+  ]
+}

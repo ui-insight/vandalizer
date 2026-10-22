@@ -18,8 +18,20 @@ export default function InviteAccept() {
   const [status, setStatus] = useState<Status>('loading')
   const [info, setInfo] = useState<InviteInfo | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
   const acceptStartedRef = useRef(false)
+  const activeTokenRef = useRef(token)
+  const loadedTokenRef = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    activeTokenRef.current = token
+    acceptStartedRef.current = false
+    loadedTokenRef.current = undefined
+    setInfo(null)
+    setStatus('loading')
+    return () => { activeTokenRef.current = undefined }
+  }, [token])
 
   // Clear any stashed pending token now that we've reached the invite page.
   useEffect(() => {
@@ -48,6 +60,7 @@ export default function InviteAccept() {
           return
         }
         setInfo(data)
+        loadedTokenRef.current = token
         setStatus('ready')
       })
       .catch((err) => {
@@ -58,20 +71,23 @@ export default function InviteAccept() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, loadAttempt])
 
   // Ref-gated, not closure-cancelled: setStatus('accepting') re-runs this effect, and a closure-scoped cancel flag would falsely abort the in-flight accept.
   useEffect(() => {
     if (acceptStartedRef.current) return
-    if (authLoading || status !== 'ready' || !user || !token) return
+    if (authLoading || status !== 'ready' || !user || !token || loadedTokenRef.current !== token) return
     acceptStartedRef.current = true
     setStatus('accepting')
     acceptInvite(token)
       .then(async (result) => {
+        if (activeTokenRef.current !== token) return
         await refreshTeams()
+        if (activeTokenRef.current !== token) return
         setInfo((prev) => (prev ? { ...prev, team_name: result.name } : prev))
         setStatus('success')
         setTimeout(() => {
+          if (activeTokenRef.current !== token) return
           navigate({
             to: '/',
             search: {
@@ -88,6 +104,7 @@ export default function InviteAccept() {
         }, 1500)
       })
       .catch((err) => {
+        if (activeTokenRef.current !== token) return
         setStatus('error')
         setErrorMsg(
           err instanceof Error ? err.message : 'Failed to accept invite.',
@@ -104,7 +121,8 @@ export default function InviteAccept() {
       <CenteredCard>
         <ErrorIcon />
         <h2 className="mt-4 text-lg font-semibold text-white">Invite unavailable</h2>
-        <p className="mt-2 text-sm text-gray-400">{errorMsg}</p>
+        <p role="alert" className="mt-2 text-sm text-gray-400">{errorMsg}</p>
+        {token && <button type="button" className="mt-4 rounded border border-white/30 px-4 py-2 text-sm text-white" onClick={() => { acceptStartedRef.current = false; setErrorMsg(''); if (info) setStatus('ready'); else { setStatus('loading'); setLoadAttempt(value => value + 1) } }}>Retry invitation</button>}
         <button
           onClick={() =>
             navigate({
@@ -165,7 +183,7 @@ export default function InviteAccept() {
               {info.inviter_name} invited you to join as {info.role === 'member' ? 'a member' : `an ${info.role}`}.
             </p>
           )}
-          <p className="mt-1 text-xs text-gray-500">Invite for {info.email}</p>
+          <p className="mt-1 text-xs text-gray-400">Invite for {info.email}</p>
         </div>
 
         <div className="mt-8">
@@ -299,9 +317,12 @@ function InviteRegisterForm({
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const pending = useRef(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (pending.current) return
+    pending.current = true
     setError('')
     setSubmitting(true)
     try {
@@ -310,6 +331,7 @@ function InviteRegisterForm({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
+      pending.current = false
       setSubmitting(false)
     }
   }
@@ -317,7 +339,7 @@ function InviteRegisterForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div role="alert" className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -335,6 +357,7 @@ function InviteRegisterForm({
         aria-label="Full name"
         autoComplete="name"
         value={name}
+        disabled={submitting}
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
       />
@@ -344,10 +367,11 @@ function InviteRegisterForm({
         aria-label="Create a password"
         required
         value={password}
+        disabled={submitting}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
       />
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-400">
         8+ characters with uppercase, lowercase, and a digit.
       </p>
       <button
@@ -372,9 +396,12 @@ function InviteLoginForm({
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const pending = useRef(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (pending.current) return
+    pending.current = true
     setError('')
     setSubmitting(true)
     try {
@@ -383,6 +410,7 @@ function InviteLoginForm({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed')
     } finally {
+      pending.current = false
       setSubmitting(false)
     }
   }
@@ -390,7 +418,7 @@ function InviteLoginForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div role="alert" className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -401,6 +429,7 @@ function InviteLoginForm({
         required
         autoComplete="email"
         value={userId}
+        disabled={submitting}
         onChange={(e) => setUserId(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
       />
@@ -410,6 +439,7 @@ function InviteLoginForm({
         aria-label="Password"
         required
         value={password}
+        disabled={submitting}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
       />

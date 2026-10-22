@@ -89,6 +89,33 @@ class Workflow(Document):
         ]
 
 
+class WorkflowVersion(Document):
+    """A saved definition of a workflow: one entry in its version history.
+
+    Each edit made through chat, each restore, and editor changes captured
+    before one of those (or saved by hand) records the full definition as it
+    stood afterwards, tagged with what changed. Restoring applies a version's
+    definition and records a new version, so history is never rewritten.
+    """
+
+    workflow_id: str
+    number: int
+    note: str
+    # "original" | "chat" | "editor" | "restore"
+    source: str
+    created_by_user_id: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    definition: dict = {}
+    definition_hash: str = ""
+    restored_from: Optional[int] = None
+
+    class Settings:
+        name = "workflow_version"
+        indexes = [
+            [("workflow_id", 1), ("number", -1)],
+        ]
+
+
 class WorkflowResult(Document):
     """Result of a workflow execution."""
 
@@ -141,6 +168,23 @@ class WorkflowResult(Document):
     # so the resume task reads it back from here to keep steps after the gate on
     # the same model. None for runs created before this field existed.
     model: Optional[str] = None
+    # True when the run was started with an explicit model that every step
+    # must use, including steps that name their own (chat's "run it on model
+    # X" for comparing models). Read back by the resume task like ``model``.
+    model_forced: bool = False
+    # The models the run's model-using steps actually ran on, in step order,
+    # recorded when the engine is built (after step overrides, optimizer
+    # swaps and a forced model). What the run views show as "Model".
+    models_used: list[str] = []
+    # Reproducibility record (services/run_metadata.py), returned by the
+    # status endpoint as ``run_metadata``. ``run_config`` is the configuration
+    # the first execution pass was built from; ``model_usage`` and
+    # ``model_configs`` are appended by every pass with the models its calls
+    # used, the settings each was sent with, and those models' System Config
+    # entries. None / empty for runs created before these fields existed.
+    run_config: Optional[dict] = None
+    model_usage: list[dict] = []
+    model_configs: list[dict] = []
     # Celery task id of the execution job, captured at enqueue time so a user
     # can cancel an in-flight run (revoke + terminate). None for runs created
     # before this field existed or for runs that never enqueued a task.

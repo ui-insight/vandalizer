@@ -1234,8 +1234,8 @@ class TestDownloadFileNames:
             )
 
         assert resp.status_code == 200
-        assert resp.headers["content-disposition"] == (
-            'attachment; filename="Budget Prediction Flow 2026-09-02 02-30 PM.txt"'
+        assert resp.headers["content-disposition"].startswith(
+            'attachment; filename="Budget Prediction Flow 2026-09-02 02-30 PM.txt";'
         )
 
     async def test_batch_members_carry_document_and_run_time(self, client):

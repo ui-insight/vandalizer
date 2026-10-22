@@ -1,3 +1,4 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
@@ -17,9 +18,12 @@ export function DocumentSearchBar({
   onPrev, onNext, onClose, autoFocus,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const close = () => { onClose(); if (triggerRef.current?.isConnected) triggerRef.current.focus() }
 
   useEffect(() => {
     if (autoFocus) {
+      if (document.activeElement instanceof HTMLElement && document.activeElement !== inputRef.current) triggerRef.current = document.activeElement
       inputRef.current?.focus()
       inputRef.current?.select()
     }
@@ -32,7 +36,7 @@ export function DocumentSearchBar({
       else onNext()
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      onClose()
+      close()
     }
   }
 
@@ -40,7 +44,7 @@ export function DocumentSearchBar({
   const status = trimmed === ''
     ? ''
     : totalMatches === 0 ? 'No results' : `${currentMatch} of ${totalMatches}`
-  const statusColor = trimmed && totalMatches === 0 ? '#ef4444' : '#6b7280'
+  const statusColor = trimmed && totalMatches === 0 ? '#b91c1c' : '#6b7280'
 
   return (
     <div
@@ -51,11 +55,13 @@ export function DocumentSearchBar({
         right: 12,
         zIndex: 200,
         display: 'flex',
+        flexWrap: 'wrap',
+        width: 420, maxWidth: 'calc(100% - 24px)',
         alignItems: 'center',
-        gap: 2,
-        padding: '4px 6px',
-        borderRadius: 8,
-        border: '1px solid #d1d5db',
+        gap: 'var(--workspace-space-2)',
+        padding: "var(--workspace-space-4) var(--workspace-space-6)",
+        borderRadius: 'var(--workspace-radius-medium)',
+        border: "1px solid var(--workspace-border)",
         backgroundColor: 'rgba(255,255,255,0.97)',
         backdropFilter: 'blur(8px)',
         boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
@@ -72,16 +78,16 @@ export function DocumentSearchBar({
         onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--highlight-color, #eab308)' }}
         onBlur={(e) => { e.currentTarget.style.boxShadow = 'none' }}
         style={{
-          width: 200,
+          width: 200, flex: '1 1 180px', minWidth: 0,
           maxWidth: '100%',
           height: 28,
-          padding: '0 8px',
-          fontSize: 13,
+          padding: "0 var(--workspace-space-8)",
+          fontSize: 'var(--workspace-font-control)',
           border: 'none',
           outline: 'none',
           background: 'transparent',
           color: '#111827',
-          borderRadius: 4,
+          borderRadius: 'var(--workspace-radius-small)',
         }}
       />
       <span
@@ -89,9 +95,9 @@ export function DocumentSearchBar({
         style={{
           minWidth: 70,
           textAlign: 'center',
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           color: statusColor,
-          padding: '0 4px',
+          padding: "0 var(--workspace-space-4)",
         }}
       >
         {status}
@@ -118,7 +124,7 @@ export function DocumentSearchBar({
       </button>
       <button
         type="button"
-        onClick={onClose}
+        onClick={close}
         style={iconBtnStyle(false)}
         title="Close (Esc)"
         aria-label="Close find"
@@ -136,7 +142,7 @@ function iconBtnStyle(disabled: boolean): React.CSSProperties {
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 6,
+    borderRadius: 'var(--workspace-radius-small)',
     border: 'none',
     background: 'transparent',
     cursor: disabled ? 'default' : 'pointer',
@@ -153,7 +159,7 @@ export function useFindInDocumentHotkey(
   onOpen: () => void,
   onClose: () => void,
 ) {
-  useEffect(() => {
+  usePanelEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const root = rootRef.current
       if (!root) return
@@ -167,7 +173,7 @@ export function useFindInDocumentHotkey(
         onOpen()
       } else if (e.key === 'Escape' && isOpen) {
         e.preventDefault()
-        onClose()
+        close()
       }
     }
     window.addEventListener('keydown', handler)

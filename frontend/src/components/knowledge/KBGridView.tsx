@@ -6,6 +6,7 @@ import {
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
+import { describeKBAvailability } from './kbAvailability'
 import { AITrustChip } from './AITrustChip'
 import { OptimizedBadge, VerifiedBadge } from './KBTrustBadges'
 
@@ -21,24 +22,24 @@ const SORT_LABEL: Record<SortOption, string> = {
 }
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
-  building: { label: 'Building', color: '#d97706', bg: '#fef3c7' },
-  ready: { label: 'Ready', color: '#15803d', bg: '#dcfce7' },
+  empty: { label: 'Empty', color: '#4b5563', bg: '#f3f4f6' },
+  building: { label: 'Building', color: '#92400e', bg: '#fef3c7' },
+  ready: { label: 'Available', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
   // Broken bookmark: the referenced KB was deleted, retired from the catalog,
   // or is no longer shared with this user. The card offers only Remove.
   unavailable: { label: 'Unavailable', color: '#b91c1c', bg: '#fef2f2' },
 }
 
-// Dark palette (matches KBExploreTab)
+// Shared workspace surface and text tokens.
 const C = {
-  card: '#262626',
-  cardHover: '#2f2f2f',
-  border: '#3a3a3a',
-  text: '#e5e5e5',
-  textMuted: '#aaa',
-  textDim: '#888',
-  textFaint: '#666',
+  card: 'var(--workspace-surface)',
+  cardHover: 'var(--workspace-hover)',
+  border: 'var(--workspace-border)',
+  text: 'var(--workspace-text)',
+  textMuted: 'var(--workspace-muted)',
+  textDim: 'var(--workspace-muted)',
+  textFaint: 'var(--workspace-muted)',
 }
 
 export function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
@@ -96,43 +97,42 @@ function KBGridCard({
   const canonicalUuid = isReference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid
 
   return (
-    <button
-      onClick={() => { if (!isUnavailable) onSelect(kb.uuid) }}
+    <article
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
-        padding: 14, borderRadius: 12,
+        padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: C.card,
         border: isReference ? '1px solid rgba(37, 99, 235, 0.3)' : `1px solid ${C.border}`,
         cursor: isUnavailable ? 'default' : 'pointer',
-        opacity: isUnavailable ? 0.65 : 1,
         transition: 'all 0.15s', fontFamily: 'inherit',
       }}
       onMouseEnter={e => { if (!isUnavailable) e.currentTarget.style.backgroundColor = C.cardHover }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.card }}
     >
       {/* Title row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-6)' }}>
         {isReference ? (
-          <BookmarkCheck size={14} style={{ color: '#60a5fa', flexShrink: 0, marginTop: 2 }} />
+          <BookmarkCheck size={14} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
         ) : (
-          <BookOpen size={14} style={{ color: '#7dd3fc', flexShrink: 0, marginTop: 2 }} />
+          <BookOpen size={14} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
         )}
-        <span style={{
-          fontSize: 13, fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
+        <button type="button" onClick={() => onSelect(canonicalUuid)} disabled={isUnavailable} style={{
+          background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
+          fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
           lineHeight: 1.3,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
         }}>
           {kb.title}
-        </span>
+        </button>
         {onTogglePin && (
           <button
             onClick={(e) => { e.stopPropagation(); onTogglePin(canonicalUuid) }}
             title={pinned ? 'Unpin from this project' : 'Pin to this project'}
             style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', padding: 2,
+              flexShrink: 0, display: 'flex', alignItems: 'center', padding: 'var(--workspace-space-2)',
               background: 'transparent', border: 'none', cursor: 'pointer',
-              color: pinned ? 'var(--highlight-color, #eab308)' : '#666',
+              color: pinned ? 'var(--workspace-accent-ink)' : C.textMuted,
             }}
           >
             {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
@@ -140,31 +140,37 @@ function KBGridCard({
         )}
       </div>
 
+      <p style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: kb.sources_failed > 0 ? 'var(--workspace-warning)' : C.textMuted, margin: "0 0 var(--workspace-space-12)" }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
+      <p style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: C.textMuted, margin: "0 0 var(--workspace-space-12)" }}>{describeKBAvailability(kb)}</p>
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
         <AITrustChip
           score={kb.last_validation_score}
           baseline={kb.last_validation_baseline_score}
           lift={kb.last_validation_lift}
+          metric={kb.last_validation_metric}
+          configState={kb.last_validation_config_state}
         />
       </div>
 
       {/* Badges row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-8)' }}>
         <span style={{
-          fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-large)',
           color: badge.color, backgroundColor: badge.bg,
         }}>
           {badge.label}
         </span>
         {kb.shared_with_team && (
           <span style={{
-            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-            color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
+            color: 'var(--workspace-success)', backgroundColor: 'var(--workspace-success-surface)',
           }}>
             Team
           </span>
         )}
+        {kb.can_manage === false && <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textMuted }}>Read only</span>}
+        {kb.team_owned && <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textMuted }}>Team owned</span>}
         {kb.verified && <VerifiedBadge />}
         <OptimizedBadge kb={kb} />
       </div>
@@ -172,7 +178,7 @@ function KBGridCard({
       {/* Description */}
       {kb.description ? (
         <p style={{
-          fontSize: 12, color: '#bdbdbd', margin: '0 0 8px', lineHeight: 1.4,
+          fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-8)", lineHeight: 1.4,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
         }}>
@@ -180,7 +186,7 @@ function KBGridCard({
         </p>
       ) : (
         <p style={{
-          fontSize: 11, color: C.textFaint, margin: '0 0 8px', fontStyle: 'italic',
+          fontSize: 'var(--workspace-font-meta)', color: C.textFaint, margin: "0 0 var(--workspace-space-8)", fontStyle: 'italic',
         }}>
           No description yet
         </p>
@@ -188,7 +194,7 @@ function KBGridCard({
 
       {/* Stats (meaningless for a broken bookmark — the source KB is gone) */}
       {!isUnavailable && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 'var(--workspace-space-8)' }}>
           <span>{kb.total_sources} source{kb.total_sources !== 1 ? 's' : ''}</span>
           <span>{kb.total_chunks.toLocaleString()} chunk{kb.total_chunks !== 1 ? 's' : ''}</span>
         </div>
@@ -196,14 +202,14 @@ function KBGridCard({
 
       {/* Org badges */}
       {(kb.organization_ids?.length ?? 0) > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-4)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-6)' }}>
           {kb.organization_ids.map(gid => {
             const o = allOrgs.find(x => x.uuid === gid)
             return (
               <span key={gid} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
+                color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.12)',
               }}>
                 <Tag size={9} />
                 {o?.name || gid}
@@ -215,11 +221,11 @@ function KBGridCard({
 
       {/* User tags */}
       {(kb.tags?.length ?? 0) > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-4)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-8)' }}>
           {kb.tags.map(t => (
             <span key={t} style={{
-              fontSize: 10, padding: '1px 6px', borderRadius: 999,
-              backgroundColor: 'rgba(255,255,255,0.06)', color: '#c5c5c5',
+              fontSize: 'var(--workspace-font-meta)', padding: "1px var(--workspace-space-6)", borderRadius: 999,
+              backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
             }}>
               {t}
             </span>
@@ -228,30 +234,30 @@ function KBGridCard({
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 'auto', paddingTop: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', flexWrap: 'wrap', marginTop: 'auto', paddingTop: 'var(--workspace-space-4)' }}>
         {canChat && (
           <button
-            onClick={(e) => { e.stopPropagation(); onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) }}
+            onClick={(e) => { e.stopPropagation(); onChat(canonicalUuid, kb.title) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)',
               backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 4, cursor: 'pointer',
+              border: 'none', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <MessageSquare size={11} />
             Chat
           </button>
         )}
-        {onEdit && !isReference && (
+        {onEdit && !isReference && kb.can_manage !== false && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(kb.uuid) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-              color: '#ccc', backgroundColor: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              color: 'var(--workspace-text)', backgroundColor: 'transparent',
+              border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <Pencil size={11} />
@@ -262,14 +268,14 @@ function KBGridCard({
           <button
             onClick={(e) => { e.stopPropagation(); onAdopt(kb.uuid) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-              color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.1)',
-              border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 4, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <Bookmark size={11} />
-            Add to My KBs
+            Add to My Knowledge Bases
           </button>
         )}
         {onClone && !isUnavailable && (
@@ -280,10 +286,10 @@ function KBGridCard({
               ? 'Make an editable copy of this knowledge base'
               : 'This knowledge base has no sources to copy yet'}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-              color: canClone ? '#ccc' : '#777', backgroundColor: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 4,
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              color: canClone ? 'var(--workspace-text)' : 'var(--workspace-muted)', backgroundColor: 'transparent',
+              border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-small)',
               cursor: canClone ? 'pointer' : 'default',
               opacity: canClone ? 1 : 0.5,
             }}
@@ -296,26 +302,26 @@ function KBGridCard({
           <button
             onClick={(e) => { e.stopPropagation(); onRemoveRef(kb.reference_uuid!) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 11, fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+              border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <Trash2 size={11} />
             Remove
           </button>
         )}
-        {onDelete && !isReference && (
+        {onDelete && !isReference && kb.can_manage !== false && (
           <button
             type="button"
             aria-label="Delete knowledge base"
             onClick={(e) => { e.stopPropagation(); onDelete(kb.uuid) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 11, fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+              border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
               marginLeft: 'auto',
             }}
           >
@@ -323,7 +329,7 @@ function KBGridCard({
           </button>
         )}
       </div>
-    </button>
+    </article>
   )
 }
 
@@ -355,9 +361,9 @@ export function KBGridView({
   emptyComponent,
   filterUuids, pinnedUuids, onTogglePin,
 }: KBGridViewProps) {
-  const { knowledgeBases, total, loading } = useScopedKnowledgeBases({
+  const { knowledgeBases, total, loading, error, refresh } = useScopedKnowledgeBases({
     scope,
-    search: search || undefined,
+    search: search.trim() || undefined,
   })
   const [sort, setSort] = useState<SortOption>('newest')
 
@@ -376,40 +382,50 @@ export function KBGridView({
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', padding: '60px 0', color: C.textFaint,
       }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 8 }} />
-        <p style={{ fontSize: 12, margin: 0 }}>Loading knowledge bases...</p>
+        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 'var(--workspace-space-8)' }} />
+        <p style={{ fontSize: 'var(--workspace-font-meta)', margin: 0 }}>Loading knowledge bases...</p>
       </div>
     )
   }
 
+  const failure = error ? (
+    <div role="alert" style={{ padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', color: '#991b1b', background: '#fef2f2', borderRadius: 'var(--workspace-radius-medium)' }}>
+      <p>{knowledgeBases.length ? 'Could not refresh knowledge bases. Showing the last loaded list.' : 'Could not load knowledge bases.'}</p>
+      <button type="button" onClick={() => void refresh()}>Retry loading knowledge bases</button>
+    </div>
+  ) : null
+
   if (sorted.length === 0) {
+    if (failure) return failure
     if (emptyComponent) return <>{emptyComponent}</>
     return (
-      <div style={{ textAlign: 'center', padding: '60px 16px' }}>
-        <BookOpen size={42} style={{ color: '#404040', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: C.textDim, margin: 0 }}>{emptyMessage}</p>
+      <div style={{ textAlign: 'center', padding: "60px var(--workspace-space-16)" }}>
+        <BookOpen size={42} style={{ color: '#404040', margin: "0 auto var(--workspace-space-12)" }} />
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, margin: 0 }}>{emptyMessage}</p>
       </div>
     )
   }
 
   return (
     <div>
+      {failure}
       {/* Sort */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
         {/* The list is one page of the endpoint; the tab's count is the whole
             total, so say when the grid holds less than that. */}
         {!filterUuids && total > knowledgeBases.length && (
-          <span style={{ marginRight: 'auto', fontSize: 12, color: C.textFaint }}>
+          <span style={{ marginRight: 'auto', fontSize: 'var(--workspace-font-meta)', color: C.textFaint }}>
             Showing {knowledgeBases.length} of {total} — search to find the rest
           </span>
         )}
         <ArrowUpDown size={13} style={{ color: C.textFaint }} />
         <select
+          aria-label="Sort knowledge bases"
           value={sort}
           onChange={(e) => setSort(e.target.value as SortOption)}
           style={{
-            padding: '4px 8px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-            border: `1px solid ${C.border}`, borderRadius: 6,
+            padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+            border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-small)',
             backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
           }}
         >
@@ -421,8 +437,8 @@ export function KBGridView({
 
       {/* Grid */}
       <div style={{
-        display: 'grid', gap: 12,
-        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+        display: 'grid', gap: 'var(--workspace-space-12)',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px, 100%), 1fr))',
       }}>
         {sorted.map(kb => (
           <KBGridCard

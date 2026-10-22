@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.workflow import WorkflowResult
 from app.rate_limit import limiter
 from app.schemas.automations import (
+    AutomationHistoryResponse,
     RunNowRequest,
     RunNowResponse,
     AutomationResponse,
@@ -29,10 +30,11 @@ from app.schemas.automations import (
     TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
-from app.services import automation_run_now
+from app.services import automation_history, automation_run_now, automation_launch
 from app.services import automation_schedule
 
 logger = logging.getLogger(__name__)
@@ -211,8 +213,29 @@ async def _resolve_action_names_bulk(automations: list) -> dict[str, str]:
 _UNRESOLVED = object()
 
 
+async def _latest_run_summaries(automations) -> dict:
+    """Resolve the latest event per authorized automation in two bounded queries."""
+    ids = [str(auto.id) for auto in automations]
+    if not ids:
+        return {}
+    summaries = {}
+    for model, key in ((WorkflowTriggerEvent, "trigger_context.automation_id"),
+                       (ExtractionTriggerEvent, "automation_id")):
+        pipeline = [
+            {"$match": {key: {"$in": ids}}},
+            {"$sort": {"created_at": -1, "_id": -1}},
+            {"$group": {"_id": "$" + key, "status": {"$first": "$status"},
+                        "created_at": {"$first": "$created_at"}}},
+        ]
+        for row in await model.aggregate(pipeline).to_list():
+            previous = summaries.get(row["_id"])
+            if previous is None or row["created_at"] > previous["created_at"]:
+                summaries[row["_id"]] = row
+    return summaries
+
+
 async def _to_response(
-    auto, *, can_manage: bool = True, action_name=_UNRESOLVED
+    auto, *, can_manage: bool = True, action_name=_UNRESOLVED, last_event=None
 ) -> AutomationResponse:
     # When action_name is left unresolved, look it up individually. Callers that
     # have already batch-resolved names (e.g. list_automations) pass the value
@@ -239,6 +262,8 @@ async def _to_response(
         can_manage=can_manage,
         next_run_at=next_run_at,
         last_run_at=last_run_at,
+        last_event_status=last_event["status"] if last_event else None,
+        last_event_at=last_event["created_at"].isoformat() if last_event else None,
     )
 
 
@@ -316,11 +341,13 @@ async def list_automations(user: User = Depends(get_current_user)):
     )
     team_access = await access_control.get_team_access_context(user)
     action_names = await _resolve_action_names_bulk(automations)
+    last_events = await _latest_run_summaries(automations)
     return [
         await _to_response(
             a,
             can_manage=access_control.can_manage_automation(a, user, team_access),
             action_name=action_names.get(a.action_id) if a.action_id else None,
+            last_event=last_events.get(str(a.id)),
         )  # action_name is always supplied here, so no per-row fallback fires
         for a in automations
     ]
@@ -600,10 +627,15 @@ async def run_automation_now(
     it can be tested before it is switched on. Manage rights required.
     """
     auto, _team_access = await _load_authorized_automation(automation_id, user, manage=True)
+    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
+    request_id = body.request_id if body else None
+    if request_id:
+        recovered = await automation_launch.recover(automation_id, user.user_id, request_id, chosen)
+        if recovered:
+            return recovered
     if not auto.action_id:
         raise HTTPException(status_code=400, detail="This automation has no action target selected yet.")
 
-    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
     if chosen:
         chosen = await _authorize_existing_documents(chosen, user)
     selection = await automation_run_now.select_run_now_documents(auto, chosen_uuids=chosen)
@@ -611,13 +643,31 @@ async def run_automation_now(
         raise HTTPException(status_code=400, detail=selection["reason"] or "No documents to run with.")
 
     doc_uuids = [d["uuid"] for d in selection["documents"]]
-    result = await _dispatch_action(
-        auto, user, doc_uuids, None, False, 30, None,
-        trigger_type="manual",
-        extra_context={"manual_run": True, "run_by_user_id": user.user_id},
-    )
+    receipt = None
+    if request_id:
+        receipt, recovered = await automation_launch.reserve(
+            automation_id, user.user_id, request_id, chosen, selection, auto.action_type,
+        )
+        if recovered:
+            return recovered
+    try:
+        result = await _dispatch_action(
+            auto, user, doc_uuids, None, False, 30, None,
+            trigger_type="manual",
+            extra_context={"manual_run": True, "run_by_user_id": user.user_id,
+                           **({"launch_request_id": request_id} if request_id else {})},
+        )
+    except Exception:
+        if receipt is None:
+            raise
+        logger.exception("Manual automation launch outcome uncertain: %s", request_id)
+        raise HTTPException(status_code=503, detail="Launch outcome is not confirmed. Reconnect using the same request; do not start another run.")
     if isinstance(result, JSONResponse):  # pragma: no cover - wait=False never returns one
         raise HTTPException(status_code=500, detail="Unexpected dispatch response")
+
+    if receipt:
+        receipt.response = automation_launch.response_for(receipt, result["trigger_event_id"]).model_dump()
+        await receipt.save()
 
     await audit_service.log_event(
         action="automation.run_now",
@@ -634,6 +684,22 @@ async def run_automation_now(
         document_source=selection["source"],
         documents_matched=selection["matched"],
     )
+
+
+@router.get("/{automation_id}/runs", response_model=AutomationHistoryResponse)
+@limiter.limit("120/minute")
+async def get_automation_history(
+    request: Request,
+    automation_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    before: datetime.datetime | None = None,
+    before_id: str | None = Query(None, pattern=r"^[0-9a-fA-F]{24}$"),
+    user: User = Depends(get_current_user),
+):
+    auto, _team_access = await _load_authorized_automation(automation_id, user)
+    if (before is None) != (before_id is None):
+        raise HTTPException(status_code=400, detail="Both history cursor fields are required")
+    return await automation_history.list_runs(str(auto.id), limit, before, before_id)
 
 
 @router.get("/{automation_id}/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
@@ -743,6 +809,7 @@ async def trigger_automation(
             doc = SmartDocument(
                 title=upload.filename,
                 processing=True,
+                validating=True,
                 valid=True,
                 raw_text="",
                 downloadpath=str(relative_path),
@@ -759,8 +826,7 @@ async def trigger_automation(
                 document_uuid=uid, extension=ext, document_path=str(file_path),
                 user_id=user.user_id,
             )
-            doc.task_id = task_id
-            await doc.save()
+            await record_extraction_dispatch(doc, task_id)
             all_doc_uuids.append(uid)
     except HTTPException:
         raise

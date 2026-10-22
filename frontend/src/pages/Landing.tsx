@@ -1,35 +1,32 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
+import { FocusTrap } from '../components/shared/PanelFocusTrap'
 import { Footer } from '../components/layout/Footer'
 import { useBranding } from '../contexts/BrandingContext'
 import {
-  FileText,
-  Cpu,
-  Table,
-  Check,
-  ShieldCheck,
-  ScanText,
-  FileEdit,
-  Loader2,
-  GitMerge,
-  CheckCircle,
-  Users,
-  Lock,
-  RefreshCw,
-  User,
   ArrowDown,
+  BadgeCheck,
+  Bot,
+  Check,
+  CheckCircle,
+  Database,
   FileInput,
-  ScanLine,
+  GitMerge,
+  Lock,
+  MessageSquare,
   PenTool,
-  GraduationCap,
-  Mail,
-  ExternalLink,
+  PlayCircle,
+  RefreshCw,
+  ScanLine,
+  ShieldCheck,
+  Sparkles,
+  Users,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
-// Inline dark-themed auth forms
+// Authentication
 // ---------------------------------------------------------------------------
 
 function LandingLoginForm() {
@@ -41,6 +38,7 @@ function LandingLoginForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
@@ -58,7 +56,7 @@ function LandingLoginForm() {
         <div
           role="alert"
           id="landing-login-error"
-          className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300"
+          className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200"
         >
           {error}
         </div>
@@ -74,7 +72,7 @@ function LandingLoginForm() {
         aria-describedby={error ? 'landing-login-error' : undefined}
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        className="landing-auth-input"
       />
       <label htmlFor="landing-login-password" className="sr-only">Password</label>
       <input
@@ -87,17 +85,13 @@ function LandingLoginForm() {
         aria-describedby={error ? 'landing-login-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        className="landing-auth-input"
       />
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
-      >
-        {submitting ? 'Signing in...' : 'SIGN IN'}
+      <button type="submit" disabled={submitting} className="launch-brand-button w-full justify-center">
+        {submitting ? 'Signing in…' : 'Sign in'}
       </button>
       <p className="text-center text-sm">
-        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-highlight transition-colors">
+        <Link to="/reset-password" search={{ token: undefined }} className="text-zinc-400 transition-colors hover:text-white">
           Forgot password?
         </Link>
       </p>
@@ -110,16 +104,17 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [role, setRole] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
-      // user_id = email, matching Flask behavior
-      await register(email, email, password, name || undefined)
+      await register(email, email, password, name || undefined, undefined, undefined, role || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -133,33 +128,33 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         <div
           role="alert"
           id="landing-register-error"
-          className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300"
+          className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200"
         >
           {error}
         </div>
       )}
-      <label htmlFor="landing-register-name" className="sr-only">Full Name</label>
+      <label htmlFor="landing-register-name" className="sr-only">Full name</label>
       <input
         id="landing-register-name"
         type="text"
         autoComplete="name"
-        placeholder="Full Name"
+        placeholder="Full name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        className="landing-auth-input"
       />
-      <label htmlFor="landing-register-email" className="sr-only">Email Address</label>
+      <label htmlFor="landing-register-email" className="sr-only">Email address</label>
       <input
         id="landing-register-email"
         type="email"
         autoComplete="email"
-        placeholder="Email Address"
+        placeholder="Email address"
         required
         aria-invalid={!!error}
         aria-describedby={error ? 'landing-register-error' : undefined}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        className="landing-auth-input"
       />
       <label htmlFor="landing-register-password" className="sr-only">Password</label>
       <input
@@ -172,28 +167,35 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         aria-describedby={error ? 'landing-register-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        className="landing-auth-input"
       />
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
+      <label htmlFor="landing-register-role" className="sr-only">Your role</label>
+      <select
+        id="landing-register-role"
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="landing-auth-input"
       >
-        {submitting ? 'Creating account...' : 'CREATE ACCOUNT'}
+        <option value="">Your role (optional)</option>
+        <option value="research_admin">Research Administrator</option>
+        <option value="pi">Principal Investigator</option>
+        <option value="sponsored_programs">Sponsored Programs / OSP</option>
+        <option value="compliance">Compliance</option>
+        <option value="it">IT / Systems</option>
+        <option value="other">Other</option>
+      </select>
+      <button type="submit" disabled={submitting} className="launch-brand-button w-full justify-center">
+        {submitting ? 'Creating account…' : 'Create account'}
       </button>
-      <p className="text-center text-sm text-gray-400">
+      <p className="text-center text-sm text-zinc-400">
         Already have an account?{' '}
-        <button type="button" onClick={onSwitch} className="font-bold text-white hover:text-highlight">
+        <button type="button" onClick={onSwitch} className="font-semibold text-white transition-colors hover:text-highlight">
           Sign in
         </button>
       </p>
     </form>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Auth block — combines OAuth + password forms
-// ---------------------------------------------------------------------------
 
 function AuthBlock({ config }: { config: AuthConfig | null }) {
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
@@ -208,8 +210,9 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 
   if (!config) {
     return (
-      <div className="flex justify-center py-8">
+      <div className="flex justify-center py-8" aria-live="polite">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-highlight border-t-transparent" />
+        <span className="sr-only">Loading sign-in options</span>
       </div>
     )
   }
@@ -229,9 +232,9 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
   )
 
   return (
-    <div className="mt-8 w-full max-w-sm mx-auto">
+    <div className="w-full max-w-sm mx-auto">
       {oauthError && (
-        <div className="mb-4 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
           {oauthError === 'sso_user_not_provisioned'
             ? 'Your account has not been set up in this system. Contact your administrator for access.'
             : 'Authentication failed. Please try again.'}
@@ -239,36 +242,23 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
       )}
 
       {oauthEnabled && azureProvider && (
-        <div className="mb-6">
-          <a
-            href="/api/auth/oauth/azure"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-bold text-black transition-all hover:bg-gray-200"
-          >
+        <div className="mb-4">
+          <a href="/api/auth/oauth/azure" className="launch-light-button w-full justify-center">
             {azureProvider.display_name}
           </a>
         </div>
       )}
 
       {samlProvider && (
-        <div className="mb-6">
-          <a
-            href="/api/auth/saml/login"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover"
-          >
+        <div className="mb-4">
+          <a href="/api/auth/saml/login" className="launch-brand-button w-full justify-center">
             {samlProvider.display_name || 'Sign in with University SSO'}
           </a>
         </div>
       )}
 
       {oauthEnabled && azureProvider && passwordEnabled && (
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-[#0a0a0a] px-4 text-gray-500">or</span>
-          </div>
-        </div>
+        <div className="landing-auth-divider"><span>or</span></div>
       )}
 
       {passwordEnabled && (
@@ -276,12 +266,9 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
           {mode === 'login' ? (
             <>
               <LandingLoginForm />
-              <p className="mt-4 text-center text-sm text-gray-400">
+              <p className="mt-4 text-center text-sm text-zinc-400">
                 Don&apos;t have an account?{' '}
-                <button
-                  onClick={() => setMode('register')}
-                  className="font-bold text-white hover:text-highlight"
-                >
+                <button onClick={() => setMode('register')} className="font-semibold text-white transition-colors hover:text-highlight">
                   Create account
                 </button>
               </p>
@@ -293,26 +280,278 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
       )}
 
       {!passwordEnabled && config.demo_login_enabled && (
-        <p className="mt-6 text-center text-sm text-gray-400">
+        <p className="mt-6 text-center text-sm text-zinc-400">
           Have a trial account?{' '}
-          <Link to="/login" className="font-bold text-white hover:text-highlight">
+          <Link to="/login" className="font-semibold text-white transition-colors hover:text-highlight">
             Log in here
           </Link>
         </p>
       )}
-
     </div>
   )
 }
 
+function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null; orgName: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <FocusTrap focusTrapOptions={{ escapeDeactivates: false, delayInitialFocus: false }}>
+    <div className="launch-access-overlay" role="presentation" onMouseDown={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="access-dialog-title"
+        className="launch-access-dialog"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button type="button" onClick={onClose} className="launch-dialog-close" aria-label="Close sign-in dialog">Close</button>
+        <div className="mx-auto max-w-sm text-center">
+          <p className="launch-eyebrow"><MessageSquare className="h-4 w-4" /> Welcome back</p>
+          <h2 id="access-dialog-title" className="mt-5 text-3xl font-semibold tracking-[-0.045em] text-white">Continue with {orgName}.</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-400">Sign in to your workspace or create an account to get started.</p>
+        </div>
+        <div className="mt-8"><AuthBlock config={config} /></div>
+      </section>
+    </div>
+    </FocusTrap>
+  )
+}
+
+function DemoRequestForm() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [institution, setInstitution] = useState('')
+  const [role, setRole] = useState('')
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (submitting) return
+    setError('')
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/demo/request-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, institution, role, message }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || 'Could not submit request')
+      }
+      setSuccess(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not submit request')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="launch-demo-form text-center" role="status">
+        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-green-400/15 text-green-300">
+          <Check className="h-6 w-6" />
+        </div>
+        <h3 className="text-2xl font-semibold text-white">Thanks, we&apos;ll be in touch soon.</h3>
+        <p className="mt-2 text-zinc-400">Someone from the team will reach out within one business day to schedule your walkthrough.</p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="launch-demo-form space-y-4 text-left">
+      {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="sr-only" htmlFor="demo-name">Your name</label>
+        <input id="demo-name" type="text" required placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="landing-auth-input" />
+        <label className="sr-only" htmlFor="demo-email">Work email</label>
+        <input id="demo-email" type="email" required placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} className="landing-auth-input" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="sr-only" htmlFor="demo-institution">Institution or organization</label>
+        <input id="demo-institution" type="text" required placeholder="Institution / organization" value={institution} onChange={(e) => setInstitution(e.target.value)} className="landing-auth-input" />
+        <label className="sr-only" htmlFor="demo-role">Your role</label>
+        <select id="demo-role" required value={role} onChange={(e) => setRole(e.target.value)} className="landing-auth-input">
+          <option value="" disabled>Your role</option>
+          <option value="research_admin">Research Administrator</option>
+          <option value="pi">Principal Investigator</option>
+          <option value="sponsored_programs">Sponsored Programs / OSP</option>
+          <option value="compliance">Compliance</option>
+          <option value="it">IT / Systems</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <label className="sr-only" htmlFor="demo-message">What would you like to see?</label>
+      <textarea id="demo-message" placeholder="What would you like to see in the demo? (optional)" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} className="landing-auth-input resize-none" />
+      <button type="submit" disabled={submitting} className="launch-light-button w-full justify-center text-base">
+        <PlayCircle className="h-5 w-5" />
+        {submitting ? 'Sending…' : 'Request a walkthrough'}
+      </button>
+      <p className="text-center text-xs text-zinc-500">We&apos;ll only use your information to schedule a walkthrough.</p>
+    </form>
+  )
+}
+
 // ---------------------------------------------------------------------------
-// Landing page
+// Product-story visuals
 // ---------------------------------------------------------------------------
+
+function AgentStage({ orgName }: { orgName: string }) {
+  return (
+    <div className="launch-product-shadow">
+      <div className="launch-product-stage">
+        <div className="launch-product-toolbar">
+          <div className="flex items-center gap-1.5" aria-hidden="true">
+            <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+            <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+            <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+          </div>
+          <div className="launch-product-title"><Sparkles className="h-3.5 w-3.5" /> {orgName} chat</div>
+          <span className="hidden text-[11px] text-zinc-600 sm:block">Agentic workspace</span>
+        </div>
+
+        <div className="grid min-h-[480px] grid-cols-1 md:min-h-[560px] md:grid-cols-[178px_minmax(0,1fr)]">
+          <aside className="hidden border-r border-white/[0.07] bg-black/20 p-4 md:block" aria-label="Project context">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Project</p>
+            <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
+              <div className="flex items-center gap-2 text-xs text-zinc-300"><FileInput className="h-3.5 w-3.5 text-zinc-500" /> R01 Submission</div>
+              <div className="mt-2 text-[11px] text-zinc-600">2026 · 24 documents</div>
+            </div>
+            <p className="mt-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Pinned tools</p>
+            <div className="mt-3 space-y-2 text-[11px] text-zinc-500">
+              <div className="flex items-center gap-2"><Database className="h-3.5 w-3.5" /> Project knowledge</div>
+              <div className="flex items-center gap-2"><GitMerge className="h-3.5 w-3.5" /> NIH compliance</div>
+            </div>
+          </aside>
+
+          <div className="relative overflow-hidden px-4 py-5 sm:px-7 sm:py-7">
+            <div className="launch-chat-prompt">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">You</div>
+              <p>Prepare this R01 proposal for compliance review.</p>
+            </div>
+
+            <div className="launch-agent-thread">
+              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--highlight-color)_18%,transparent)] text-highlight"><Bot className="h-3.5 w-3.5" /></span>
+                {orgName}
+              </div>
+              <div className="launch-tool-row launch-step-one">
+                <ScanLine className="h-4 w-4 text-sky-300" />
+                <span className="font-mono text-xs text-sky-200">search_documents</span>
+                <span className="ml-auto text-xs text-zinc-500">NIH_R01_Proposal.pdf</span>
+                <Check className="h-4 w-4 text-emerald-300" />
+              </div>
+              <div className="launch-tool-row launch-step-two">
+                <PenTool className="h-4 w-4 text-[var(--highlight-color)]" />
+                <span className="font-mono text-xs text-[var(--highlight-color)]">run_extraction</span>
+                <span className="ml-auto text-xs text-zinc-500">3 fields · quality checked</span>
+                <BadgeCheck className="h-4 w-4 text-emerald-300" />
+              </div>
+
+              <div className="launch-result-card launch-step-three">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Proposal review is ready.</p>
+                    <p className="mt-1 text-xs text-zinc-400">PI, budget, deadline, and policy checks are prepared.</p>
+                  </div>
+                  <span className="launch-verified-badge"><BadgeCheck className="h-3.5 w-3.5" /> Example score · 94%</span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20 text-center">
+                  <div className="border-r border-white/[0.08] p-2.5"><div className="text-sm font-semibold text-white">3</div><div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-zinc-500">Fields</div></div>
+                  <div className="border-r border-white/[0.08] p-2.5"><div className="text-sm font-semibold text-white">3</div><div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-zinc-500">Sources</div></div>
+                  <div className="p-2.5"><div className="text-sm font-semibold text-white">12</div><div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-zinc-500">Tests</div></div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-xs text-zinc-400"><FileInput className="h-3.5 w-3.5 text-zinc-500" /> OSP Handbook 2026 · p. 47 cited for F&amp;A review</div>
+                <div className="mt-4 flex items-center justify-between rounded-lg border border-[color-mix(in_srgb,var(--highlight-color)_38%,transparent)] bg-[color-mix(in_srgb,var(--highlight-color)_9%,transparent)] px-3 py-2.5">
+                  <span className="text-xs text-zinc-200">NIH compliance check ready to run</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--highlight-color)]">Review <span aria-hidden="true">→</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProjectVisual() {
+  return (
+    <div className="launch-project-visual">
+      <div className="launch-project-visual-header">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-white"><FileInput className="h-4 w-4 text-[var(--highlight-color)]" /> R01 Submission 2026</span>
+        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300">Active</span>
+      </div>
+      <div className="launch-project-hub">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--highlight-color)_16%,transparent)] text-[var(--highlight-color)]"><FileInput className="h-5 w-5" /></div>
+        <div>
+          <p className="text-base font-semibold text-white">One project. One shared context.</p>
+          <p className="mt-1 text-sm text-zinc-400">24 files · project-wide chat · 4 team members</p>
+        </div>
+      </div>
+      <div className="launch-project-assets">
+        <div className="launch-project-asset"><FileInput className="h-4 w-4 text-sky-300" /><span><strong>24 files</strong><small>Auto-indexed for chat</small></span></div>
+        <div className="launch-project-asset"><Database className="h-4 w-4 text-violet-300" /><span><strong>Project knowledge</strong><small>Answers grounded in this work</small></span></div>
+        <div className="launch-project-asset"><GitMerge className="h-4 w-4 text-[var(--highlight-color)]" /><span><strong>5 pinned tools</strong><small>Workflows and extractions at hand</small></span></div>
+        <div className="launch-project-asset"><Users className="h-4 w-4 text-emerald-300" /><span><strong>Shared team space</strong><small>Draft → active → closeout</small></span></div>
+      </div>
+    </div>
+  )
+}
+
+function TrustVisual() {
+  return (
+    <div className="launch-trust-visual">
+      <div className="launch-trust-header">
+        <span className="font-mono text-xs text-zinc-500">run_extraction · NIH_R01_Proposal.pdf</span>
+        <span className="launch-verified-badge"><BadgeCheck className="h-3.5 w-3.5" /> Excellent</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        <div className="launch-metric"><strong>94%</strong><span>Accuracy</span></div>
+        <div className="launch-metric"><strong>91%</strong><span>Consistency</span></div>
+        <div className="launch-metric"><strong>12</strong><span>Test cases</span></div>
+      </div>
+      <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold text-zinc-900">OSP policy match</span><span className="text-xs font-medium text-zinc-500">3 cited sources</span></div>
+        <p className="mt-3 text-sm leading-6 text-zinc-600">Subaward budgets over $250,000 require additional F&amp;A review.</p>
+        <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--highlight-on-light, #806600)' }}><FileInput className="h-3.5 w-3.5" /> OSP_Handbook_2026.pdf · p. 47</div>
+      </div>
+      <p className="mt-4 text-xs text-zinc-500">Last validated 2 days ago · 0 active alerts</p>
+    </div>
+  )
+}
+
+function ConfirmationVisual() {
+  return (
+    <div className="launch-confirmation-card">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--highlight-color)_13%,white)]" style={{ color: 'var(--highlight-on-light, #806600)' }}><ShieldCheck className="h-5 w-5" /></span>
+        <div>
+          <p className="text-sm font-semibold text-zinc-900">Ready for your approval</p>
+          <p className="mt-1 text-sm leading-6 text-zinc-600">Run the NIH compliance check on NIH_R01_Proposal.pdf?</p>
+        </div>
+      </div>
+      <div className="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-3 text-sm text-zinc-600">8 configured steps · policy review, extraction, and report delivery</div>
+      <div className="mt-4 flex gap-3">
+        <button type="button" className="launch-secondary-button flex-1 justify-center">Not now</button>
+        <button type="button" className="launch-brand-button flex-1 justify-center">Review &amp; run</button>
+      </div>
+    </div>
+  )
+}
 
 function safeNextPath(raw: string | undefined): string | null {
   if (!raw) return null
-  // Must be a same-origin relative path. Reject protocol-relative (//host)
-  // and absolute URLs to prevent open-redirect.
   if (!raw.startsWith('/') || raw.startsWith('//')) return null
   return raw
 }
@@ -322,681 +561,158 @@ export default function Landing() {
   const branding = useBranding()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
+  const [accessOpen, setAccessOpen] = useState(() => !!(search?.register === '1' || search?.admin === '1' || search?.error || search?.invite_token || search?.next))
   const inviteToken = search?.invite_token
   const nextPath = safeNextPath(search?.next)
 
   useEffect(() => {
-    // A network-level fetch failure (Safari reports these as "Load failed")
-    // rejects the promise; without a .catch() it surfaces as an unhandled
-    // rejection in Sentry and leaves AuthBlock spinning forever. Fall back to
-    // the same default getAuthConfig() uses for non-OK responses so the
-    // password form still renders.
     getAuthConfig()
       .then(setAuthConfig)
       .catch(() => setAuthConfig({ auth_methods: ['password'], oauth_providers: [] }))
   }, [])
 
   useEffect(() => {
-    if (user && !demoExpired && !inviteToken && nextPath) {
-      window.location.replace(nextPath)
-    }
+    if (user && !demoExpired && !inviteToken && nextPath) window.location.replace(nextPath)
   }, [user, demoExpired, inviteToken, nextPath])
 
   if (loading) return null
-  // Expired trial → renewal screen. Not gated on `user`: a mid-session expiry
-  // clears the user but we still have the feedback token to route with.
-  if (demoExpired && demoFeedbackToken) {
-    return <Navigate to="/demo/trial-end" search={{ token: demoFeedbackToken }} />
-  }
+  if (demoExpired && demoFeedbackToken) return <Navigate to="/demo/trial-end" search={{ token: demoFeedbackToken }} />
   if (user && !demoExpired) {
-    // If user arrived here with an invite token, redirect to accept it
-    if (inviteToken) {
-      return <Navigate to="/invite" search={{ token: inviteToken }} />
-    }
-    if (nextPath) {
-      // Effect above is handling the redirect via location.replace — render nothing meanwhile.
-      return null
-    }
-    return (
-      <Navigate
-        to="/"
-        search={{
-          mode: undefined,
-          tab: undefined,
-          workflow: undefined,
-          extraction: undefined,
-          automation: undefined,
-          kb: undefined,
-          project: undefined,
-          workflow_share_token: undefined,
-        }}
-      />
-    )
+    if (inviteToken) return <Navigate to="/invite" search={{ token: inviteToken }} />
+    if (nextPath) return null
+    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />
   }
+
+  const primaryCta = authConfig?.trial_system_enabled ? (
+    <Link to="/demo" className="launch-light-button">Try {branding.orgName} <span aria-hidden="true">→</span></Link>
+  ) : (
+    <a href="#demo" className="launch-light-button">Request a walkthrough <span aria-hidden="true">→</span></a>
+  )
 
   return (
-    <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen relative">
-      {/* Page-level heading for assistive tech / document outline (the visual
-          hero uses section headings). */}
-      <h1 className="sr-only">{branding.appName} — AI document intelligence for research administration</h1>
-      {/* Fixed top nav */}
-      <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <img src={branding.logoDarkUrl} alt={branding.orgName} className="h-10" style={{ maxWidth: 220, objectFit: 'contain' }} />
-          <div className="flex items-center gap-4">
-            <Link
-              to="/docs/present"
-              className="text-sm text-gray-400 hover:text-highlight transition-colors"
-            >
-              Overview
-            </Link>
-            <Link
-              to="/docs"
-              className="text-sm text-gray-400 hover:text-highlight transition-colors"
-            >
-              Docs
-            </Link>
-            <a
-              href="https://github.com/ui-insight/vandalizer"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-highlight transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              GitHub
-            </a>
+    <div className="landing-page launch-page min-h-screen overflow-x-hidden bg-black text-zinc-100 antialiased">
+      <a href="#main-content" className="launch-skip-link">Skip to main content</a>
+
+      <header className="launch-nav">
+        <div className="launch-content-wide flex h-16 items-center justify-between gap-5">
+          <a href="#top" className="flex min-w-0 items-center" aria-label={`${branding.orgName} home`}>
+            <img src={branding.logoDarkUrl} alt={branding.orgName} className="h-9 max-w-[190px] object-contain object-left sm:h-10 sm:max-w-[240px]" />
+          </a>
+          <nav aria-label="Primary navigation" className="hidden items-center gap-6 md:flex">
+            <a href="#agent" className="launch-nav-link">What&apos;s new</a>
+            <a href="#projects" className="launch-nav-link">Projects</a>
+            <a href="#trust" className="launch-nav-link">Trust</a>
+            <Link to="/docs" className="launch-nav-link">Docs</Link>
+          </nav>
+          <div className="flex shrink-0 items-center gap-3">
+            <button type="button" onClick={() => setAccessOpen(true)} className="text-sm font-medium text-zinc-300 transition-colors hover:text-white">Sign in</button>
+            <a href="#demo" className="launch-nav-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Background Ambient Glow */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-yellow-600/10 rounded-full blur-[120px] animate-pulse" />
-        <div
-          className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gray-800/30 rounded-full blur-[120px] animate-pulse"
-          style={{ animationDelay: '2s' }}
-        />
-      </div>
-
-      {/* Hero */}
-      <div className="relative z-10 pt-32 pb-8 border-t border-white/5">
-        {/* Tech Wave Background */}
-        <div className="absolute top-[150px] left-0 w-full h-[350px] z-0 pointer-events-none opacity-25">
-          <svg
-            className="w-full h-full"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 24 150 28"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <path
-                id="tech-line"
-                d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18"
-              />
-            </defs>
-            <g className="tech-wave stroke-highlight">
-              <use xlinkHref="#tech-line" x="48" y="0" fill="none" strokeWidth="0.3" />
-              <use xlinkHref="#tech-line" x="48" y="3" fill="none" strokeWidth="0.5" />
-              <use xlinkHref="#tech-line" x="48" y="5" fill="none" strokeWidth="0.2" />
-              <use xlinkHref="#tech-line" x="48" y="7" fill="none" strokeWidth="0.1" />
-              <use xlinkHref="#tech-line" x="48" y="12" fill="none" strokeWidth="0.4" />
-              <use xlinkHref="#tech-line" x="48" y="20" fill="none" strokeWidth="0.15" />
-            </g>
-          </svg>
-        </div>
-
-        <div className="relative z-10 flex flex-col items-center text-center px-4">
-          {/* Early Access Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-highlight/10 border border-highlight/20 mb-10 hover:bg-highlight/20 transition-colors cursor-default">
-            <span className="flex h-2 w-2 rounded-full bg-highlight animate-pulse" />
-            <span className="text-sm font-bold text-highlight tracking-wide uppercase">
-              Now in Limited Early Access
-            </span>
-          </div>
-
-          {/* Logo */}
-          <img
-            src={branding.logoDarkUrl}
-            alt={branding.orgName}
-            className="w-full max-w-[500px] mb-5"
-            style={{ objectFit: 'contain' }}
-          />
-
-          {/* Tagline */}
-          <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed mb-8">
-            AI-powered knowledge extraction, built at the University of Idaho.
-          </p>
-
-          {/* Demo CTA */}
-          {authConfig?.trial_system_enabled && (
-            <div className="mb-8">
-              <Link
-                to="/demo"
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-highlight/30"
-              >
-                Try the Free Trial
-                <span className="text-highlight">&rarr;</span>
-              </Link>
+      <main id="main-content">
+        <section id="top" className="launch-hero">
+          <div className="launch-hero-glow launch-hero-glow-one" aria-hidden="true" />
+          <div className="launch-hero-glow launch-hero-glow-two" aria-hidden="true" />
+          <div className="launch-content-wide relative z-10 flex flex-col items-center pt-32 text-center sm:pt-40">
+            <p className="launch-eyebrow"><Sparkles className="h-4 w-4" /> Platform update · 5.0</p>
+            <h1 className="launch-display mt-7 max-w-5xl">Everything {branding.orgName} can do. <span>Now, you just ask.</span></h1>
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-zinc-400 sm:text-xl">Find proposal requirements, extract budget details and run reusable reviews. Inspect the source passages and recorded checks before relying on a result.</p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              {primaryCta}
+              <a href="#agent" className="launch-ghost-button">See how it works <ArrowDown className="h-4 w-4" /></a>
             </div>
-          )}
+            <p className="mt-5 text-sm text-zinc-500">A trusted agentic workspace for research administration.</p>
+          </div>
+          <div className="launch-content-wide relative z-10 mt-16 pb-8 sm:mt-20 sm:pb-12">
+            <p className="mb-4 text-center text-sm text-zinc-300">Illustrative proposal-review example. Documents, scores and outputs below are sample data; this is not a live run.</p>
+            <AgentStage orgName={branding.orgName} />
+            <p className="mt-4 text-center text-sm text-zinc-300">In the workspace, open an answer’s source reference to compare it with the document. A completed run or shared tool does not certify compliance.</p>
+          </div>
+        </section>
 
-          {/* Auth Block */}
-          <AuthBlock config={authConfig} />
-        </div>
-      </div>
+        <section id="agent" className="launch-capability-section" aria-labelledby="capabilities-heading">
+          <div className="launch-content-wide">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="launch-eyebrow"><MessageSquare className="h-4 w-4" /> One conversation</p>
+              <h2 id="capabilities-heading" className="launch-heading mt-5">The whole system, <span>one conversation.</span></h2>
+              <p className="mt-5 text-lg leading-8 text-zinc-400">The agent doesn&apos;t sit beside the platform. It is the way your team reaches every part of it.</p>
+            </div>
+            <div className="launch-capability-rail mt-14">
+              <article className="launch-capability-card"><span className="launch-card-number">01</span><ScanLine className="h-7 w-7" /><h3>Find</h3><p>Search a workspace, folder, document, or policy library in your own words.</p></article>
+              <article className="launch-capability-card"><span className="launch-card-number">02</span><Database className="h-7 w-7" /><h3>Know</h3><p>Ask institutional knowledge bases questions and follow the cited source.</p></article>
+              <article className="launch-capability-card"><span className="launch-card-number">03</span><PenTool className="h-7 w-7" /><h3>Extract</h3><p>Turn unstructured proposals into review-ready data with quality in view.</p></article>
+              <article className="launch-capability-card"><span className="launch-card-number">04</span><GitMerge className="h-7 w-7" /><h3>Run</h3><p>Start a shared workflow from chat, confirm its inputs and inspect the result against your sources.</p></article>
+              <article className="launch-capability-card"><span className="launch-card-number">05</span><BadgeCheck className="h-7 w-7" /><h3>Verify</h3><p>Build test cases, validate results, and make trust visible over time.</p></article>
+            </div>
+          </div>
+        </section>
 
-      {/* Hero Visualization */}
-      <main className="relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mt-24 relative mx-auto max-w-5xl hidden md:block" style={{ animation: 'float 6s ease-in-out infinite' }}>
-            <div className="absolute -inset-1 bg-gradient-to-r from-highlight-hover to-yellow-600 rounded-xl blur opacity-20" />
-            <div className="relative glass-panel rounded-xl border border-white/10 overflow-hidden shadow-2xl">
-              {/* Window chrome */}
-              <div className="flex items-center px-4 py-3 border-b border-white/5 bg-black/40">
-                <div className="flex space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
-                </div>
-                <div className="ml-4 text-xs text-gray-500 font-mono">workflow_pipeline.json</div>
+        <section id="projects" className="launch-project-section" aria-labelledby="projects-heading">
+          <div className="launch-content-wide grid items-center gap-14 lg:grid-cols-[minmax(0,0.93fr)_minmax(0,1.07fr)] lg:gap-24">
+            <div>
+              <p className="launch-eyebrow"><FileInput className="h-4 w-4" /> Projects</p>
+              <h2 id="projects-heading" className="launch-heading mt-5">One piece of work. <span>One shared place.</span></h2>
+              <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-400">A Project gives every grant, award, contract, or review a scoped home. Its files, project-wide chat, trusted tools, and team context all stay together.</p>
+              <div className="mt-9 space-y-4 text-sm leading-6 text-zinc-300">
+                <div className="flex gap-3"><Check className="mt-1 h-4 w-4 shrink-0 text-[var(--highlight-color)]" /><span>Files are automatically indexed, so project-wide chat is ready from the first upload.</span></div>
+                <div className="flex gap-3"><Check className="mt-1 h-4 w-4 shrink-0 text-[var(--highlight-color)]" /><span>Pin the workflows, extraction templates, and automations this work needs most.</span></div>
+                <div className="flex gap-3"><Check className="mt-1 h-4 w-4 shrink-0 text-[var(--highlight-color)]" /><span>Keep the right people in context as the work moves from draft to closeout.</span></div>
               </div>
-              {/* Pipeline columns */}
-              <div className="p-8 grid grid-cols-3 gap-6 text-left">
-                {/* Input */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xl font-semibold text-gray-400 uppercase tracking-wider">
-                    <FileText className="w-4 h-4 text-highlight" /> Input
-                  </div>
-                  <div className="bg-[#262626] p-4 rounded-lg border border-white/5 font-mono text-xs text-gray-400 leading-relaxed">
-                    <span className="text-gray-500"># NIH_Grant_Announcement.pdf</span>
-                    <br />
-                    <span className="text-white">Due Date:</span> Oct 05, 2025
-                    <br />
-                    <span className="text-white">Budget Cap:</span> $250,000
-                  </div>
-                </div>
-                {/* Processing */}
-                <div className="space-y-3 relative">
-                  <div className="flex items-center gap-2 text-xl font-semibold text-gray-400 uppercase tracking-wider">
-                    <Cpu className="w-4 h-4 text-cyan-400" /> Processing
-                  </div>
-                  <div className="bg-[#262626] p-4 rounded-lg border border-cyan-500/20 font-mono text-xs relative overflow-hidden h-full">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-highlight to-transparent" style={{ animation: 'landing-shimmer 2s infinite' }} />
-                    <div className="space-y-2 pt-1">
-                      <div className="flex justify-between">
-                        <span className="text-highlight">Extracting...</span>
-                        <Check className="w-3 h-3 text-green-500" />
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-highlight">Verifying...</span>
-                        <ShieldCheck className="w-3 h-3 text-green-500" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {/* Output */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xl font-semibold text-gray-400 uppercase tracking-wider">
-                    <Table className="w-4 h-4 text-green-400" /> Output
-                  </div>
-                  <div className="bg-[#262626] p-4 rounded-lg border border-white/5 font-mono text-xs text-green-300">
-                    {'{\n'}
-                    {'  "deadline": "2025-10-05",\n'}
-                    {'  "budget": 250000\n'}
-                    {'}'}
-                  </div>
-                </div>
+            </div>
+            <ProjectVisual />
+          </div>
+        </section>
+
+        <section id="trust" className="launch-trust-section" aria-labelledby="trust-heading">
+          <div className="launch-content-wide grid items-center gap-14 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-24">
+            <div>
+              <p className="launch-eyebrow launch-eyebrow-dark"><BadgeCheck className="h-4 w-4" /> The trust layer</p>
+              <h2 id="trust-heading" className="launch-heading-dark mt-6">It doesn&apos;t just answer. <span>It shows its work.</span></h2>
+              <p className="mt-7 max-w-xl text-lg leading-8 text-zinc-600">Generic chat is built to sound useful. {branding.orgName} is built for the work where you need to know why an answer deserves your confidence.</p>
+              <div className="mt-10 space-y-7">
+                <div className="launch-proof"><FileInput className="h-5 w-5" /><div><h3>Cited answers</h3><p>Follow a knowledge-base answer to the exact passage that supports it.</p></div></div>
+                <div className="launch-proof"><BadgeCheck className="h-5 w-5" /><div><h3>Quality you can see</h3><p>Accuracy, consistency, test cases, and active alerts stay with the result.</p></div></div>
+                <div className="launch-proof"><RefreshCw className="h-5 w-5" /><div><h3>Trust that improves</h3><p>Guided verification turns real work into stronger, reusable templates.</p></div></div>
+              </div>
+            </div>
+            <TrustVisual />
+          </div>
+        </section>
+
+        <section className="launch-control-section" aria-labelledby="control-heading">
+          <div className="launch-content-wide grid items-center gap-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-24">
+            <ConfirmationVisual />
+            <div>
+              <p className="launch-eyebrow"><ShieldCheck className="h-4 w-4" /> Human control, built in</p>
+              <h2 id="control-heading" className="launch-heading mt-5">The agent acts. <span>You stay in control.</span></h2>
+              <p className="mt-6 text-lg leading-8 text-zinc-400">Every meaningful write is previewed before it happens. You approve workflow runs, knowledge-base changes, validation, and new templates—without leaving the conversation.</p>
+              <div className="mt-9 grid gap-3 sm:grid-cols-2">
+                <div className="launch-control-point"><ShieldCheck className="h-5 w-5" /><span>Explicit approval gates</span></div>
+                <div className="launch-control-point"><Users className="h-5 w-5" /><span>Team-based access</span></div>
+                <div className="launch-control-point"><Lock className="h-5 w-5" /><span>Private workspaces</span></div>
+                <div className="launch-control-point"><CheckCircle className="h-5 w-5" /><span>Auditable actions</span></div>
               </div>
             </div>
           </div>
-        </div>
-        {/* Grid Background Effect */}
-        <div className="absolute inset-0 grid-bg -z-10 opacity-20" />
+        </section>
+
+        <section id="demo" className="launch-demo-section" aria-labelledby="demo-heading">
+          <div className="launch-content-wide grid items-start gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-24">
+            <div>
+              <p className="launch-eyebrow"><Sparkles className="h-4 w-4" /> See 5.0 in action</p>
+              <h2 id="demo-heading" className="launch-heading mt-6">Your office has a better way to work.</h2>
+              <p className="mt-6 max-w-lg text-lg leading-8 text-zinc-400">Bring a real proposal, policy question, or review workflow. We&apos;ll show you what an agentic {branding.orgName} experience can look like for your team.</p>
+              {authConfig?.trial_system_enabled && <div className="mt-8">{primaryCta}</div>}
+              <div className="launch-demo-credentials"><span>Built for research administration</span><span>Open source · self-hosted</span></div>
+            </div>
+            <DemoRequestForm />
+          </div>
+        </section>
       </main>
 
-      {/* Tasks & Extractions */}
-      <section className="py-32 relative border-t border-white/5 bg-[#171717]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row gap-16 items-center">
-            <div className="w-full lg:w-1/2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-highlight/10 border border-highlight/20 mb-8">
-                <CheckCircle className="w-5 h-5 text-highlight" />
-                <span className="text-sm font-bold text-highlight uppercase tracking-wider">
-                  Atomic Units of Work
-                </span>
-              </div>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-8 leading-tight">
-                Verified <span className="text-highlight">Tasks</span> &{' '}
-                <br />
-                Reliable <span className="text-highlight">Extractions</span>
-              </h2>
-              <p className="text-xl text-gray-400 leading-relaxed mb-8">
-                Forget generic &ldquo;chat with PDF&rdquo;. Vandalizer uses specialized tasks to
-                perform specific actions with high accuracy.
-              </p>
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-fit">
-                    <ScanText className="w-6 h-6 text-highlight" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-white mb-2">Structured Extraction</h4>
-                    <p className="text-lg text-gray-400">
-                      Pull dates, budgets, and requirements from messy PDFs into clean JSON.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-fit">
-                    <FileEdit className="w-6 h-6 text-highlight" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-white mb-2">Smart Summarization</h4>
-                    <p className="text-lg text-gray-400">
-                      Generate executive summaries tailored to specific grant guidelines.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Task cards visual */}
-            <div className="w-full lg:w-1/2">
-              <div className="relative">
-                <div className="glass-panel p-6 rounded-xl border border-white/10 mb-4 transform translate-x-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-sm font-mono text-gray-500">Extraction Task</span>
-                    <span className="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs font-bold">
-                      COMPLETED
-                    </span>
-                  </div>
-                  <div className="space-y-2 font-mono text-sm">
-                    <div className="text-gray-400">&quot;action&quot;: &quot;extract_deadline&quot;</div>
-                    <div className="text-highlight">&quot;result&quot;: &quot;extraction.csv&quot;</div>
-                  </div>
-                </div>
-                <div className="glass-panel p-6 rounded-xl border border-white/10 mb-4 transform -translate-x-4 z-10 relative bg-[#262626]">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-sm font-mono text-gray-500">Verified Prompt</span>
-                    <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-400 text-xs font-bold">
-                      PROCESSING
-                    </span>
-                  </div>
-                  <div className="space-y-2 font-mono text-sm">
-                    <div className="text-gray-400">&quot;action&quot;: &quot;check_compliance&quot;</div>
-                    <div className="flex items-center gap-2 text-blue-400">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Analyzing...
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Workflows */}
-      <section className="py-32 relative border-t border-white/5 bg-black">
-        <div className="absolute inset-0 grid-bg opacity-30" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row-reverse gap-16 items-center">
-            <div className="w-full lg:w-1/2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-8">
-                <GitMerge className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-bold text-blue-400 uppercase tracking-wider">
-                  End-to-End Automation
-                </span>
-              </div>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-8 leading-tight">
-                Chain Tasks into <br />
-                <span className="text-blue-400">Powerful Workflows</span>
-              </h2>
-              <p className="text-xl text-gray-400 leading-relaxed mb-8">
-                Combine tasks to handle complex processes. Output from one task becomes input for
-                the next, creating reliable pipelines that scale.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  'Standardize processes across your team',
-                  'Handle conditional logic and branching',
-                  'Reproducible results, every time',
-                ].map((text) => (
-                  <li key={text} className="flex items-center gap-4 text-lg text-gray-300">
-                    <CheckCircle className="w-6 h-6 text-blue-500" />
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Workflow diagram visual */}
-            <div className="w-full lg:w-1/2">
-              <div className="glass-panel p-8 rounded-2xl border border-white/10 relative">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-full p-4 rounded-lg bg-[#262626] border border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded bg-white/5">
-                        <FileInput className="w-5 h-5 text-gray-400" />
-                      </div>
-                      <span className="font-mono text-sm text-gray-300">Input: RFP.pdf</span>
-                    </div>
-                  </div>
-
-                  <ArrowDown className="w-6 h-6 text-gray-600" />
-
-                  <div
-                    className="w-full p-4 rounded-lg bg-[#262626] border border-highlight/30 flex items-center justify-between"
-                    style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--highlight-color) 10%, transparent)' }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded bg-highlight/10">
-                        <ScanLine className="w-5 h-5 text-highlight" />
-                      </div>
-                      <span className="font-mono text-sm text-white">
-                        Task: Extract Requirements
-                      </span>
-                    </div>
-                    <Check className="w-4 h-4 text-green-500" />
-                  </div>
-
-                  <ArrowDown className="w-6 h-6 text-gray-600" />
-
-                  <div className="w-full p-4 rounded-lg bg-[#262626] border border-blue-500/30 flex items-center justify-between shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded bg-blue-500/10">
-                        <PenTool className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <span className="font-mono text-sm text-white">Task: Draft Outline</span>
-                    </div>
-                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Bento Grid */}
-      <section className="py-24 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-20">
-            <h2 className="text-4xl font-bold text-white mb-6">Tools to Augment your Team</h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Collaborate, verify, and scale with confidence using our secure platform.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Feature 1: Collaborative Workspace (large) */}
-            <div className="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
-              <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
-                  <Users className="w-8 h-8" />
-                </div>
-                <span className="text-sm font-mono text-gray-500">01</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-highlight transition-colors relative z-10">
-                Unified Team Workspace
-              </h3>
-              <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
-                All of your team&apos;s files and workflows in one central hub. Share specific tasks or
-                entire pipelines instantly. No more emailing refined prompts or Python scripts back
-                and forth.
-              </p>
-              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-highlight/5 rounded-full blur-2xl group-hover:bg-highlight/10 transition-colors" />
-            </div>
-
-            {/* Feature 2: Private & Secure */}
-            <div className="glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
-              <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-gray-700/30 text-gray-300">
-                  <Lock className="w-8 h-8" />
-                </div>
-                <span className="text-sm font-mono text-gray-500">02</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-gray-300 transition-colors relative z-10">
-                Private & Secure
-              </h3>
-              <p className="text-gray-400 text-xl leading-relaxed relative z-10">
-                Powerful AI models that are private and secure. Your data stays within your control
-                and is not used to train public models.
-              </p>
-            </div>
-
-            {/* Feature 3: Reproducible */}
-            <div className="glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
-              <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-gray-700/30 text-gray-300">
-                  <RefreshCw className="w-8 h-8" />
-                </div>
-                <span className="text-sm font-mono text-gray-500">03</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-gray-300 transition-colors relative z-10">
-                Reproducible
-              </h3>
-              <p className="text-gray-400 text-xl leading-relaxed relative z-10">
-                Eliminate variability. Build workflows that produce consistent, standardized outputs
-                every time, regardless of who runs them.
-              </p>
-            </div>
-
-            {/* Feature 4: Evaluate Once (large) */}
-            <div className="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
-              <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
-                  <CheckCircle className="w-8 h-8" />
-                </div>
-                <span className="text-sm font-mono text-gray-500">04</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-highlight transition-colors relative z-10">
-                Verify Once, Deploy with Confidence
-              </h3>
-              <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
-                Create a &ldquo;Golden Set&rdquo; of documents to evaluate a workflow&apos;s accuracy using
-                TaMPER scoring. Once verified, publish it to your team knowing it has been tested
-                against real data.
-              </p>
-              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-highlight/5 rounded-full blur-2xl group-hover:bg-highlight/10 transition-colors" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-24 border-t border-white/5 bg-[#171717]/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row gap-12 items-center">
-            <div className="w-full md:w-1/2">
-              <h2 className="text-4xl font-bold text-white mb-6">
-                Not a replacement.
-                <br />
-                An augmentation.
-              </h2>
-              <div className="space-y-8">
-                {[
-                  {
-                    n: 1,
-                    title: 'Upload Document',
-                    desc: 'Drag and drop RFPs, contracts, or emails into the secure workspace.',
-                  },
-                  {
-                    n: 2,
-                    title: 'Select Tasks',
-                    desc: 'Start from a starter example or create custom extraction logic.',
-                  },
-                  {
-                    n: 3,
-                    title: 'Review & Export',
-                    desc: 'Validate the AI output against the source document and export to your system.',
-                  },
-                ].map((step) => (
-                  <div key={step.n} className="flex gap-6">
-                    <div className="w-10 h-10 rounded-full bg-highlight/20 flex items-center justify-center text-lg font-bold text-highlight shrink-0">
-                      {step.n}
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-bold text-white mb-2">{step.title}</h4>
-                      <p className="text-gray-400 text-lg">{step.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-12">
-                <blockquote className="border-l-4 border-highlight pl-6 italic text-gray-300 text-xl leading-relaxed">
-                  &ldquo;Vandalizer allows RAs to leverage their institutional knowledge to create
-                  flexible workflows targeted at common issues.&rdquo;
-                </blockquote>
-              </div>
-            </div>
-
-            {/* How-it-works visual */}
-            <div className="w-full md:w-1/2">
-              <div className="glass-panel p-8 rounded-2xl border border-white/10 relative overflow-hidden">
-                <div className="absolute inset-0 grid-bg opacity-30" />
-                <div className="relative z-10 flex flex-col gap-8">
-                  {/* Step 1: User Input */}
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-[#262626] border border-white/5">
-                    <div className="p-3 rounded-lg bg-white/10 text-white">
-                      <User className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-mono text-gray-400 mb-1">Input Source</div>
-                      <div className="text-white font-bold">Research Administrator</div>
-                    </div>
-                    <div className="px-3 py-1 rounded-full bg-white/5 text-xs font-mono text-gray-400">
-                      PDF/Email
-                    </div>
-                  </div>
-
-                  <div className="flex justify-center -my-2">
-                    <ArrowDown className="w-6 h-6 text-gray-600 animate-bounce" />
-                  </div>
-
-                  {/* Step 2: Core */}
-                  <div
-                    className="relative p-6 rounded-xl bg-[#0a0a0a] border border-highlight/30"
-                    style={{ boxShadow: '0 0 30px color-mix(in srgb, var(--highlight-color) 10%, transparent)' }}
-                  >
-                    <div className="absolute inset-0 bg-highlight/5 animate-pulse rounded-xl" />
-                    <div className="relative flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
-                        <Cpu className="w-8 h-8" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-mono text-highlight mb-1">Vandalizer Core</div>
-                        <div className="text-white font-bold">AI Processing & Extraction</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 p-3 rounded bg-black/50 font-mono text-xs text-gray-400 border border-white/5">
-                      <span className="text-highlight">&gt;&gt;</span> Extracting key_dates...
-                      <br />
-                      <span className="text-highlight">&gt;&gt;</span> Validating budget_caps...
-                      <br />
-                      <span className="text-green-500">&#10003;</span> Confidence: 98.5%
-                    </div>
-                  </div>
-
-                  <div className="flex justify-center -my-2">
-                    <ArrowDown
-                      className="w-6 h-6 text-gray-600 animate-bounce"
-                      style={{ animationDelay: '0.5s' }}
-                    />
-                  </div>
-
-                  {/* Step 3: Expert Review */}
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-[#262626] border border-green-500/20">
-                    <div className="p-3 rounded-lg bg-green-500/10 text-green-400">
-                      <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-mono text-green-400 mb-1">Final Validation</div>
-                      <div className="text-white font-bold">Human Expert Approval</div>
-                    </div>
-                    <div className="px-3 py-1 rounded-full bg-green-500/10 text-xs font-mono text-green-400">
-                      Verified
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Origins */}
-      <section className="py-32 relative border-t border-white/5 bg-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center justify-center p-3 mb-8 rounded-full bg-white/5 border border-white/10">
-            <GraduationCap className="w-6 h-6 text-gray-400" />
-          </div>
-
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Born at the University of Idaho
-          </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg leading-relaxed mb-12">
-            Vandalizer is an open-source initiative developed by the{' '}
-            <strong>Artificial Intelligence for Research Administration (AI4RA)</strong> team at the
-            University of Idaho.
-            <br />
-            <br />
-            This project is made possible through the support of the{' '}
-            <strong>NSF GRANTED</strong> program (Award #2427549), dedicated to reducing barriers to
-            research administration and building capacity for research administration operations of
-            all structures and sizes. Developed in collaboration with{' '}
-            <strong>Southern Utah University</strong>.
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
-            <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
-              <span className="text-2xl font-bold text-highlight tracking-wider">
-                University of Idaho
-              </span>
-            </div>
-            <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
-              <span className="text-2xl font-bold text-blue-400 tracking-wider">NSF GRANTED</span>
-            </div>
-            <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
-              <span className="text-2xl font-bold text-green-400 tracking-wider">
-                Southern Utah University
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Collaboration CTA */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] to-highlight/5 pointer-events-none" />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">Help Shape the Future of RA</h2>
-          <p className="text-gray-300 text-lg mb-10 max-w-2xl mx-auto">
-            We are actively seeking collaborators, testers, and contributors. If you are a Research
-            Administrator interested in using Vandalizer at your institution, or a developer wanting
-            to contribute to the codebase, we want to hear from you.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="https://github.com/ui-insight/vandalizer/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-14 items-center justify-center rounded-full bg-white text-black px-8 font-bold text-lg transition-all hover:bg-gray-200 hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-            >
-              <Mail className="w-5 h-5 mr-2" /> Get in Touch
-            </a>
-            <a
-              href="https://github.com/ui-insight/vandalizer"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-14 items-center justify-center rounded-full border border-white/20 bg-white/5 px-8 font-bold text-white transition-all hover:bg-white/10"
-            >
-              View on GitHub
-            </a>
-          </div>
-        </div>
-      </section>
-
+      {accessOpen && <AccessDialog config={authConfig} orgName={branding.orgName} onClose={() => setAccessOpen(false)} />}
       <Footer />
     </div>
   )

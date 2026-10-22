@@ -1,0 +1,221 @@
+"""Owned Validation learner actions and preserved source/run history."""
+import base64
+
+from .source_access import owned_source
+from app.models.search_set import SearchSet
+from app.services.storage import get_storage
+from . import practical_preparation
+from .attempts import encode
+from .catalog import CourseCatalogError
+from .enrollments import EnrollmentConflict, EnrollmentRepository
+from .process_delivery import ProcessAssessment
+from .runtime import CourseOperation
+from .validation_approval import ValidationScopeRepository
+from .validation_case import load_validation_case
+from .validation_execution import ValidationExecution
+from .validation_inputs import ValidationInputRepository
+from .validation_preparation import ValidationPreparation
+from .validation_recovery import ValidationRecovery
+from .validation_reviews import ValidationReviewRepository, PROMPT_ID
+from .validation_suites import ValidationSuiteRepository, PROMPT_ID as SUITE_PROMPT
+
+
+class ValidationUnavailable(ValueError):
+    pass
+
+
+class ValidationDelivery:
+    def __init__(self, repository=None):
+        self.repository = repository or EnrollmentRepository()
+        self.inputs = ValidationInputRepository()
+        self.suites = ValidationSuiteRepository()
+        self.runs = ValidationExecution()
+        self.scopes = ValidationScopeRepository()
+        self.reviews = ValidationReviewRepository()
+
+    async def course(self, user_id, enrollment_id):
+        enrollment = await self.repository._enrollment(user_id, enrollment_id)
+        package = self.repository.catalog.load(enrollment.course_version)
+        if 'validation-cases/validation_qa.json' not in package.manifest.artifacts:
+            raise ValidationUnavailable('This course does not offer the representative validation suite')
+        return enrollment, package, load_validation_case(package)
+
+    @staticmethod
+    def verify(record, enrollment, case):
+        if (any(record[key] != value for key, value in {'user_id': enrollment.user_id,
+                'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
+                'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'validation_qa'}.items())
+                or record.get('case', record.get('input_snapshot', {}).get('case')) != case.public_definition()):
+            raise CourseCatalogError('This saved validation work differs from its original course')
+
+    async def writable(self, enrollment, enabled):
+        selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
+        return bool(enabled and enrollment.state in ('active', 'completed') and selection
+                    and selection.get('active_enrollment_id') == enrollment.uuid)
+
+    @staticmethod
+    def capture_view(saved):
+        return {key: saved[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
+            'case', 'artifact_id', 'artifact_sha256', 'artifact', 'captured_at')} | {
+            'documents': [{key: value for key, value in source.items() if key != 'source_pdf_base64'} for source in saved['documents']],
+            'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
+
+    def suite_view(self, saved):
+        return {key: saved[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
+            'case', 'submission', 'test_cases', 'suite_sha256', 'submitted_at', 'source_correctness_verified',
+            'execution_authorized', 'credit_awarded', 'module_completion_eligible')} | {
+            'suite_record_sha256': encode(saved)[1],
+            'input_snapshot': self.capture_view(ValidationInputRepository.decode(saved['input_snapshot']))}
+
+    async def run_view(self, run, *, writable=False):
+        plan = run['plan']
+        scope = run['authorization']['decision'] if run['authorization'] else None
+        if scope is None and run['scope_decision_id']:
+            scope = await self.scopes.get(plan['user_id'], run['scope_decision_id'])
+        if scope is not None and (scope['run_id'] != run['run_id'] or scope['plan_sha256'] != run['plan_sha256']
+                or scope['user_id'] != plan['user_id'] or scope['enrollment_id'] != plan['enrollment_id']
+                or encode(scope)[1] != run['scope_decision_sha256']):
+            raise CourseCatalogError('The displayed approval differs from this saved suite')
+        original = ValidationPreparation.decode(plan['original_run_record']) if plan['original_run_record'] else None
+        return {**{key: plan[key] for key in ('enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
+                    'input_snapshot_id', 'case_sha256', 'model_names', 'prepared_at', 'phase', 'changed_fields')},
+                **{key: run[key] for key in ('run_id', 'state', 'plan_sha256', 'scope_decision_id', 'scope_decision_sha256',
+                                            'case_events', 'result')},
+                'run_sha256': encode(run)[1], 'suite': self.suite_view(plan['suite']),
+                'input_snapshot': self.capture_view(plan['input_snapshot']), 'scope_decision': scope,
+                'original_run': await self.run_view(original) if original else None,
+                'authorization_sha256': encode(run['authorization'])[1] if run['authorization'] else None,
+                'result_sha256': encode(run['result'])[1] if run['result'] else None,
+                'case_events_sha256': encode(run['case_events'])[1],
+                'can_save_scope': writable and run['state'] == 'prepared',
+                'can_execute': bool(writable and run['state'] == 'prepared' and scope and scope['submission']['choice'] == 'approve'),
+                'can_finalize': bool(writable and run['state'] == 'executing' and len(run['case_events']) == 4
+                    and all(e['receipt'].get('result', {}).get('status', 'completed') == 'completed' for e in run['case_events'])),
+                'credit_awarded': False, 'module_completion_eligible': False}
+
+    def repositories(self):
+        return {'capture': self.inputs, 'suite': self.suites, 'run': self.runs, 'scope': self.scopes, 'review': self.reviews}
+
+    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+        enrollment, _, case = await self.course(user_id, enrollment_id)
+        saved = await self.repositories()[kind].get(user_id, reference)
+        if saved is None:
+            raise ValidationUnavailable('This saved validation record is unavailable')
+        record = saved['plan'] if kind == 'run' else saved
+        self.verify({**record, 'case': record.get('case', record.get('input_snapshot', {}).get('case', case.public_definition()))}, enrollment, case)
+        if kind == 'scope':
+            if saved['case_sha256'] != case.digest:
+                raise CourseCatalogError('This choice belongs to a different validation assignment')
+            return {**saved, 'decision_sha256': encode(saved)[1]}
+        if kind == 'capture':
+            return self.capture_view(saved)
+        if kind == 'suite':
+            return self.suite_view(saved)
+        if kind == 'run':
+            return await self.run_view(saved, writable=await self.writable(enrollment, delivery_enabled))
+        return {key: saved[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
+            'case', 'submission', 'submitted_at', 'credit_awarded', 'module_completion_eligible')} | {
+            'run': await self.run_view(ValidationPreparation.decode(saved['execution']))}
+
+    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+        enrollment, _, case = await self.course(user_id, enrollment_id)
+        query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'validation_qa'}
+        result = {'enrollment_id': enrollment_id, 'module_id': 'validation_qa', 'course_version': enrollment.course_version,
+                  'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition()}
+        for kind, repository, selector in (
+                ('captures', self.inputs, {'record_kind': 'validation_extraction_input'}),
+                ('suites', self.suites, {'prompt_id': SUITE_PROMPT}), ('runs', self.runs, {}),
+                ('submissions', self.reviews, {'prompt_id': PROMPT_ID})):
+            rows = await repository.records.find({**query, **selector}).sort('_id', -1).limit(51).to_list(51)
+            summaries = []
+            for raw in rows[:50]:
+                saved = repository.decode(raw)
+                record = saved['plan'] if kind == 'runs' else saved
+                self.verify(record, enrollment, case)
+                if kind == 'runs':
+                    summaries.append({'run_id': saved['run_id'], 'state': saved['state'], 'phase': record['phase'],
+                        'prepared_at': record['prepared_at'], 'input_snapshot_id': record['input_snapshot_id']})
+                elif kind == 'captures':
+                    summaries.append({'input_snapshot_id': record['uuid'], 'captured_at': record['captured_at'],
+                                      'extraction_name': record['artifact']['title']})
+                else:
+                    summaries.append({'submission_id': record['uuid'], 'submitted_at': record['submitted_at'],
+                        'run_id': record['run_id'], 'previous_submission_id': record['submission'].get('previous_submission_id')})
+            result[kind] = summaries
+            result['older_' + kind + '_available'] = len(rows) > 50
+        writable = await self.writable(enrollment, delivery_enabled)
+        owned = await SearchSet.find({'user_id': user_id, 'set_type': 'extraction'}).sort('-updated_at').limit(51).to_list() if writable else []
+        sources = []
+        if writable:
+            progress = await self.repository.read_progress(user_id, enrollment_id)
+            for document_id in progress.modules.get('validation_qa', {}).get('provisioned_docs', []):
+                document = await owned_source(user_id, document_id, lab_folder_id=progress.lab_folder_id)
+                if document:
+                    sources.append({'document_id': document.uuid, 'title': document.title, 'text': document.raw_text,
+                                    'processing': document.processing, 'provenance': 'current_owned_workspace_ingestion'})
+        return {**result, 'extractions': [{'artifact_id': item.uuid, 'title': item.title} for item in owned[:50]],
+                'assigned_sources': sources, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
+                'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
+
+    async def download(self, user_id, enrollment_id, reference, *, origin, source_id):
+        enrollment, _, case = await self.course(user_id, enrollment_id)
+        saved = await self.repositories()[origin].get(user_id, reference)
+        if saved is None:
+            raise ValidationUnavailable('This saved source is unavailable')
+        record = saved['plan'] if origin == 'run' else saved
+        self.verify(record, enrollment, case)
+        if origin == 'capture':
+            snapshot = saved
+        elif origin == 'suite':
+            snapshot = ValidationInputRepository.decode(saved['input_snapshot'])
+        elif origin == 'run':
+            snapshot = saved['plan']['input_snapshot']
+        else:
+            snapshot = ValidationPreparation.decode(saved['execution'])['plan']['input_snapshot']
+        source = next((item for item in snapshot['documents'] if item['source_id'] == source_id), None)
+        if source is None:
+            raise ValidationUnavailable('This source is not a member of the original suite')
+        return base64.b64decode(source['source_pdf_base64'], validate=True), source['assigned_filename']
+
+    async def save(self, user_id, enrollment_id, payload, *, action):
+        current = await self.repository.current(user_id)
+        if current is None or current.uuid != enrollment_id:
+            raise EnrollmentConflict('Select your existing course before saving or executing validation work')
+        _, package, _ = await self.course(user_id, enrollment_id)
+        async with self.repository.write_boundary(user_id, enrollment_id, operation='validation_' + action) as progress:
+            operation = CourseOperation(user_id, package, progress, True)
+            if action == 'capture':
+                return self.capture_view(await self.inputs.capture(operation, payload, actor_user_id=user_id, storage=get_storage()))
+            if action == 'suite':
+                return self.suite_view(await self.suites.submit(operation, payload, actor_user_id=user_id))
+            if action == 'review':
+                saved = await self.reviews.submit(operation, payload, actor_user_id=user_id)
+                return await self.get(user_id, enrollment_id, saved['uuid'])
+            if action == 'prepare':
+                existing = await self.runs.records.find_one({'uuid': payload.request_id})
+                config = {} if existing else await practical_preparation.configured_runtime()
+                saved = await self.runs.prepare(operation, payload, config, actor_user_id=user_id)
+            elif action == 'scope':
+                await self.scopes.submit(operation, payload, actor_user_id=user_id)
+                saved = await self.runs.get(user_id, payload.run_id)
+            elif action == 'execute':
+                existing = await self.runs.get(user_id, payload.run_id)
+                config = await practical_preparation.configured_runtime() if existing and existing['state'] == 'prepared' else {}
+                saved = await self.runs.execute(operation, payload, config, actor_user_id=user_id)
+            elif action == 'finalize':
+                saved = await ValidationRecovery().finalize(operation, payload, actor_user_id=user_id)
+            else:
+                raise ValueError('Unsupported validation action')
+            return await self.run_view(saved, writable=True)
+
+
+class ValidationAssessment(ProcessAssessment):
+    module_id = 'validation_qa'
+    channel = 'trusted_saved_validation_records'
+    reference_key = 'validation_review_submission_id'
+    assessment_kind = 'validation_suite_review_draft'
+    delivery_class = ValidationDelivery
+    prepare_method = 'prepare_from_validation_review'
+
+    def __init__(self, repository=None):
+        super().__init__(repository or EnrollmentRepository())

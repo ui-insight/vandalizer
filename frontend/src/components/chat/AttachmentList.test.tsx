@@ -9,6 +9,11 @@ const file = (id: string, filename: string) => ({ id, filename }) as FileAttachm
 // Before these, knowledge bases lived in their own bars at the other end of the
 // window and folders were sent to the backend with nothing on screen at all.
 describe('AttachmentList', () => {
+  it('does not label a failed document ready after its progress notice disappears', () => {
+    render(<AttachmentList selectedDocUuids={['failed']} selectedDocNames={{ failed: 'Scanned.pdf' }} processingByUuid={{}} documentErrors={{ failed: 'OCR failed' }} />)
+    expect(screen.getByText('Processing failed · open Files to retry')).toBeInTheDocument()
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
+  })
   it('renders knowledge bases, folders and documents in one row', () => {
     const { container } = render(
       <AttachmentList

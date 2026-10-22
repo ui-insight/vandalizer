@@ -1,3 +1,5 @@
+import { TableRegion } from './shared/TableRegion'
+import { useConfirm } from '../shared/useConfirm'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   ShieldCheck, Users, Settings,
@@ -8,7 +10,7 @@ import {
 } from 'lucide-react'
 import {
   getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  testOcr, testPrompt, getReadiness, probeOcrReadiness,
+  testOcr, testPrompt, testWebSearch, getReadiness, probeOcrReadiness,
 } from '../../api/admin'
 import type { TestPromptResult, ReadinessReport, ReadinessItem, OcrTestResult } from '../../api/admin'
 import { DiagnosticsPanel, type DiagnosticFact } from './config/DiagnosticsPanel'
@@ -19,6 +21,8 @@ import { AuthPanel } from './config/AuthPanel'
 import { ModelEditor } from './config/ModelEditor'
 import type { ModelEditorHandle } from './config/ModelEditor'
 import { ThemePanel } from './config/ThemePanel'
+import { ConfigDraftProvider, ConfigDraftStatus } from './config/ConfigDraftProvider'
+import { useConfigDraft } from './config/configDrafts'
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputStyle, checkStyle, hintStyle } from './config/styles'
 
 // Starting point for the Docling-Serve options blob — the options sites most
@@ -59,7 +63,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
     <div style={{ marginBottom: 20, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
         {report.ready
-          ? <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+          ? <ShieldCheck size={18} style={{ color: '#15803d' }} />
           : <AlertCircle size={18} style={{ color: '#d97706' }} />}
         <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>
           {report.ready ? 'System ready' : 'Finish setting up your workspace'}
@@ -71,7 +75,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
         )}
         <div style={{ flex: 1 }} />
         {onDismiss && (
-          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
+          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: 2 }}>
             <X size={16} />
           </button>
         )}
@@ -85,7 +89,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
             <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderTop: '1px solid #f8fafc' }}>
               <div style={{ marginTop: 1 }}>
                 {done
-                  ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                  ? <CheckCircle2 size={18} style={{ color: '#15803d' }} />
                   : broken
                     ? <XCircle size={18} style={{ color: '#dc2626' }} />
                     : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
@@ -96,7 +100,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9999, background: pill.bg, color: pill.fg }}>{pill.label}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{item.summary}</div>
-                {!done && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
+                {!done && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
               </div>
               {!done && (
                 <button
@@ -130,18 +134,34 @@ function ocrDiagFacts(result: OcrTestResult): DiagnosticFact[] {
 // Config Tab
 // ──────────────────────────────────────────
 
+function revealConfigField(id: string, focus = false) {
+  const target = document.getElementById(id)
+  let details = target?.closest('details')
+  while (details) { details.open = true; details = details.parentElement?.closest('details') ?? null }
+  if (focus) target?.focus()
+  else target?.scrollIntoView?.({ block: 'start' })
+}
+
 export function ConfigTab() {
+  return <ConfigDraftProvider><ConfigEditor /></ConfigDraftProvider>
+}
+
+function ConfigEditor() {
+  const confirm = useConfirm()
   const [cfg, setCfg] = useState<SystemConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const savePending = useRef(false)
+  const configRevision = useRef(0)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldError, setFieldError] = useState<{ id: string; message: string } | null>(null)
 
   // Extraction config
   const [extractionMode, setExtractionMode] = useState('one_pass')
   const [chunkingEnabled, setChunkingEnabled] = useState(false)
-  const [maxKeysPerChunk, setMaxKeysPerChunk] = useState(10)
+  const [maxKeysPerChunk, setMaxKeysPerChunk] = useState<number | ''>(10)
   const [repetitionEnabled, setRepetitionEnabled] = useState(false)
   const [onePassThinking, setOnePassThinking] = useState(true)
   const [onePassStructured, setOnePassStructured] = useState(true)
@@ -156,12 +176,12 @@ export function ConfigTab() {
 
   // Quality config
   const [requireValidation, setRequireValidation] = useState(false)
-  const [minAccuracy, setMinAccuracy] = useState(70)
-  const [minConsistency, setMinConsistency] = useState(80)
+  const [minAccuracy, setMinAccuracy] = useState<number | ''>(70)
+  const [minConsistency, setMinConsistency] = useState<number | ''>(80)
   const [minWorkflowGrade, setMinWorkflowGrade] = useState('C')
-  const [excellentThreshold, setExcellentThreshold] = useState(90)
-  const [goodThreshold, setGoodThreshold] = useState(70)
-  const [fairThreshold, setFairThreshold] = useState(50)
+  const [excellentThreshold, setExcellentThreshold] = useState<number | ''>(90)
+  const [goodThreshold, setGoodThreshold] = useState<number | ''>(70)
+  const [fairThreshold, setFairThreshold] = useState<number | ''>(50)
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
@@ -185,7 +205,17 @@ export function ConfigTab() {
   const [ocrOptionsText, setOcrOptionsText] = useState('')
   const [ocrOptionsError, setOcrOptionsError] = useState<string | null>(null)
   const [ocrAsync, setOcrAsync] = useState(false)
-  const [ocrTimeout, setOcrTimeout] = useState(120)
+  const [ocrTimeout, setOcrTimeout] = useState<number | ''>(120)
+
+  // Web Search — powers the agentic chat web_search tool
+  const [webSearchProvider, setWebSearchProvider] = useState('')
+  const [webSearchEndpoint, setWebSearchEndpoint] = useState('')
+  const [webSearchApiKey, setWebSearchApiKey] = useState('')
+  // Same dirty-tracking defense as the OCR key: only a user-edited key is
+  // sent on save, so the '***' sentinel can never overwrite the stored key.
+  const [webSearchApiKeyDirty, setWebSearchApiKeyDirty] = useState(false)
+  const [webSearchTesting, setWebSearchTesting] = useState(false)
+  const [webSearchTestResult, setWebSearchTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // System readiness / setup checklist
   const [readiness, setReadiness] = useState<ReadinessReport | null>(null)
@@ -264,6 +294,23 @@ export function ConfigTab() {
   const [retentionSaving, setRetentionSaving] = useState(false)
   const [retentionSaved, setRetentionSaved] = useState(false)
 
+  const processingDraft = useConfigDraft('Processing settings', {
+    extractionMode, chunkingEnabled, maxKeysPerChunk, repetitionEnabled, onePassThinking,
+    onePassStructured, onePassModel, twoPassP1Thinking, twoPassP1Structured, twoPassP1Model,
+    twoPassP2Thinking, twoPassP2Structured, twoPassP2Model, useImages, requireValidation,
+    minAccuracy, minConsistency, minWorkflowGrade, excellentThreshold, goodThreshold,
+    fairThreshold, ocrEndpoint, allowedHosts, ocrApiKey, webSearchProvider,
+    webSearchEndpoint, webSearchApiKey, ocrProvider, ocrOptionsText, ocrAsync, ocrTimeout,
+  }, !!cfg)
+  const complianceDraft = useConfigDraft('Compliance', {
+    complianceEnabled, complianceCheckOnUpload, complianceRules, complianceChunkSize, complianceChunkOverlap,
+  }, !!cfg)
+  const retentionDraft = useConfigDraft('Retention', {
+    retentionEnabled, retentionPolicies, activityRetentionDays, chatRetentionDays,
+    workflowResultRetentionDays, staleActivityMinutes,
+  }, !!cfg)
+  useConfigDraft('New support contact', newContact, showAddContact)
+
   useEffect(() => { void refreshReadiness() }, [refreshReadiness])
   useEffect(() => { void refreshOcrReadiness() }, [refreshOcrReadiness])
 
@@ -279,6 +326,10 @@ export function ConfigTab() {
       setEnvAllowedHosts(c.outbound_url_env_allowed_hosts || [])
       setOcrApiKey(c.ocr_api_key || '')
       setOcrApiKeyDirty(false)
+      setWebSearchProvider(c.web_search_provider || '')
+      setWebSearchEndpoint(c.web_search_endpoint || '')
+      setWebSearchApiKey(c.web_search_api_key || '')
+      setWebSearchApiKeyDirty(false)
       setOcrProvider(c.ocr_provider === 'docling' ? 'docling' : 'raw')
       setOcrOptionsText(
         c.ocr_options && Object.keys(c.ocr_options).length
@@ -347,7 +398,71 @@ export function ConfigTab() {
     void loadConfig()
   }, [loadConfig])
 
+  useEffect(() => {
+    if (loading) return
+    const reveal = () => { const id = window.location.hash.slice(1); if (id.startsWith('cfg-')) requestAnimationFrame(() => revealConfigField(id)) }
+    reveal()
+    window.addEventListener('hashchange', reveal)
+    return () => window.removeEventListener('hashchange', reveal)
+  }, [loading])
+
+  const numericFieldProps = (id: string) => ({
+    id, required: true,
+    'aria-invalid': fieldError?.id === id || undefined,
+    'aria-describedby': fieldError?.id === id ? `${id}-error` : undefined,
+  })
+  const numericFieldError = (id: string) => fieldError?.id === id
+    ? <p id={`${id}-error`} role="alert" style={{ color: '#991b1b', fontSize: 13, margin: '6px 0' }}>{fieldError.message}</p>
+    : null
+
+  const validatePolicyNumbers = (section: string) => {
+    const inputs = document.querySelectorAll<HTMLInputElement>(`#cfg-${section} input[type=number]`)
+    for (const input of inputs) {
+      if (!input.checkValidity() || (input.value !== '' && !Number.isInteger(input.valueAsNumber))) {
+        setFieldError({ id: input.id, message: `${input.getAttribute('aria-label') || 'Value'} must be a whole number of at least ${input.min || 0}.` })
+        revealConfigField(input.id, true)
+        return false
+      }
+    }
+    if (section === 'compliance' && complianceChunkOverlap >= complianceChunkSize) {
+      setFieldError({ id: 'compliance-overlap', message: 'Compliance chunk overlap must be smaller than chunk size.' })
+      revealConfigField('compliance-overlap', true)
+      return false
+    }
+    setFieldError(null)
+    return true
+  }
+  const policyError = (prefix: string) => fieldError?.id.startsWith(prefix)
+    ? <p id={`${fieldError.id}-error`} role="alert" style={{ color: '#991b1b', padding: '8px 20px' }}>{fieldError.message}</p> : null
+
   const handleSaveConfig = async () => {
+    if (savePending.current) return
+    const fields: [string, string, number | '', number, number, boolean][] = [
+      ['quality-accuracy', 'Minimum extraction accuracy', minAccuracy, 0, 100, false],
+      ['quality-consistency', 'Minimum extraction consistency', minConsistency, 0, 100, false],
+      ['quality-excellent', 'Excellent threshold', excellentThreshold, 0, 100, false],
+      ['quality-good', 'Good threshold', goodThreshold, 0, 100, false],
+      ['quality-fair', 'Fair threshold', fairThreshold, 0, 100, false],
+      ['extraction-max-fields', 'Maximum fields per chunk', maxKeysPerChunk, 1, 100, true],
+      ['ocr-timeout', 'OCR timeout', ocrTimeout, 10, 3600, true],
+    ]
+    let invalid: { id: string; message: string } | null = null
+    for (const [id, label, value, min, max, integer] of fields) {
+      if (value === '' || !Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value))) {
+        invalid = { id, message: `${label} must be ${integer ? 'a whole number' : 'a number'} between ${min} and ${max}.` }
+        break
+      }
+    }
+    if (!invalid && !(Number(excellentThreshold) > Number(goodThreshold) && Number(goodThreshold) > Number(fairThreshold))) {
+      invalid = { id: 'quality-good', message: 'Thresholds must decrease: Excellent > Good > Fair.' }
+    }
+    setFieldError(invalid)
+    if (invalid) {
+      setSaved(false)
+      setError(invalid.message)
+      revealConfigField(invalid.id, true)
+      return
+    }
     // Parse before touching the saving state so a malformed options blob fails
     // loudly at the field rather than being silently dropped from the payload.
     let parsedOcrOptions: Record<string, unknown> = {}
@@ -366,6 +481,8 @@ export function ConfigTab() {
       }
     }
     setOcrOptionsError(null)
+    savePending.current = true
+    const revision = configRevision.current
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -378,21 +495,21 @@ export function ConfigTab() {
             pass_1: { thinking: twoPassP1Thinking, structured: twoPassP1Structured, model: twoPassP1Model || '' },
             pass_2: { thinking: twoPassP2Thinking, structured: twoPassP2Structured, model: twoPassP2Model || '' },
           },
-          chunking: { enabled: chunkingEnabled, max_keys_per_chunk: maxKeysPerChunk },
+          chunking: { enabled: chunkingEnabled, max_keys_per_chunk: Number(maxKeysPerChunk) },
           repetition: { enabled: repetitionEnabled },
           use_images: useImages,
         },
         quality_config: {
           verification_gates: {
             require_validation: requireValidation,
-            min_extraction_accuracy: minAccuracy / 100,
-            min_extraction_consistency: minConsistency / 100,
+            min_extraction_accuracy: Number(minAccuracy) / 100,
+            min_extraction_consistency: Number(minConsistency) / 100,
             min_workflow_grade: minWorkflowGrade,
           },
           quality_tiers: {
-            excellent: { min_score: excellentThreshold },
-            good: { min_score: goodThreshold },
-            fair: { min_score: fairThreshold },
+            excellent: { min_score: Number(excellentThreshold) },
+            good: { min_score: Number(goodThreshold) },
+            fair: { min_score: Number(fairThreshold) },
           },
         },
         ocr_endpoint: ocrEndpoint,
@@ -400,20 +517,25 @@ export function ConfigTab() {
         ocr_provider: ocrProvider,
         ocr_options: parsedOcrOptions,
         ocr_async: ocrAsync,
-        ocr_timeout_seconds: ocrTimeout,
+        ocr_timeout_seconds: Number(ocrTimeout),
         // Only send the key when the user actually touched the field. An
         // untouched field after a successful load holds the "***" sentinel,
         // which the backend already treats as "keep the stored key" — so
         // omitting it here is equivalent and avoids ever sending ''.
         ...(ocrApiKeyDirty ? { ocr_api_key: ocrApiKey } : {}),
+        web_search_provider: webSearchProvider,
+        web_search_endpoint: webSearchEndpoint,
+        ...(webSearchApiKeyDirty ? { web_search_api_key: webSearchApiKey } : {}),
       })
-      setSaved(true)
+      processingDraft.markSaved()
+      setSaved(revision === configRevision.current)
       setTimeout(() => setSaved(false), 3000)
       void refreshReadiness()
       void refreshOcrReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
+      savePending.current = false
       setSaving(false)
     }
   }
@@ -442,6 +564,23 @@ export function ConfigTab() {
     }
   }
 
+  const handleTestWebSearch = async () => {
+    setWebSearchTesting(true)
+    setWebSearchTestResult(null)
+    try {
+      // The form's current values, so unsaved edits are what gets tested; an
+      // untouched key field holds the "***" sentinel, meaning the saved key.
+      const res = await testWebSearch({
+        web_search_provider: webSearchProvider, web_search_endpoint: webSearchEndpoint, web_search_api_key: webSearchApiKey,
+      })
+      setWebSearchTestResult({ ok: true, message: res.message })
+    } catch (e) {
+      setWebSearchTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
+    } finally {
+      setWebSearchTesting(false)
+    }
+  }
+
   const handleSendPlaygroundPrompt = async () => {
     if (!playgroundUser.trim()) return
     setPlaygroundSending(true)
@@ -461,15 +600,25 @@ export function ConfigTab() {
     }
   }
 
+  const contactPending = useRef(false)
+  const [contactsSaving, setContactsSaving] = useState(false)
+  const [contactsError, setContactsError] = useState<string | null>(null)
   const saveSupportContacts = async (contacts: typeof supportContacts) => {
+    if (contactPending.current) return false
+    contactPending.current = true
+    setContactsSaving(true)
+    setContactsError(null)
     try {
       await updateSystemConfig({ support_contacts: contacts } as Record<string, unknown>)
+      setSupportContacts(contacts)
+      return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save support contacts')
-    }
+      setContactsError(e instanceof Error ? e.message : 'Failed to save support contacts')
+      return false
+    } finally { contactPending.current = false; setContactsSaving(false) }
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading config...</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#4b5563' }}>Loading config...</div>
 
   // Structural guard: without this, a failed load left `cfg` null but still
   // rendered the form against pristine useState defaults, and Save would
@@ -503,11 +652,11 @@ export function ConfigTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Sticky save bar */}
+    <div onChangeCapture={() => { configRevision.current++; setSaved(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowWrap: 'anywhere' }}>
+      {/* This action saves only the processing sections; other panels own their writes. */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 20,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #e5e7eb',
         padding: '12px 20px', margin: '0 0 -4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -515,8 +664,8 @@ export function ConfigTab() {
         <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Settings size={16} color="#6b7280" /> System Configuration
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Processing settings saved.</span>}
           <button
             onClick={handleSaveConfig}
             disabled={saving}
@@ -526,13 +675,22 @@ export function ConfigTab() {
               opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? 'Saving...' : 'Save Configuration'}
+            {saving ? 'Saving...' : 'Save Processing Settings'}
           </button>
         </div>
+        <ConfigDraftStatus />
       </div>
 
+      <p style={{ fontSize: 13, color: '#4b5563', margin: 0 }}>
+        Save Processing Settings applies to OCR, web search, extraction, and quality gates.
+        Models, authentication, branding, contacts, compliance, and retention save in their own sections.
+      </p>
+
+      <nav aria-label="Configuration sections" className="config-section-links">
+        {Object.entries({ models: 'Models', playground: 'Prompt playground', auth: 'Authentication', ocr: 'OCR and search', branding: 'Branding', extraction: 'Extraction', quality: 'Quality gates', contacts: 'Support contacts', compliance: 'Compliance', retention: 'Retention' }).map(([id, label]) => <a key={id} href={`#cfg-${id}`}>{label}</a>)}
+      </nav>
       {error && (
-        <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+        <div role="alert" style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -570,15 +728,16 @@ export function ConfigTab() {
       />
 
       {/* Prompt Playground */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
+      <details id="cfg-playground" style={sectionStyle}>
+        <summary className="config-advanced-summary" style={{ ...sectionHeaderStyle, cursor: 'pointer' }}>
+          <span className="config-disclosure" aria-hidden="true">▸</span>
           <Play size={18} color="#6b7280" /> Prompt Playground
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#4b5563' }}>
             — send a prompt to a configured model and see the raw round-trip
           </span>
-        </div>
+        </summary>
         <div style={sectionBodyStyle}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label htmlFor="admin-playground-system" style={labelStyle}>System Prompt (optional)</label>
@@ -634,7 +793,7 @@ export function ConfigTab() {
                 <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
               </button>
               {playgroundResult && (
-                <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.6 }}>
                   <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
                   <div>Latency: {playgroundResult.latency_ms} ms</div>
                   {playgroundResult.tokens && (
@@ -655,7 +814,7 @@ export function ConfigTab() {
           )}
 
           {playgroundResult && (
-            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   Request sent
@@ -696,7 +855,7 @@ ${playgroundResult.request.user_prompt}`}
             </div>
           )}
         </div>
-      </div>
+      </details>
 
       <AuthPanel
         providers={cfg.oauth_providers}
@@ -731,7 +890,7 @@ ${playgroundResult.request.user_prompt}`}
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR Endpoint</label>
             <input
-              type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
+              type="url" aria-label="OCR endpoint" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
               placeholder={ocrProvider === 'docling' ? 'https://docling.example.edu' : 'https://...'}
               style={{ ...inputStyle, maxWidth: 500 }}
             />
@@ -782,11 +941,12 @@ ${playgroundResult.request.user_prompt}`}
                 <div>
                   <label style={labelStyle} htmlFor="ocr-timeout">Request Timeout (seconds)</label>
                   <input
-                    id="ocr-timeout" type="number" min={10} max={3600}
+                    {...numericFieldProps('ocr-timeout')} type="number" min={10} max={3600}
                     value={ocrTimeout}
-                    onChange={e => setOcrTimeout(parseInt(e.target.value) || 120)}
+                    onChange={e => setOcrTimeout(e.target.value === '' ? '' : Number(e.target.value))}
                     style={{ ...inputStyle, maxWidth: 160 }}
                   />
+                  {numericFieldError('ocr-timeout')}
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', alignSelf: 'flex-end', paddingBottom: 8 }}>
                   <input type="checkbox" checked={ocrAsync} onChange={e => setOcrAsync(e.target.checked)} />
@@ -805,11 +965,11 @@ ${playgroundResult.request.user_prompt}`}
             <input
               type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
               name="vandalizer-ocr-api-key"
-              value={ocrApiKey} onChange={e => { setOcrApiKey(e.target.value); setOcrApiKeyDirty(true) }}
+              aria-label="OCR API key" value={ocrApiKey} onChange={e => { setOcrApiKey(e.target.value); setOcrApiKeyDirty(true) }}
               placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
             <button
               onClick={handleTestOcr}
               disabled={ocrTesting || !ocrEndpoint}
@@ -829,6 +989,7 @@ ${playgroundResult.request.user_prompt}`}
               </span>
             )}
           </div>
+          {ocrTestResult && (ocrTestResult.endpoint !== ocrEndpoint || ocrTestResult.provider !== ocrProvider) && <p role="status" style={hintStyle}>These results describe {ocrTestResult.provider} at {ocrTestResult.endpoint}. Settings have changed since this test; test again to check the current draft.</p>}
           {ocrTestResult && ocrTestResult.checks.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <DiagnosticsPanel
@@ -864,6 +1025,67 @@ ${playgroundResult.request.user_prompt}`}
               </div>
             )}
           </div>
+
+          {/* Web Search — powers the agentic chat web_search tool */}
+          <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Web Search</div>
+            <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 16 }}>
+              Lets the chat assistant and workflow Web Search steps search the web when an answer isn't in the user's documents or knowledge bases, and lets knowledge bases find pages from a topic. The assistant favors local sources first and only reaches for the web when needed. Each query is sent to the provider; the assistant is told to keep names, award numbers and figures from users' documents out of them.
+            </div>
+            <div>
+              <label style={labelStyle}>Provider</label>
+              <select
+                aria-label="Web search provider" value={webSearchProvider} onChange={e => setWebSearchProvider(e.target.value)}
+                style={{ ...inputStyle, maxWidth: 500, background: '#fff', cursor: 'pointer' }}
+              >
+                <option value="">Disabled</option>
+                <option value="mindrouter">MindRouter (campus search proxy)</option>
+                <option value="tavily">Tavily</option>
+                <option value="searxng">SearXNG (self-hosted)</option>
+                <option value="brave">Brave Search API</option>
+              </select>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional, defaults to api.tavily.com)' : webSearchProvider === 'mindrouter' ? ' (optional, defaults to mindrouter.uidaho.edu/v1/search)' : ''}</label>
+              <input
+                type="url" aria-label="Web search endpoint" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
+                placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : webSearchProvider === 'mindrouter' ? 'https://mindrouter.uidaho.edu/v1/search' : 'https://...'}
+                style={{ ...inputStyle, maxWidth: 500 }}
+              />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={labelStyle}>API Key{webSearchProvider === 'searxng' ? ' (optional)' : ''}</label>
+              <input
+                type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
+                name="vandalizer-web-search-api-key"
+                aria-label="Web search API key" value={webSearchApiKey} onChange={e => { setWebSearchApiKey(e.target.value); setWebSearchApiKeyDirty(true) }}
+                placeholder="API key..." style={{ ...inputStyle, maxWidth: 500 }}
+              />
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={handleTestWebSearch}
+                disabled={webSearchTesting || !webSearchProvider}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                  fontSize: 13, fontWeight: 500, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#fff', cursor: webSearchProvider ? 'pointer' : 'not-allowed',
+                  color: '#374151', opacity: webSearchTesting ? 0.6 : 1,
+                }}
+              >
+                <Play size={14} /> {webSearchTesting ? 'Testing...' : 'Test Search'}
+              </button>
+              {webSearchTestResult && (
+                <span role="status" aria-live="polite" style={{ fontSize: 13, color: webSearchTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
+                  {webSearchTestResult.ok ? <CheckCircle2 size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} />}
+                  {webSearchTestResult.message}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 10 }}>
+              Test Search uses the values above, saved or not. Chat, workflows and knowledge bases use the saved configuration, so save after a passing test.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -873,12 +1095,12 @@ ${playgroundResult.request.user_prompt}`}
       />
 
       {/* Extraction Configuration */}
-      <div style={sectionStyle}>
+      <div id="cfg-extraction" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Cpu size={18} color="#6b7280" /> Extraction Configuration
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div onChangeCapture={() => { configRevision.current++; setSaved(false) }} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, overflowWrap: 'anywhere' }}>
             {/* Mode */}
             <div>
               <label style={labelStyle}>Extraction Mode</label>
@@ -914,7 +1136,7 @@ ${playgroundResult.request.user_prompt}`}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                  <select value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
+                  <select aria-label="One-pass model" value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
                     <option value="">Default</option>
                     {cfg?.available_models?.map(m => (
                       <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -925,9 +1147,9 @@ ${playgroundResult.request.user_prompt}`}
             ) : (
               <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Two-Pass Settings</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 1 (Draft)</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>Pass 1 (Draft)</div>
                     <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                       <input type="checkbox" checked={twoPassP1Thinking} onChange={e => setTwoPassP1Thinking(e.target.checked)} style={checkStyle} />
                       Thinking
@@ -938,7 +1160,7 @@ ${playgroundResult.request.user_prompt}`}
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                      <select aria-label="First-pass model" value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
                         <option value="">Default</option>
                         {cfg?.available_models?.map(m => (
                           <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -947,7 +1169,7 @@ ${playgroundResult.request.user_prompt}`}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 2 (Final)</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>Pass 2 (Final)</div>
                     <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                       <input type="checkbox" checked={twoPassP2Thinking} onChange={e => setTwoPassP2Thinking(e.target.checked)} style={checkStyle} />
                       Thinking
@@ -958,7 +1180,7 @@ ${playgroundResult.request.user_prompt}`}
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                      <select aria-label="Second-pass model" value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
                         <option value="">Default</option>
                         {cfg?.available_models?.map(m => (
                           <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
@@ -970,6 +1192,9 @@ ${playgroundResult.request.user_prompt}`}
               </div>
             )}
 
+            <details id="cfg-extraction-advanced">
+              <summary className="config-advanced-summary" style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Advanced extraction: chunking, consensus and images</summary>
+              <div style={{ display: 'grid', gap: 20, marginTop: 16 }}>
             {/* Chunking */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
@@ -980,10 +1205,11 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ marginTop: 12, paddingLeft: 24 }}>
                   <label style={labelStyle}>Max Keys Per Chunk</label>
                   <input
-                    type="number" min={1} max={100} value={maxKeysPerChunk}
-                    onChange={e => setMaxKeysPerChunk(Number(e.target.value))}
+                    type="number" min={1} max={100} {...numericFieldProps('extraction-max-fields')} aria-label="Maximum fields per chunk" value={maxKeysPerChunk}
+                    onChange={e => setMaxKeysPerChunk(e.target.value === '' ? '' : Number(e.target.value))}
                     style={{ ...inputStyle, maxWidth: 120 }}
                   />
+                  {numericFieldError('extraction-max-fields')}
                 </div>
               )}
             </div>
@@ -1001,17 +1227,19 @@ ${playgroundResult.request.user_prompt}`}
                   <input type="checkbox" checked={useImages} onChange={e => setUseImages(e.target.checked)} style={checkStyle} />
                   Use Document Images (Multimodal)
                 </label>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, paddingLeft: 24 }}>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4, paddingLeft: 24 }}>
                   Send document files directly to multimodal LLMs instead of OCR text. Requires a multimodal model to be selected for extraction.
                 </div>
               </div>
             )}
+              </div>
+            </details>
           </div>
         </div>
       </div>
 
       {/* Quality & Verification Gates */}
-      <div style={sectionStyle}>
+      <div id="cfg-quality" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <ShieldCheck size={18} color="#6b7280" /> Quality &amp; Verification Gates
         </div>
@@ -1021,22 +1249,24 @@ ${playgroundResult.request.user_prompt}`}
               <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
               Require validation before verification submission
             </label>
-            <p style={{ fontSize: 12, color: '#6b7280', margin: '-8px 0 0' }}>
+            <p style={{ fontSize: 12, color: '#4b5563', margin: '-8px 0 0' }}>
               The three thresholds below apply only while that box is checked. Unchecked, anything can be submitted and the examiner decides.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Min Extraction Accuracy (%)</label>
-                <input type="number" min={0} max={100} value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-accuracy')} aria-label="Minimum extraction accuracy percent" value={minAccuracy} onChange={e => setMinAccuracy(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-accuracy')}
               </div>
               <div>
                 <label style={labelStyle}>Min Extraction Consistency (%)</label>
-                <input type="number" min={0} max={100} value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-consistency')} aria-label="Minimum extraction consistency percent" value={minConsistency} onChange={e => setMinConsistency(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-consistency')}
               </div>
               <div>
                 <label style={labelStyle}>Min Workflow Grade</label>
-                <select value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
+                <select aria-label="Minimum workflow grade" value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
                   <option value="A">A</option>
                   <option value="B">B</option>
                   <option value="C">C</option>
@@ -1048,18 +1278,21 @@ ${playgroundResult.request.user_prompt}`}
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Excellent threshold</label>
-                  <input type="number" min={0} max={100} value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-excellent')} aria-label="Excellent score threshold" value={excellentThreshold} onChange={e => setExcellentThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-excellent')}
                 </div>
                 <div>
                   <label style={labelStyle}>Good threshold</label>
-                  <input type="number" min={0} max={100} value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-good')} aria-label="Good score threshold" value={goodThreshold} onChange={e => setGoodThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-good')}
                 </div>
                 <div>
                   <label style={labelStyle}>Fair threshold</label>
-                  <input type="number" min={0} max={100} value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  <input type="number" min={0} max={100} step="any" {...numericFieldProps('quality-fair')} aria-label="Fair score threshold" value={fairThreshold} onChange={e => setFairThreshold(e.target.value === '' ? '' : Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                  {numericFieldError('quality-fair')}
                 </div>
               </div>
             </div>
@@ -1068,7 +1301,7 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Support Contacts */}
-      <div style={sectionStyle}>
+      <div id="cfg-contacts" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Users size={18} color="#6b7280" /> Support Contacts
           <div style={{ flex: 1 }} />
@@ -1084,29 +1317,32 @@ ${playgroundResult.request.user_prompt}`}
           </button>
         </div>
         <div style={sectionBodyStyle}>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: '#4b5563', marginBottom: 12 }}>
             People listed here will receive email alerts and in-app notifications when new support tickets are created. They will also have access to the Support Center to manage all tickets.
           </p>
+          {contactsError && <p role="alert" style={{ color: '#991b1b', marginBottom: 12 }}>{contactsError} Your saved contacts have not changed. Retry the change.</p>}
           {supportContacts.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {supportContacts.map((c, i) => (
                 <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center',
                   padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
                   border: '1px solid #e5e7eb',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{c.name}</span>
-                    <span style={{ fontSize: 13, color: '#6b7280' }}>{c.email}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{c.user_id}</span>
+                    <span style={{ fontSize: 13, color: '#4b5563' }}>{c.email}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#4b5563', fontWeight: 600 }}>{c.user_id}</span>
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      if (!await confirm({ title: `Remove ${c.name}?`, message: 'Remove this support contact from notifications and the configured Support Center access list?', confirmLabel: 'Remove contact', destructive: true })) return
                       const updated = supportContacts.filter((_, idx) => idx !== i)
-                      setSupportContacts(updated)
                       saveSupportContacts(updated)
                     }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                    disabled={contactsSaving}
+                    aria-label={`Remove support contact ${c.name}`}
                     title="Remove contact"
                   >
                     <Trash2 size={16} />
@@ -1115,35 +1351,36 @@ ${playgroundResult.request.user_prompt}`}
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#9ca3af' }}>No support contacts configured.</div>
+            <div style={{ fontSize: 13, color: '#4b5563' }}>No support contacts configured.</div>
           )}
           {showAddContact && (
             <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Add Support Contact</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Name</label>
-                  <input value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact name" required value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>User ID</label>
-                  <input value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact user ID" required value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Email</label>
-                  <input value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="jdoe@example.com" style={inputStyle} />
+                  <input disabled={contactsSaving} aria-label="Support contact email" value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="jdoe@example.com" style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!newContact.name.trim() || !newContact.user_id.trim()) return
                     const updated = [...supportContacts, { ...newContact }]
-                    setSupportContacts(updated)
-                    saveSupportContacts(updated)
-                    setShowAddContact(false)
+                    if (await saveSupportContacts(updated)) {
+                      setShowAddContact(false)
+                      setNewContact({ name: '', user_id: '', email: '' })
+                    }
                   }}
-                  disabled={!newContact.name.trim() || !newContact.user_id.trim()}
+                  disabled={contactsSaving || !newContact.name.trim() || !newContact.user_id.trim()}
                   style={{
                     padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                     background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -1153,6 +1390,7 @@ ${playgroundResult.request.user_prompt}`}
                   Add
                 </button>
                 <button
+                  disabled={contactsSaving}
                   onClick={() => setShowAddContact(false)}
                   style={{ padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer' }}
                 >
@@ -1165,12 +1403,14 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Compliance Activation */}
-      <div style={sectionStyle}>
+      <div id="cfg-compliance" style={sectionStyle}>
+        {policyError('compliance-')}
+        {complianceEnabled && !complianceRules.trim() && <p role="status" style={{ padding: '0 20px', fontSize: 13 }}>Checks remain inactive until a non-empty policy is saved.</p>}
         <div style={sectionHeaderStyle}>
           <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
             When enabled, every uploaded document is scanned in chunks by an LLM
             against the policy below. Documents containing sensitive or policy-violating
             content are flagged in the document library.
@@ -1192,13 +1432,13 @@ ${playgroundResult.request.user_prompt}`}
               <div>
                 <label style={labelStyle}>Compliance policy (sent to the validator LLM)</label>
                 <textarea
-                  value={complianceRules}
+                  aria-label="Compliance rules" value={complianceRules}
                   onChange={e => setComplianceRules(e.target.value)}
                   placeholder="Describe what content should be flagged…"
                   rows={6}
                   style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
                 />
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
                   Plain English. The validator decides whether each chunk passes or fails based on this rule set.
                 </div>
               </div>
@@ -1208,8 +1448,8 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={500}
-                    value={complianceChunkSize}
-                    onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
+                    {...numericFieldProps('compliance-size')} max={2147483647} aria-label="Compliance chunk size" value={Number.isNaN(complianceChunkSize) ? '' : complianceChunkSize}
+                    onChange={e => setComplianceChunkSize(e.target.valueAsNumber)}
                     style={inputStyle}
                   />
                 </div>
@@ -1218,8 +1458,8 @@ ${playgroundResult.request.user_prompt}`}
                   <input
                     type="number"
                     min={0}
-                    value={complianceChunkOverlap}
-                    onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
+                    {...numericFieldProps('compliance-overlap')} max={2147483647} aria-label="Compliance chunk overlap" value={Number.isNaN(complianceChunkOverlap) ? '' : complianceChunkOverlap}
+                    onChange={e => setComplianceChunkOverlap(e.target.valueAsNumber)}
                     style={inputStyle}
                   />
                 </div>
@@ -1229,6 +1469,7 @@ ${playgroundResult.request.user_prompt}`}
           <div>
             <button
               onClick={async () => {
+                if (!validatePolicyNumbers('compliance')) return
                 setComplianceSaving(true)
                 setComplianceSaved(false)
                 try {
@@ -1239,6 +1480,7 @@ ${playgroundResult.request.user_prompt}`}
                     chunk_size: complianceChunkSize,
                     chunk_overlap: complianceChunkOverlap,
                   })
+                  complianceDraft.markSaved()
                   setComplianceSaved(true)
                   setTimeout(() => setComplianceSaved(false), 3000)
                 } catch {
@@ -1256,18 +1498,20 @@ ${playgroundResult.request.user_prompt}`}
             >
               {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {complianceSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceDraft.dirty && <p style={hintStyle}>Unsaved compliance changes. Use Save Compliance Settings.</p>}
+            {complianceSaved && !complianceDraft.dirty && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
 
       {/* Retention Policy */}
-      <div style={sectionStyle}>
+      <div id="cfg-retention" style={sectionStyle}>
+        {policyError('retention-')}
         <div style={sectionHeaderStyle}>
           <ShieldCheck size={18} color="#6b7280" /> Document Retention Policy
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
             When enforcement is on, documents are auto-scheduled for soft-deletion after their
             classification-specific retention window. Soft-deleted documents become unrecoverable
             after the grace period expires. Items on retention hold are never auto-deleted.
@@ -1287,9 +1531,9 @@ ${playgroundResult.request.user_prompt}`}
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                   Per-classification rules
                 </div>
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <TableRegion label="Retention policy rules — scroll for more columns"><table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+                    <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', textAlign: 'left' }}>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Tier</th>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Retention (days)</th>
                       <th style={{ padding: '8px 12px', fontWeight: 500 }}>Grace before purge (days)</th>
@@ -1318,7 +1562,7 @@ ${playgroundResult.request.user_prompt}`}
                               display: 'inline-flex', alignItems: 'center', gap: 6,
                               padding: '2px 10px', borderRadius: 9999,
                               fontSize: 12, fontWeight: 600,
-                              backgroundColor: `${level.color}1a`, color: level.color,
+                              backgroundColor: `${level.color}1a`, color: '#334155',
                               border: `1px solid ${level.color}66`,
                             }}>
                               <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: level.color }} />
@@ -1329,8 +1573,8 @@ ${playgroundResult.request.user_prompt}`}
                             <input
                               type="number"
                               min={0}
-                              value={p.retention_days || 0}
-                              onChange={e => update({ retention_days: Number(e.target.value) || 0 })}
+                              {...numericFieldProps(`retention-${level.name}-retention_days`)} max={2147483647} aria-label={`${level.label} Retention days`} value={Number.isNaN(p.retention_days) ? '' : p.retention_days ?? 0}
+                              onChange={e => update({ retention_days: e.target.valueAsNumber })}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
                           </td>
@@ -1338,8 +1582,8 @@ ${playgroundResult.request.user_prompt}`}
                             <input
                               type="number"
                               min={0}
-                              value={p.soft_delete_grace_days || 0}
-                              onChange={e => update({ soft_delete_grace_days: Number(e.target.value) || 0 })}
+                              {...numericFieldProps(`retention-${level.name}-soft_delete_grace_days`)} max={2147483647} aria-label={`${level.label} Grace period days`} value={Number.isNaN(p.soft_delete_grace_days) ? '' : p.soft_delete_grace_days ?? 0}
+                              onChange={e => update({ soft_delete_grace_days: e.target.valueAsNumber })}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
                           </td>
@@ -1349,10 +1593,10 @@ ${playgroundResult.request.user_prompt}`}
                               min={0}
                               value={p.warning_days_before ?? ''}
                               placeholder="—"
-                              aria-label="Retention period (days)"
+                              {...numericFieldProps(`retention-${level.name}-warning`)} required={false} max={2147483647} aria-label={`${level.label} Warning days before deletion`}
                               onChange={e => {
                                 const v = e.target.value
-                                update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
+                                update({ warning_days_before: v === '' ? undefined : Number(v) })
                               }}
                               style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
                             />
@@ -1361,21 +1605,21 @@ ${playgroundResult.request.user_prompt}`}
                       )
                     })}
                   </tbody>
-                </table>
+                </table></TableRegion>
               </div>
 
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                   Other retention windows
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
                   <div>
                     <label style={labelStyle}>Activity logs (days)</label>
                     <input
                       type="number"
                       min={0}
-                      value={activityRetentionDays}
-                      onChange={e => setActivityRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-activity')} max={2147483647} aria-label="Activity retention days" value={Number.isNaN(activityRetentionDays) ? '' : activityRetentionDays}
+                      onChange={e => setActivityRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1384,8 +1628,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={chatRetentionDays}
-                      onChange={e => setChatRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-chat')} max={2147483647} aria-label="Chat retention days" value={Number.isNaN(chatRetentionDays) ? '' : chatRetentionDays}
+                      onChange={e => setChatRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1394,8 +1638,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={workflowResultRetentionDays}
-                      onChange={e => setWorkflowResultRetentionDays(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-workflows')} max={2147483647} aria-label="Workflow result retention days" value={Number.isNaN(workflowResultRetentionDays) ? '' : workflowResultRetentionDays}
+                      onChange={e => setWorkflowResultRetentionDays(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1404,8 +1648,8 @@ ${playgroundResult.request.user_prompt}`}
                     <input
                       type="number"
                       min={0}
-                      value={staleActivityMinutes}
-                      onChange={e => setStaleActivityMinutes(Number(e.target.value) || 0)}
+                      {...numericFieldProps('retention-stale')} max={2147483647} aria-label="Stale activity threshold minutes" value={Number.isNaN(staleActivityMinutes) ? '' : staleActivityMinutes}
+                      onChange={e => setStaleActivityMinutes(e.target.valueAsNumber)}
                       style={inputStyle}
                     />
                   </div>
@@ -1416,6 +1660,7 @@ ${playgroundResult.request.user_prompt}`}
           <div>
             <button
               onClick={async () => {
+                if (!validatePolicyNumbers('retention')) return
                 setRetentionSaving(true)
                 setRetentionSaved(false)
                 try {
@@ -1429,6 +1674,7 @@ ${playgroundResult.request.user_prompt}`}
                       activity_stale_threshold_minutes: staleActivityMinutes,
                     },
                   })
+                  retentionDraft.markSaved()
                   setRetentionSaved(true)
                   setTimeout(() => setRetentionSaved(false), 3000)
                 } catch {
@@ -1446,13 +1692,14 @@ ${playgroundResult.request.user_prompt}`}
             >
               {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
             </button>
-            {retentionSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {retentionDraft.dirty && <p style={hintStyle}>Unsaved retention changes. Use Save Retention Settings.</p>}
+            {retentionSaved && !retentionDraft.dirty && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#15803d' }}>Saved!</span>}
           </div>
         </div>
       </div>
 
       {/* Save config button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
         <button
           onClick={handleSaveConfig}
           disabled={saving}
@@ -1462,9 +1709,9 @@ ${playgroundResult.request.user_prompt}`}
             opacity: saving ? 0.6 : 1,
           }}
         >
-          {saving ? 'Saving...' : 'Save Configuration'}
+          {saving ? 'Saving...' : 'Save Processing Settings'}
         </button>
-        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#15803d' }}>Processing settings saved.</span>}
       </div>
     </div>
   )

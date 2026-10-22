@@ -9,7 +9,9 @@ from typing import Literal, Optional
 
 from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.schemas.admin_config import validate_extraction_config, validate_quality_config, validate_retention_config, validate_compliance_config, validate_compliance_patch
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
@@ -23,6 +25,7 @@ from app.services.name_conflicts import (
     ensure_model_identity_available,
 )
 from app.services.version_service import get_update_status
+from app.services.certification_versions.support_access import AccessChangeRequest
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.utils import url_validation
 from app.models.team import Team, TeamMembership
@@ -101,6 +104,22 @@ def _find_by_id(entries: list[dict], entry_id: str) -> int:
     return -1
 
 
+def context_window_status(model: dict) -> str:
+    """Whether a model's context window is known, for the Config page.
+
+    "detected": the serving endpoint reported it. "entered": an admin typed
+    it (or accepted a preset). "unconfirmed": a value with no record of where
+    it came from, which is what the model form's old 128,000 placeholder
+    saved for every model nobody probed. "missing": no value at all, so the
+    context budget guesses from the model name or assumes 65,536 tokens.
+    """
+    window = model.get("context_window")
+    if not isinstance(window, int) or window <= 0:
+        return "missing"
+    source = model.get("context_window_source")
+    return source if source in ("detected", "entered") else "unconfirmed"
+
+
 def _sanitize_models(models: list[dict]) -> list[dict]:
     """Replace api_key values with '***' in model config dicts."""
     sanitized = []
@@ -110,6 +129,7 @@ def _sanitize_models(models: list[dict]) -> list[dict]:
         if key:
             # Decrypt to check if a real value exists, then mask it
             m_copy["api_key"] = "***" if decrypt_value(key) else ""
+        m_copy["context_window_status"] = context_window_status(m_copy)
         sanitized.append(m_copy)
     return sanitized
 
@@ -185,6 +205,8 @@ def _can_view_platform_role_flags(team_scope: str | None) -> bool:
 # ---------------------------------------------------------------------------
 
 class UsageStatsResponse(BaseModel):
+    period_start: Optional[datetime.datetime] = None
+    period_end: Optional[datetime.datetime] = None
     conversations: int = 0
     search_runs: int = 0
     workflows_started: int = 0
@@ -276,6 +298,9 @@ class ConfigUpdateRequest(BaseModel):
     retention_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
+    web_search_endpoint: Optional[str] = None
+    web_search_api_key: Optional[str] = None
+    web_search_provider: Optional[str] = None
     ocr_provider: Optional[str] = None
     ocr_options: Optional[dict] = None
     ocr_async: Optional[bool] = None
@@ -284,6 +309,11 @@ class ConfigUpdateRequest(BaseModel):
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
     outbound_url_allowed_hosts: Optional[list[str]] = None
+
+    _validate_compliance = field_validator("compliance_config")(validate_compliance_patch)
+    _validate_retention = field_validator("retention_config")(validate_retention_config)
+    _validate_quality = field_validator("quality_config")(validate_quality_config)
+    _validate_extraction = field_validator("extraction_config")(validate_extraction_config)
 
 
 class AdminTeamItem(BaseModel):
@@ -336,7 +366,12 @@ class ModelAddRequest(BaseModel):
     supports_structured: bool = True
     multimodal: bool = False
     supports_pdf: bool = False
-    context_window: int = 128000
+    # The serving window, in tokens. No default: the form used to send
+    # 128,000 for every model nobody probed, and every budget and memory
+    # warning was then wrong for a model serving 32K or 1M.
+    context_window: Optional[int] = None
+    # Where it came from: "detected" (the endpoint reported it) or "entered".
+    context_window_source: Optional[Literal["detected", "entered"]] = None
     # Optional per-model overrides (None = use system default / computed value).
     # request_timeout_seconds replaces the shared LLM read timeout for this model;
     # response_reserve_tokens sets the output cap (tokens reserved for the answer).
@@ -469,8 +504,9 @@ async def usage_stats(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-    query_filter: dict = {"started_at": {"$gte": cutoff}}
+    period_end = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = period_end - datetime.timedelta(days=days)
+    query_filter: dict = {"started_at": {"$gte": cutoff, "$lt": period_end}}
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -505,6 +541,8 @@ async def usage_stats(
             team_ids.add(ev.team_id)
 
     return UsageStatsResponse(
+        period_start=cutoff,
+        period_end=period_end,
         conversations=conversations,
         search_runs=search_runs,
         workflows_started=workflows_started,
@@ -633,6 +671,7 @@ async def usage_timeseries(
 async def user_leaderboard(
     days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -674,7 +713,7 @@ async def user_leaderboard(
         team_user_ids = [m.user_id for m in team_memberships]
         all_users = await User.find({"user_id": {"$in": team_user_ids}}).to_list()
     else:
-        all_users = await User.find().limit(10000).to_list()
+        all_users = await User.find().to_list()
     user_map = {u.user_id: u for u in all_users}
 
     # Build result list — include ALL users, not just those with activity
@@ -729,10 +768,10 @@ async def user_leaderboard(
             )
 
     # Sort by tokens desc
-    result.sort(key=lambda x: x.tokens_total, reverse=True)
+    result.sort(key=lambda x: (-x.tokens_total, x.user_id))
     total = len(result)
-    capped = total > limit
-    return UserLeaderboardResponse(items=result[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return UserLeaderboardResponse(items=result[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -743,6 +782,7 @@ async def user_leaderboard(
 async def team_leaderboard(
     days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -756,7 +796,7 @@ async def team_leaderboard(
         query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
-    all_teams = await Team.find().limit(10000).to_list()
+    all_teams = await Team.find().to_list()
     team_lookup: dict[str, Team] = {}
     for team in all_teams:
         team_lookup[str(team.id)] = team
@@ -791,7 +831,7 @@ async def team_leaderboard(
                 agg["latencies"].append(delta_ms)
 
     # Fetch member counts per team
-    all_memberships = await TeamMembership.find().limit(50000).to_list()
+    all_memberships = await TeamMembership.find().to_list()
     member_counts: dict[str, int] = {}
     for m in all_memberships:
         tid_str = str(m.team) if m.team else ""
@@ -816,10 +856,10 @@ async def team_leaderboard(
             )
         )
 
-    result.sort(key=lambda x: x.tokens_total, reverse=True)
+    result.sort(key=lambda x: (-x.tokens_total, x.team_id))
     total = len(result)
-    capped = total > limit
-    return TeamLeaderboardResponse(items=result[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return TeamLeaderboardResponse(items=result[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -1354,10 +1394,27 @@ async def workflow_events(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, ge=1, le=200),
     user: User = Depends(get_current_user),
+    started_after: Optional[datetime.datetime] = None,
+    started_before: Optional[datetime.datetime] = None,
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
+    def utc(value):
+        return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
+    if started_after is not None:
+        started_after = utc(started_after)
+    if started_before is not None:
+        started_before = utc(started_before)
+    if started_after and started_before and started_after >= started_before:
+        raise HTTPException(status_code=422, detail="Start must be before end of the workflow window.")
+    period = {}
+    if started_after:
+        period["$gte"] = started_after
+    if started_before:
+        period["$lt"] = started_before
     query_filter: dict = {"type": "workflow_run"}
+    if period:
+        query_filter["started_at"] = period
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -1371,7 +1428,7 @@ async def workflow_events(
     skip = (page - 1) * per_page
 
     events = await ActivityEvent.find(query_filter).sort(
-        -ActivityEvent.started_at
+        "-started_at", "_id"
     ).skip(skip).limit(per_page).to_list()
 
     # Resolve user and team names
@@ -1424,6 +1481,8 @@ async def workflow_events(
 
     # Compute summary stats across all matching workflows (not just this page)
     summary_filter: dict = {"type": "workflow_run"}
+    if period:
+        summary_filter["started_at"] = period
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         summary_filter["team_id"] = {"$in": team_scope_ids}
@@ -1485,6 +1544,9 @@ async def get_config(
         "validation_judge_model": getattr(cfg, "validation_judge_model", "") or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
+        "web_search_endpoint": cfg.web_search_endpoint,
+        "web_search_api_key": "***" if decrypt_value(cfg.web_search_api_key) else "",
+        "web_search_provider": cfg.web_search_provider,
         "ocr_provider": cfg.ocr_provider or "raw",
         "ocr_options": cfg.ocr_options or {},
         "ocr_async": bool(cfg.ocr_async),
@@ -1528,6 +1590,23 @@ async def update_config(
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.ocr_api_key is not None and body.ocr_api_key != "***":
         cfg.ocr_api_key = encrypt_value(body.ocr_api_key)
+    if body.web_search_endpoint is not None:
+        cfg.web_search_endpoint = body.web_search_endpoint
+    if body.web_search_api_key is not None and body.web_search_api_key != "***":
+        cfg.web_search_api_key = encrypt_value(body.web_search_api_key)
+    if body.web_search_provider is not None:
+        from app.services.web_search_service import PROVIDERS as WEB_SEARCH_PROVIDERS
+
+        provider = body.web_search_provider.strip().lower()
+        # Saved unchecked, a provider the service can't call (the README once
+        # listed "serper") broke every search with "Unknown web search provider".
+        if provider and provider not in WEB_SEARCH_PROVIDERS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown web search provider {body.web_search_provider!r}. "
+                f"Use one of: {', '.join(WEB_SEARCH_PROVIDERS)}.",
+            )
+        cfg.web_search_provider = provider
     if body.ocr_provider is not None:
         if body.ocr_provider not in ocr_client.OCR_PROVIDERS:
             raise HTTPException(
@@ -1706,7 +1785,11 @@ async def add_model(
             "supports_structured": body.supports_structured,
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
-            "context_window": body.context_window,
+            "context_window": body.context_window if body.context_window and body.context_window > 0 else None,
+            "context_window_source": (
+                (body.context_window_source or "entered")
+                if body.context_window and body.context_window > 0 else None
+            ),
             "request_timeout_seconds": body.request_timeout_seconds,
             "response_reserve_tokens": body.response_reserve_tokens,
             "temperature": body.temperature,
@@ -1895,13 +1978,20 @@ async def update_model(
     for field in (
         "external", "thinking", "endpoint", "api_protocol", "speed", "tier",
         "privacy", "supports_structured", "multimodal", "supports_pdf",
-        "context_window", "request_timeout_seconds", "response_reserve_tokens",
+        "context_window", "context_window_source", "request_timeout_seconds", "response_reserve_tokens",
         "temperature", "cost_per_1m_input", "cost_per_1m_output",
     ):
         if field not in sent:
             continue
         value = getattr(body, field)
         merged[field] = (value or "") if field in _blank_to_empty else value
+    # A window sent without saying where it came from was typed by an admin.
+    if "context_window" in sent:
+        if not (isinstance(merged.get("context_window"), int) and merged["context_window"] > 0):
+            merged["context_window"] = None
+            merged["context_window_source"] = None
+        elif "context_window_source" not in sent or not merged.get("context_window_source"):
+            merged["context_window_source"] = "entered"
     cfg.available_models[index] = merged
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
@@ -2184,16 +2274,12 @@ async def update_compliance_config(
         current["check_on_upload"] = bool(body["check_on_upload"])
     if "rules" in body:
         current["rules"] = str(body["rules"] or "")
-    if "chunk_size" in body:
-        try:
-            current["chunk_size"] = max(500, int(body["chunk_size"]))
-        except (TypeError, ValueError):
-            pass
-    if "chunk_overlap" in body:
-        try:
-            current["chunk_overlap"] = max(0, int(body["chunk_overlap"]))
-        except (TypeError, ValueError):
-            pass
+    proposed = {**current, **{key: body[key] for key in ("chunk_size", "chunk_overlap") if key in body}}
+    try:
+        validate_compliance_config(proposed)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    current = proposed
 
     cfg.compliance_config = current
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -2690,18 +2776,23 @@ async def optimizer_activity(
 @router.get("/teams/all", response_model=AdminTeamListResponse)
 async def admin_list_all_teams(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
 ):
     await _require_admin(user)
 
     cfg = await SystemConfig.get_config()
-    all_teams = await Team.find().limit(10000).to_list()
-    all_memberships = await TeamMembership.find().limit(100000).to_list()
+    import re
+    query = {"name": {"$regex": re.escape(q.strip()), "$options": "i"}} if q.strip() else {}
+    total = await Team.find(query).count()
+    all_teams = await Team.find(query).sort("name", "_id").skip(offset).limit(limit).to_list()
+    counts = await TeamMembership.aggregate([
+        {"$match": {"team": {"$in": [t.id for t in all_teams]}}},
+        {"$group": {"_id": "$team", "count": {"$sum": 1}}},
+    ]).to_list()
 
-    member_counts: dict[str, int] = {}
-    for m in all_memberships:
-        key = str(m.team)
-        member_counts[key] = member_counts.get(key, 0) + 1
+    member_counts = {str(row["_id"]): row["count"] for row in counts}
 
     items = [
         AdminTeamItem(
@@ -2714,8 +2805,7 @@ async def admin_list_all_teams(
         )
         for t in all_teams
     ]
-    total = len(items)
-    capped = total > limit
+    capped = offset + len(items) < total
     return AdminTeamListResponse(items=items[:limit], total=total, capped=capped)
 
 
@@ -2823,11 +2913,12 @@ async def admin_remove_user_from_team(
 @router.get("/users/isolated", response_model=IsolatedUsersResponse)
 async def isolated_users(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
 ):
     await _require_admin(user)
 
-    all_memberships = await TeamMembership.find().limit(100000).to_list()
+    all_memberships = await TeamMembership.find().to_list()
 
     # Count memberships per user and members per team
     user_team_ids: dict[str, set] = {}
@@ -2851,9 +2942,10 @@ async def isolated_users(
         IsolatedUserItem(user_id=u.user_id, name=u.name, email=u.email)
         for u in users
     ]
+    items.sort(key=lambda item: item.user_id)
     total = len(items)
-    capped = total > limit
-    return IsolatedUsersResponse(items=items[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return IsolatedUsersResponse(items=items[offset:offset + limit], total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------
@@ -2995,6 +3087,65 @@ async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(g
         api_key=api_key,
         provider=body.ocr_provider if body else None,
     )
+
+
+class TestWebSearchRequest(BaseModel):
+    web_search_provider: Optional[str] = None
+    web_search_endpoint: Optional[str] = None
+    web_search_api_key: Optional[str] = None
+
+
+@router.post("/config/test-web-search")
+async def test_web_search(body: Optional[TestWebSearchRequest] = None, user: User = Depends(get_current_user)):
+    """Test web search by running a real sample query.
+
+    Accepts the admin form's current values so unsaved edits are what gets
+    tested (an ``"***"`` key means the saved key, as on save); omitted fields
+    fall back to the saved config. This used to test only the saved config,
+    so testing before saving checked the old setup.
+
+    A search that returns no results fails: a provider answering an empty
+    list for a common query is misconfigured (wrong index, wrong path), and
+    reporting it "ok" would hide that every chat search finds nothing.
+    """
+    await _require_superadmin(user)
+
+    from app.services import web_search_service
+    from app.services.metering import metered_async
+
+    cfg = await SystemConfig.get_config()
+    sys_config_doc = cfg.model_dump()
+    if body:
+        if body.web_search_provider is not None:
+            sys_config_doc["web_search_provider"] = body.web_search_provider
+        if body.web_search_endpoint is not None:
+            sys_config_doc["web_search_endpoint"] = body.web_search_endpoint
+        if body.web_search_api_key is not None and body.web_search_api_key != "***":
+            sys_config_doc["web_search_api_key"] = body.web_search_api_key
+    if not web_search_service.is_configured(sys_config_doc):
+        raise HTTPException(status_code=400, detail="Web search is not configured")
+
+    async with metered_async("web_search_test", user_id=user.user_id):
+        result = await web_search_service.web_search(
+            query="university research administration",
+            sys_config_doc=sys_config_doc,
+            max_results=3,
+        )
+    if result.get("error"):
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    count = len(result.get("results", []))
+    if count == 0:
+        raise HTTPException(
+            status_code=502,
+            detail="The provider answered but returned no results for a common query. "
+            "Check the endpoint path and that the provider's index is enabled.",
+        )
+    return {
+        "status": "ok",
+        "result_count": count,
+        "message": f"Web search returned {count} result(s).",
+    }
 
 
 @router.post("/config/test-model/{model_id}")
@@ -3186,6 +3337,65 @@ async def probe_model(
         model_name=(body.name or "").strip(),
     )
     return result.to_dict()
+
+
+class SavedModelProbeRequest(BaseModel):
+    # Replace a window an admin entered with the detected one. Without it, an
+    # entered value that differs is reported, not overwritten.
+    force: bool = False
+
+
+@router.post("/config/models/{model_id}/context-window/probe")
+async def probe_saved_model_context_window(
+    model_id: str,
+    body: SavedModelProbeRequest,
+    user: User = Depends(get_current_user),
+):
+    """Ask a saved model's endpoint for its context window and record it.
+
+    The one-click fix for models the Config page flags as unconfirmed or
+    missing. Saves the detected window unless an admin entered a different
+    one and ``force`` is false.
+    """
+    await _require_superadmin(user)
+
+    from app.services.model_probe import probe_context_window
+
+    cfg = await SystemConfig.get_config()
+    await _ensure_config_ids(cfg)
+    index = _find_by_id(cfg.available_models, model_id)
+    if index == -1:
+        raise HTTPException(status_code=404, detail="Model not found")
+    model = cfg.available_models[index]
+    result = await probe_context_window(
+        endpoint=(model.get("endpoint") or "").strip(),
+        api_protocol=(model.get("api_protocol") or "").strip(),
+        api_key=decrypt_value(model.get("api_key") or "") or "",
+        model_name=(model.get("name") or "").strip(),
+    )
+    detected = result.context_window if result.context_window and result.context_window > 0 else None
+    applied = False
+    entered_differs = (
+        detected is not None
+        and context_window_status(model) == "entered"
+        and model.get("context_window") != detected
+    )
+    if detected is not None and (not entered_differs or body.force):
+        cfg.available_models[index] = {
+            **model, "context_window": detected, "context_window_source": "detected",
+        }
+        cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        cfg.updated_by = user.user_id
+        await cfg.save()
+        clear_agent_caches()
+        await _audit(user, "probe_model_context_window", f"{model.get('name')}: context window {detected} detected")
+        applied = True
+    return {
+        "probe": result.to_dict(),
+        "applied": applied,
+        "entered_differs": entered_differs and not applied,
+        "models": _sanitize_models(cfg.available_models),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -3420,12 +3630,110 @@ async def email_analytics(
 
 
 # ---------------------------------------------------------------------------
+# v5.0 launch announcement — one-time blast trigger
+# ---------------------------------------------------------------------------
+
+
+class V5AnnouncementTriggerRequest(BaseModel):
+    """Payload for manually triggering the v5.0 announcement blast."""
+
+    batch_size: int = Field(default=200, ge=1, le=5000)
+    dry_run: bool = False  # if True, counts eligible users but doesn't send
+
+
+class V5AnnouncementTriggerResponse(BaseModel):
+    sent: int
+    eligible: int
+    dry_run: bool
+
+
+@router.post("/announcements/v5-launch", response_model=V5AnnouncementTriggerResponse)
+async def trigger_v5_launch_announcement(
+    body: V5AnnouncementTriggerRequest,
+    user: User = Depends(get_current_user),
+):
+    """Admin-only: blast the v5.0 announcement to eligible users.
+
+    Idempotent — only users without `v5_announcement_sent_at` receive it.
+    Run in batches; re-invoke until `sent == 0` to flush the queue.
+    """
+    await _require_admin(user)
+
+    eligible = await User.find(
+        User.v5_announcement_sent_at == None,  # noqa: E711
+        User.is_demo_user != True,  # noqa: E712
+    ).count()
+
+    if body.dry_run:
+        return V5AnnouncementTriggerResponse(
+            sent=0, eligible=eligible, dry_run=True,
+        )
+
+    from app.services.engagement_service import process_v5_launch_announcement
+    sent = await process_v5_launch_announcement(batch_size=body.batch_size)
+    return V5AnnouncementTriggerResponse(
+        sent=sent, eligible=eligible, dry_run=False,
+    )
+
+
+class AgenticDripBackfillRequest(BaseModel):
+    """Payload for backfilling existing users into the agentic-chat drip."""
+
+    batch_size: int = Field(default=500, ge=1, le=5000)
+    dry_run: bool = False
+
+
+class AgenticDripBackfillResponse(BaseModel):
+    enrolled: int
+    eligible: int
+    dry_run: bool
+
+
+@router.post("/announcements/backfill-agentic-drip", response_model=AgenticDripBackfillResponse)
+async def backfill_agentic_drip(
+    body: AgenticDripBackfillRequest,
+    user: User = Depends(get_current_user),
+):
+    """Admin-only: enroll existing users into the agentic-chat tutorial drip.
+
+    New-user drip enrollment happens automatically at registration; this
+    backfill is the one-shot for users who signed up before v5.0.
+    """
+    await _require_admin(user)
+
+    eligible = await User.find(
+        User.agentic_drip_next_at == None,  # noqa: E711
+        User.agentic_drip_step == 0,
+        User.is_demo_user != True,  # noqa: E712
+    ).count()
+
+    if body.dry_run:
+        return AgenticDripBackfillResponse(enrolled=0, eligible=eligible, dry_run=True)
+
+    from app.services.engagement_service import backfill_agentic_chat_drip
+    enrolled = await backfill_agentic_chat_drip(batch_size=body.batch_size)
+    return AgenticDripBackfillResponse(enrolled=enrolled, eligible=eligible, dry_run=False)
+
+
+# ---------------------------------------------------------------------------
 # Certifications — admin view of user progress through Vandal Workflow Architect
 # ---------------------------------------------------------------------------
 
 
 class CertificationProgressItem(BaseModel):
     user_id: str
+    progress_id: Optional[str] = None
+    enrollment_id: Optional[str] = None
+    course_version: Optional[str] = None
+    course_title: Optional[str] = None
+    enrollment_state: Optional[str] = None
+    is_active: Optional[bool] = None
+    optional_update_available: Optional[bool] = None
+    can_unlock: bool = True
+    progression_policy_id: Optional[str] = None
+    learning_order: Optional[str] = None
+    unlock_unavailable_reason: Optional[str] = None
+    reconciliation_error: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
     level: str
@@ -3441,6 +3749,7 @@ class CertificationProgressItem(BaseModel):
 
 class CertificationProgressDetail(CertificationProgressItem):
     modules: dict
+    support_summary: Optional[dict] = None
 
 
 class CertificationProgressListResponse(BaseModel):
@@ -3452,13 +3761,15 @@ class CertificationProgressListResponse(BaseModel):
 @router.get("/certifications", response_model=CertificationProgressListResponse)
 async def list_certification_progress(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
 ):
     """List all users who have started the certification program with progress summary."""
     await _require_admin(user)
 
     from app.models.certification import CertificationProgress
-    from app.services import certification_service as cert_svc
+    from app.services.certification_versions.readers import support_metadata_many
 
     progresses = await CertificationProgress.find().to_list()
     if not progresses:
@@ -3468,20 +3779,23 @@ async def list_certification_progress(
     users = await User.find({"user_id": {"$in": user_ids}}).to_list()
     user_map = {u.user_id: u for u in users}
 
-    total_modules = len(cert_svc.MODULE_ORDER)
+    metadata_by_progress = await support_metadata_many(progresses)
     items: list[CertificationProgressItem] = []
     for p in progresses:
         u = user_map.get(p.user_id)
-        completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+        metadata = metadata_by_progress[str(p.id)]
+        module_ids = metadata.pop('module_ids')
+        completed = sum(1 for mid in module_ids if isinstance(p.modules.get(mid), dict) and p.modules[mid].get('completed'))
         items.append(
             CertificationProgressItem(
+                **metadata,
                 user_id=p.user_id,
                 name=u.name if u else None,
                 email=u.email if u else None,
                 level=p.level,
                 total_xp=p.total_xp,
                 modules_completed=completed,
-                modules_total=total_modules,
+                modules_total=len(module_ids),
                 certified=p.certified,
                 certified_at=p.certified_at,
                 last_activity_date=p.last_activity_date,
@@ -3490,79 +3804,190 @@ async def list_certification_progress(
             )
         )
 
-    items.sort(key=lambda i: (i.modules_completed, i.total_xp), reverse=True)
+    if q.strip():
+        needle = q.strip().casefold()
+        items = [item for item in items if any(needle in (text or "").casefold()
+                 for text in (item.name, item.email, item.user_id, item.course_title, item.course_version))]
+    items.sort(key=lambda i: (-i.modules_completed, -i.total_xp, i.user_id, i.progress_id or "", i.enrollment_id or ""))
     total = len(items)
-    capped = total > limit
-    return CertificationProgressListResponse(items=items[:limit], total=total, capped=capped)
+    capped = offset + limit < total
+    return CertificationProgressListResponse(items=items[offset:offset + limit], total=total, capped=capped)
+
+
+@router.get("/certifications/health")
+async def get_certification_health(user: User = Depends(get_current_user)):
+    """Global admin metadata census; no course or assessment writes."""
+    await _require_admin(user)
+    from app.services.certification_versions.course_health import course_health, HealthUnavailable
+    from pymongo.errors import PyMongoError
+    try:
+        return await course_health()
+    except (HealthUnavailable, PyMongoError):
+        # A failed/partial read must never look like zero failures or no learners.
+        raise HTTPException(status_code=503, detail="Course health is unavailable. Retry the report.") from None
 
 
 @router.get("/certifications/{user_id}", response_model=CertificationProgressDetail)
 async def get_certification_progress_detail(
     user_id: str,
+    enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
     """Get a single user's full certification progress including per-module state."""
     await _require_admin(user)
 
-    from app.models.certification import CertificationProgress
-    from app.services import certification_service as cert_svc
-
-    p = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
+    from app.services.certification_versions.readers import course_incident, support_metadata, existing_active_progress
+    from app.services.certification_versions.enrollments import EnrollmentRepository, EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        p = await EnrollmentRepository().read_progress(user_id, enrollment_id) if enrollment_id else await existing_active_progress(user_id)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=await course_incident(user_id, enrollment_id, exc)) from exc
     if not p:
         raise HTTPException(status_code=404, detail="No certification progress for this user")
 
     target = await User.find_one(User.user_id == user_id)
-    completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+    metadata = await support_metadata(p)
+    module_ids = metadata.pop('module_ids')
+    completed = sum(1 for mid in module_ids if isinstance(p.modules.get(mid), dict) and p.modules[mid].get('completed'))
+    from app.services.certification_versions.support_snapshot import support_snapshot, progress_modules
+    try:
+        support = await support_snapshot(p, metadata, repository=EnrollmentRepository())
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return CertificationProgressDetail(
+        **metadata,
         user_id=p.user_id,
         name=target.name if target else None,
         email=target.email if target else None,
         level=p.level,
         total_xp=p.total_xp,
         modules_completed=completed,
-        modules_total=len(cert_svc.MODULE_ORDER),
+        modules_total=len(module_ids),
         certified=p.certified,
         certified_at=p.certified_at,
         last_activity_date=p.last_activity_date,
         unlocked=p.unlocked,
         updated_at=p.updated_at,
-        modules=p.modules,
+        modules=progress_modules(p, module_ids),
+        support_summary=support,
     )
 
 
-class CertificationUnlockRequest(BaseModel):
-    unlocked: bool
+class CertificationRecoveryRequest(BaseModel):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    review_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+@router.get("/certifications/{user_id}/recovery")
+async def review_certification_recovery(user_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+    """Read-only review of one explicitly selected enrollment; never enroll."""
+    await _require_admin(user)
+    from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    workflow = RecoveryWorkflow()
+    try:
+        return {'review': await workflow.inspect(user_id, enrollment_id),
+                'history': [{**item, 'can_resume': item['actor_user_id'] == user.user_id and item['state'] == 'started'}
+                            for item in await workflow.history(user_id, enrollment_id)], 'can_apply': bool(user.is_admin)}
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/certifications/{user_id}/recovery")
+async def recover_certification_completion(user_id: str, enrollment_id: str, payload: CertificationRecoveryRequest,
+                                         user: User = Depends(get_current_user)):
+    """Full admins only; persist the reviewed intent before revoking a worker."""
+    await _require_superadmin(user)
+    from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        return await RecoveryWorkflow().submit(user.user_id, user_id, enrollment_id,
+            request_id=payload.request_id, review_sha256=payload.review_sha256, reason=payload.reason)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+class CertificationGradingCorrectionRequest(BaseModel):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    parent_attempt_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    parent_result_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    reason: str = Field(min_length=20, max_length=1000)
+    reference: str = Field(min_length=3, max_length=200)
+
+
+@router.get("/certifications/{user_id}/grading-corrections")
+async def review_certification_grading_correction(user_id: str, enrollment_id: str, attempt_id: str,
+                                                  user: User = Depends(get_current_user)):
+    """Read-only: the exact graded result a correction would re-examine."""
+    await _require_admin(user)
+    from app.services.certification_versions.grading_corrections import GradingCorrections
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        return {**await GradingCorrections().review(user_id, enrollment_id, attempt_id), 'can_apply': bool(user.is_admin)}
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/certifications/{user_id}/grading-corrections")
+async def apply_certification_grading_correction(user_id: str, enrollment_id: str, payload: CertificationGradingCorrectionRequest,
+                                                 user: User = Depends(get_current_user)):
+    """Full admins only: rerun the automatic review as a linked, recorded regrade."""
+    await _require_superadmin(user)
+    from app.services.certification_versions import practical_preparation
+    from app.services.certification_versions.grading_corrections import GradingCorrections
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        result = await GradingCorrections().submit(user.user_id, user_id, enrollment_id, payload.model_dump(),
+                                                   await practical_preparation.configured_runtime())
+    except (EnrollmentConflict, CourseCatalogError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    # References only: the evidence and verdicts stay in the immutable attempt records.
+    await _audit(user, "certification.grading_correction", f"Regraded a certification assessment for user {user_id}",
+                 {"user_id": user_id, "enrollment_id": enrollment_id, "parent_attempt_id": payload.parent_attempt_id,
+                  "parent_result_sha256": payload.parent_result_sha256, "correction_attempt_id": result['attempt_id'],
+                  "reason": payload.reason, "reference": payload.reference, "credit_effect": "none"})
+    return result
+
+
+class CertificationUnlockRequest(AccessChangeRequest):
+    pass
 
 
 @router.put("/certifications/{user_id}/unlock")
 async def set_certification_unlock(
     user_id: str,
     payload: CertificationUnlockRequest,
+    enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
-    """Debug toggle — when unlocked, the user can pick any module without prerequisites."""
+    """Legacy prerequisite access control; assessed outcome requirements remain enforced."""
     await _require_admin(user)
 
-    from app.models.certification import CertificationProgress
-
-    prog = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
-    if not prog:
-        prog = CertificationProgress(user_id=user_id)
-        await prog.insert()
-
-    prog.unlocked = payload.unlocked
-    prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await prog.save()
+    from app.services.certification_versions.readers import set_support_unlock
+    from app.services.certification_versions.enrollments import EnrollmentConflict
+    from app.services.certification_versions.catalog import CourseCatalogError
+    try:
+        prog = await set_support_unlock(user_id, payload.unlocked, enrollment_id,
+            actor_user_id=user.user_id, reason=payload.reason, request_id=payload.request_id)
+    except (EnrollmentConflict, CourseCatalogError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     await _audit(
         user,
         "certification.unlock" if payload.unlocked else "certification.lock",
         f"{'Unlocked' if payload.unlocked else 'Locked'} certification for user {user_id}",
-        {"user_id": user_id, "unlocked": payload.unlocked},
+        {"user_id": user_id, "unlocked": payload.unlocked, "enrollment_id": prog.enrollment_id, "course_version": prog.course_version,
+         "reason": payload.reason, "request_id": payload.request_id, "credit_effect": "none"},
     )
 
-    return {"user_id": user_id, "unlocked": prog.unlocked}
+    return {"user_id": user_id, "unlocked": prog.unlocked, "enrollment_id": prog.enrollment_id, "course_version": prog.course_version}
 
 
 # ---------------------------------------------------------------------------
@@ -3770,8 +4195,11 @@ class AdminKBListResponse(BaseModel):
 
 @router.get("/knowledge-bases", response_model=AdminKBListResponse)
 async def admin_list_knowledge_bases(
-    search: Optional[str] = Query(None, description="Case-insensitive title substring"),
+    search: Optional[str] = Query(None, max_length=300, description="Case-insensitive title, owner email, team name or tag substring"),
+    status: Optional[Literal["empty", "building", "ready", "error"]] = Query(None),
+    sort: Literal["title", "updated", "created"] = Query("created"),
     limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
 ):
     """List every knowledge base across all users and teams (admin-only).
@@ -3783,7 +4211,7 @@ async def admin_list_knowledge_bases(
 
     from app.services import knowledge_service
 
-    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit)
+    kbs, total = await knowledge_service.admin_search_knowledge_bases(search=search, status=status, sort=sort, limit=limit, offset=offset)
 
     # Batch-resolve owner emails and team names so the table is readable
     # without an N+1 per row.
@@ -3818,4 +4246,4 @@ async def admin_list_knowledge_bases(
         )
         for kb in kbs
     ]
-    return AdminKBListResponse(total=len(summaries), knowledge_bases=summaries)
+    return AdminKBListResponse(total=total, knowledge_bases=summaries)

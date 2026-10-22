@@ -5,6 +5,9 @@ import Account from './Account'
 const mockUpdateProfile = vi.fn()
 const mockGetApiTokenStatus = vi.fn()
 const mockRefreshUser = vi.fn()
+const mockGetPreferences = vi.fn()
+const mockSavePreferences = vi.fn()
+const mockGetMemory = vi.fn()
 
 // Stable references: Account's mount effect depends on `user`, so a fresh
 // object each render would re-run the effect and clobber typed input.
@@ -12,6 +15,10 @@ const mockUser = { user_id: 'testuser', email: 'old@example.com', name: 'Test Us
 const mockSsoUser = { ...mockUser, sso_provider: 'saml' }
 const mockAuthValue = { user: mockUser, refreshUser: mockRefreshUser }
 
+vi.mock('../api/obligations', () => ({
+  getInbox: vi.fn().mockResolvedValue({ items: [], inbox_hidden: false }),
+  setInboxHidden: vi.fn(),
+}))
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => mockAuthValue,
 }))
@@ -29,12 +36,16 @@ vi.mock('../api/auth', () => ({
   generateApiToken: vi.fn(),
   revokeApiToken: vi.fn(),
   getApiTokenStatus: () => mockGetApiTokenStatus(),
-  getEmailPreferences: () => Promise.resolve({ onboarding: true, nudges: true }),
-  updateEmailPreferences: (prefs: Record<string, boolean>) =>
-    Promise.resolve({ onboarding: true, nudges: true, ...prefs }),
+  getEmailPreferences: () => mockGetPreferences(),
+  updateEmailPreferences: (prefs: Record<string, boolean>) => mockSavePreferences(prefs),
 }))
 
+vi.mock('../api/chat', () => ({ getUserMemory: () => mockGetMemory(), clearUserMemory: vi.fn() }))
+
 beforeEach(() => {
+  mockGetPreferences.mockReset().mockResolvedValue({ onboarding: true, nudges: false, announcements: true })
+  mockSavePreferences.mockReset()
+  mockGetMemory.mockReset().mockResolvedValue({ extractions: [], workflows: [], kbs: [] })
   mockAuthValue.user = mockUser
   mockUpdateProfile.mockReset()
   mockRefreshUser.mockReset()
@@ -113,5 +124,41 @@ describe('Account — SSO-managed email', () => {
     fireEvent.click(screen.getByRole('button', { name: /save profile/i }))
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({ name: 'Renamed' }))
     expect(screen.queryByLabelText('Current Password')).not.toBeInTheDocument()
+  })
+})
+
+
+describe('Account recovery', () => {
+  it('does not invent preferences after a failed load and supports retry', async () => {
+    mockGetPreferences.mockRejectedValueOnce(new Error('Preferences unavailable'))
+    render(<Account />)
+    await screen.findByRole('button', { name: 'Retry email preferences' })
+    // The email-preference checkboxes; the Home inbox setting (#999) loads separately.
+    expect(screen.queryByRole('checkbox', { name: /Onboarding|Activity nudges|Product announcements/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry email preferences' }))
+    expect(await screen.findByRole('checkbox', { name: /Activity nudges/ })).not.toBeChecked()
+  })
+  it('serializes preference writes and visibly restores saved values after failure', async () => {
+    let reject!: (error: Error) => void
+    mockSavePreferences.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail }))
+    render(<Account />)
+    const onboarding = await screen.findByRole('checkbox', { name: /Onboarding/ })
+    fireEvent.click(onboarding)
+    expect(screen.getByRole('checkbox', { name: /Activity nudges/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Activity nudges/ }))
+    expect(mockSavePreferences).toHaveBeenCalledTimes(1)
+    reject(new Error('Preference service unavailable'))
+    await screen.findByText(/last saved preferences have been restored/)
+    expect(onboarding).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /Activity nudges/ })).not.toBeChecked()
+  })
+  it('keeps failed memory and token reads distinct from empty states', async () => {
+    mockGetMemory.mockRejectedValueOnce(new Error('Memory unavailable'))
+    mockGetApiTokenStatus.mockRejectedValueOnce(new Error('Token status unavailable'))
+    render(<Account />)
+    await screen.findByRole('button', { name: 'Retry assistant memory' })
+    await screen.findByRole('button', { name: 'Retry token status' })
+    expect(screen.queryByText(/Nothing yet/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Generate API Token' })).toBeNull()
   })
 })

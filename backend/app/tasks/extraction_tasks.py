@@ -220,6 +220,19 @@ def perform_extraction_task(
                 },
             )
 
+            # A long extraction the user may have walked away from (#994).
+            # `activity` is the row as it was before this run finished, so a
+            # retry of an already-completed run does not bell again.
+            from app.services.run_notifications import notify_extraction_completed
+
+            notify_extraction_completed(
+                db,
+                user_id=activity.get("user_id"),
+                activity=activity,
+                search_set_uuid=searchset_uuid,
+                document_count=len(document_uuids or []),
+            )
+
             # Trigger description generation
             try:
                 from app.tasks.activity_tasks import generate_activity_description_task

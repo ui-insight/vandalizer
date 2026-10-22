@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "bank_id": "v5.0.governance.scenarios",
+  "revision": 1,
+  "rubric_id": "v5.0-competency-draft.1",
+  "module_id": "governance",
+  "outcome_ids": [
+    "governance.review_and_revision"
+  ],
+  "questions": [
+    {
+      "id": "governance.pending_library_review",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "A learner has recorded completion for the assessed course revision. Their separate request to share a workflow with everyone is still pending. Which description preserves both facts?",
+      "choices": [
+        {
+          "id": "approved",
+          "text": "The library request is approved because the learner completed certification.",
+          "feedback": "Course completion cannot supply a missing library review decision."
+        },
+        {
+          "id": "separate",
+          "text": "Keep the earned course completion and describe the library request as pending.",
+          "feedback": "The two records describe separate processes. Do not invent approval or erase earned history."
+        },
+        {
+          "id": "erase",
+          "text": "Remove earned completion until a staff examiner handles the library request.",
+          "feedback": "A separate pending request does not rewrite the demonstrated course outcomes."
+        }
+      ],
+      "correct_choice_id": "separate"
+    },
+    {
+      "id": "governance.changed_artifact",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "After a passing assessment, a workflow owner changes the prompt that selects the budget amount. The old evidence is intact, but no new run has been tested. What is justified?",
+      "choices": [
+        {
+          "id": "same_claim",
+          "text": "Apply the old passing result to the changed prompt because the workflow name is unchanged.",
+          "feedback": "The name does not establish that changed behavior was assessed."
+        },
+        {
+          "id": "discard",
+          "text": "Delete the old evidence so only the latest prompt remains visible.",
+          "feedback": "The original evidence should remain traceable; deleting it hides what was actually assessed."
+        },
+        {
+          "id": "preserve_retest",
+          "text": "Preserve the original achievement and test the changed revision before making a new quality claim.",
+          "feedback": "Earlier achievement remains historical evidence while changed behavior needs its own support."
+        }
+      ],
+      "correct_choice_id": "preserve_retest"
+    },
+    {
+      "id": "governance.optional_course_upgrade",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "A learner is partway through a supported course when a new V5 course is offered. The new version adds source-review and release-decision requirements. Which transition respects the stated optional-upgrade policy?",
+      "choices": [
+        {
+          "id": "automatic_reset",
+          "text": "Switch the learner immediately and reset progress because V5 is newer.",
+          "feedback": "The optional policy requires an explicit choice and preserves existing earned work."
+        },
+        {
+          "id": "preview_choice",
+          "text": "Keep the current enrollment; preview new requirements and justified retained credit before an explicit upgrade choice.",
+          "feedback": "New requirements do not silently replace an active course, and retained credit needs an evidence-based mapping."
+        },
+        {
+          "id": "rename",
+          "text": "Rename the old credential V5 and assume matching module titles prove the new skills.",
+          "feedback": "A title or XP total does not demonstrate newly required outcomes."
+        }
+      ],
+      "correct_choice_id": "preview_choice"
+    },
+    {
+      "id": "governance.agent_claims_review",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "The agent writes, “The learner checked every source and approved the internal handoff.” No learner decision or source-check record exists. A colleague says the workflow was popular before the edit. What can be concluded?",
+      "choices": [
+        {
+          "id": "enough",
+          "text": "Popularity plus the agent's statement establishes the missing review.",
+          "feedback": "Adoption and agent prose cannot establish the learner's own unrecorded judgments."
+        },
+        {
+          "id": "missing_evidence",
+          "text": "The required learner review remains unproven; obtain the actual decisions and source evidence for this revision.",
+          "feedback": "The claim needs authenticated learner evidence tied to the assessed revision."
+        },
+        {
+          "id": "publish",
+          "text": "Share the workflow with everyone to make the review claim valid.",
+          "feedback": "Changing access does not create source-check or learner-decision evidence."
+        }
+      ],
+      "correct_choice_id": "missing_evidence"
+    }
+  ]
+}

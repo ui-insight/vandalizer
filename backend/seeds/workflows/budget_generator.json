@@ -6,7 +6,7 @@
   "_seed_meta": {
     "seed_id": "wf-budget-generator",
     "display_name": "Budget Generator",
-    "description": "",
+    "description": "Drafts a line-by-line budget justification from a budget, flagging lines whose basis the PI must supply",
     "collections": [
       "pre-award",
       "financial"
@@ -14,12 +14,15 @@
     "credit": {
       "name": "Ezekiel Morrison",
       "org": "University of Idaho"
-    }
+    },
+    "superseded_prompt_sha256": [
+      "dae62e91334196daaeb1c485af1d6f89b1cffd14e159db25d9e1bc41c31a7fcc"
+    ]
   },
   "items": [
     {
       "name": "Budget Generator",
-      "description": "",
+      "description": "Drafts a line-by-line budget justification from a budget, flagging lines whose basis the PI must supply",
       "steps": [
         {
           "name": "Generator",
@@ -29,7 +32,7 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "Please analyze this budget. Create a complete budget justification."
+                "prompt": "Write a budget justification for the budget in the attached document.\n\n- Go through the budget line by line, in its own order and categories (for example personnel, fringe benefits, equipment, travel, participant support, materials and supplies, consultants, subawards, other direct costs, indirect costs). Give every line its own justification with the same amount the budget shows, by year where the budget gives years.\n- Explain each line using only what the documents state: names, roles, effort, salary bases, rates, quantities, unit costs, destinations and quotes. When the budget gives the inputs, show how the amount was calculated (for example, 2 trips at $1,800 each = $3,600) and check that the arithmetic is right.\n- Do not invent a cost, quantity, rate, person, purpose or rationale the documents don't give. Where a line has no stated basis, write \"[Basis to be supplied: ...]\" saying what the PI needs to provide.\n- State the indirect cost rate and base exactly as the budget does. Do not apply a rate or threshold from memory.\n- End with the totals by category and the overall total, and confirm they equal the budget's totals. If the budget's own figures don't add up, say where and by how much instead of correcting them silently."
               }
             }
           ]
@@ -37,8 +40,34 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
-      "validation_inputs": []
+      "validation_plan": [
+        {
+          "id": "8a9090bc-05e7-5a99-81da-7fa32c41bf59",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every line item, amount, rate and total in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "d033d4ce-52ae-5f41-b0b2-cd9a31048910",
+          "name": "Every budget line is justified, with its amount",
+          "category": "completeness",
+          "description": "Each line of the source budget appears in the justification with the same amount, and the justification's totals equal the budget's totals. FAIL for a missing line, a changed amount or a total that does not add up."
+        },
+        {
+          "id": "60168701-9c68-512f-b337-0a57c922faa1",
+          "name": "No invented costs or rationale",
+          "category": "accuracy",
+          "description": "The justification adds no cost, quantity, rate or personnel detail that the source budget does not give. Where the budget gives no basis for a line, the output says the basis must be supplied. FAIL for any invented specifics."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "1a868c5c-35fd-51c5-b25f-c8ebfa8c264e",
+          "type": "text",
+          "label": "Fictional budget. Answer key: every line justified with its amount: PI $10,667 (1.0 summer month on a $96,000 nine-month base), graduate assistant $30,000 (12 months at $2,500), fringe $3,307 (31%) and $600 (2%), travel $3,600 (2 trips at $1,800), materials and supplies $4,500; total direct $52,674, indirect $26,337 (50% of MTDC $52,674), total $79,011, and these add up. Materials and supplies has no stated basis, so it must be flagged for the PI, not given invented items.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL BUDGET\nProposal budget — Example State University — Year 1\nSenior personnel: Jordan Sample, PI, 1.0 summer month on a nine-month salary base of $96,000: $10,667\nOther personnel: one graduate research assistant, 12 months at $2,500 per month: $30,000\nFringe benefits, PI at 31%: $3,307\nFringe benefits, graduate assistant at 2%: $600\nTravel: 2 domestic conference trips at $1,800 each: $3,600\nMaterials and supplies: $4,500\nTotal direct costs: $52,674\nIndirect costs at 50% of modified total direct costs ($52,674): $26,337\nTotal costs: $79,011"
+        }
+      ]
     }
   ]
 }

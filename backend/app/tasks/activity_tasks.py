@@ -171,14 +171,17 @@ def generate_activity_description_task(
     # 2-minute client-side fallback fires.
     def _mark_done(description: str | None = None) -> None:
         try:
-            update: dict = {"meta_summary.description_generated": True}
-            if description:
-                update["meta_summary.ai_description"] = description
-                update["title"] = description
             db.activity_event.update_one(
                 {"_id": ObjectId(activity_id)},
-                {"$set": update},
+                {"$set": {"meta_summary.description_generated": True}},
             )
+            if description:
+                # A name the user gave the chat is never replaced, including
+                # one set while this task was running.
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id), "meta_summary.title_user_set": {"$ne": True}},
+                    {"$set": {"meta_summary.ai_description": description, "title": description}},
+                )
         except Exception:
             logger.exception(
                 "Failed to mark description_generated for activity %s",
@@ -189,6 +192,14 @@ def generate_activity_description_task(
         activity = db.activity_event.find_one({"_id": ObjectId(activity_id)})
         if not activity:
             logger.warning("Activity %s not found", activity_id)
+            return
+
+        # Only a chat gets a generated title. A run keeps its extraction set's
+        # or workflow's name: the activity list shows the run's documents and
+        # time beside it, and a generated title ("Workflow Processing Subaward
+        # Agreement Document") replaced the one name that says what ran.
+        if activity_type != "conversation":
+            _mark_done()
             return
 
         # Get first 2 documents for context

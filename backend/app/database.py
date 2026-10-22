@@ -16,11 +16,13 @@ from app.models.workflow import (
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
 )
 from app.models.system_config import SystemConfig
 from app.models.user_config import UserModelConfig
 from app.models.chat import ChatMessage, FileAttachment, UrlAttachment, ChatConversation
 from app.models.activity import ActivityEvent
+from app.models.certification_journey import CertificationJourneyEvent
 from app.models.library import LibraryFolder, LibraryItem, Library
 from app.models.feedback import ChatFeedback, ExtractionQualityRecord, ProductFeedback
 from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
@@ -42,25 +44,32 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.extraction_optimization_run import ExtractionOptimizationRun
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.models.validation_run import ValidationRun
+from app.models.kb_validation_task import KBValidationTask
+from app.models.automation_launch import AutomationLaunch
 from app.models.quality_alert import QualityAlert
+from app.models.verification_session import VerificationSession
 from app.models.regression_suite_run import RegressionSuiteRun
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
-from app.models.certification import CertificationProgress
+from app.models.certification import CertificationProgress, CertificationEnrollment, CertificationEnrollmentSelection, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery
 from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
 from app.models.support import SupportTicket, SupportCounter
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
+from app.models.user_memory import UserMemory
 from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
+from app.models.obligation import Obligation
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
 from app.models.telemetry import TelemetryHeartbeat
+from app.models.web_search_usage import WebSearchUsage
 
 ALL_MODELS = [
+    Obligation,
     User,
     Team,
     TeamMembership,
@@ -76,6 +85,7 @@ ALL_MODELS = [
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
     SystemConfig,
     UserModelConfig,
     ChatMessage,
@@ -83,6 +93,7 @@ ALL_MODELS = [
     UrlAttachment,
     ChatConversation,
     ActivityEvent,
+    CertificationJourneyEvent,
     LibraryFolder,
     LibraryItem,
     Library,
@@ -109,7 +120,10 @@ ALL_MODELS = [
     ExtractionOptimizationRun,
     WorkflowOptimizationRun,
     ValidationRun,
+    KBValidationTask,
+    AutomationLaunch,
     QualityAlert,
+    VerificationSession,
     RegressionSuiteRun,
     DemoApplication,
     PostExperienceResponse,
@@ -118,6 +132,23 @@ ALL_MODELS = [
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,
+    CertificationEnrollment,
+    CertificationEnrollmentSelection,
+    CertificationCredential,
+    CertificationAttempt,
+    CertificationRecoveryRecord,
+    CertificationLabInput,
+    CertificationScenarioAttempt,
+    CertificationLabExecution,
+    CertificationReviewAttempt,
+    CertificationLearnerDecision,
+    CertificationProcessSubmission,
+    CertificationWorkflowDesignSubmission,
+    CertificationUpgradeDecision,
+    CertificationCompletionNotice,
+    CertificationUpgradeActivation,
+    CertificationSavedCourseSelection,
+    CertificationSelectionPreparationRecovery,
     Organization,
     AuditLog,
     AdminAuditLog,
@@ -127,6 +158,7 @@ ALL_MODELS = [
     SupportCounter,
     FeedbackPrompt,
     FeedbackPromptResponse,
+    UserMemory,
     EmailLog,
     ApiKey,
     Credential,
@@ -136,6 +168,7 @@ ALL_MODELS = [
     ProjectPin,
     ProjectJoinLink,
     TelemetryHeartbeat,
+    WebSearchUsage,
 ]
 
 

@@ -1,3 +1,4 @@
+import { ProjectWorkOverview } from '../projects/ProjectWorkOverview'
 import { FolderKanban, Settings, X } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -7,41 +8,46 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
  * (files, chat, automations, knowledge) is the normal workspace, just scoped.
  * The gear opens the in-workspace Manage panel (rename/share/leave/delete).
  */
-export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void }) {
+export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: { onOpenManage?: () => void; railWidth?: number }) {
   const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, railDocked } = useWorkspace()
   if (!activeProjectUuid) return null
 
   // The Activity rail is fixed to the right edge; reserve its width so the
   // Manage/Exit controls aren't rendered underneath (and unclickable).
-  const railWidth = railDocked ? 64 : 220
+  const railWidth = fittedRailWidth ?? (railDocked ? 64 : 220)
 
   return (
     <div
+      role="region" aria-label="Active project"
+      className="project-context-bar"
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
-        padding: '6px 16px',
+        flexWrap: 'wrap',
+        gap: 'var(--workspace-space-8)',
+        padding: "var(--workspace-space-6) var(--workspace-space-16)",
         marginRight: railWidth,
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         background: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
         borderBottom: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, white)',
         flexShrink: 0,
       }}
     >
-      <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-      <span style={{ color: '#6b7280', fontWeight: 500 }}>Project</span>
-      <span style={{ color: '#111', fontWeight: 600 }}>{activeProjectTitle}</span>
-      {activeProjectRole === 'viewer' && (
-        <span style={{ color: '#6b7280', fontSize: 12 }}>· viewing</span>
-      )}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flex: '1 1 240px', minWidth: 0 }}>
+        <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)', flexShrink: 0 }} />
+        <span className="project-context-label" style={{ color: '#59616b', fontWeight: 500 }}>Project</span>
+        <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{activeProjectTitle}</span>
+        {activeProjectRole === 'viewer' && (
+          <span style={{ color: '#59616b', fontSize: 'var(--workspace-font-meta)' }}>Read only</span>
+        )}
+      </div>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', flexShrink: 0 }}>
         {onOpenManage && (
           <button
             type="button"
             onClick={onOpenManage}
             title="View details, share, rename, leave, or delete this project"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 12, fontWeight: 600 }}
+            style={{ minHeight: 'var(--workspace-control-height)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-12)", cursor: 'pointer', color: '#374151', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}
           >
             <Settings size={14} />
             Manage project
@@ -51,12 +57,13 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
           type="button"
           onClick={deactivateProject}
           title="Exit project scope"
-          style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
+          style={{ minHeight: 'var(--workspace-control-height)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}
         >
           Exit
           <X size={14} />
         </button>
       </div>
+      <ProjectWorkOverview key={activeProjectUuid} uuid={activeProjectUuid} />
     </div>
   )
 }

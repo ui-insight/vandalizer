@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { ActionButton } from './ActionButton'
+import { createPortal } from './panelPortal'
+import { usePanelEffect } from './usePanelEffect'
+import { useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from './PanelFocusTrap'
 import { Sparkles, X, ChevronRight, ChevronLeft } from 'lucide-react'
 import { WizardSteps } from './WizardSteps'
 
@@ -47,7 +50,7 @@ export function AutovalidateWizard<TOptions>({
   const [stepIndex, setStepIndex] = useState(0)
   const [options, setOptions] = useState<TOptions>(initialOptions)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -66,7 +69,7 @@ export function AutovalidateWizard<TOptions>({
   const prev = () => { if (!isFirst) setStepIndex(i => i - 1) }
   const confirm = () => { if (canAdvance) onConfirm(options) }
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
@@ -77,64 +80,51 @@ export function AutovalidateWizard<TOptions>({
         aria-modal="true"
         aria-labelledby="autovalidate-wizard-title"
         style={{
-          width: 520, maxHeight: '90vh', overflowY: 'auto',
-          padding: 22, backgroundColor: '#1f1f1f',
-          border: '1px solid #2e2e2e', borderRadius: 10,
+          width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)',
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sparkles size={18} aria-hidden="true" style={{ color: '#a78bfa' }} />
-          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: '#fff' }}>{title}</h3>
-          <button
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)', flexShrink: 0 }}>
+          <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--workspace-accent-ink)' }} />
+          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>{title}</h3>
+          <ActionButton variant="quiet" iconOnly
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
+            style={{ marginLeft: 'auto' }}
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </ActionButton>
         </div>
 
         {/* Step indicator */}
         <WizardSteps steps={stepIds} current={currentStep.id} labels={stepLabels} />
 
         {/* Body */}
-        <div style={{ minHeight: 240, marginTop: 14 }}>
+        <div key={currentStep.id} role="region" aria-label={currentStep.label} tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', marginTop: 'var(--workspace-space-16)', padding: 'var(--workspace-space-4)' }}>
           {currentStep.render(options, setOptions)}
         </div>
 
         {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
-          <button onClick={isFirst ? onClose : prev} style={btn()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginTop: 'var(--workspace-space-16)', flexShrink: 0 }}>
+          <ActionButton variant="secondary" onClick={isFirst ? onClose : prev} >
             {isFirst ? 'Cancel' : (<><ChevronLeft size={12} />Back</>)}
-          </button>
+          </ActionButton>
           {!isLast ? (
-            <button onClick={next} disabled={!canAdvance} style={btn(canAdvance, '#7c3aed')}>
+            <ActionButton variant="primary" onClick={next} disabled={!canAdvance} >
               Next<ChevronRight size={12} />
-            </button>
+            </ActionButton>
           ) : (
-            <button onClick={confirm} disabled={!canAdvance} style={btn(canAdvance, '#7c3aed')}>
+            <ActionButton variant="primary" onClick={confirm} disabled={!canAdvance} >
               <Sparkles size={12} />
               {typeof confirmLabel === 'function' ? confirmLabel(options) : confirmLabel}
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>
       </FocusTrap>
-    </div>
+    </div>, document.body
   )
-}
-
-function btn(enabled: boolean = true, color?: string): React.CSSProperties {
-  return {
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? '#e5e5e5' : '#555',
-    backgroundColor: color ? color : '#2a2a2a',
-    border: `1px solid ${color || '#3a3a3a'}`,
-    borderRadius: 5,
-    cursor: enabled ? 'pointer' : 'not-allowed',
-    opacity: enabled ? 1 : 0.5,
-  }
 }

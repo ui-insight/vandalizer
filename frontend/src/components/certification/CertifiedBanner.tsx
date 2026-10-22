@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Award, Download, Loader2 } from 'lucide-react'
+import type { CertificationProgress } from '../../types/certification'
 import { downloadCertificate } from '../../api/certification'
 
-export function CertifiedBanner() {
+export function CertifiedBanner({ progress }: { progress: CertificationProgress }) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -10,7 +11,7 @@ export function CertifiedBanner() {
     setDownloading(true)
     setError(null)
     try {
-      await downloadCertificate()
+      await downloadCertificate(progress.enrollment_id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Download failed')
     } finally {
@@ -20,7 +21,8 @@ export function CertifiedBanner() {
 
   return (
     <div
-      className="relative overflow-hidden p-8 text-center"
+      data-cert-certificate
+      className="relative overflow-hidden p-3 text-center sm:p-8"
       style={{
         borderRadius: 'var(--ui-radius, 12px)',
         background: 'linear-gradient(135deg, #191919, #2d2d2d)',
@@ -33,21 +35,22 @@ export function CertifiedBanner() {
         <div className="flex items-center justify-center gap-3 mb-1">
           <Award size={32} className="text-yellow-400" />
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-0.5">
               University of Idaho &middot; Certified
             </p>
             <h2 className="text-2xl font-bold text-white title-shimmer">
-              Vandal Workflow Architect
+              {progress.course_title || 'Vandal Workflow Architect'}
             </h2>
           </div>
           <Award size={32} className="text-yellow-400" />
         </div>
         <p className="text-gray-400 text-sm mt-2">
-          All 11 modules completed &middot; 1850 XP &middot; Architect level
+          {progress.module_ids ? progress.module_ids.filter(id => progress.modules[id]?.completed).length : Object.values(progress.modules).filter(module => module.completed).length} modules completed &middot; {progress.total_xp.toLocaleString()} XP &middot; {progress.level} level
         </p>
-        <p className="text-gray-500 text-xs mt-1">
-          Recognized for mastery in AI-powered document workflow design for research administration
+        <p className="text-gray-300 text-xs mt-1">
+          Your earned certificate records the requirements of this course. Keep it with your training records.
         </p>
+        {progress.course_version && <p className="text-gray-300 text-xs mt-1">Course version: {progress.course_version}</p>}
         <button
           type="button"
           onClick={handleDownload}

@@ -1,0 +1,78 @@
+NSF PAPPG (NSF 24-1) — Summary of Changes
+Source: https://www.nsf.gov/policies/pappg/24-1/summary-changes
+
+#### Effective Date May 20, 2024
+
+#### Overall Document
+
+- Editorial changes have been made throughout to either clarify or enhance the intended meaning of a sentence or section.
+- Website and document references have been updated to reflect current information.
+- Updates have been made to ensure consistency with data contained in NSF systems or guidance located and terminology used in other NSF or Federal policy documents.
+
+#### By-Chapter Changes
+
+#### Chapter I: Pre-Submission Information
+
+- Chapter I.D, Concept Outlines, has been updated to provide additional clarity on the use of concept outlines and the Program Suitability and Proposal Concept Tool (ProSPCT).
+- Chapter I.D, Types of Submissions, includes new coverage on the use of concept outlines and the required use of the Program Suitability and Proposal Concept Tool (ProSPCT) for submission. Additional changes on the use of concept outlines and the use of ProSPCT for specific proposal types is available in Chapter II.E.
+- Chapter I.E, Who May Submit Proposals:
+
+- 1(c) Tribal Nations, has been revised to substitute the term "Tribal Government" with the term "Tribal nation". This update has also been made throughout the PAPPG.
+- 2(c) Foreign Organizations, has been updated to clarify the information required from proposers to justify the request to provide funding through the NSF budget of a foreign organization or foreign individual (through a subaward or consultant arrangement).
+- 3(b) Parties to Malign Foreign Talent Recruitment Programs, has been modified to incorporate a new section establishing that individuals who are a party to a Malign Foreign Talent Recruitment Program are not eligible to serve as a senior/key person on an NSF proposal.
+
+- Chapter I.F, When to Submit Proposals, has been modified to clarify that the 5 p.m. submitter's local time is tied to the organization, and not the location of the PI.
+- Chapter I.G.2, Requirements Relating to Unique Entity Identifier (UEI) and Registration in the System for Award Management (SAM), has been updated to clarify SAM and UEI requirements for new and renewal proposals or the transfer of an award.
+
+#### Chapter II: Proposal Preparation Instructions
+
+- Chapter II.B, NSF Disclosure Requirements, has been modified to incorporate the annual postaward annual reporting requirements mandated by Section 10339B, "Foreign Financial Support", of the CHIPS and Science Act of 2022, (42 U.S.C. § 19040). Language also has been added to this section to reference the certification regarding malign foreign talent recruitment programs.
+- Chapter II.C, Format of the Proposal, Research Opportunity Awards for Predominantly Undergraduate Institutions (ROA)(PUI) Supplemental Funding Requests has been added to the listing of types of proposals.
+- Chapter II.C.2, Proposal Font, Spacing, and Margin Requirements, has been modified to allow for submission of proposal documents in landscape format.
+- Chapter II.D.1.d(ix), Certification Regarding Malign Foreign Talent Recruitment Programs, is a new section that addresses Section 10632 of the CHIPS and Science Act of 2022 (42 U.S.C. § 19232) organizational certification requirement regarding malign foreign talent recruitment programs.
+- Chapter II.D.1.e(ii), Malign Foreign Talent Recruitment Programs, is a new section that addresses Section 10632 of the CHIPS and Science Act of 2022 (42 U.S.C. § 19232), requirements regarding malign foreign talent recruitment programs. This applies to individuals designated as senior/key persons on a proposal.
+-
+Chapter II.D.2.h(i), Biographical Sketch(es), the updated guidance serves as NSF’s implementation of the biographical sketch common form developed by the National Science and Technology Council’s Research Security Subcommittee.
+
+This section has been revised to remove the 3-page limitation for the biographical sketch. There is no page limitation for this section of the proposal.
+
+The Synergistic Activities section has been removed from the biographical sketch. This information must now be submitted by individuals designated as senior/key persons as part of the senior/key personnel documents in Research.gov.
+
+- Chapter II.D.2.h(ii), Current and Pending (Other) Support, the updated guidance serves as NSF's implementation of the current and pending (other) support common form developed by the National Science and Technology Council's Research Security Subcommittee.
+- Chapter II.D.2.i(i), Mentoring Plan, has been expanded to address the revision to Section 7008(a) of the America COMPETES Act of 2022 (42 U.S.C. § 1862o(a)) requiring a mentoring plan for postdoctoral researchers or graduate students supported on the project. This page limitation for the Mentoring Plan remains one page.
+- Chapter II.D.2.i(iv), Federal Environmental Statutes, has been revised to address new requirements for consultation with Tribal Nations.
+- Chapter II.E.7, Projects Requiring Advanced Computing, Data, and Analysis Capabilities, has been updated with revised instructions for projects that require such resources.
+- Chapter II.E.10, Seeking and Obtaining Tribal Nation Approval for Proposals that May Impact Tribal Resources or Interests, has been added as a new section for proposals that may impact the resources of a Tribal Nation. Projects that do not have prior written approval from the official(s) designated by the relevant Tribal Nation(s) will not be awarded by NSF.
+- Chapter II.F.14, Research Opportunity Supplemental Funding Requests for Primarily Undergraduate Institutions (ROA/PUI), is now included as a new type of supplemental funding request, rather than described in an NSF solicitation.
+
+#### Chapter VI: Award, Administration and Monitoring of NSF Assistance Awards
+
+- Chapter VI.E, Supplemental Support, has been modified to reflect that NSF Dear Colleague Letters and solicitations may identify supplemental funding opportunities with specified durations longer than six months and for additional funding amounts.
+
+#### Chapter VII: Award Administration
+
+- Chapter VII.B.2.f, Disposition of an Award When a PI Transfers from One Organization to Another:
+
+- implements the CHIPS and Science Act of 2022 requirement to mentor graduate students in addition to postdoctoral researchers; and
+- includes new language to remind users about NSF's policies regarding funding of foreign organizations, including foreign subawards and consultant arrangements.
+
+- Chapter VII.B.5, Postaward Additions of Postdoctoral or Graduate Student Researchers, has been modified to expand the requirement to cover graduate student researchers.
+- Chapter VII.B.6, Postaward Addition of Off-Site or Off-Campus Research, is a new section to address postaward requirements associated with the plan for safe and inclusive working environments.
+- Chapter VII.B.7, Individual Development Plans for Postdoctoral Scholars or Graduate Students, implements Section 10313 (42 U.S.C. § 18993) of the CHIPS and Science Act of 2022 requirement for postdoctoral scholars or graduate students who receive substantial NSF support must have an Individual Development Plan which is required to be updated annually.
+- Chapter VII.D, Reporting Requirements, has been revised to incorporate new institutional annual reporting requirements mandated Section 10339B, “Foreign Financial Support”, of the CHIPS and Science Act of 2022 ((42 U.S.C. § 19040).
+
+#### Chapter VIII: Financial Requirements and Payments
+
+- Chapter VIII.C.6, Recipient Banking Information for Payments, has been revised to include new information regarding maintenance of banking information for Postdoctoral Fellowship awards made to individuals.
+- Chapter VIII.D.2, Erroneous Payments, has been updated to provide new instructions regarding the need to confirm that the correct form is being used to ensure that the remittance has been sent to NSF.
+
+#### Chapter XI: Other Post Award Requirements and Considerations
+
+- Chapter XI.A, Non-Discrimination Statutes and Regulations, includes clarifying language for when IRB approval is required for awards involving human subjects.
+
+- incorporates new coverage to address Executive Order 14096, "Revitalizing Our Nation's Commitment to Environmental Justice for All;" and
+- updates the section covering "NSF Policy on Sexual Harassment, Other Forms of Harassment, or Sexual Assault," to improve clarity of language and NSF's expectations.
+
+- Chapter XI.A.7, Limited English Proficiency under E.O. 13166, has incorporated additional language regarding Limited English Proficiency under Executive Order 13166.
+- Chapter XI.A.8, Environmental Justice under E.O. 14096, has been added as a new section regarding NSF's implementation of Executive Order 14096, "Environmental Justice."
+- Chapter XI.M, Scientific Integrity, incorporates a new definition for scientific integrity derived from "A Framework for Federal Scientific Integrity Policy and Practice" issued by the National Science and Technology Council.

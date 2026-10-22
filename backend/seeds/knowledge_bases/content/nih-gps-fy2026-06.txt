@@ -1,0 +1,76 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 6: Payment
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+6 PAYMENT
+The PMS is a centralized grants payment and cash management system, operated by HHS PSC, PMS.
+HHS grant payments may be made by one of several advance payment methods, including
+SMARTLINK II/ACH, cash request, or by cash request on a reimbursement basis, as specified in the
+NoA and as described in this chapter. Payments under NIH grants generally are made as advance payments. NIH grant payments are made by PMS, operated by PSC, in accordance with Department of the
+Treasury and OMB requirements, as implemented by 2 CFR Part 200.305. These requirements are intended to minimize the time elapsing between the transfer of funds from the Federal government and disbursement by a recipient. Therefore, although the grant may be financed by advance payments, the intent
+is that recipients draw funds on an as-needed basis—specifically, no more than 3 business days before
+the funds are needed.
+All Federal funds deposited by PMS in a recipient’s bank account as an unrestricted advance payment
+should be fully disbursed (checks written, signed, and issued to the payees) by the close of business the
+next workday after receipt of the funds. The potential for excessive Federal cash on hand exists each
+time a recipient does not disburse Federal funds in this manner. The recipient is responsible for determining when the Federal funds have been deposited into its bank account for each drawdown, ensuring
+that the funds are fully disbursed by the close of business the next workday after they are received, and
+immediately returning all undisbursed Federal funds to PMS.
+The Treasury and OMB policies also establish accountability for interest earned on advances of grant
+funds and provide for use of the reimbursement method if cash management requirements are not met.
+Advances made by recipients to consortium participants and contractors under grants must conform to
+substantially the same standards of timing and amount that govern advances to the recipient.
+Operational guidance for recipients is provided through a training CD from PSC. Inquiries regarding
+drawdown requests, cash management rules, and the disbursement of funds through the Federal Financial
+Report (SF 425) should be directed to PSC/PMS (see Part III).
+
+6.1 NIH PAYMENT REVIEW PROCESS
+As part of the implementation of Executive Order 14222 - Implementing the President's "Department of
+Government Efficiency" Cost Efficiency Initiative, to enhance transparency and accountability and
+reduce waste, fraud and abuse. NIH grant recipients are required to include a detailed justification
+explaining why the funds are being drawn and how the funds are being used during the period of performance when submitting payment requests to PMS in order for NIH staff to conduct a timely review
+and approval within the Defend the Spend (DTS) system.
+6.2 SMARTLINK II/ACH
+The SMARTLINK II/ACH method of advance payment makes direct deposit of funds to a recipient’s
+bank account and requires recipients to have Internet access to submit a request for funds to PMS.
+SMARTLINK II/ACH provides funds the day following the request with direct deposit using the Federal
+Reserve Bank’s (Richmond, Virginia) ACH process.
+6.3 CASH REQUEST
+Recipients not eligible for an unrestricted advance of funds by SMARTLINK II/ACH must submit a
+cash request, usually monthly. The cash request may be on either an advance or reimbursement basis, as
+(GPS page IIA-66)
+
+specified by the NIH awarding IC. Cash requests are used when a recipient’s cash management must be
+closely monitored (for example, recipients whose financial management systems do not meet the standards specified in 2 CFR Part 200.302) or under programs where reimbursement financing is appropriate.
+A recipient also may be converted from an unrestricted advance payment method to a cash request basis
+if, during post-award administration, the GMO determines that a recipient is not complying with the cash
+management requirements or other requirements of the award, including the submission of complete and
+timely reports (see Administrative Requirements—Monitoring—Reporting and Administrative Requirements—Enforcement Actions—Modification of the Terms of Award).
+If the cash request is for an advance payment, the recipient may request grant funds from PMS monthly
+on the basis of expected disbursements during the succeeding month and the amount of Federal funds
+already on hand. A request for reimbursement may be submitted more often, if authorized. For timely
+receipt of cash, a recipient must submit the request through the awarding IC early enough for it to be forwarded to PMS at least 2 weeks before the cash is needed. PMS makes payment to the recipient electronically through the ACH process upon receipt of the approved payment request from the awarding IC.
+
+6.4 INTEREST EARNED ON ADVANCES OF GRANT FUNDS
+Except as provided in 2 CFR Part 200.305(b)(8), any NIH recipient subject to the requirements of 2 CFR
+Part 200 that receives advance payments must maintain those advances in an interest-bearing account.
+Recipients are expected to promptly return any funds not spent within three business days. As provided
+in 2 CFR Part 200.305(b)(9)  subject to the requirements of 2 CFR Part 200 and to the extent required by
+law, interest earned on Federal advance payments deposited in interest-bearing accounts must be remitted annually to the Department of Health and Human Services, Payment Management System, Rockville,
+MD 20852. Interest amounts up to $500 per year may be retained by the recipient or subrecipient for
+administrative expense.
+6.5 IMPROPER PAYMENTS ELIMINATION AND RECOVERY
+IMPROVEMENT ACT
+The Improper Payments Elimination and Recovery Improvement Act of 2012 (IPERIA) (PL 112-248),
+signed into law on January 10, 2013, established the Do Not Pay Initiative to reduce improper payments
+or awards.  Improper payments occur when funds go to the wrong recipient, the recipient receives the
+incorrect amount of funds (including overpayments and underpayments), documentation is not available
+to support a payment, or the recipient uses funds in an improper manner. Incorrect amounts are overpayments or underpayments that are made to eligible recipients (including inappropriate denials of payment or service, any payment that does not account for credit for applicable discounts, payments that are
+for an incorrect amount, and duplicate payments). When an agency’s review is unable to discern whether
+a payment was proper as a result of insufficient or lack of documentation, this payment should also be
+considered an improper payment. When establishing documentation requirements for payments, agencies
+should ensure that all documentation requirements are necessary and should refrain from imposing additional burdensome documentation requirements. Interest or other fees that may result from an underpayment by an agency are not considered an improper payment if the interest was paid correctly. These
+payments are generally separate transactions and may be necessary under certain statutory, contractual,
+administrative, or other legally applicable requirements.
+HHS has implemented provisions of IPERIA through integrating use of the Do Not Pay system
+into the current payment processes managed by the PMS, HHS.
+(GPS page IIA-67)

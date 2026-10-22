@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { usePanelEffect } from './usePanelEffect'
+import { useState, useRef, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from './panelPortal'
 
 type TermKey =
   | 'judge'
@@ -24,7 +25,7 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   baseline: {
     short:
-      'What the score looks like before any tuning — your current setup, or no setup at all. We compare every trial against the baseline so you know whether tuning actually helped.',
+      'What the score looks like before any tuning, your current setup, or no setup at all. We compare every trial against the baseline so you know whether tuning actually helped.',
   },
   candidate: {
     short:
@@ -33,11 +34,11 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   tier: {
     short:
-      'How thoroughly we search — Quick tries fewer combinations and finishes faster, Thorough tries more and finishes slower. Standard is a sensible default.',
+      'How thoroughly we search: Quick tries fewer combinations and finishes faster, Thorough tries more and finishes slower. Standard is a sensible default.',
   },
   'noise-floor': {
     short:
-      "How much a score can wiggle from one run to the next, even on identical inputs. If a trial only beats the baseline by less than the noise floor, the win isn't real — we won't let you apply it.",
+      "How much a score can wiggle from one run to the next, even on identical inputs. If a trial only beats the baseline by less than the noise floor, the win isn't real, so we won't let you apply it.",
   },
   accuracy: {
     short:
@@ -49,7 +50,7 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   'expected-answer': {
     short:
-      "The correct answer for a test question — what you'd want the AI to say. The judge compares the AI's response against this.",
+      "The correct answer for a test question: what you'd want the AI to say. The judge compares the AI's response against this.",
   },
 }
 
@@ -108,7 +109,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
     reposition()
   }, [open, reposition])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node
@@ -136,11 +137,11 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
   }, [open, reposition])
 
   const isDark = theme === 'dark'
-  const triggerColor = isDark ? '#c4b5fd' : '#7c3aed'
-  const tipBg = isDark ? '#1f1f2e' : '#fff'
-  const tipBorder = isDark ? 'rgba(124, 58, 237, 0.4)' : '#d1d5db'
-  const tipText = isDark ? '#e5e5e5' : '#1f2937'
-  const tipMeta = isDark ? '#9ca3af' : '#6b7280'
+  const triggerColor = isDark ? 'var(--workspace-info)' : 'var(--workspace-info)'
+  const tipBg = isDark ? '#1f1f2e' : 'var(--workspace-text)'
+  const tipBorder = isDark ? 'var(--workspace-border)' : 'var(--workspace-border)'
+  const tipText = isDark ? 'var(--workspace-text)' : '#1f2937'
+  const tipMeta = isDark ? 'var(--workspace-muted)' : '#6b7280'
 
   return (
     <span ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
@@ -179,14 +180,14 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
             visibility: pos ? 'visible' : 'hidden',
             minWidth: 240,
             maxWidth: 320,
-            padding: '10px 12px',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
             background: tipBg,
             border: `1px solid ${tipBorder}`,
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: tipText,
             fontWeight: 400,
@@ -196,7 +197,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
         >
           <div>{def.short}</div>
           {def.example && (
-            <div style={{ marginTop: 6, fontSize: 11, color: tipMeta }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: tipMeta }}>
               {def.example}
             </div>
           )}

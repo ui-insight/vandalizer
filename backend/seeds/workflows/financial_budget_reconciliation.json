@@ -7,7 +7,6 @@
     "seed_id": "wf-financial-budget-reconciliation",
     "display_name": "Budget Reconciliation",
     "description": "Compares a financial report against the original budget, identifying variances and flagging categories that need sponsor approval for rebudgeting.",
-    "quality_tier": "excellent",
     "collections": [
       "financial"
     ]
@@ -43,6 +42,26 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "a401ea69-2bb6-5f42-80e1-379920ed5f13",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every budget amount, expenditure, balance and percentage in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "f0af760f-167a-55a7-881b-c7bb1258ab68",
+          "name": "Variance arithmetic is right",
+          "category": "accuracy",
+          "description": "For each category reported, the variance equals actual minus budget and the percentage equals that variance divided by the budget amount. FAIL for any variance or percentage that does not follow from the stated figures."
+        },
+        {
+          "id": "891a3bd7-e1ab-5683-aa24-7aae3076b3d2",
+          "name": "Rebudgeting thresholds have a source",
+          "category": "content",
+          "description": "A threshold used to flag rebudgeting (such as 25%) is either quoted from the award or sponsor terms in the document or labelled as a general practice to confirm with the sponsor. FAIL if a threshold is applied as the sponsor's rule when the document does not state it."
         }
       ]
     }

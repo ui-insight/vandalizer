@@ -406,7 +406,7 @@ class TestKnowledgeBaseQueryNodeApproximatePages:
         # The lookup imports get_document_manager inside the function, so it
         # has to be patched where it is defined rather than on workflow_engine.
         from app.services import document_manager as dm_mod
-        monkeypatch.setattr(dm_mod, "get_document_manager", lambda: dm)
+        monkeypatch.setattr(dm_mod, "get_document_manager", lambda *a, **k: dm)
         monkeypatch.setattr(we, "llm_chat_model", fake_llm_chat_model)
 
         node = we.KnowledgeBaseQueryNode({

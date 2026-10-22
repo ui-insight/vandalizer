@@ -7,10 +7,14 @@
     "seed_id": "wf-pre-award-budget-analyzer",
     "display_name": "Budget Analyzer",
     "description": "Extracts budget line items from a proposal or award document, checks for arithmetic errors, and flags potentially disallowed costs.",
-    "quality_tier": "excellent",
     "collections": [
       "pre-award",
       "financial"
+    ],
+    "superseded_prompt_sha256": [
+      "1d0780447f789a97fd9b9bc826497d32cef7a5fc222dbde5c0a0b76ed30ec717",
+      "9a9f2064484621c8257efa540780afb28b85d8315ded334b1328ab10c6196532",
+      "f78fb8d97263c8244bdbdead9e4c2ba3a0557f8c55b4ad4426780164449fe650"
     ]
   },
   "items": [
@@ -26,7 +30,76 @@
             {
               "name": "Extraction",
               "data": {
-                "searchphrases": "Senior Personnel Costs, Other Personnel Costs, Fringe Benefits, Fringe Benefit Rate, Equipment, Travel Domestic, Travel Foreign, Participant Support Costs, Materials and Supplies, Subcontracts, Consultant Costs, Other Direct Costs, Total Direct Costs, Indirect Costs, Indirect Cost Rate, Indirect Cost Base, Total Project Cost, Cost Sharing Amount, Number of Budget Periods, Annual Budget Amounts"
+                "searchphrases": "Senior Personnel Costs, Other Personnel Costs, Fringe Benefits, Fringe Benefit Rate, Equipment, Travel Domestic, Travel Foreign, Participant Support Costs, Materials and Supplies, Subcontracts, Consultant Costs, Other Direct Costs, Total Direct Costs, Indirect Costs, Indirect Cost Rate, Indirect Cost Base, Total Project Cost, Cost Sharing Amount, Number of Budget Periods, Annual Budget Amounts",
+                "cross_field_rules": [
+                  {
+                    "id": "wf-budget-analyzer-direct-sum",
+                    "type": "sum_equals",
+                    "label": "Direct cost categories add up to Total Direct Costs",
+                    "source_fields": [
+                      "Senior Personnel Costs",
+                      "Other Personnel Costs",
+                      "Fringe Benefits",
+                      "Equipment",
+                      "Travel Domestic",
+                      "Travel Foreign",
+                      "Participant Support Costs",
+                      "Materials and Supplies",
+                      "Subcontracts",
+                      "Consultant Costs",
+                      "Other Direct Costs"
+                    ],
+                    "target_field": "Total Direct Costs",
+                    "missing_as_zero": true,
+                    "tolerance": 1,
+                    "source": "imported"
+                  },
+                  {
+                    "id": "wf-budget-analyzer-total-sum",
+                    "type": "sum_equals",
+                    "label": "Total Direct Costs plus Indirect Costs equal Total Project Cost",
+                    "source_fields": [
+                      "Total Direct Costs",
+                      "Indirect Costs"
+                    ],
+                    "target_field": "Total Project Cost",
+                    "tolerance": 1,
+                    "source": "imported"
+                  },
+                  {
+                    "id": "wf-budget-analyzer-rate-applied",
+                    "type": "product_equals",
+                    "label": "Indirect Costs equal the Indirect Cost Rate applied to the Indirect Cost Base",
+                    "base_field": "Indirect Cost Base",
+                    "rate_field": "Indirect Cost Rate",
+                    "target_field": "Indirect Costs",
+                    "tolerance": 5,
+                    "source": "imported"
+                  },
+                  {
+                    "id": "wf-budget-analyzer-base-exclusions",
+                    "type": "at_most_difference",
+                    "label": "Indirect Cost Base leaves out equipment and participant support costs",
+                    "field": "Indirect Cost Base",
+                    "minuend_field": "Total Direct Costs",
+                    "subtrahend_fields": [
+                      "Equipment",
+                      "Participant Support Costs"
+                    ],
+                    "missing_as_zero": true,
+                    "tolerance": 1,
+                    "source": "imported"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-2cfr200",
+                "query": "Equipment means acquisition cost capitalization level; Modified Total Direct Cost (MTDC) means portion of each subaward; participant support costs means; unallowable costs entertainment alcoholic beverages lobbying",
+                "mode": "passages",
+                "k": 8
               }
             }
           ]
@@ -39,11 +112,45 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are a grants budget specialist reviewing an extracted budget. Perform the following analysis:\n\n## Arithmetic Verification\n- Do the personnel + fringe + other categories sum to Total Direct Costs?\n- Is the indirect cost rate applied correctly to the appropriate base (MTDC)?\n- Does Total Direct + Indirect = Total Project Cost?\n\n## Compliance Flags\n- Are there any potentially unallowable costs (entertainment, alcohol, lobbying, first-class travel)?\n- Is equipment properly categorized (items >$5,000)?\n- Are participant support costs separated from other categories?\n- For subawards, is only the first $25K of each included in the indirect cost base?\n\n## Reasonableness Check\n- Is the fringe benefit rate within normal institutional ranges (20-35% typical)?\n- Is the indirect cost rate consistent with the stated rate?\n- Are travel costs reasonable for the scope of work?\n\nPresent findings as:\n1. **Summary Table** - Budget category, amount, status (OK/Warning/Error)\n2. **Issues Found** - Numbered list with severity\n3. **Recommendations** - Actions to resolve issues",
+                "prompt": "You are a grants budget specialist reviewing an extracted budget. Perform the following analysis:\n\nYour input has three parts: the fields extracted from the document, passages from the Uniform Guidance (2 CFR 200) retrieved for this review, each labeled with its source, and the arithmetic checks Vandalizer computed from the extracted values. Apply each rule as those passages state it and cite its section (for example 2 CFR 200.1, definition of Equipment). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Arithmetic Verification\nThe checks below the extracted fields were computed exactly, in code, from the extracted values: the direct-cost categories against Total Direct Costs, Total Direct plus Indirect against Total Project Cost, the indirect cost rate applied to its base, and whether the base leaves out equipment and participant support costs. Report each one as computed. Do not redo or correct the arithmetic yourself.\n- PASS: say it adds up, and give the computed figure.\n- FAIL: report the difference the check gives as an Error.\n- NOT CHECKED: say which value was missing or was not one exact amount, and that the check could not be made. Never fill the gap with your own calculation.\n- A category counted as 0 because the document didn't state it: say so.\n- A base that passes \"leaves out equipment and participant support\" is only consistent with those two exclusions. Whether other MTDC exclusions apply (for example, each subaward above its first portion) still needs the subaward amounts; say so if the budget has subawards.\n\n## Compliance Flags\n- Are there any potentially unallowable costs (entertainment, alcohol, lobbying, first-class travel)?\n- Is equipment categorized as the 2 CFR 200.1 definition of equipment in the passages requires?\n- Are participant support costs separated from other categories?\n- For subawards, is only the portion of each subaward that the 2 CFR 200.1 MTDC definition allows included in the indirect cost base? An award made before October 1, 2024 may carry the earlier Uniform Guidance thresholds; check the award date.\n\n## Reasonableness Check\n- Is the fringe benefit rate within normal institutional ranges (20-35% typical)?\n- Is the indirect cost rate consistent with the stated rate?\n- Are travel costs reasonable for the scope of work?\n\nPresent findings as:\n1. **Summary Table** - Budget category, amount, status (OK/Warning/Error)\n2. **Issues Found** - Numbered list with severity\n3. **Recommendations** - Actions to resolve issues",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000002",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.1, definition of Equipment), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
+        },
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1013a0000003",
+          "name": "Reports the computed arithmetic as computed",
+          "description": "Each arithmetic finding (category sum, total, rate applied to the base, base exclusions) matches the PASS, FAIL or NOT CHECKED result Vandalizer computed, with the computed figure or difference. A NOT CHECKED result is reported as not checked, with the missing or inexact value named, never replaced by the model's own calculation.",
+          "category": "accuracy"
+        },
+        {
+          "id": "c81749b2-e1cd-5e54-9fbb-eaeff30315a3",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every budget amount, rate and total in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "b646ca7d-1e52-59f6-9a5b-e16c275a429d",
+          "name": "Allowability flags name the line",
+          "category": "content",
+          "description": "Every equipment, unallowable-cost or participant-support finding names the budget line and amount it is about. FAIL for a flag that does not identify the line, or a line flagged on a basis the budget does not show."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "7e8b7708-c57a-5abf-b1a3-a188333944fc",
+          "type": "text",
+          "label": "Fictional budget with one planted error. Answer key: categories sum to $345,000 total direct (pass); MTDC base $300,000 = $345,000 less $25,000 equipment and $20,000 participant support (consistent); 50% of $300,000 = $150,000 indirect (pass); $345,000 + $150,000 = $495,000, so the stated $500,000 total is overstated by $5,000 (fail). Foreign travel and consultants are not budgeted.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL BUDGET\nWatershed Sensor Network Pilot — proposed budget, budget period 1\nSenior Personnel Costs: $120,000\nOther Personnel Costs: $60,000\nFringe Benefits: $54,000 (fringe benefit rate 30%)\nEquipment: $25,000 (one sensor array, unit cost $25,000)\nTravel Domestic: $8,000\nTravel Foreign: N/A\nParticipant Support Costs: $20,000\nMaterials and Supplies: $12,000\nSubcontracts: $40,000 (one subaward to River College)\nConsultant Costs: none\nOther Direct Costs: $6,000\nTotal Direct Costs: $345,000\nIndirect Cost Rate: 50% (applied to modified total direct costs, MTDC)\nIndirect Cost Base: $300,000 (MTDC)\nIndirect Costs: $150,000\nTotal Project Cost: $500,000\nCost Sharing Amount: none\nNumber of Budget Periods: 1"
         }
       ]
     }
