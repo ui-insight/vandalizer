@@ -66,6 +66,7 @@ from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
 from app.models.telemetry import TelemetryHeartbeat
+from app.models.web_search_usage import WebSearchUsage
 
 ALL_MODELS = [
     Obligation,
@@ -167,6 +168,7 @@ ALL_MODELS = [
     ProjectPin,
     ProjectJoinLink,
     TelemetryHeartbeat,
+    WebSearchUsage,
 ]
 
 
