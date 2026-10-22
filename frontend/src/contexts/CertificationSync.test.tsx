@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { CertificationProgress, CourseDefinition } from '../types/certification'
@@ -46,7 +45,10 @@ function progress(definition: CourseDefinition, modules: Record<string, object>,
 const handle: { current: ReturnType<typeof useCertificationPanel> | null } = { current: null }
 function Panel() {
   const certification = useCertificationPanel()
-  useEffect(() => { handle.current = certification })
+  // Assigned during render, not in an effect: waitFor can see this render's
+  // text before its effects run, and the previous render's handlers still
+  // hold the progress from before it.
+  handle.current = certification
   return <output aria-label="Panel course">{`${certification.progress?.course_version} ${certification.progress?.total_xp} XP`}</output>
 }
 // The same handler ChatPanel registers for live tool results.
