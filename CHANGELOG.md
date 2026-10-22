@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- **certifi 2026.10.19 and Pillow 13.0.0 patch four critical advisories.** certifi bundled emSign root CAs with compromised keys (GHSA-6q48-6c7w-9gw2), and Pillow before 13.0.0 had three critical CVEs (CVE-2026-112393, CVE-2026-112403, CVE-2026-112900). The CI vulnerability scan failed on every pull request until both were upgraded in `backend/uv.lock`. Vandalizer doesn't import Pillow itself; it comes in through fpdf2, reportlab and python-pptx.
+
 ## [v4.15.0] - 2026-10-20
 
 ### Added
