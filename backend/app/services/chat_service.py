@@ -2997,7 +2997,6 @@ def _build_manifest_block(manifest: list[dict]) -> str:
         name = (entry.get("name") or "").strip()
         if not name:
             continue
-        status = entry.get("status")
         kb_title = entry.get("kb_title")
         line = f"- {name}"
         # Only set when several knowledge bases are attached, where a bare

@@ -12,11 +12,14 @@ import pytest
 from app.services import run_notifications
 from app.services.run_notifications import notify_extraction_completed, notify_workflow_completed
 
-NOW = datetime.datetime.now(datetime.timezone.utc)
+def _now():
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 def _ago(seconds):
-    return NOW - datetime.timedelta(seconds=seconds)
+    # Read the clock when the test runs, not at collection: a full suite runs
+    # for minutes, which ages a "10 seconds ago" start past the bell threshold.
+    return _now() - datetime.timedelta(seconds=seconds)
 
 
 def _result(**overrides):
@@ -55,19 +58,19 @@ class TestWorkflowCompleted:
         assert sent["group_title"] == "Workflow finished {count}×: NOA Summary"
 
     @pytest.mark.parametrize("why,user,result", [
-        ("finished while being watched", "ra-1", _result(start_time=_ago(10))),
-        ("an automation run", "ra-1", _result(is_passive=True)),
-        ("an automation run by id", "ra-1", _result(automation_id="auto-1")),
-        ("canceled, not completed", "ra-1", _result(status="canceled")),
-        ("nobody started it", None, _result()),
-        ("a system run", "system", _result()),
-        ("no start time", "ra-1", _result(start_time=None)),
+        ("finished while being watched", "ra-1", lambda: _result(start_time=_ago(10))),
+        ("an automation run", "ra-1", lambda: _result(is_passive=True)),
+        ("an automation run by id", "ra-1", lambda: _result(automation_id="auto-1")),
+        ("canceled, not completed", "ra-1", lambda: _result(status="canceled")),
+        ("nobody started it", None, lambda: _result()),
+        ("a system run", "system", lambda: _result()),
+        ("no start time", "ra-1", lambda: _result(start_time=None)),
     ])
     def test_no_bell(self, why, user, result):
-        assert _sent(notify_workflow_completed, user_id=user, workflow_doc={"_id": "wf-1"}, result_doc=result) is None, why
+        assert _sent(notify_workflow_completed, user_id=user, workflow_doc={"_id": "wf-1"}, result_doc=result()) is None, why
 
     def test_a_naive_start_time_is_read_as_utc(self):
-        naive = (NOW - datetime.timedelta(seconds=90)).replace(tzinfo=None)
+        naive = _ago(90).replace(tzinfo=None)
         assert _sent(notify_workflow_completed, user_id="ra-1", workflow_doc={"_id": "wf-1"}, result_doc=_result(start_time=naive))
 
     def test_a_failure_writing_the_bell_never_raises(self):
@@ -94,12 +97,12 @@ class TestExtractionCompleted:
         assert sent["coalesce_key"] == "extraction_completed:act-1"
 
     @pytest.mark.parametrize("why,activity", [
-        ("quick", {"_id": "a", "status": "running", "started_at": _ago(5)}),
-        ("a retry of a run that already finished", {"_id": "a", "status": "completed", "started_at": _ago(500)}),
+        ("quick", lambda: {"_id": "a", "status": "running", "started_at": _ago(5)}),
+        ("a retry of a run that already finished", lambda: {"_id": "a", "status": "completed", "started_at": _ago(500)}),
     ])
     def test_no_bell(self, why, activity):
         with patch.object(run_notifications, "create_notification_sync") as create:
-            notify_extraction_completed(self._db(), user_id="ra-1", activity=activity, search_set_uuid="ss-1", document_count=1)
+            notify_extraction_completed(self._db(), user_id="ra-1", activity=activity(), search_set_uuid="ss-1", document_count=1)
         assert not create.called, why
 
 

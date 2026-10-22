@@ -7,10 +7,10 @@ from types import SimpleNamespace
 from .attempts import encode
 from .enrollments import EnrollmentConflict
 from .lab_execution import implementation_digest as extraction_implementation_digest, runtime_digest
+from .stage_inputs import STAGE_SOURCES as SOURCES, reads_previous_stage
 
 INPUT_KEYS = {'input_sources', 'input_source', 'selected_document_uuid'}
 TASK_INPUT_KEYS = INPUT_KEYS | {'override_step_input'}
-from .stage_inputs import STAGE_SOURCES as SOURCES, reads_previous_stage
 TASK_KEYS = {
     'Extraction': TASK_INPUT_KEYS | {'model', 'extractions', 'search_set_uuid'},
     'Prompt': TASK_INPUT_KEYS | {'model', 'prompt'},
