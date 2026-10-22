@@ -13,7 +13,7 @@ from tests.integration import test_certification_enrollments as base
 
 repo = base.repo
 versioned_runtime = base.versioned_runtime
-pytestmark = base.pytestmark
+pytestmark = [base.pytestmark, pytest.mark.usefixtures("completion_approved", "lessons_read")]
 
 
 @pytest.mark.parametrize('state', ['prepared', 'transferred', 'abandoned'])

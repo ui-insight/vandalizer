@@ -18,7 +18,7 @@ from tests.integration import test_certification_enrollments as base
 from tests.test_certification_outcome_rubric import candidate, VERSION
 
 repo = base.repo
-pytestmark = base.pytestmark
+pytestmark = [base.pytestmark, pytest.mark.usefixtures("completion_approved", "lessons_read")]
 
 
 async def enroll(repo, monkeypatch, tmp_path, kind):

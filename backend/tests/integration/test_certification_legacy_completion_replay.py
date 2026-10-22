@@ -14,7 +14,7 @@ from app.services.certification_versions.catalog import CourseCatalogError
 from tests.integration import test_certification_enrollments as base
 
 repo = base.repo
-pytestmark = base.pytestmark
+pytestmark = [base.pytestmark, pytest.mark.usefixtures("completion_approved", "lessons_read")]
 
 
 async def test_legacy_retry_after_changed_answers_returns_original_result_without_grading_again(repo, monkeypatch):

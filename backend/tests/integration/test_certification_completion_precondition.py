@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 from tests.integration import test_certification_enrollments as base
 
 repo = base.repo
-pytestmark = base.pytestmark
+pytestmark = [base.pytestmark, pytest.mark.usefixtures("completion_approved", "lessons_read")]
 
 
 @pytest.mark.parametrize('pinned', [False, True])
