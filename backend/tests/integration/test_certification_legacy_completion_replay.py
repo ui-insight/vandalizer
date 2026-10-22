@@ -190,6 +190,8 @@ async def test_live_chat_derives_a_stable_request_reference_and_preserves_explic
     assert await chat_tools.complete_certification_module(context, 'ai_literacy') == first
     context.tool_call_id = 'new-call'
     assert await chat_tools.complete_certification_module(context, 'ai_literacy', request_id=first['attempt_id']) == first
+    # A new request is checked first (adbea744): the edited answers fail, so
+    # nothing is graded or recorded, and the original completion stands.
     different = await chat_tools.complete_certification_module(context, 'ai_literacy', expected_attempts=1)
-    assert different['error'] == 'Validation did not pass' and different['attempt_id'] != first['attempt_id']
+    assert "isn't ready to complete" in different['error'] and 'attempt_id' not in different
     assert (await service.get_progress(learner)).total_xp == 125
