@@ -141,8 +141,6 @@ Legacy field-count assessments retain their original sharing and counting rules,
 - Build outcome-based credit previews and an explicit optional-upgrade decision. Keep source enrollments and original credentials available.
 - Extend browser and real HTTP/chat contract evidence to full labs, transitions and live-model journeys before activation. Current captures use synthetic API responses; integration tests use disposable MongoDB databases. Rehearse rollout and rollback: simply disabling the flag after initialization is not a verified rollback.
 
-The authoritative acceptance status and evidence are in [the implementation log](../../../docs/certification-v5-implementation-progress.md).
-
 ## Administrator access changes
 
 An administrator access change affects only the prerequisite-access flag. It cannot supply an outcome, completion, XP or a credential, and courses with the explicit any-order policy reject the override. Each new request requires a reason and a stable retry identity; the authenticated server-side administrator supplies its actor. The flag and its private course audit event are written in the same atomic update. An audit-write failure cannot leave an unrecorded override. Replaying a request preserves its original reason and actor and cannot reverse a later access change.
