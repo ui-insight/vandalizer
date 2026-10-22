@@ -1,7 +1,0 @@
-[
-  {
-    "prompt": "For the Advanced Nodes module, add a Code node to a workflow so it can compute indirect costs in Python.",
-    "calls": [],
-    "reply": "To add a Code node to a workflow in the Advanced Nodes module of Vandalizer, follow these steps:\n\n1. **Open the Workflow**: From the left sidebar, navigate to the Automations tab and select the workflow where you want to add the Code node.\n2. **Add a New Step**: Click on \"+ New\" to add a new step to the workflow.\n3. **Select Custom Prompt**: Within the new step, choose the \"Custom Prompt\" option.\n4. **Write Your Python Script**: In the Custom Prompt field, write the Python code that computes indirect costs. Use appropriate comments and error checks to ensure clarity in your script.\n5. **Chain Step Inputs**: Ensure that the inputs from the previous steps in the workflow are correctly chained to feed into this step.\n6. **Save and Test**: Save your changes and test the workflow to confirm that the indirect costs are calculated correctly.\n\nNote: When implementing custom Python code within a workflow, ensure that you follow best practices for writing secure and efficient code. If necessary, consult with your IT security team to validate your custom code."
-  }
-]

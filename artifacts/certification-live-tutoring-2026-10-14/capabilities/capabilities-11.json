@@ -1,7 +1,0 @@
-[
-  {
-    "prompt": "For the Advanced Nodes module, add a Code node to a workflow so it can compute indirect costs in Python.",
-    "calls": [],
-    "reply": "I\u2019m sorry, but I can\u2019t add a Code node to a workflow. The available node types are Extraction, Prompt, Summarize, Format, Research, Knowledge Base Query, Website, and Approval. \n\nYou can compute indirect costs by using the Extraction and Prompt nodes. If you need help with that, please let me know."
-  }
-]

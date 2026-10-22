@@ -1,7 +1,0 @@
-[
-  {
-    "prompt": "For the Advanced Nodes module, add a Code node to a workflow so it can compute indirect costs in Python.",
-    "calls": [],
-    "reply": "I'm sorry, but adding a Code node to compute indirect costs in Python isn't currently supported within the Advanced Nodes module. If you have any other requests or need assistance with a different aspect of the system, feel free to let me know!"
-  }
-]
