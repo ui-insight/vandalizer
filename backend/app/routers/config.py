@@ -263,6 +263,8 @@ async def get_features(
     settings: Settings = Depends(get_settings),
 ):
     """Return feature flags for the current deployment."""
+    from app.services import web_search_service
+
     config = await SystemConfig.get_config()
     return {
         "m365_enabled": False,
@@ -270,6 +272,9 @@ async def get_features(
         # True only on the fleet collector instance — gates the admin telemetry
         # dashboard so it stays hidden on every other deployment.
         "telemetry_collector_enabled": settings.telemetry_collector_enabled,
+        # A provider is set up: the workflow editor warns on a Web Search step
+        # that would otherwise stop its run.
+        "web_search_enabled": web_search_service.is_configured(config.model_dump()),
     }
 
 

@@ -11,7 +11,7 @@ import {
   Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
-  Cpu, GitBranch,
+  Cpu, GitBranch, ScanSearch,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -40,7 +40,7 @@ import { StalePlanBanner } from './StalePlanBanner'
 import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
-import { getModels } from '../../api/config'
+import { getFeatureFlags, getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { useAdminQuery } from '../admin/shared/useAdminQuery'
@@ -124,6 +124,8 @@ const TASK_TYPES: TaskTypeDef[] = [
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
   { name: 'ResearchNode', label: 'Deep Analysis', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
     description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
+  { name: 'WebSearch', label: 'Web Search', icon: ScanSearch, color: '#0d9488', categories: ['all', 'web'], enabled: true,
+    description: 'Searches the web and passes the results, each with its URL, to later steps. Needs a web search provider set up by an administrator.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
     description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
@@ -204,14 +206,14 @@ const TEST_MESSAGES = [
 const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
-  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery', 'APINode',
+  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery', 'APINode', 'WebSearch',
 ])
 
 // Steps whose test input is their own configuration — a URL, an endpoint, a
 // knowledge-base question — rather than the run's documents. Testing one with
 // no document selected is the normal case, not a missing prerequisite.
 const TEST_STEP_NO_DOCUMENT_TYPES = new Set([
-  'APINode', 'CrawlerNode', 'AddWebsite', 'KnowledgeBaseQuery',
+  'APINode', 'CrawlerNode', 'AddWebsite', 'KnowledgeBaseQuery', 'WebSearch',
 ])
 
 const TEST_STEP_NEEDS_DOCUMENT_HINT =
@@ -2555,6 +2557,7 @@ function describeTaskType(name: string): string {
     case 'CrawlerNode': return 'Web crawler'
     case 'ResearchNode': return 'Two-pass document analysis'
     case 'KnowledgeBaseQuery': return 'Search knowledge base'
+    case 'WebSearch': return 'Search the web'
     case 'APINode': return 'HTTP API request'
     case 'DocumentRenderer': return 'Render document'
     case 'FormFiller': return 'Fill template'
@@ -2998,6 +3001,9 @@ export function requiredFieldMessage(taskName: string, data: Record<string, unkn
   if (taskName === 'AddWebsite' && !text('url')) {
     return 'Enter the URL of the page to fetch before saving this step.'
   }
+  if (taskName === 'WebSearch' && !text('query')) {
+    return 'Enter what to search for before saving this step.'
+  }
   if (taskName === 'APINode' && !text('url')) {
     return 'Enter the endpoint URL before saving this step.'
   }
@@ -3393,6 +3399,18 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     }
   }, [task.name])
 
+  // Whether this deployment has a web search provider; a Web Search step
+  // fails its run without one, so the editor says so up front.
+  const [webSearchEnabled, setWebSearchEnabled] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (task.name !== 'WebSearch') return
+    let cancelled = false
+    getFeatureFlags()
+      .then(f => { if (!cancelled) setWebSearchEnabled(f.web_search_enabled ?? null) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [task.name])
+
   // Load knowledge bases for KnowledgeBaseQuery tasks
   useEffect(() => {
     if (task.name === 'KnowledgeBaseQuery') {
@@ -3715,6 +3733,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   : task.name === 'CrawlerNode' ? 'Crawl multiple pages from a starting URL'
                   : task.name === 'ResearchNode' ? 'Two-pass AI analysis of the step input'
                   : task.name === 'KnowledgeBaseQuery' ? 'Search a knowledge base and inject results as context'
+                  : task.name === 'WebSearch' ? 'Search the web and pass results with their URLs downstream'
                   : task.name === 'APINode' ? 'Make HTTP API requests'
                   : task.name === 'DocumentRenderer' ? 'Render output as a downloadable file'
                   : task.name === 'FormFiller' ? 'Fill a template with data'
@@ -4218,6 +4237,63 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
+              </div>
+            )}
+
+            {task.name === 'WebSearch' && (
+              <div>
+                {webSearchEnabled === false && (
+                  <div role="status" style={{
+                    padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)', backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-small)',
+                    fontSize: 'var(--workspace-font-control)', color: '#92400e', lineHeight: 1.5,
+                  }}>
+                    Web search isn't set up on this deployment, so this step will stop the run. An administrator can
+                    choose a provider in System Config.
+                  </div>
+                )}
+                <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
+                    Search for <span style={{ color: '#dc2626' }} aria-hidden="true">*</span>
+                  </label>
+                  <textarea
+                    aria-label="Web search query"
+                    aria-required="true"
+                    aria-invalid={saveError ? true : undefined}
+                    value={getTextValue('query')}
+                    onChange={e => setTextValue('query', e.target.value)}
+                    placeholder="e.g., {{ inputs.output }} proposal page limit"
+                    rows={3}
+                    style={{
+                      width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                      fontFamily: 'inherit', border: `1px solid ${saveError ? '#dc2626' : 'var(--workspace-border)'}`, borderRadius: 'var(--workspace-radius-small)',
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                    Supports {'{{ inputs.output }}'} to search with the previous step's output, e.g. the sponsor an
+                    earlier step extracted. The search goes to a third-party provider: search for the public rule, not
+                    names, award numbers or figures from your documents.
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
+                    Results
+                  </label>
+                  <input
+                    aria-label="Web search results"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={getTextValue('max_results') || '5'}
+                    onChange={e => setTextValue('max_results', e.target.value)}
+                    style={{
+                      width: 80, padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                      fontFamily: 'inherit', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
               </div>
             )}
 
@@ -5910,7 +5986,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   )
 }
 
-function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
+export function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
   const [expanded, setExpanded] = useState(false)
   return (
     <div style={{ marginTop: 'var(--workspace-space-4)', borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-8)' }}>
@@ -5937,18 +6013,25 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
             const label = locator ? `${c.document_title} · ${locator}` : c.document_title
             const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
             const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' - ')
+            const chipStyle: CSSProperties = {
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+              backgroundColor: '#f3f4f6', color: '#374151',
+              border: "1px solid var(--workspace-border)", borderRadius: 999,
+              cursor: c.url ? 'pointer' : 'help', textDecoration: 'none',
+            }
+            // A web result opens its page; a knowledge-base passage has no
+            // address of its own, so it stays a labelled chip.
+            if (c.url) {
+              return (
+                <a key={`${c.url}-${i}`} href={c.url} target="_blank" rel="noopener noreferrer" title={tooltip || c.url} style={chipStyle}>
+                  <Globe size={12} aria-hidden="true" />
+                  {label}
+                </a>
+              )
+            }
             return (
-              <span
-                key={`${c.chunk_id ?? c.document_id ?? i}`}
-                title={tooltip}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
-                  padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
-                  backgroundColor: '#f3f4f6', color: '#374151',
-                  border: "1px solid var(--workspace-border)", borderRadius: 999,
-                  cursor: 'help',
-                }}
-              >
+              <span key={`${c.chunk_id ?? c.document_id ?? i}`} title={tooltip} style={chipStyle}>
                 {label}
               </span>
             )

@@ -454,3 +454,27 @@ class TestThemeRoute:
             )
 
         assert resp.status_code == 403
+
+
+class TestFeatureFlags:
+    """GET /api/config/features says whether web search is set up, so the
+    workflow editor can warn on a Web Search step that would stop its run."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("provider,enabled", [("tavily", True), ("", False)])
+    async def test_web_search_enabled_follows_the_provider(self, client, provider, enabled):
+        user = _make_user()
+        cookies, headers = _auth()
+        cfg = MagicMock()
+        cfg.is_compliance_enabled.return_value = False
+        cfg.model_dump.return_value = {"web_search_provider": provider}
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/config/features", cookies=cookies, headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["web_search_enabled"] is enabled

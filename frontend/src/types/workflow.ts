@@ -124,6 +124,8 @@ export interface WorkflowCitation {
   score?: number | null;
   similarity?: number | null;
   content_preview?: string;
+  /** A web result's address (Web Search step); the chip opens it. */
+  url?: string | null;
 }
 
 export interface WorkflowStatus {
