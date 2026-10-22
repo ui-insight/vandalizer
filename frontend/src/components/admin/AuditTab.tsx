@@ -5,8 +5,42 @@ import { useEffect, useRef, useCallback } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 
 import * as auditApi from '../../api/audit'
+import { WebSearchLog } from './WebSearchLog'
+
+type AuditView = 'actions' | 'web_searches'
+const VIEWS: { id: AuditView; label: string }[] = [
+  { id: 'actions', label: 'Actions' },
+  { id: 'web_searches', label: 'Web searches' },
+]
 
 export function AuditTab() {
+  const [view, setView] = useAdminViewState<AuditView>('AuditTab.view', 'actions')
+  return (
+    <div>
+      <div role="group" aria-label="Audit view" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {VIEWS.map(v => (
+          <button
+            key={v.id}
+            type="button"
+            aria-pressed={view === v.id}
+            onClick={() => setView(v.id)}
+            style={{
+              padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+              backgroundColor: view === v.id ? 'var(--highlight-color, #eab308)' : '#fff',
+              color: view === v.id ? 'var(--highlight-text-color, #000)' : '#374151',
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === 'web_searches' ? <WebSearchLog /> : <ActionLog />}
+    </div>
+  )
+}
+
+function ActionLog() {
   const [page, setPage] = useAdminViewState('AuditTab.page', 0)
   const [actionFilter, setActionFilter] = useAdminViewState('AuditTab.actionFilter', '')
   const [debouncedActionFilter, setDebouncedActionFilter] = useAdminViewState('AuditTab.debouncedActionFilter', '')
