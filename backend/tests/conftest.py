@@ -81,6 +81,15 @@ def _celery_in_memory():
     celery.conf.broker_url = "memory://"
 
 
+@pytest.fixture(autouse=True)
+def _vector_ranking_by_default(monkeypatch):
+    """Precise KB retrieval (services/kb_retrieval.py) builds an index over a
+    store's chunks and fetches a cross-encoder on first use. Unit tests run
+    the vector ranking they were written against, and never reach for the
+    model; tests of precise retrieval turn it on and inject a scorer."""
+    monkeypatch.setenv("KB_PRECISE_RETRIEVAL", "false")
+
+
 @pytest.fixture
 async def client():
     with patch("app.main.init_db", new_callable=AsyncMock):

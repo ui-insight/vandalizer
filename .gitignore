@@ -6,6 +6,8 @@ mongo-backup
 # Uploads directory
 app/static/uploads/
 app/static/db/
+# The knowledge-base reranker's model files, fetched on first use in development
+backend/models/
 
 # Development certificates
 certs/

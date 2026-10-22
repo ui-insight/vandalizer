@@ -213,3 +213,42 @@ class TestReplaceKbSource:
             mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "third version. " * 300)
 
         assert all("third version" in t for t in collection.text_of("src-1"))
+
+
+class TestGetKbAllChunks:
+    """What precise retrieval builds its per-base index from: every chunk,
+    or nothing when the base is missing, unreadable, or too big to index."""
+
+    def _with(self, collection) -> DocumentManager:
+        mgr = _manager()
+        mgr.get_kb_collection_readonly = MagicMock(return_value=collection)
+        return mgr
+
+    def test_returns_every_chunk_in_query_shape(self):
+        coll = MagicMock()
+        coll.count.return_value = 2
+        coll.get.return_value = {
+            "ids": ["s_chunk_0", "s_chunk_1"],
+            "documents": ["first", "second"],
+            "metadatas": [{"source_id": "s"}, {"source_id": "s"}],
+        }
+        chunks = self._with(coll).get_kb_all_chunks("kb")
+        assert [c["chunk_id"] for c in chunks] == ["s_chunk_0", "s_chunk_1"]
+        assert chunks[1] == {"content": "second", "metadata": {"source_id": "s"},
+                             "chunk_id": "s_chunk_1", "score": None, "similarity": None}
+        coll.get.assert_called_once_with(include=["documents", "metadatas"])
+
+    def test_a_base_never_ingested_has_none(self):
+        assert self._with(None).get_kb_all_chunks("kb") == []
+
+    def test_a_base_over_the_limit_is_not_read(self):
+        coll = MagicMock()
+        coll.count.return_value = 10
+        assert self._with(coll).get_kb_all_chunks("kb", limit=5) == []
+        coll.get.assert_not_called()
+
+    def test_a_failed_read_is_empty_not_an_error(self):
+        coll = MagicMock()
+        coll.count.return_value = 1
+        coll.get.side_effect = RuntimeError("chroma down")
+        assert self._with(coll).get_kb_all_chunks("kb") == []

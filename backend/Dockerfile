@@ -82,6 +82,11 @@ RUN case "$INSTALL_BROWSER" in \
     fi
 
 COPY app ./app
+# The knowledge-base reranker's pinned, hash-verified model files
+# (app/services/cross_encoder.py), so the first grounded task does not fetch
+# 90 MB. A build without network still succeeds: the files are then fetched
+# and verified on first use, and until then retrieval keeps its vector ranking.
+RUN python -m app.services.cross_encoder || echo "KB reranker model not baked; it is fetched on first use"
 COPY certification-data ./certification-data
 COPY scripts ./scripts
 COPY seeds ./seeds

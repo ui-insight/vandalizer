@@ -22,10 +22,15 @@ The pipeline, per task:
    found by its heading and handed over whole (heading to next heading,
    capped — see "Sections" below), then a lexical lookup for any other cited
    number or identifier (``NSF-24-117``) that a bi-encoder scores as
-   near-noise, then an over-fetched vector search with a per-source
-   diversity cap so one long page cannot fill every slot.
-   The knowledge base's Autovalidate-tuned relevance floor applies unless the
-   task sets its own.
+   near-noise, then the rest by relevance. Where it can run, that is precise
+   retrieval (:mod:`app.services.kb_retrieval`): a plain query is expanded
+   with research-administration vocabulary, routed to a section whose title
+   it names, searched by vector and BM25 together, and reranked by a local
+   cross-encoder whose cut hands over no passage rather than a wrong one.
+   Otherwise it is an over-fetched vector search with a per-source diversity
+   cap so one long page cannot fill every slot.
+   The knowledge base's Autovalidate-tuned relevance floor applies to the
+   vector candidates unless the task sets its own.
 3. Round-robin the pools across a base's queries, then across bases, so each
    query and each base is represented before any contributes twice; dedupe
    on chunk id *and* on content, because a corpus that ingests both a whole
@@ -45,6 +50,8 @@ Deliberately not applied from a knowledge base's tuned config: LLM reranking
 and query rewriting. Those tune a chat answer to one free-text question; a
 grounded task issues several author-written retrieval queries per run, and an
 LLM call per (base, query) pair inside a parallel step is the wrong trade.
+The local cross-encoder costs well under a second per pair of base and query
+on a CPU, and a task's queries are fixed, so its results are cached.
 """
 
 from __future__ import annotations
@@ -666,12 +673,97 @@ def dedupe_passages(passages: list[dict]) -> list[dict]:
     return out
 
 
+def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Optional[list[dict]]:
+    """One (knowledge base, query) pool through precise retrieval (see
+    :mod:`app.services.kb_retrieval`), or None when it cannot run here — the
+    store cannot list the base, the reranker is unavailable, or it is turned
+    off — so the caller keeps the vector ranking.
+
+    The lanes, in the order their passages are handed over:
+
+    1. Each section the query names by number, from its heading (as before);
+       a plain query whose words match one section's title unambiguously is
+       routed to that section the same way.
+    2. Literal identifiers that are not sections of this base (``NSF-24-117``).
+    3. A named or routed section's best chunks by the query's words: past the
+       cap of a long section's passage (§ 200.308(g) on one-time extensions),
+       or the section itself where the heading lane cannot build it (a policy
+       page headed "45.13 - Program Income").
+    4. Hybrid candidates reranked by the cross-encoder, kept only above the
+       relevance cut — so a query the base cannot answer hands over nothing.
+    """
+    from app.services import kb_retrieval as kr
+
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or not kr.ready():
+        return None
+    cache_key = (kb_uuid, index.count, index.built_at, query, k, floor)
+    hit = kr.cached(cache_key)
+    if hit is not None:
+        return hit
+
+    expanded = kr.expand(index, query)
+    half = max(1, -(-k // 2))
+    named = section_terms(query)
+    routed = kr.route(index, query) if not named else None
+
+    section_query = f"{routed.key} {query}" if routed and routed.numbered and not routed.term else query
+    sections = _section_passages(dm, kb_uuid, section_query)[:half]
+    built = {s["_section"] for s in sections}
+    pinned = _pinned_hits(dm, kb_uuid, query, skip=frozenset(built | set(index.section_titles)))
+
+    final: list[dict] = []
+    seen: set = set().union(*(s["_replaces"] for s in sections)) if sections else set()
+    for r in sections + pinned:
+        if len(final) >= half:
+            break
+        cid = r.get("chunk_id")
+        if cid is not None and cid in seen:
+            continue
+        if cid is not None:
+            seen.add(cid)
+        final.append(r)
+
+    scoped: list[tuple[str, Optional[str], bool]] = [(s, None, True) for s in named if s in index.section_titles]
+    if routed and (routed.term or routed.key not in built):
+        scoped.append((routed.key, routed.term, False))
+    anchor = next(iter(built), None) or (scoped[0][0] if scoped else None)
+    for key, term, asked in scoped:
+        lane = [c for c in kr.candidates(dm, index, kb_uuid, expanded, floor=0.0, within=key, containing=term)
+                if c.get("chunk_id") not in seen]
+        scored = kr.rerank(index, expanded, lane)
+        # A section the author named is theirs to have: its best chunk (or
+        # two, when no passage stands for it). A routed one is inferred, so
+        # its chunks must also clear the cut.
+        take = scored[: (1 if key in built else kr.ROUTED_CHUNKS)] if asked else \
+            kr.keep(scored, anchor_section=key, index=index)[: kr.ROUTED_CHUNKS]
+        for r in take:
+            seen.add(r.get("chunk_id"))
+            final.append(r)
+
+    general = [c for c in kr.candidates(dm, index, kb_uuid, expanded, floor=floor) if c.get("chunk_id") not in seen]
+    for r in kr.keep(kr.rerank(index, expanded, general), anchor_section=anchor, index=index):
+        if len(final) >= k:
+            break
+        if r.get("chunk_id") in seen:
+            continue
+        seen.add(r.get("chunk_id"))
+        final.append(r)
+    pool = final[:k]
+    kr.remember(cache_key, pool)
+    return pool
+
+
 def _retrieve_pool(
     dm, kb_uuid: str, query: str, *, k: int, floor: float,
 ) -> list[dict]:
-    """One (knowledge base, query) pool: the sections the query names, then
+    """One (knowledge base, query) pool: precise retrieval when it can run
+    (:func:`_precise_pool`); otherwise the sections the query names, then
     pinned lexical hits, then the over-fetched vector search, diversified and
     cut to ``k``."""
+    precise = _precise_pool(dm, kb_uuid, query, k=k, floor=floor)
+    if precise is not None:
+        return precise
     vector = dm.query_kb(kb_uuid, query, k * OVERFETCH_MULTIPLIER, floor)
     if floor > 0:
         # Belt and braces: the store applies the floor too, but a fake or an

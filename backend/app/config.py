@@ -66,6 +66,23 @@ class Settings(BaseSettings):
     # is the pre-existing behaviour, so leaving this unset costs accuracy for
     # self-hosted models but breaks nothing.
     tokenizer_cache_root: str = "/hf-cache"
+    # Knowledge-base retrieval for workflow grounding: hybrid lexical+vector
+    # candidates, a local cross-encoder, and a relevance cut that hands over
+    # no passage rather than a wrong one (services/kb_retrieval.py). Off falls
+    # back to the vector ranking with its per-source diversity cap.
+    kb_precise_retrieval: bool = True
+    # Where the cross-encoder's pinned model files live. Empty means
+    # backend/models/ms-marco-MiniLM-L-6-v2 (baked into the image; fetched and
+    # verified on first use otherwise).
+    kb_reranker_dir: str = ""
+    # onnxruntime threads per scoring call. Several Celery workers each score
+    # in parallel, so this stays small.
+    kb_reranker_threads: int = 4
+    # Who the deployment serves. "ihe" (institutions of higher education)
+    # keeps the cost-principle appendices written for other kinds of
+    # recipient (2 CFR 200 Appendices IV-IX) out of retrieved passages; any
+    # other value keeps them.
+    kb_institution_type: str = "ihe"
 
     # Observability
     sentry_dsn: str = ""

@@ -647,6 +647,35 @@ class DocumentManager:
             }
         return [found[cid] for cid in ids if cid in found]
 
+    def get_kb_all_chunks(self, kb_uuid: str, limit: int = 50_000) -> list[dict[str, Any]]:
+        """Every chunk of a KB collection, in the store's order, with no
+        score — what a lexical index over the whole base is built from.
+        Returns ``[]`` for a base that was never ingested, a failed read, or
+        one larger than ``limit`` (an index over it would not be worth the
+        memory)."""
+        collection = self.get_kb_collection_readonly(kb_uuid)
+        if collection is None:
+            return []
+        try:
+            if collection.count() > limit:
+                return []
+            results = collection.get(include=["documents", "metadatas"])
+        except Exception as e:
+            logger.debug("KB full read failed for kb=%s: %s", kb_uuid, e)
+            return []
+        docs = results.get("documents") or []
+        metas = results.get("metadatas") or []
+        return [
+            {
+                "content": docs[i] if i < len(docs) else "",
+                "metadata": metas[i] if i < len(metas) else {},
+                "chunk_id": cid,
+                "score": None,
+                "similarity": None,
+            }
+            for i, cid in enumerate(results.get("ids") or [])
+        ]
+
     def delete_kb_collection(self, kb_uuid: str) -> None:
         """Drop an entire KB collection. No-op if the collection never existed."""
         collection_name = f"kb_{kb_uuid}"
