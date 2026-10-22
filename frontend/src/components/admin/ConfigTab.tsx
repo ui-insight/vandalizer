@@ -568,7 +568,11 @@ function ConfigEditor() {
     setWebSearchTesting(true)
     setWebSearchTestResult(null)
     try {
-      const res = await testWebSearch()
+      // The form's current values, so unsaved edits are what gets tested; an
+      // untouched key field holds the "***" sentinel, meaning the saved key.
+      const res = await testWebSearch({
+        web_search_provider: webSearchProvider, web_search_endpoint: webSearchEndpoint, web_search_api_key: webSearchApiKey,
+      })
       setWebSearchTestResult({ ok: true, message: res.message })
     } catch (e) {
       setWebSearchTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
@@ -1026,7 +1030,7 @@ ${playgroundResult.request.user_prompt}`}
           <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #f0f0f0' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Web Search</div>
             <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 16 }}>
-              Lets the chat assistant search the web when an answer isn't in the user's documents or knowledge bases. The assistant favors local sources first and only reaches for the web when needed.
+              Lets the chat assistant and workflow Web Search steps search the web when an answer isn't in the user's documents or knowledge bases, and lets knowledge bases find pages from a topic. The assistant favors local sources first and only reaches for the web when needed. Each query is sent to the provider; the assistant is told to keep names, award numbers and figures from users' documents out of them.
             </div>
             <div>
               <label style={labelStyle}>Provider</label>
@@ -1079,7 +1083,7 @@ ${playgroundResult.request.user_prompt}`}
               )}
             </div>
             <div style={{ fontSize: 12, color: '#4b5563', marginTop: 10 }}>
-              Note: Test Search and chat use the saved configuration — use Save Processing Settings before testing new values.
+              Test Search uses the values above, saved or not. Chat, workflows and knowledge bases use the saved configuration, so save after a passing test.
             </div>
           </div>
         </div>

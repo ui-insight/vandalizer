@@ -599,8 +599,11 @@ export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string; ocr_p
   })
 }
 
-export function testWebSearch() {
-  return apiFetch<{ status: string; result_count: number; message: string }>('/api/admin/config/test-web-search', { method: 'POST' })
+export function testWebSearch(data: { web_search_provider: string; web_search_endpoint: string; web_search_api_key: string }) {
+  return apiFetch<{ status: string; result_count: number; message: string }>('/api/admin/config/test-web-search', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 export type ModelCheck = { label: string; ok: boolean; detail: string }

@@ -1595,7 +1595,18 @@ async def update_config(
     if body.web_search_api_key is not None and body.web_search_api_key != "***":
         cfg.web_search_api_key = encrypt_value(body.web_search_api_key)
     if body.web_search_provider is not None:
-        cfg.web_search_provider = body.web_search_provider
+        from app.services.web_search_service import PROVIDERS as WEB_SEARCH_PROVIDERS
+
+        provider = body.web_search_provider.strip().lower()
+        # Saved unchecked, a provider the service can't call (the README once
+        # listed "serper") broke every search with "Unknown web search provider".
+        if provider and provider not in WEB_SEARCH_PROVIDERS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown web search provider {body.web_search_provider!r}. "
+                f"Use one of: {', '.join(WEB_SEARCH_PROVIDERS)}.",
+            )
+        cfg.web_search_provider = provider
     if body.ocr_provider is not None:
         if body.ocr_provider not in ocr_client.OCR_PROVIDERS:
             raise HTTPException(
@@ -3078,27 +3089,58 @@ async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(g
     )
 
 
+class TestWebSearchRequest(BaseModel):
+    web_search_provider: Optional[str] = None
+    web_search_endpoint: Optional[str] = None
+    web_search_api_key: Optional[str] = None
+
+
 @router.post("/config/test-web-search")
-async def test_web_search(user: User = Depends(get_current_user)):
-    """Test the web search endpoint by running a real sample query."""
+async def test_web_search(body: Optional[TestWebSearchRequest] = None, user: User = Depends(get_current_user)):
+    """Test web search by running a real sample query.
+
+    Accepts the admin form's current values so unsaved edits are what gets
+    tested (an ``"***"`` key means the saved key, as on save); omitted fields
+    fall back to the saved config. This used to test only the saved config,
+    so testing before saving checked the old setup.
+
+    A search that returns no results fails: a provider answering an empty
+    list for a common query is misconfigured (wrong index, wrong path), and
+    reporting it "ok" would hide that every chat search finds nothing.
+    """
     await _require_superadmin(user)
 
     from app.services import web_search_service
+    from app.services.metering import metered_async
 
     cfg = await SystemConfig.get_config()
     sys_config_doc = cfg.model_dump()
+    if body:
+        if body.web_search_provider is not None:
+            sys_config_doc["web_search_provider"] = body.web_search_provider
+        if body.web_search_endpoint is not None:
+            sys_config_doc["web_search_endpoint"] = body.web_search_endpoint
+        if body.web_search_api_key is not None and body.web_search_api_key != "***":
+            sys_config_doc["web_search_api_key"] = body.web_search_api_key
     if not web_search_service.is_configured(sys_config_doc):
         raise HTTPException(status_code=400, detail="Web search is not configured")
 
-    result = await web_search_service.web_search(
-        query="university research administration",
-        sys_config_doc=sys_config_doc,
-        max_results=3,
-    )
+    async with metered_async("web_search_test", user_id=user.user_id):
+        result = await web_search_service.web_search(
+            query="university research administration",
+            sys_config_doc=sys_config_doc,
+            max_results=3,
+        )
     if result.get("error"):
         raise HTTPException(status_code=502, detail=result["error"])
 
     count = len(result.get("results", []))
+    if count == 0:
+        raise HTTPException(
+            status_code=502,
+            detail="The provider answered but returned no results for a common query. "
+            "Check the endpoint path and that the provider's index is enabled.",
+        )
     return {
         "status": "ok",
         "result_count": count,

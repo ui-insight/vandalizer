@@ -215,9 +215,11 @@ Navigate to **Admin → System Config → Endpoints** and set:
 
 | Field | Description |
 |-------|-------------|
-| **Web Search Provider** | `serper`, `tavily`, or `brave` — selects the response shape to parse |
-| **Web Search Endpoint** | The provider's search API URL |
+| **Web Search Provider** | `mindrouter` (campus search proxy), `tavily`, `searxng` (self-hosted) or `brave`. Any other value is rejected on save |
+| **Web Search Endpoint** | The provider's search API URL. Optional for `mindrouter` and `tavily`, which have defaults. A SearXNG on a private address needs its host in **Outbound URL allowed hosts** |
 | **Web Search API Key** | Provider API key (stored encrypted, same Fernet key as LLM credentials) |
+
+**Test Search** runs a real query with the values on screen, before you save, and fails if the provider returns no results. The same provider serves workflow **Web Search** steps and a knowledge base's **Find pages from a topic**. Each query leaves the deployment for the provider; every search is recorded in the `web_search_usage` collection (who, from which feature, provider, the first 200 characters of the query, result count).
 
 Reading a URL a user pastes into chat (`fetch_url`) needs no provider and works whenever the backend has outbound network access. Both tools make **server-side** outbound requests; see [Agentic chat web access](DEPLOY.md#agentic-chat-web-access) for the egress and air-gap considerations.
 

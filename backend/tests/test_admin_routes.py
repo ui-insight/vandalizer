@@ -1817,3 +1817,73 @@ class TestModelIdentityUniqueness:
             {"name": "gpt-oss", "tag": "fast"},
         )
         assert resp.status_code == 404
+
+
+class TestWebSearchAdmin:
+    """Web search settings: only providers the service can call are saved, and
+    the Test button tests the form's values and fails when nothing comes back."""
+
+    def _config_stub(self, **overrides):
+        base = dict(
+            extraction_config={}, quality_config={}, compliance_config={},
+            retention_config={}, ocr_endpoint="", ocr_api_key="", ocr_provider="raw",
+            ocr_options={}, ocr_async=False, ocr_timeout_seconds=120,
+            llm_endpoint="", default_team_id=None, support_contacts=[],
+            web_search_provider="", web_search_endpoint="", web_search_api_key="enc-saved",
+            updated_at=None, updated_by=None, save=AsyncMock(),
+        )
+        base.update(overrides)
+        cfg = SimpleNamespace(**base)
+        cfg.model_dump = lambda: {k: v for k, v in vars(cfg).items() if k not in ("save", "model_dump")}
+        return cfg
+
+    async def _call(self, client, method, path, body, cfg, search=None):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+            patch("app.routers.admin.clear_agent_caches"),
+            patch("app.services.web_search_service.web_search", search or AsyncMock()),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            return await getattr(client, method)(path, json=body, cookies=cookies, headers=headers)
+
+    @pytest.mark.asyncio
+    async def test_a_provider_the_service_cannot_call_is_rejected(self, client):
+        cfg = self._config_stub(web_search_provider="tavily")
+        resp = await self._call(client, "put", "/api/admin/config", {"web_search_provider": "serper"}, cfg)
+        assert resp.status_code == 400
+        assert "serper" in resp.json()["detail"]
+        assert cfg.web_search_provider == "tavily"
+
+    @pytest.mark.asyncio
+    async def test_a_known_provider_is_saved_normalized(self, client):
+        cfg = self._config_stub()
+        resp = await self._call(client, "put", "/api/admin/config", {"web_search_provider": " SearXNG "}, cfg)
+        assert resp.status_code == 200
+        assert cfg.web_search_provider == "searxng"
+
+    @pytest.mark.asyncio
+    async def test_the_test_button_uses_the_forms_values(self, client):
+        search = AsyncMock(return_value={"results": [{"url": "https://ex.org"}]})
+        resp = await self._call(client, "post", "/api/admin/config/test-web-search", {
+            "web_search_provider": "searxng", "web_search_endpoint": "https://searx.campus.edu",
+            "web_search_api_key": "***",
+        }, self._config_stub(web_search_provider="tavily"), search)
+        assert resp.status_code == 200 and resp.json()["result_count"] == 1
+        tested = search.call_args.kwargs["sys_config_doc"]
+        assert tested["web_search_provider"] == "searxng"
+        assert tested["web_search_endpoint"] == "https://searx.campus.edu"
+        assert tested["web_search_api_key"] == "enc-saved"  # "***" keeps the saved key
+
+    @pytest.mark.asyncio
+    async def test_no_results_fails_the_test(self, client):
+        search = AsyncMock(return_value={"results": []})
+        resp = await self._call(client, "post", "/api/admin/config/test-web-search",
+                                {"web_search_provider": "tavily"}, self._config_stub(), search)
+        assert resp.status_code == 502
+        assert "no results" in resp.json()["detail"]

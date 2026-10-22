@@ -523,7 +523,7 @@ The dedicated editors are unchanged and remain the precision surface. Chat is a 
 - **Projects** — `create_project` and five project tools. Files added to a project are auto-indexed into its implicit knowledge base, so project-wide chat needs no separate KB. The agent recommends a project over a bare KB whenever the user describes an ongoing effort ("chat across all my files").
 - **`save_to_folder`** — chat output becomes a real `SmartDocument`: browsable, downloadable, and once indexed, searchable and usable as workflow/extraction input.
 - **`check_compliance`** — evaluates an extraction set's cross-field rules (sum checks, required-when, date ordering, ranges, cross-references) and reports each pass/fail with a plain-language reason.
-- **`web_search` + `fetch_url`** — configurable web search (serper/tavily/brave via System Config) and single-page URL reading, with prompt ordering that puts the user's own documents and knowledge bases first. Web search fails closed when no provider is configured.
+- **`web_search` + `fetch_url`** — configurable web search (MindRouter/Tavily/SearXNG/Brave via System Config) and single-page URL reading, with prompt ordering that puts the user's own documents and knowledge bases first. Web search fails closed when no provider is configured.
 - **`get_app_help`** — a curated topic catalog (`help_content.py`) the agent uses to explain the product on demand, including the "why not just ChatGPT" case. Bodies respect white-label branding.
 
 ### Added — certification in chat
