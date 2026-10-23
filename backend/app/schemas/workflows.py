@@ -1,5 +1,6 @@
 """Request/response models for workflow endpoints."""
 
+import datetime
 from typing import Any, Optional
 from pydantic import BaseModel
 
@@ -116,11 +117,18 @@ class WorkflowStatusResponse(BaseModel):
     approval_request_id: Optional[str] = None
     error: Optional[str] = None
     error_payload: Optional[dict] = None
+    # Outputs that failed to deliver after the run completed (#810). Without
+    # the field here the response model dropped it, and a poll showed a clean
+    # "completed" that the stream (which sends the service dict) did not.
+    delivery_failures: list[str] = []
     retrieved_sources: list[dict] = []
     # The run's model, and the models its steps actually ran on (see
     # WorkflowResult.models_used). Shown on every run view.
     model: Optional[str] = None
     models_used: list[str] = []
+    workflow_name: Optional[str] = None
+    document_title: Optional[str] = None
+    start_time: Optional[datetime.datetime] = None
     # Models used, the settings each call was sent with, and the run's
     # configuration snapshot; None for runs recorded before it existed.
     run_metadata: Optional[dict] = None
