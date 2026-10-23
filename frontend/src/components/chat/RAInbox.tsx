@@ -145,6 +145,7 @@ export function RAInbox() {
   const [items, setItems] = useState<Obligation[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [hidden, setHidden] = useState(false)
+  const [projectCount, setProjectCount] = useState(0)
   const [showDismissed, setShowDismissed] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -156,6 +157,7 @@ export function RAInbox() {
       setLoadError(false)
       setItems(data.items)
       setHidden(data.inbox_hidden)
+      setProjectCount(data.project_count ?? 0)
     } catch {
       // A failed background refresh keeps what is on screen; only a first
       // load that fails is shown as an error, never as an empty inbox.
@@ -182,7 +184,14 @@ export function RAInbox() {
   if (hidden) return null
   const visible = showDismissed ? items : items.filter(i => !i.dismissed)
   const dismissedCount = items.filter(i => i.dismissed).length
-  if (visible.length === 0 && !showDismissed) return null
+  // With projects to cover, an empty inbox says what it checked: silence
+  // would read as "nothing is due", which it can't know about unsaved work.
+  if (visible.length === 0 && !showDismissed) {
+    if (projectCount === 0) return null
+    return <p role="status" className="home-meta">
+      Nothing due or missing in your {projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.
+    </p>
+  }
 
   // Done leaves the inbox for everyone; Dismiss only hides it here, so it
   // stays countable under "Show dismissed".

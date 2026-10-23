@@ -187,7 +187,10 @@ async def test_dismiss_is_personal_done_is_shared_and_viewers_cannot_mark_done(m
 
     async with await _client(owner) as http:
         assert (await http.post(f"/api/obligations/{deadline['uuid']}/done", json={"done": True})).status_code == 200
-        assert (await http.get("/api/obligations")).json()["items"] == []
+        emptied = (await http.get("/api/obligations")).json()
+        assert emptied["items"] == []
+        # The empty inbox still says how many projects it covered (#1014 item 34).
+        assert emptied["project_count"] == 1
 
 
 async def test_the_inbox_can_be_hidden_for_this_account(mongo_client):

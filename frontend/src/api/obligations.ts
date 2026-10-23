@@ -32,7 +32,7 @@ export interface Obligation {
 }
 
 export function getInbox(includeDismissed = false) {
-  return apiFetch<{ items: Obligation[]; inbox_hidden: boolean }>(
+  return apiFetch<{ items: Obligation[]; inbox_hidden: boolean; project_count?: number }>(
     `/api/obligations${includeDismissed ? '?include_dismissed=true' : ''}`,
   )
 }

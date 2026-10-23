@@ -455,11 +455,22 @@ def serialize(ob: Obligation, user: User, project_title: str | None = None) -> d
     }
 
 
-async def inbox(user: User, *, include_dismissed: bool = False) -> list[dict]:
-    """Open obligations across every project *user* can see, for Home."""
+async def inbox_projects(user: User) -> dict[str, Project]:
+    """The projects Home's inbox covers: every unarchived one *user* can see."""
     from app.services.project_service import list_projects
 
-    projects = {p.uuid: p for p in await list_projects(user) if p.state != "archived"}
+    return {p.uuid: p for p in await list_projects(user) if p.state != "archived"}
+
+
+async def inbox(
+    user: User,
+    *,
+    include_dismissed: bool = False,
+    projects: dict[str, Project] | None = None,
+) -> list[dict]:
+    """Open obligations across every project *user* can see, for Home."""
+    if projects is None:
+        projects = await inbox_projects(user)
     if not projects:
         return []
     obligations = await Obligation.find(
