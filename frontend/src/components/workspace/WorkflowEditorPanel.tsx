@@ -9028,6 +9028,19 @@ print(response.json())`
         Parameters: <code>workflow_id</code> (required) and one or more <code>files</code> (multipart uploads).
         At least one file must be provided.
       </div>
+
+      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
+        Every status field, including <code>run_metadata</code> (the models and settings each run used), is
+        described in the{' '}
+        <a
+          href="https://github.com/ui-insight/vandalizer/blob/main/docs/api.md#get-apiworkflowsstatus"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: '#2563eb' }}
+        >
+          workflow API reference
+        </a>.
+      </div>
       </div>
     </div>
   )

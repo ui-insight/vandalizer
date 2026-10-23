@@ -152,6 +152,64 @@ class TestGetWorkflowStatus:
         assert resp.status_code == 401
         assert resp.json()["detail"] == "Not authenticated"
 
+    async def test_reports_delivery_failures(self, client):
+        """A run whose output never left the building is not a clean "completed".
+
+        The service returned ``delivery_failures`` but the response model had
+        no such field, so the poll silently dropped it.
+        """
+        user = _make_user()
+        user.api_token_expires_at = None
+
+        with patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(return_value={
+                "status": "completed",
+                "final_output": {"output": "result"},
+                "delivery_failures": ["Email to grants@example.edu failed"],
+                "workflow_name": "Budget check",
+                "document_title": "budget.pdf",
+            })
+
+            resp = await client.get(
+                "/api/workflows/status?session_id=sess123",
+                headers={"x-api-key": "test-api-key"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["delivery_failures"] == ["Email to grants@example.edu failed"]
+        assert data["workflow_name"] == "Budget check"
+        assert data["document_title"] == "budget.pdf"
+
+
+class TestStreamWorkflowStatus:
+    async def test_a_canceled_run_ends_the_stream(self, client):
+        user = _make_user()
+        user.api_token_expires_at = None
+        canceled = {"status": "canceled", "error": "Canceled by user"}
+
+        with patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.asyncio.sleep", new_callable=AsyncMock):
+            MockUser.find_one = AsyncMock(return_value=user)
+            # The route's initial lookup, the first stream read, then a poll
+            # that should never happen for a run that has already ended.
+            mock_svc.get_workflow_status = AsyncMock(side_effect=[
+                canceled, canceled,
+                AssertionError("the stream kept polling a canceled run"),
+            ])
+
+            resp = await client.get(
+                "/api/workflows/status/stream?session_id=sess123",
+                headers={"x-api-key": "test-api-key"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.text.count("data: ") == 1
+        assert '"canceled"' in resp.text
+
 
 # ---------------------------------------------------------------------------
 # GET /api/workflows/batch-status
