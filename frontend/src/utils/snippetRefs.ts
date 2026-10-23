@@ -6,7 +6,9 @@ import type { Citation } from '../types/chat'
 // citation they stand for. Mirrors expand_snippet_refs in
 // backend/app/services/kb_answer_grounding.py, which does the same to the
 // stored answer.
-const SNIPPET_REF_RE = /\[\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\]/g
+// "[**S2**]": a model that bolds what it cites may bold the number too; and
+// some write "(S1)", which otherwise stayed as text with no chip.
+const SNIPPET_REF_RE = /\[\s*[*_]*\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*[*_]*\s*\]|\(\s*[*_]*\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*[*_]*\s*\)/g
 
 export function expandSnippetRefs(text: string, citations: Citation[]): string {
   if (!citations.length) return text

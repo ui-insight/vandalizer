@@ -81,6 +81,11 @@ class ChatMessage(Document):
     # shares almost none of the words the answer attributes to it. Chat shows
     # them under the answer.
     unsupported_citations: Optional[list[str]] = None
+    # Each cited claim of a KB answer checked against the passage it cites
+    # (see chat_claim_check): ``{version, claims: [{claim, citations, status,
+    # reason, quote?}], summary}``. The UI marks a chip whose claim the
+    # passage does not state.
+    claim_checks: Optional[dict] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -118,6 +123,8 @@ class ChatMessage(Document):
             d["interruption"] = self.interruption
         if self.unsupported_citations:
             d["unsupported_citations"] = self.unsupported_citations
+        if self.claim_checks:
+            d["claim_checks"] = self.claim_checks
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -366,6 +373,7 @@ class ChatConversation(Document):
         silence_inferences: Optional[list[str]] = None,
         interruption: Optional[str] = None,
         unsupported_citations: Optional[list[str]] = None,
+        claim_checks: Optional[dict] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -380,6 +388,7 @@ class ChatConversation(Document):
             silence_inferences=silence_inferences or None,
             interruption=interruption or None,
             unsupported_citations=unsupported_citations or None,
+            claim_checks=claim_checks or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

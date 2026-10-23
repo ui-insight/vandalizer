@@ -2695,6 +2695,20 @@ async def chat_stream(
                     streamed_tool_results, previous_messages,
                     kbs_attached=bool(active_kbs),
                 )
+                # Each cited claim, checked against the passage it cites: a
+                # claim can share every word with its passage and still say
+                # something else ("must" for "should", a prior-approval item
+                # read as allowed). The answer has already streamed; the UI
+                # marks the chips when this arrives.
+                claim_checks = await _check_cited_claims(
+                    assistant_message, message, streamed_citations, model_name, sys_config_doc,
+                )
+                if claim_checks:
+                    yield json.dumps({
+                        "kind": "claim_checks",
+                        "content": "",
+                        "claim_checks": claim_checks,
+                    }) + "\n"
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -2711,6 +2725,7 @@ async def chat_stream(
                     unsupported_figures=unsupported or None,
                     silence_inferences=silent or None,
                     unsupported_citations=miscited or None,
+                    claim_checks=claim_checks,
                 )
                 if unsupported or silent or miscited:
                     yield json.dumps({
@@ -3855,6 +3870,16 @@ async def _retrieve_kb_results(
     kb_results = annotate_amendments(kb_results, links)
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+        return kb_results
+    # A chunk holding only items of a list ("(5) The transfer of funds
+    # budgeted for participant support costs …") is read with the sentence
+    # that says what the list is ("… must request prior written approval …
+    # for the following"): without it, an answer once read the prior-approval
+    # list as things allowed without approval. Precise retrieval sets it on
+    # its own pool; this covers the other lanes and the vector pipeline.
+    from app.services.kb_lead_in import attach_lead_ins
+
+    await asyncio.to_thread(attach_lead_ins, get_document_manager, kb_uuid, kb_results)
     return kb_results
 
 
@@ -3873,6 +3898,7 @@ async def _render_kb_segment(
         return None, []
 
     from app.services.kb_grounding import CITATION_CONTENT_CHARS, _passage_label
+    from app.services.kb_lead_in import with_lead_in
     from app.services.kb_validation_service import AMENDMENT_INSTRUCTION, amendment_label
 
     kb_sources: list[dict] = []
@@ -3904,7 +3930,9 @@ async def _render_kb_segment(
         any_spanning = any_spanning or annotated != content
         # Numbered so the answer can say which snippets it used: a filename
         # can't, when one document contributes several.
-        snippet_blocks.append(f"\n**[S{ref}] Source: {label}**\n{annotated}\n")
+        snippet_blocks.append(
+            f"\n**[S{ref}] Source: {label}**\n{with_lead_in(annotated, r.get('lead_in'))}\n"
+        )
         kb_sources.append({
             "ref": ref,
             # What [S{ref}] reads as in the answer the user sees and the one
@@ -3915,6 +3943,9 @@ async def _render_kb_segment(
             # shows the text the claim rests on.
             "label": cite_label,
             "content": content[:CITATION_CONTENT_CHARS],
+            # The lead-in of the list the passage's items belong to, which
+            # the model read above it and the popover shows above it.
+            "lead_in": r.get("lead_in"),
             "document_id": meta.get("source_id"),
             "document_title": src,
             "page": page,
@@ -4127,6 +4158,41 @@ def _kb_tool_source_texts(results: list[tuple[str, object]]) -> dict[str, str]:
                 key = entry["source_name"]
                 out[key] = out.get(key, "") + "\n" + text
     return out
+
+
+CLAIM_CHECK_ENV = "CHAT_CLAIM_CHECK"
+
+
+async def _check_cited_claims(
+    answer: str,
+    question: str,
+    citations: list[dict],
+    model_name: str,
+    system_config_doc: Optional[dict],
+) -> Optional[dict]:
+    """Every claim of ``answer`` that cites a knowledge-base passage,
+    checked against it (``chat_claim_check``); None when none does, or
+    when the deployment turns the check off (``CHAT_CLAIM_CHECK=off``).
+    Never raises: a turn's answer must not depend on it."""
+    import os
+
+    if os.environ.get(CLAIM_CHECK_ENV, "on").strip().lower() in ("0", "off", "false", "no"):
+        return None
+    # Only passages carry their text; a chip derived from an attached
+    # document's page does not, and stays out (kept as {} so ``cites``
+    # still indexes the stored citations).
+    sources = [c if c.get("label") and c.get("content") else {} for c in citations or []]
+    if not any(sources):
+        return None
+    from app.services import chat_claim_check
+
+    try:
+        return await chat_claim_check.check_claims(
+            answer, sources, question, chat_claim_check.model_ask(model_name, system_config_doc),
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Chat claim check failed: %s", e)
+        return None
 
 
 def _miscited_sources(
@@ -4771,6 +4837,7 @@ async def _finalize(
     unsupported_figures: Optional[list[str]] = None,
     silence_inferences: Optional[list[str]] = None,
     unsupported_citations: Optional[list[str]] = None,
+    claim_checks: Optional[dict] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -4785,6 +4852,7 @@ async def _finalize(
         unsupported_figures=unsupported_figures,
         silence_inferences=silence_inferences,
         unsupported_citations=unsupported_citations,
+        claim_checks=claim_checks,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

@@ -1,3 +1,5 @@
+import type { ClaimCheck } from './workflow'
+
 export interface ChatMessage {
   /** Local stream interruption; does not claim cancellation of server work. */
   interruption?: 'stopped' | 'connection'
@@ -17,6 +19,8 @@ export interface ChatMessage {
   /** KB answers only: sources the answer cites for text they don't contain —
    *  e.g. a scraped page holding only its title. */
   unsupported_citations?: string[]
+  /** KB answers: each cited claim checked against the passage it cites. */
+  claim_checks?: ClaimChecks
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -220,6 +224,16 @@ export interface Citation {
    *  but not used. Absent on answers saved before the distinction, which
    *  show every snippet as a source. */
   used?: boolean
+  /** The sentence earlier in the passage's section that introduces the list
+   *  its items belong to; the model read it above the passage. */
+  lead_in?: string | null
+}
+
+/** A KB answer's cited claims, each checked against the passage it cites. */
+export interface ClaimChecks {
+  version: number
+  claims: ClaimCheck[]
+  summary?: { verified: number; unverified: number; unchecked: number }
 }
 
 // Live task checklist from the update_plan tool (chat_tools Phase 8).
@@ -247,6 +261,7 @@ export interface StreamChunk {
     | 'sources'
     | 'sources_used'
     | 'grounding_warning'
+    | 'claim_checks'
   content: string
   duration?: number
   tool_name?: string
@@ -283,6 +298,8 @@ export interface StreamChunk {
   silence_inferences?: string[]
   // grounding_warning only: cited sources that don't contain the cited text.
   unsupported_citations?: string[]
+  // claim_checks only: each cited claim checked against its passage.
+  claim_checks?: ClaimChecks
 }
 
 export interface SuggestedModel {

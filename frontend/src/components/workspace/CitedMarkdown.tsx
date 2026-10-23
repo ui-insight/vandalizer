@@ -4,7 +4,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { X } from 'lucide-react'
 import { formatPageLocator } from '../../utils/pageLocator'
-import type { SourcedStatement, SourcingLink, WorkflowCitation } from '../../types/workflow'
+import type { ClaimCheck, SourcedStatement, SourcingLink, WorkflowCitation } from '../../types/workflow'
 import { applySourcingSpans, stripMarks, withSentinels } from './sourcingSpans'
 
 /**
@@ -154,6 +154,44 @@ export function matchSectionReference(
 /** Skip code, links and anything already a chip. */
 const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'BUTTON', 'SCRIPT', 'STYLE'])
 
+/** The blocks a claim sits in: a chat answer's paragraph, list item or cell. */
+const BLOCK_TAGS = new Set(['P', 'LI', 'TD', 'TH', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'DIV'])
+
+/** Letters and digits only, lower-cased: how a claim the backend wrote as
+ *  plain text compares with the rendered text it was cut from. */
+function claimText(text: string): string {
+  return text.replace(/\[[^[\]]*\]/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+/** The check of the claim a citation at `offset` in `node` closes: one that
+ *  carries this citation and whose claim ends the text before it, read back
+ *  to the start of its paragraph or list item. Null when none does. */
+function claimCheckFor(
+  doc: Document, node: Text, offset: number, citation: string, checks: ClaimCheck[],
+): number | null {
+  if (!checks.length) return null
+  let block: Node | null = node.parentNode
+  while (block && block.nodeType === 1 && !BLOCK_TAGS.has((block as Element).tagName)) block = block.parentNode
+  if (!block) return null
+  const range = doc.createRange()
+  range.setStart(block, 0)
+  range.setEnd(node, offset)
+  const before = claimText(range.toString())
+  const cited = normalizeCitation(citation)
+  let best: number | null = null
+  let bestEnd = -1
+  checks.forEach((c, i) => {
+    if (!c.citations.some(x => normalizeCitation(x) === cited)) return
+    const claim = claimText(c.claim)
+    if (claim.length < 8) return
+    const at = before.lastIndexOf(claim)
+    // The claim nearest the citation; the text after it is only punctuation
+    // or citations once compared.
+    if (at >= 0 && at + claim.length > bestEnd) { best = i; bestEnd = at + claim.length }
+  })
+  return best
+}
+
 /** Where in its source a passage sits: the section it is ("§ 200.405", for a
  *  passage retrieved as a whole section), its page(s) or sheet, or — for a
  *  source without pages (a web page, an eCFR subpart) — the part of a
@@ -219,7 +257,7 @@ function sectionHeading(text: string, section: string): string | null {
  * built with DOM APIs from the passage data, never from the model's text, so
  * this runs after sanitization without reopening it.
  */
-export function injectCitationChips(html: string, sources: WorkflowCitation[]): string {
+export function injectCitationChips(html: string, sources: WorkflowCitation[], checks: ClaimCheck[] = []): string {
   // Nothing to link unless there is a bracket or something section-shaped.
   if (!sources.length || !/[[§]|\d\.\d/.test(html)) return html
   const doc = new DOMParser().parseFromString(`<div id="root">${html}</div>`, 'text/html')
@@ -236,20 +274,27 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
     if (!skip && n.nodeValue && /[[§]|\d\.\d/.test(n.nodeValue)) textNodes.push(n as Text)
   }
 
-  const makeChip = (idx: number, compact: boolean, section?: string): HTMLElement => {
+  const makeChip = (idx: number, compact: boolean, section?: string, check?: number | null): HTMLElement => {
     const c = sources[idx]
     const chip = doc.createElement('button')
     chip.setAttribute('type', 'button')
-    chip.className = compact ? 'kb-cite kb-cite-ref' : 'kb-cite'
+    const unverified = check != null && checks[check]?.status === 'unverified'
+    chip.className = (compact ? 'kb-cite kb-cite-ref' : 'kb-cite') + (unverified ? ' kb-cite-unverified' : '')
     chip.setAttribute('data-cite', String(idx))
     // A section chip points at that section's heading inside the passage.
     if (section) chip.setAttribute('data-section', section)
-    chip.setAttribute('title', `${citationLabel(c)} — click to see the passage`)
-    chip.setAttribute('aria-label', `Citation: ${citationLabel(c)}`)
+    // The check of the claim this chip closes: the popover says what it found.
+    if (check != null) chip.setAttribute('data-check', String(check))
+    chip.setAttribute('title', unverified
+      ? `${citationLabel(c)} — this passage does not state the claim as written; click to compare`
+      : `${citationLabel(c)} — click to see the passage`)
+    chip.setAttribute('aria-label', unverified
+      ? `Citation, not confirmed by the passage: ${citationLabel(c)}`
+      : `Citation: ${citationLabel(c)}`)
     chip.setAttribute('aria-haspopup', 'dialog')
     const n = doc.createElement('span')
     n.className = 'kb-cite-n'
-    n.textContent = String(idx + 1)
+    n.textContent = unverified ? '?' : String(idx + 1)
     chip.appendChild(n)
     if (!compact) chip.appendChild(doc.createTextNode(shortLabel(c)))
     return chip
@@ -274,9 +319,10 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
       const parts = m[1].split(/\s*;\s*/).filter(Boolean)
       const matches = parts.map(p => matchCitation(p, sources))
       if (matches.some(i => i === null)) continue
+      const check = claimCheckFor(doc, node, m.index, m[1], checks)
       spans.push({
         start: m.index, end: m.index + m[0].length,
-        chips: matches.map(i => makeChip(i as number, false)), keep: false,
+        chips: matches.map(i => makeChip(i as number, false, undefined, check)), keep: false,
       })
     }
     // Section references stay as written and get a compact numbered chip
@@ -343,10 +389,10 @@ export function renderCitedText(
 /** HTML another renderer already sanitized — a chat answer, a workflow output
  *  shown in chat — with its citations as chips, sanitized again after the
  *  round trip (chat's action and document buttons kept). Unchanged on error. */
-export function withCitationChips(html: string, sources: WorkflowCitation[]): string {
+export function withCitationChips(html: string, sources: WorkflowCitation[], checks: ClaimCheck[] = []): string {
   if (!sources.length) return html
   try {
-    return DOMPurify.sanitize(injectCitationChips(html, sources), {
+    return DOMPurify.sanitize(injectCitationChips(html, sources, checks), {
       ADD_TAGS: ['button'], ADD_ATTR: ['data-action', 'data-doc-uuid'],
     })
   } catch {
@@ -382,6 +428,9 @@ interface CitationAnchor extends FloatAnchor {
   /** Set when a section chip ("2 CFR 200.421") opened it: the heading of that
    *  section in the passage is what gets highlighted. */
   section: string | null
+  /** The check of the claim the chip closes (an index into the answer's
+   *  claim checks), when there is one. */
+  check: number | null
 }
 
 const POPOVER_WIDTH = 440
@@ -521,11 +570,32 @@ export const CAPTION_STYLE: CSSProperties = {
   fontSize: 10.5, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 4,
 }
 
+const UNVERIFIED_STYLE: CSSProperties = {
+  fontSize: 12, lineHeight: 1.45, color: '#92400e', backgroundColor: '#fef3c7',
+  border: '1px solid #fcd34d', borderRadius: 6, padding: '6px 8px', marginBottom: 8,
+}
+
+const LEAD_IN_STYLE: CSSProperties = {
+  fontSize: 12, lineHeight: 1.45, color: '#374151', fontStyle: 'italic', marginBottom: 6,
+}
+
+/** What the popover says of a claim the passage was checked against. */
+const CHECK_REASONS: Record<string, string> = {
+  obligation_differs: 'it says how strongly something is required differently (for example "must" where the passage says "should")',
+  modality_differs: 'it says something is required, allowed or forbidden where the passage does not say so',
+  limit_differs: 'it turns the passage\'s limit around (a maximum read as a minimum, or the reverse)',
+  value_not_in_quote: 'a number or date in it is not in the passage',
+  values_merged: 'it merges two limits the passage gives separately',
+  condition_dropped: 'it leaves out the case the passage limits the rule to',
+  subject_differs: 'the passage says it of someone or something else',
+}
+
 /** The passage a citation rests on, floated beside the chip that was clicked. */
-function CitationPopover({ citation, anchor, onClose }: {
+function CitationPopover({ citation, anchor, onClose, check }: {
   citation: WorkflowCitation
   anchor: CitationAnchor
   onClose: () => void
+  check?: ClaimCheck
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const markRef = useRef<HTMLElement>(null)
@@ -543,13 +613,16 @@ function CitationPopover({ citation, anchor, onClose }: {
   // What to highlight: a section chip points at that section's heading; a
   // citation chip at the excerpts the check verified for this passage.
   const heading = anchor.section ? sectionHeading(passage, anchor.section) : null
-  const quotes = (citation.quotes || []).map(q => q.quote).filter(Boolean)
+  const verified = check?.status === 'verified' && check.quote ? [check.quote] : []
+  const quotes = verified.length ? verified : (citation.quotes || []).map(q => q.quote).filter(Boolean)
   const ranges = findHighlights(passage, heading ? [heading] : quotes)
   const caption = heading
     ? `§ ${anchor.section} in this passage`
     : ranges.length > 0
       ? 'Highlighted: the text the statement rests on, checked against this passage'
       : 'Passage the claim rests on'
+  const unverified = check?.status === 'unverified'
+  const because = check?.reason ? CHECK_REASONS[check.reason] : undefined
 
   return (
     <FloatingCard anchor={anchor} label={`Passage: ${citationLabel(citation)}`} onClose={onClose}>
@@ -579,9 +652,22 @@ function CitationPopover({ citation, anchor, onClose }: {
             <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
+        {unverified && (
+          <div role="note" style={UNVERIFIED_STYLE}>
+            <strong>Not confirmed.</strong> This passage does not state the claim as written
+            {because ? <>: {because}</> : check?.why ? <> ({check.why})</> : null}. Check the claim
+            {' '}<q style={{ fontStyle: 'italic' }}>{check?.claim}</q> against the text below before relying on it.
+          </div>
+        )}
         <div style={CAPTION_STYLE}>
           {caption}
         </div>
+        {citation.lead_in && (
+          <div style={LEAD_IN_STYLE}>
+            <span style={{ fontWeight: 600 }}>Earlier in this section, the list these items belong to:</span>{' '}
+            {citation.lead_in}
+          </div>
+        )}
         <div ref={boxRef} style={PASSAGE_BOX_STYLE}>
           {passage
             ? <MarkedText text={passage} ranges={ranges} markRef={markRef} />
@@ -593,17 +679,22 @@ function CitationPopover({ citation, anchor, onClose }: {
 }
 
 /** Popover state shared by the inline chips and the bottom Sources panel. */
-export function useCitationPopover(sources: WorkflowCitation[]) {
+export function useCitationPopover(sources: WorkflowCitation[], checks: ClaimCheck[] = []) {
   const [anchor, setAnchor] = useState<CitationAnchor | null>(null)
   const close = useCallback(() => setAnchor(null), [])
   const openAt = useCallback((index: number, el: Element) => {
+    const check = parseInt(el.getAttribute('data-check') || '', 10)
     setAnchor(prev => (
-      prev && prev.el === el ? null : { ...floatAnchorOf(el), index, section: el.getAttribute('data-section') }
+      prev && prev.el === el ? null : {
+        ...floatAnchorOf(el), index, section: el.getAttribute('data-section'),
+        check: Number.isFinite(check) ? check : null,
+      }
     ))
   }, [])
   const citation = anchor ? sources[anchor.index] : undefined
+  const check = anchor && anchor.check != null ? checks[anchor.check] : undefined
   const popover = anchor && citation
-    ? <CitationPopover citation={citation} anchor={anchor} onClose={close} />
+    ? <CitationPopover citation={citation} anchor={anchor} onClose={close} check={check} />
     : null
   return { anchor, openAt, popover }
 }
@@ -639,6 +730,9 @@ const CITATION_CHIP_CSS = `
 }
 .kb-cite:hover, .kb-cite:focus-visible { background: #bae6fd; border-color: #7dd3fc; outline: none; }
 .kb-cite-ref { padding: 0 2px; margin: 0 1px 0 3px; height: 16px; vertical-align: super; font-size: 9px; line-height: 16px; }
+.kb-cite.kb-cite-unverified { color: #92400e; background: #fffbeb; border: 1px dashed #d97706; }
+.kb-cite.kb-cite-unverified:hover, .kb-cite.kb-cite-unverified:focus-visible { background: #fef3c7; border-color: #b45309; }
+.kb-cite-unverified .kb-cite-n { background: #b45309; }
 .kb-cite-n {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px;
@@ -721,14 +815,17 @@ export function CitedMarkdown({ markdown, sources, format = 'markdown', classNam
  * workflow run shows, and the passage popover. A click anywhere else bubbles
  * on to the caller's own handler (chat's action and document buttons).
  */
-export function CitedHtml({ html, sources, className, style }: {
+export function CitedHtml({ html, sources, checks, className, style }: {
   html: string
   sources: WorkflowCitation[]
+  /** A chat answer's claim checks: a chip whose claim its passage does not
+   *  state is marked, and its popover says so. */
+  checks?: ClaimCheck[]
   className?: string
   style?: CSSProperties
 }) {
-  const chipped = useMemo(() => withCitationChips(html, sources), [html, sources])
-  const { openAt, popover } = useCitationPopover(sources)
+  const chipped = useMemo(() => withCitationChips(html, sources, checks), [html, sources, checks])
+  const { openAt, popover } = useCitationPopover(sources, checks)
 
   const onClick = (e: ReactMouseEvent<HTMLDivElement>) => {
     const chip = (e.target as Element | null)?.closest?.('.kb-cite') as HTMLElement | null

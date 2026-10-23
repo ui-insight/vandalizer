@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
-import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { ChatMessage, Citation, ClaimChecks, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -115,6 +115,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const unsupportedFiguresRef = useRef<string[]>([])
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
+  const claimChecksRef = useRef<ClaimChecks | null>(null)
 
   /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
@@ -160,6 +161,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       unsupportedFiguresRef.current = []
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
+      claimChecksRef.current = null
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
@@ -212,6 +214,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
         if (unsupportedCitationsRef.current.length) {
           assistantMsg.unsupported_citations = unsupportedCitationsRef.current
+        }
+        if (claimChecksRef.current) {
+          assistantMsg.claim_checks = claimChecksRef.current
         }
         setMessages((prev) => [...prev, assistantMsg])
       }
@@ -343,6 +348,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
               silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
+            } else if (chunk.kind === 'claim_checks') {
+              claimChecksRef.current = chunk.claim_checks ?? null
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,

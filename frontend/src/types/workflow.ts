@@ -142,6 +142,28 @@ export interface WorkflowCitation {
    *  highlights the excerpts. Absent on runs from before citations were
    *  checked. */
   quotes?: { claim: string; quote: string }[] | null;
+  /** For a passage holding only items of a list, the sentence earlier in its
+   *  section that says what the list is ("… must request prior written
+   *  approval … for the following …:"); shown above the passage. */
+  lead_in?: string | null;
+}
+
+/** One cited claim of a chat answer, checked against the passage it cites
+ *  (backend chat_claim_check). The UI finds its chip by `citations` and the
+ *  claim text before it. */
+export interface ClaimCheck {
+  claim: string;
+  /** The bracketed citations the claim carries, as written. */
+  citations: string[];
+  /** Indexes into the message's citations. */
+  cites: number[];
+  status: 'verified' | 'unverified' | 'unchecked';
+  reason?: string;
+  /** The checker's few words on why the passage does not state it. */
+  why?: string;
+  /** The excerpt that states a verified claim (verbatim from the passage). */
+  quote?: string;
+  source?: number;
 }
 
 /** One knowledge base a grounded task reads, with the retrieval queries it is

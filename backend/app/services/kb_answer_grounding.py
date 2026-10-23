@@ -339,7 +339,11 @@ def unsupported_citations(
 
 # "[S3]", "[S1, S3]", "[S1; S3]" or "[S1, 3]". Adjacent "[S1][S3]" are two
 # matches.
-_SNIPPET_REF_RE = re.compile(r"\[\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\]")
+# "[**S2**]": a model that bolds what it cites may bold the number too; and
+# some write "(S1)", which otherwise stayed as text with no chip.
+_SNIPPET_REF_RE = re.compile(
+    r"\[\s*[*_]*\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*[*_]*\s*\]|\(\s*[*_]*\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*[*_]*\s*\)"
+)
 _DIGITS_RE = re.compile(r"\d+")
 # The filename form the prompt asked for before snippets were numbered, which
 # a model can still fall back on, e.g. after seeing it in earlier turns.

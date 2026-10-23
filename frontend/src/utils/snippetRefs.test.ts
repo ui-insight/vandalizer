@@ -19,6 +19,13 @@ describe('expandSnippetRefs', () => {
       .toBe('Both agree [Source: PAPPG.pdf, p. ~54; NIH_GPS.pdf, p. 88].')
   })
 
+  it('expands a number the model bolded or wrote in parentheses', () => {
+    expect(expandSnippetRefs('Up to 12 months [**S2**].', cites))
+      .toBe('Up to 12 months [Source: PAPPG.pdf, p. ~139].')
+    expect(expandSnippetRefs('Up to 12 months (S2).', cites))
+      .toBe('Up to 12 months [Source: PAPPG.pdf, p. ~139].')
+  })
+
   it('leaves a number no snippet carries as written', () => {
     expect(expandSnippetRefs('Odd [S9].', cites)).toBe('Odd [S9].')
   })

@@ -685,7 +685,7 @@ async def search_knowledge_base(
     # Autovalidate-tuned knobs (k, min_similarity floor, query rewriting,
     # rerank) apply on the agentic path too. A raw top-k vector query here
     # would silently skip the relevance floor the platform advertises.
-    from app.services import kb_grounding, kb_retrieval
+    from app.services import kb_grounding, kb_lead_in, kb_retrieval
     from app.services.document_manager import get_document_manager
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
@@ -711,6 +711,12 @@ async def search_knowledge_base(
                 uuid, query, context.deps.model_name, per_step_timeout=6.0,
             )
         results = results[: rag_cfg.k]
+        # A bare list item ("(5) The transfer of funds budgeted for
+        # participant support costs …") with the sentence that says what the
+        # list is ("… must request prior written approval … for the
+        # following"), read from the chunks before it. Precise retrieval has
+        # set it already; this covers the vector pipeline.
+        await asyncio.to_thread(kb_lead_in.attach_lead_ins, get_document_manager, uuid, results)
     except Exception as e:
         # Distinguish infrastructure failure from an empty corpus: a Chroma /
         # embedding outage must never be presented as "the KB had nothing".
@@ -799,9 +805,12 @@ async def search_knowledge_base(
         # where the page changes instead of inferring it.
         annotated = annotate_chunk_pages(content, meta)
         any_spanning = any_spanning or annotated != content
+        lead = r.get("lead_in")
+        annotated = kb_lead_in.with_lead_in(annotated, lead)
 
         entry: dict = {
-            # Annotated for the model, so it can see where the page turns.
+            # Annotated for the model, so it can see where the page turns,
+            # under the lead-in of the list it opens inside.
             "content": annotated,
             "source_name": meta.get("source_name", "unknown"),
             # What to cite: [Source: <label>].
@@ -844,6 +853,7 @@ async def search_knowledge_base(
             "cite_label": label,
             "label": label,
             "content": content[:kb_grounding.CITATION_CONTENT_CHARS],
+            "lead_in": lead,
             "document_id": sid or None,
             "document_title": source_name,
             "page": page if isinstance(page, int) else None,

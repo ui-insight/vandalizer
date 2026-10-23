@@ -63,6 +63,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from app.services.kb_lead_in import attach_lead_ins, with_lead_in
 from app.services.page_locator import (
     annotate_chunk_pages,
     cited_pages,
@@ -751,7 +752,7 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
             continue
         seen.add(r.get("chunk_id"))
         final.append(r)
-    pool = final[:k]
+    pool = attach_lead_ins(dm, kb_uuid, final[:k])
     kr.remember(cache_key, pool)
     return pool
 
@@ -810,7 +811,7 @@ def _retrieve_pool(
         final.append(r)
     remaining = [r for r in vector if r.get("chunk_id") is None or r.get("chunk_id") not in seen]
     final.extend(_diverse(remaining, k - len(final)))
-    return final[:k]
+    return attach_lead_ins(dm, kb_uuid, final[:k])
 
 
 def merge_pools(per_kb: list[list[list[dict]]], max_passages: int) -> list[dict]:
@@ -908,6 +909,9 @@ def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str
         # only guards against an oversized ingest.
         "label": label,
         "content": content[:CITATION_CONTENT_CHARS],
+        # The sentence that says what a list is, for a passage that holds
+        # only items of it (see kb_lead_in): shown above the passage.
+        "lead_in": r.get("lead_in"),
         "kb_uuid": r.get("kb_uuid"),
         "kb_title": r.get("kb_title"),
     }
@@ -946,7 +950,8 @@ def render_passages(
             r, kb_title=(r.get("kb_title") if label_kb else None), query=query,
         )
         heading = f"[KB{i}] {label}" if tagged else f"[{label}]"
-        parts.append(f"{heading}\n{annotate_chunk_pages(r.get('content') or '', r.get('metadata') or {})}")
+        body = annotate_chunk_pages(r.get("content") or "", r.get("metadata") or {})
+        parts.append(f"{heading}\n{with_lead_in(body, r.get('lead_in'))}")
         sources.append(source)
     if not parts:
         return "", []

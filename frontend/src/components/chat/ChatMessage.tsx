@@ -190,6 +190,12 @@ export function ChatMessage({
     () => (message.citations ?? []) as WorkflowCitation[],
     [message.citations],
   )
+  // Each cited claim checked against the passage it cites: a chip whose
+  // passage does not state its claim is marked.
+  const claimChecks = useMemo(
+    () => message.claim_checks?.claims ?? [],
+    [message.claim_checks],
+  )
 
   // For non-segment fallback: full rendered HTML
   const renderedHtml = useMemo(() => {
@@ -507,6 +513,7 @@ export function ChatMessage({
                       key={i}
                       html={renderMarkdown(cleaned)}
                       sources={chipSources}
+                      checks={claimChecks}
                       className="select-text chat-markdown"
                       style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
                     />
@@ -557,6 +564,7 @@ export function ChatMessage({
                   <CitedHtml
                     html={renderedHtml!}
                     sources={chipSources}
+                    checks={claimChecks}
                     className="select-text chat-markdown"
                     style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
                   />

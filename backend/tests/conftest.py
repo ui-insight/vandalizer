@@ -86,8 +86,11 @@ def _vector_ranking_by_default(monkeypatch):
     """Precise KB retrieval (services/kb_retrieval.py) builds an index over a
     store's chunks and fetches a cross-encoder on first use. Unit tests run
     the vector ranking they were written against, and never reach for the
-    model; tests of precise retrieval turn it on and inject a scorer."""
+    model; tests of precise retrieval turn it on and inject a scorer. Nor do
+    they check a chat answer's cited claims with a model call
+    (chat_claim_check); its tests call it with a fake model."""
     monkeypatch.setenv("KB_PRECISE_RETRIEVAL", "false")
+    monkeypatch.setenv("CHAT_CLAIM_CHECK", "off")
 
 
 @pytest.fixture
