@@ -30,6 +30,9 @@ from app.services.optimization_common import (
     WINNER_TIE_SIGMAS,
     build_apply_preview,
     pick_winner_variance_aware,
+    tie_band,
+    reported_baseline_score,
+    tied_on_reported_scores,
 )
 
 logger = logging.getLogger(__name__)
@@ -943,10 +946,30 @@ class KBOptimizer:
                 judge_variance=baselines.get("judge_variance"),
             )
 
+            # The tie was decided on training scores; the headline is the
+            # holdout score, and the paired test ran on it. Decide it again on
+            # what the run reports, so chat and the comparison card agree.
+            regated = tied_on_reported_scores(
+                tied=tied_with_baseline,
+                optimized_score=optimized_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=holdout_optimized_score,
+                    holdout_default_score=holdout_default_score,
+                    baseline_default_score=baselines.get("default_kb"),
+                ),
+                band=tie_band(blended_sigma, n_items_for_se),
+                lift_ci=lift_ci,
+            )
+            if regated and not tied_with_baseline:
+                winner_reason = "tied_on_reported_score"
+            tied_with_baseline = regated
+
             await self._update(
                 run_doc,
                 optimized_score=round(optimized_score, 4),
                 optimized_score_train=round(optimized_score_train, 4),
+                tied_with_baseline=tied_with_baseline,
+                winner_selection_reason=winner_reason,
                 holdout_default_score=(
                     round(holdout_default_score, 4)
                     if holdout_default_score is not None else None

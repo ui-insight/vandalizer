@@ -137,3 +137,24 @@ class TestFormatInline:
         md = "**DATES**\n\n***REQUIRED Components***\n\nMore body text."
         pdf = render_workflow_pdf(md, title="Workflow Results")
         assert pdf.startswith(b"%PDF-")
+
+
+class TestWorkflowEmbeddedFonts:
+    def test_report_text_tables_and_emphasis_embed_the_used_font_programs(self):
+        import fitz
+        samples = [
+            {'PI Name': 'Dr. Sarah Chen', 'Year 2 Budget Spent': 'USD 135500'},
+            '# Progress report\n\n**Reviewed** and *qualified*, with ***both*** forms.\n\n| Field | Value |\n| --- | --- |\n| Students | 9 |\n\n- Supported result\n  - Nested qualification\n1. Inspect the source',
+        ]
+        for sample in samples:
+            with fitz.open(stream=render_workflow_pdf(sample, title='Source review', subtitle='Internal draft'), filetype='pdf') as pdf:
+                used = {span['font'] for page in pdf for block in page.get_text('dict')['blocks']
+                        if 'lines' in block for line in block['lines'] for span in line['spans'] if span['text'].strip()}
+                resources = {name.split('+')[-1]: xref for page in pdf for xref, _ext, _kind, name, *_rest in page.get_fonts()}
+                assert used
+                for font in used:
+                    # MuPDF shortens long PostScript font names in text spans.
+                    matches = [resources[font]] if font in resources else [xref for name, xref in resources.items() if name.startswith(font)]
+                    assert len(matches) == 1
+                    _name, extension, _kind, data = pdf.extract_font(matches[0])
+                    assert extension == 'ttf' and data, f'{font} depends on a viewer substitute'

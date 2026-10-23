@@ -28,15 +28,15 @@ export const ICON_MAP: Record<string, React.ComponentType<{ className?: string; 
 }
 
 export const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
-  novice:     { label: 'Novice',     color: '#9ca3af' },
-  apprentice: { label: 'Apprentice', color: '#60a5fa' },
-  builder:    { label: 'Builder',    color: '#34d399' },
-  designer:   { label: 'Designer',   color: '#a78bfa' },
-  engineer:   { label: 'Engineer',   color: '#f472b6' },
-  specialist: { label: 'Specialist', color: '#fb923c' },
-  expert:     { label: 'Expert',     color: '#f43f5e' },
-  master:     { label: 'Master',     color: '#eab308' },
-  architect:  { label: 'Architect',  color: '#eab308' },
+  novice:     { label: 'Novice',     color: '#59616b' },
+  apprentice: { label: 'Apprentice', color: '#1d4ed8' },
+  builder:    { label: 'Builder',    color: '#047857' },
+  designer:   { label: 'Designer',   color: '#6d28d9' },
+  engineer:   { label: 'Engineer',   color: '#be185d' },
+  specialist: { label: 'Specialist', color: '#9a3412' },
+  expert:     { label: 'Expert',     color: '#be123c' },
+  master:     { label: 'Master',     color: '#806600' },
+  architect:  { label: 'Architect',  color: '#806600' },
 }
 
 export const LEVEL_THRESHOLDS = [

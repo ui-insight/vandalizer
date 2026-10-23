@@ -14,6 +14,10 @@ from app.models.validation_run import SMOKE_TEST_SOURCE, ValidationRun  # noqa: 
 # Query filter that leaves smoke-test runs out of every "latest run" read.
 # Missing/None ``source`` (legacy rows) passes.
 NOT_SMOKE_TEST = {"source": {"$ne": SMOKE_TEST_SOURCE}}
+# Fleet-wide reporting also leaves out the onboarding demo's fabricated run
+# (source="demo_seed"): it exists so quality signals appear during the
+# walkthrough, and its invented numbers must never average into fleet figures.
+NOT_FLEET_NOISE = {"source": {"$nin": [SMOKE_TEST_SOURCE, "demo_seed"]}}
 from app.models.verification import VerifiedItemMetadata  # noqa: E402
 
 
@@ -604,7 +608,7 @@ async def get_quality_summary() -> dict:
     """Aggregate stats: avg score, total runs, validated vs unvalidated items."""
     # Use aggregation to avoid loading all runs into memory
     pipeline = [
-        {"$match": NOT_SMOKE_TEST},
+        {"$match": NOT_FLEET_NOISE},
         {"$group": {
             "_id": {"item_kind": "$item_kind", "item_id": "$item_id"},
             "latest_score": {"$last": "$score"},
@@ -658,7 +662,7 @@ async def get_quality_timeline(
     """Aggregate ValidationRun by date for timeline charts."""
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
 
-    query_filters = [ValidationRun.created_at >= cutoff, NOT_SMOKE_TEST]
+    query_filters = [ValidationRun.created_at >= cutoff, NOT_FLEET_NOISE]
     if item_kind:
         query_filters.append(ValidationRun.item_kind == item_kind)
     if item_id:
@@ -761,7 +765,7 @@ async def get_quality_by_model(days: int = 90) -> list[dict]:
     models are a visible coverage gap, not something to hide.
     """
     cutoff = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=days)
-    runs = await ValidationRun.find(ValidationRun.created_at >= cutoff, NOT_SMOKE_TEST).to_list()
+    runs = await ValidationRun.find(ValidationRun.created_at >= cutoff, NOT_FLEET_NOISE).to_list()
 
     by_model: dict[Optional[str], dict] = {}
     for r in runs:
@@ -1468,6 +1472,7 @@ def _run_to_dict(r: ValidationRun) -> dict:
         "score": r.score,
         "score_breakdown": r.score_breakdown if hasattr(r, 'score_breakdown') and r.score_breakdown else None,
         "model": r.model,
+        "model_settings": r.model_settings,
         "num_runs": r.num_runs,
         "num_test_cases": r.num_test_cases,
         "num_checks": r.num_checks,

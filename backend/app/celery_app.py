@@ -126,6 +126,16 @@ celery.conf.beat_schedule = {
         "task": "tasks.engagement.process_inactivity_nudges",
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
     },
+    # v5.0 launch funnel — agentic-chat tutorial drip (daily)
+    "engagement-agentic-chat-drip": {
+        "task": "tasks.engagement.process_agentic_chat_drip",
+        "schedule": crontab(hour=10, minute=15),  # daily at 10:15am
+    },
+    # Power-user upsell — fires when users cross 30 chat-run workflows
+    "engagement-powerup-milestones": {
+        "task": "tasks.engagement.process_powerup_milestones",
+        "schedule": crontab(hour=10, minute=45),  # daily at 10:45am
+    },
     # Orphan-run reaper for all three optimizer run types (KB, workflow,
     # extraction) — a hard-limit-killed run otherwise blocks re-optimizing
     # its subject forever via the start paths' active-run 409.

@@ -8,7 +8,7 @@ interface PageLayoutProps {
 
 export function PageLayout({ children }: PageLayoutProps) {
   return (
-    <div className="flex h-screen flex-col">
+    <div className="supporting-page flex h-dvh min-h-0 flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-highlight"
@@ -16,8 +16,8 @@ export function PageLayout({ children }: PageLayoutProps) {
         Skip to main content
       </a>
       <Header />
-      <div className="flex-1 overflow-auto bg-gray-50">
-        <div className="px-6 pt-4 pb-2">
+      <div className="min-h-0 flex-1 overflow-auto bg-gray-50">
+        <div className="px-3 pt-4 pb-2 sm:px-6">
           <a
             href="/"
             className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
@@ -26,7 +26,7 @@ export function PageLayout({ children }: PageLayoutProps) {
             Back to workspace
           </a>
         </div>
-        <main id="main-content" className="px-6 pb-6">{children}</main>
+        <main id="main-content" tabIndex={-1} className="px-3 pb-6 sm:px-6">{children}</main>
       </div>
     </div>
   )

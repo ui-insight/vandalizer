@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
+    # Staged rollout: enable only after enrollment rehearsal and all course
+    # surfaces have passed version-aware QA. Publication alone never enables it.
+    certification_versioning_enabled: bool = False
+    # Separate course catalog for a QA staging deployment. Empty means the
+    # repository catalog. Releases published in QA staging mode refuse to
+    # serve learners when environment is "production".
+    certification_catalog_root: str = ""
     # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
     # unset to derive it from environment + frontend_url (see
     # use_secure_cookies): Secure in production, EXCEPT when the deployment is
@@ -43,6 +50,12 @@ class Settings(BaseSettings):
     chromadb_host: str = ""
     max_upload_size_mb: int = 500
 
+    # SSRF allowlist: comma-separated hostnames that outbound requests may hit
+    # even when they resolve to private/campus IP ranges. For trusted
+    # deployment infrastructure only (e.g. an on-campus search proxy) — the
+    # private-IP block still applies to every other host. Loopback, link-local,
+    # and cloud-metadata addresses stay blocked regardless.
+    ssrf_allowed_hosts: str = "mindrouter.uidaho.edu"
     # Where this process looks for model vocabularies, in the standard
     # HuggingFace cache layout (`<root>/hub/models--Org--Name/snapshots/<rev>/`).
     # Set it to your HF_HOME. Token counting reads `tokenizer.json` from here —
@@ -76,6 +89,9 @@ class Settings(BaseSettings):
     resend_from_email: str = ""
     resend_from_name: str = "Vandalizer"
 
+    # Landing-page demo-request form: where admin-notification emails go.
+    # Falls back to resend_from_email / smtp_from_email if unset.
+    demo_request_to_email: str = ""
     # Master switch for scheduled promotional email (demo recapture drips,
     # onboarding drips, inactivity nudges). Set false to silence all three
     # regardless of per-user preferences — transactional mail is unaffected.

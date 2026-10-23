@@ -100,11 +100,44 @@ async def apply_classification(
     classification: str,
     confidence: float,
     classified_by: str = "auto",
-) -> SmartDocument:
-    """Apply a classification to a document and save."""
-    document.classification = classification
-    document.classification_confidence = confidence
-    document.classified_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    document.classified_by = classified_by
-    await document.save()
+) -> Optional[SmartDocument]:
+    """Write only classification fields, rejecting obsolete automatic results.
+
+    A classifier can wait for a model while extraction, a retry or a manual
+    classification changes the document. Saving the whole original model here
+    would restore stale text and processing state (and could resurrect a delete).
+    """
+    expected = {
+        '_id': document.id, 'uuid': document.uuid,
+        'user_id': document.user_id, 'team_id': document.team_id, 'folder': document.folder,
+        'soft_deleted': {'$ne': True},
+    }
+    if classified_by in {'auto', 'default'}:
+        # An explicit human decision takes precedence over background enrichment.
+        if document.classification and document.classified_by not in {None, 'auto', 'default'}:
+            return None
+        for field in (
+            'raw_text', 'title', 'extension', 'path', 'downloadpath',
+            'classification', 'classification_confidence', 'classified_at', 'classified_by',
+        ):
+            expected[field] = {'$eq': getattr(document, field)}
+        revision = document._extraction_restart_revision
+        if revision == 0:
+            expected['$or'] = [
+                {'_extraction_restart_revision': {'$exists': False}},
+                {'_extraction_restart_revision': 0},
+            ]
+        else:
+            expected['_extraction_restart_revision'] = revision
+    values = {
+        'classification': classification,
+        'classification_confidence': confidence,
+        'classified_at': datetime.datetime.now(tz=datetime.timezone.utc),
+        'classified_by': classified_by,
+    }
+    result = await SmartDocument.get_motor_collection().update_one(expected, {'$set': values})
+    if result.matched_count != 1:
+        return None
+    for field, value in values.items():
+        setattr(document, field, value)
     return document

@@ -14,6 +14,7 @@ from app.rate_limit import limiter
 from app.services import access_control
 from app.services import verification_service as svc
 from app.services import organization_service
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
@@ -303,7 +304,7 @@ async def download_test_file(
     return StreamingResponse(
         io.BytesIO(content),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{original_name}"'},
+        headers={"Content-Disposition": content_disposition(original_name)},
     )
 
 
@@ -613,7 +614,7 @@ async def try_verified_item(
 
         from app.models.knowledge import KnowledgeBase
         from app.models.verification import VerifiedItemMetadata
-        from app.services.document_manager import DocumentManager
+        from app.services.document_manager import get_document_manager
         import asyncio
 
         kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
@@ -629,7 +630,7 @@ async def try_verified_item(
             if not set(meta.organization_ids) & set(user_org_ancestry):
                 raise HTTPException(status_code=404, detail="Verified knowledge base not found")
 
-        dm = DocumentManager()
+        dm = get_document_manager()
         results = await asyncio.to_thread(dm.query_kb, kb.uuid, query, 8)
 
         return {

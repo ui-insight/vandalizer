@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import Landing from './Landing'
 import type { AuthConfig } from '../api/auth'
 
@@ -36,6 +36,8 @@ vi.mock('../api/auth', () => ({
   getAuthConfig: () => mockGetAuthConfig(),
 }))
 
+vi.mock('../components/shared/PanelFocusTrap', () => ({ FocusTrap: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+
 vi.mock('../components/layout/Footer', () => ({ Footer: () => <footer /> }))
 
 function config(overrides: Partial<AuthConfig> = {}): AuthConfig {
@@ -51,6 +53,7 @@ describe('Landing — trial signup form', () => {
   it('hides the password block when password sign-in is off and the trial system is off', async () => {
     mockGetAuthConfig.mockResolvedValue(config({ trial_system_enabled: false }))
     render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
     expect(document.querySelector('#landing-login-email')).toBeNull()
@@ -60,6 +63,7 @@ describe('Landing — trial signup form', () => {
   it('shows the password block when the trial system is on, even with password sign-in off', async () => {
     mockGetAuthConfig.mockResolvedValue(config({ trial_system_enabled: true }))
     render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(document.querySelector('#landing-login-email')).not.toBeNull())
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
   })
@@ -75,6 +79,7 @@ describe('Landing — trial signup form', () => {
   it('opens in login mode by default', async () => {
     mockGetAuthConfig.mockResolvedValue(config({ auth_methods: ['password'] }))
     render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(document.querySelector('#landing-login-email')).not.toBeNull())
     expect(document.querySelector('#landing-register-email')).toBeNull()
   })

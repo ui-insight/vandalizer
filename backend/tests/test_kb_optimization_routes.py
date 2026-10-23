@@ -165,6 +165,7 @@ class TestStartOptimization:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.post(
@@ -184,6 +185,7 @@ class TestStartOptimization:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             for budget in (0, -100):
@@ -209,6 +211,7 @@ class TestStartOptimization:
             patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
             patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
             # The start path sweeps orphaned runs before its active check (#835);
             # the sweep is its own unit, not under test here.
             patch("app.services.kb_optimizer.reap_stale_runs", new=AsyncMock()),
@@ -619,6 +622,52 @@ class TestApplyOptimizationEdgeCases:
             )
         assert resp.status_code == 409
         assert resp.json()["detail"]["code"] == "tied_with_baseline"
+        kb.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_apply_409s_when_current_settings_won(self, client):
+        """No trial beat the KB's current settings: applying needs force."""
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        kb = _stub_kb()
+        kb.save = AsyncMock()
+        run = _stub_run(status="completed", best_config={"k": 12})
+        run.tied_with_baseline = False
+        run.winner = "current"
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=run)
+            resp = await client.post(
+                "/api/knowledge/kb-1/optimize/opt-1/apply",
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 409
+        assert resp.json()["detail"]["code"] == "current_settings_won"
+        kb.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_chat_apply_path_refuses_when_current_settings_won(self):
+        """Chat's apply_optimization goes through the same action, so it gets
+        the same gate as the router."""
+        from app.services.optimization_actions import (
+            OptimizationActionError,
+            apply_kb_optimization,
+        )
+
+        kb = _stub_kb()
+        kb.save = AsyncMock()
+        run = _stub_run(status="completed", best_config={"k": 12})
+        run.tied_with_baseline = False
+        run.winner = "current"
+        with pytest.raises(OptimizationActionError) as exc:
+            await apply_kb_optimization(kb, run, "user1")
+        assert exc.value.code == "current_settings_won"
         kb.save.assert_not_awaited()
 
     @pytest.mark.asyncio

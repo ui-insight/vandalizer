@@ -1,0 +1,609 @@
+"""Tests for the Phase 11 certification chat tools in app.services.chat_tools.
+
+Most tests mock certification_service to verify argument plumbing, result shape,
+and error handling. Progress contract tests use the actual service serializer,
+mocking only record retrieval, so obsolete fixtures cannot hide response drift.
+"""
+
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
+
+from app.services.chat_tools import (
+    check_certification_module,
+    complete_certification_module,
+    get_certification_lesson,
+    get_certification_module,
+    get_certification_progress,
+    provision_certification_lab,
+    submit_certification_assessment,
+)
+
+
+def _make_context(**overrides):
+    @dataclass
+    class FakeDeps:
+        user: MagicMock = field(default_factory=lambda: MagicMock(user_id="user1"))
+        user_id: str = "user1"
+        team_id: str | None = "team1"
+
+    ctx = MagicMock()
+    ctx.deps = FakeDeps(**{k: v for k, v in overrides.items() if k in FakeDeps.__dataclass_fields__})
+    return ctx
+
+
+def _progress(modules=None, **overrides):
+    base = {
+        "id": "p1",
+        "user_id": "user1",
+        "modules": modules or {},
+        "total_xp": 150,
+        "level": "apprentice",
+        "certified": False,
+        "certified_at": None,
+        "last_activity_date": "2026-07-09",
+        "unlocked": False,
+    }
+    base.update(overrides)
+    return base
+
+
+# ---------------------------------------------------------------------------
+# get_certification_progress
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["new", "active", "certified"])
+@pytest.mark.parametrize("legacy_streak", [False, True])
+async def test_progress_service_contract(state, legacy_streak):
+    from app.services import certification_service as cert_svc
+
+    completed_ids = {
+        "new": [],
+        "active": cert_svc.MODULE_ORDER[:2],
+        "certified": cert_svc.MODULE_ORDER,
+    }[state]
+    stored = SimpleNamespace(**_progress(
+        modules={mid: {"completed": True, "stars": 3} for mid in completed_ids},
+        total_xp=0 if state == "new" else 150,
+        level="novice" if state == "new" else "apprentice",
+        certified=state == "certified",
+    ))
+    if legacy_streak:
+        stored.streak_days = 7
+
+    # Keep get_progress_dict real: the regression was at its boundary with
+    # the chat tool, not in the database lookup.
+    with patch.object(cert_svc, "get_progress", new=AsyncMock(return_value=stored)) as get_record:
+        result = await get_certification_progress(_make_context())
+
+    get_record.assert_awaited_once_with("user1")
+    assert result["modules_completed"] == len(completed_ids)
+    assert result["modules_total"] == len(cert_svc.MODULE_ORDER)
+    assert result["next_module_id"] == (
+        cert_svc.MODULE_ORDER[len(completed_ids)] if state != "certified" else None
+    )
+    assert result["certified"] is (state == "certified")
+    assert result["total_xp"] == stored.total_xp
+    assert "streak_days" not in result
+    assert all(row["completed"] == (row["module_id"] in completed_ids) for row in result["modules"])
+
+
+@pytest.mark.asyncio
+async def test_progress_reports_next_module_and_counts():
+    modules = {
+        "ai_literacy": {"completed": True, "stars": 3},
+        "foundations": {"completed": True, "stars": 2},
+    }
+    with patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value=_progress(modules)),
+    ):
+        result = await get_certification_progress(_make_context())
+
+    assert result["modules_completed"] == 2
+    assert result["modules_total"] == 11
+    # Next incomplete module in MODULE_ORDER after ai_literacy + foundations
+    assert result["next_module_id"] == "process_mapping"
+    assert result["total_xp"] == 150
+    assert result["level"] == "apprentice"
+    by_id = {m["module_id"]: m for m in result["modules"]}
+    assert by_id["foundations"]["stars"] == 2
+    assert by_id["foundations"]["title"] == "Foundations"
+    assert by_id["governance"]["completed"] is False
+
+
+@pytest.mark.asyncio
+async def test_each_module_shows_the_most_xp_it_can_award():
+    """Ticket: AI Literacy showed 50 XP and awarded 125 (3 stars x 25), with
+    nothing saying stars add XP."""
+    with patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value=_progress({})),
+    ):
+        result = await get_certification_progress(_make_context())
+
+    by_id = {m["module_id"]: m for m in result["modules"]}
+    assert (by_id["ai_literacy"]["xp"], by_id["ai_literacy"]["max_xp"]) == (50, 125)
+    assert (by_id["foundations"]["xp"], by_id["foundations"]["max_xp"]) == (100, 175)
+
+
+def test_a_course_without_a_star_bonus_awards_only_its_base():
+    from app.services import certification_service as cert_svc
+
+    with patch.object(cert_svc, "course_star_bonus_xp", return_value=0):
+        assert cert_svc.course_module_max_xp() == cert_svc.course_module_xp()
+
+
+def test_a_module_cannot_claim_less_than_its_base_xp():
+    from pydantic import ValidationError
+    from app.services.certification_versions.tool_results import ModuleRow
+
+    row = {"module_id": "one", "title": "One", "xp": 100, "completed": False, "stars": 0}
+    assert ModuleRow.model_validate({**row, "max_xp": 175}).max_xp == 175
+    with pytest.raises(ValidationError):
+        ModuleRow.model_validate({**row, "max_xp": 50})
+
+
+@pytest.mark.asyncio
+async def test_progress_fully_certified_has_no_next_module():
+    modules = {}
+    from app.services.certification_service import MODULE_ORDER
+
+    for mid in MODULE_ORDER:
+        modules[mid] = {"completed": True, "stars": 3}
+    with patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value=_progress(modules, certified=True)),
+    ):
+        result = await get_certification_progress(_make_context())
+
+    assert result["next_module_id"] is None
+    assert result["certified"] is True
+    assert result["modules_completed"] == 11
+
+
+# ---------------------------------------------------------------------------
+# get_certification_module
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_module_unknown_id_errors():
+    result = await get_certification_module(_make_context(), "not_a_module")
+    assert "error" in result
+    assert "foundations" in result["hint"]
+
+
+@pytest.mark.asyncio
+async def test_get_module_merges_exercise_and_progress():
+    exercise = {
+        "overview": "Build your first extraction.",
+        "instructions": ["Open the Challenge tab."],
+        "expected_fields": ["pi_name", "award_amount"],
+        "star_criteria": {"1": "pass"},
+        "documents": ["sample.pdf"],
+    }
+    modules = {"foundations": {"completed": True, "stars": 2, "provisioned_docs": ["D1"]}}
+    with (
+        patch("app.services.certification_service.get_exercise", return_value=exercise),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress(modules)),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "foundations")
+
+    assert result["title"] == "Foundations"
+    assert result["xp"] == 100
+    assert result["max_xp"] == 175
+    assert result["star_bonus_xp"] == 25
+    assert result["completed"] is True
+    assert result["stars"] == 2
+    assert result["expected_fields"] == ["pi_name", "award_amount"]
+    assert result["provisioned_docs"] == ["D1"]
+    assert result["assessment_keys"] == []  # hands-on module
+
+
+@pytest.mark.asyncio
+async def test_get_module_reflective_exposes_assessment_keys():
+    with (
+        patch("app.services.certification_service.get_exercise", return_value={}),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress()),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "ai_literacy")
+
+    assert result["assessment_keys"] == ["experience", "comfort", "concern"]
+
+
+@pytest.mark.asyncio
+async def test_get_module_prefers_chat_instructions():
+    exercise = {
+        "overview": "o",
+        "instructions": ["Click the **Challenge** tab."],
+        "chat_instructions": ["Work through the lessons here in chat."],
+    }
+    with (
+        patch("app.services.certification_service.get_exercise", return_value=exercise),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress()),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "foundations")
+
+    assert result["instructions"] == ["Work through the lessons here in chat."]
+
+
+@pytest.mark.asyncio
+async def test_get_module_includes_lessons_and_assessment_questions():
+    lessons = {
+        "lessons": [{"title": "L1", "content": "c"}, {"title": "L2", "content": "c"}],
+        "assessment": {
+            "questions": [
+                {"key": "experience", "question": "Q?", "options": ["a", "b"]},
+            ],
+        },
+    }
+    with (
+        patch("app.services.certification_service.get_exercise", return_value={}),
+        patch("app.services.certification_service.get_lessons", return_value=lessons),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress()),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "ai_literacy")
+
+    assert result["lesson_titles"] == ["L1", "L2"]
+    assert result["assessment_questions"][0]["key"] == "experience"
+
+
+# ---------------------------------------------------------------------------
+# get_certification_lesson
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_unknown_module_errors():
+    result = await get_certification_lesson(_make_context(), "bogus", 1)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_module_without_lessons_errors():
+    with patch("app.services.certification_service.get_lessons", return_value={}):
+        result = await get_certification_lesson(_make_context(), "foundations", 1)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_out_of_range_errors():
+    lessons = {"lessons": [{"title": "L1", "content": "c"}]}
+    with patch("app.services.certification_service.get_lessons", return_value=lessons):
+        result = await get_certification_lesson(_make_context(), "foundations", 2)
+    assert "error" in result
+    assert "1..1" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_returns_content_and_position():
+    lessons = {
+        "lessons": [
+            {"title": "L1", "content": "first"},
+            {
+                "title": "L2",
+                "objective": "learn things",
+                "content": "second",
+                "variant": "insight",
+                "knowledge_check": {"question": "Q?", "options": [
+                    {"text": "Inspect the source", "correct": True, "explanation": "Check the original evidence."},
+                    {"text": "Trust the claim", "correct": False, "explanation": "A claim alone is not evidence."},
+                ]},
+            },
+        ],
+    }
+    with patch("app.services.certification_service.get_lessons", return_value=lessons):
+        result = await get_certification_lesson(_make_context(), "foundations", 2)
+
+    assert result["module_title"] == "Foundations"
+    assert result["lesson_number"] == 2
+    assert result["lesson_count"] == 2
+    assert result["title"] == "L2"
+    assert result["content"] == "second"
+    assert result["variant"] == "insight"
+    assert result["knowledge_check"]["question"] == "Q?"
+    assert result["is_last"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_real_data_every_module_teachable():
+    """Every module has exported lessons and chat-native instructions, and the
+    ai_literacy reflective flow exposes its real assessment questions —
+    guards the export (frontend/scripts/export-lessons.mjs) staying in sync."""
+    from app.services import certification_service as cert_svc
+
+    for mid in cert_svc.MODULE_ORDER:
+        lessons = cert_svc.get_lessons(mid)
+        assert lessons and lessons["lessons"], f"{mid} has no exported lessons"
+        exercise = cert_svc.get_exercise(mid)
+        chat_steps = exercise.get("chat_instructions")
+        assert chat_steps, f"{mid} has no chat_instructions"
+        for step in chat_steps:
+            for phrase in ("Learn tab", "**Learn**", "Challenge tab", "**Challenge**", "Set Up Lab"):
+                assert phrase not in step, f"{mid} chat_instructions reference panel UI: {step!r}"
+
+        first = await get_certification_lesson(_make_context(), mid, 1)
+        assert first["content"], f"{mid} lesson 1 has no content"
+        assert first["lesson_count"] == len(lessons["lessons"])
+
+    # Reflective modules carry the panel's real questions.
+    for mid, keys in cert_svc.ASSESSMENT_KEYS.items():
+        questions = (cert_svc.get_lessons(mid) or {}).get("assessment", {}).get("questions", [])
+        assert [q["key"] for q in questions] == list(keys), f"{mid} assessment questions out of sync"
+
+
+# ---------------------------------------------------------------------------
+# provision_certification_lab
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_provision_unknown_module_errors():
+    result = await provision_certification_lab(_make_context(), "bogus")
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_provision_passes_user_and_reports_docs():
+    provision = AsyncMock(return_value={"provisioned_docs": ["D1", "D2"]})
+    ctx = _make_context()
+    with (
+        patch("app.services.certification_service.provision_module_documents", new=provision),
+        patch("app.config.Settings", return_value=MagicMock()),
+        patch(
+            "app.services.certification_service.get_exercise",
+            return_value={"documents": ["a.pdf", "b.pdf"]},
+        ),
+    ):
+        result = await provision_certification_lab(ctx, "foundations")
+
+    assert provision.await_args.args[0] is ctx.deps.user
+    assert provision.await_args.args[1] == "foundations"
+    assert result["provisioned_docs"] == ["D1", "D2"]
+    assert result["document_names"] == ["a.pdf", "b.pdf"]
+    assert result["folder"] == "Certification Lab"
+
+
+@pytest.mark.asyncio
+async def test_provision_service_error_is_relayed():
+    provision = AsyncMock(return_value={"error": "No exercise defined for module x"})
+    with (
+        patch("app.services.certification_service.provision_module_documents", new=provision),
+        patch("app.config.Settings", return_value=MagicMock()),
+    ):
+        result = await provision_certification_lab(_make_context(), "foundations")
+
+    assert result["error"] == "No exercise defined for module x"
+
+
+# ---------------------------------------------------------------------------
+# check_certification_module
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_check_module_relays_validator_result():
+    validation = {
+        "passed": False,
+        "stars": 0,
+        "checks": [{"name": "Extraction template exists", "passed": False, "detail": "Create one"}],
+    }
+    with patch(
+        "app.services.certification_service.validate_module",
+        new=AsyncMock(return_value=validation),
+    ) as validate, patch(
+        "app.services.certification_service.get_progress_dict",
+        new=AsyncMock(return_value={"modules": {}}),
+    ):
+        result = await check_certification_module(_make_context(), "foundations")
+
+    validate.assert_awaited_once_with("user1", "foundations")
+    assert result["module_id"] == "foundations"
+    assert result["title"] == "Foundations"
+    assert result["passed"] is False
+    assert result["checks"][0]["name"] == "Extraction template exists"
+
+
+@pytest.mark.asyncio
+async def test_check_returns_the_counter_completion_needs():
+    """Ticket: every chat completion failed with "Reload the app" because the
+    model had to carry the attempts counter over from a read turns earlier.
+    The check the learner just reviewed now hands it over."""
+    validation = {"passed": True, "stars": 1, "checks": [{"name": "Answers", "passed": True, "detail": ""}]}
+    for stored, expected in (({}, 0), ({"foundations": {"attempts": 2}}, 2)):
+        with patch(
+            "app.services.certification_service.validate_module",
+            new=AsyncMock(return_value=validation),
+        ), patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value={"modules": stored}),
+        ):
+            result = await check_certification_module(_make_context(), "foundations")
+        assert result["expected_attempts"] == expected
+
+
+@pytest.mark.asyncio
+async def test_check_module_unknown_id_errors():
+    result = await check_certification_module(_make_context(), "bogus")
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# complete_certification_module
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def approved():
+    """The learner already approved completion of a module whose check passes.
+
+    Completion runs only after an approval card (see
+    test_chat_cert_completion_approval.py); these tests cover what happens next.
+    """
+    with patch("app.services.certification_service.validate_module", new=AsyncMock(return_value={"passed": True, "stars": 2, "checks": []})), \
+         patch("app.services.chat_tools._confirm_gate", new=AsyncMock(return_value=None)):
+        yield
+
+
+@pytest.mark.asyncio
+async def test_complete_success_adds_title(approved):
+    completion = {
+        "module_id": "foundations",
+        "stars": 2,
+        "xp_earned": 100,
+        "total_xp": 250,
+        "level": "builder",
+        "level_up": True,
+        "certified": False,
+        "validation": {"passed": True, "stars": 2, "checks": []},
+    }
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(return_value=completion),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations")
+
+    assert result["title"] == "Foundations"
+    assert result["xp_earned"] == 100
+    assert result["level"] == "builder"
+    # What the card needs to explain the award.
+    assert (result["base_xp"], result["star_bonus_xp"]) == (100, 25)
+
+
+@pytest.mark.asyncio
+async def test_complete_failure_returns_validation(approved):
+    failure = {
+        "error": "Validation did not pass",
+        "validation": {"passed": False, "stars": 0, "checks": [{"name": "x", "passed": False, "detail": ""}]},
+    }
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(return_value=failure),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations")
+
+    assert result["error"] == "Validation did not pass"
+    assert result["validation"]["passed"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_missing_counter_tells_the_model_what_to_do_not_the_learner_to_reload(approved):
+    from app.services.certification_versions.completion_preconditions import CompletionReviewRequired
+
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(side_effect=CompletionReviewRequired()),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations")
+
+    assert "Reload" not in result["error"] and "Reload" not in result["hint"]
+    # The learner sees error + hint, so neither names a tool or the counter.
+    for shown in (result["error"], result["hint"]):
+        assert "certification_module" not in shown and "expected_attempts" not in shown
+    assert "check_certification_module" in result["next_step"]
+    assert "expected_attempts" in result["next_step"]
+
+
+@pytest.mark.asyncio
+async def test_a_changed_counter_says_to_check_again(approved):
+    from app.services.certification_versions.completion_preconditions import CompletionChanged
+
+    with patch(
+        "app.services.certification_service.complete_module",
+        new=AsyncMock(side_effect=CompletionChanged()),
+    ):
+        result = await complete_certification_module(_make_context(), "foundations", expected_attempts=0)
+
+    assert "changed" in result["error"]
+    assert "check_certification_module" in result["next_step"]
+    assert "already completed" in result["next_step"]
+
+
+# ---------------------------------------------------------------------------
+# submit_certification_assessment
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_assessment_rejects_hands_on_module():
+    result = await submit_certification_assessment(
+        _make_context(), "foundations", {"experience": "lots"},
+    )
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_assessment_rejects_missing_keys():
+    result = await submit_certification_assessment(
+        _make_context(), "ai_literacy", {"experience": "some", "comfort": "  "},
+    )
+    assert "error" in result
+    assert "comfort" in result["error"]
+    assert "concern" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_assessment_stores_only_required_keys_stripped():
+    store = AsyncMock(return_value={"stored": True})
+    answers = {
+        "experience": "  I use AI weekly  ",
+        "comfort": "pretty comfortable",
+        "concern": "hallucinations",
+        "extra_key": "should be dropped",
+    }
+    with patch("app.services.certification_service.store_assessment", new=store):
+        result = await submit_certification_assessment(
+            _make_context(), "ai_literacy", answers,
+        )
+
+    assert result["stored"] is True
+    stored_answers = store.await_args.args[2]
+    assert stored_answers == {
+        "experience": "I use AI weekly",
+        "comfort": "pretty comfortable",
+        "concern": "hallucinations",
+    }
+
+
+@pytest.mark.asyncio
+async def test_real_lesson_export_preserves_identity_diagrams_and_practice():
+    """Exercise the actual authored export through the actual read-only tool."""
+    from app.services import certification_service as cert_svc
+
+    identities = set()
+    diagrams = set()
+    practice_count = 0
+    for module_id in cert_svc.MODULE_ORDER:
+        authored = cert_svc.get_lessons(module_id)
+        for index, lesson in enumerate(authored['lessons']):
+            result = await get_certification_lesson(_make_context(), module_id, index + 1)
+            assert result['content'] == lesson['content']
+            assert result['lesson_id'] == lesson['id']
+            assert result['lesson_revision'] == lesson['revision']
+            assert result['lesson_id'] not in identities
+            identities.add(result['lesson_id'])
+            assert result['diagram'] == lesson.get('diagram')
+            assert result['knowledge_check'] == lesson.get('knowledge_check')
+            if result['diagram']:
+                diagrams.add(result['diagram'])
+            if result['knowledge_check']:
+                practice_count += 1
+    assert len(identities) == 74
+    assert len(diagrams) == 8
+    assert practice_count == 18

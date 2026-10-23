@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import { resendCredentials } from '../api/demo'
 // ---------------------------------------------------------------------------
 
 function ResendLink() {
+  const pending = useRef(false)
   const [uuid, setUuid] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -31,6 +32,8 @@ function ResendLink() {
 
   async function handleResend(e: FormEvent) {
     e.preventDefault()
+    if (pending.current || !uuid.trim()) return
+    pending.current = true
     setBusy(true)
     setMessage('')
     setError('')
@@ -38,9 +41,10 @@ function ResendLink() {
       const res = await resendCredentials(uuid.trim())
       if (res.ok) setMessage(res.message)
       else setError(res.message)
-    } catch {
-      setError("We couldn't find a trial for that ID.")
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not request a sign-in link. Retry in a moment.')
     } finally {
+      pending.current = false
       setBusy(false)
     }
   }
@@ -52,14 +56,15 @@ function ResendLink() {
         If an admin set your account up for you, paste the trial ID from that
         email and we'll send a fresh one-click link.
       </p>
-      <form onSubmit={handleResend} className="flex gap-3">
+      <form onSubmit={handleResend} className="flex flex-wrap gap-3">
         <input
           type="text"
           aria-label="Trial ID"
           placeholder="Trial ID"
           value={uuid}
           onChange={(e) => setUuid(e.target.value)}
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+          disabled={busy}
+          className="min-w-0 flex-[1_1_160px] rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
         />
         <button
           type="submit"
@@ -70,8 +75,8 @@ function ResendLink() {
           Send
         </button>
       </form>
-      {message && <p className="mt-3 text-sm text-green-400">{message}</p>}
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {message && <p role="status" className="mt-3 text-sm text-green-400">{message}</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
     </div>
   )
 }

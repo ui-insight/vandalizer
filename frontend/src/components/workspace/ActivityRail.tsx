@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   Award,
@@ -16,17 +16,27 @@ import {
   CircleMinus,
   CircleCheck,
   SquarePen,
+  Pencil,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { useActivities } from '../../hooks/useActivities'
 import { useMyReviewCount } from '../../hooks/useMyReviewCount'
-import { deleteActivity } from '../../api/activity'
+import { deleteActivity, renameActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { pendingReviewUuid, useOpenActivity } from '../../hooks/useOpenActivity'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { LEVEL_CONFIG } from '../certification/constants'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
+import {
+  groupActivities, runDocumentLabel, runKindLabel, runName, runTimeLabel, shortError,
+  type ChatGroup,
+} from './activityGroups'
+
+export { pendingReviewUuid }
 
 function activityIcon(type: ActivityEvent['type']) {
   switch (type) {
@@ -61,22 +71,12 @@ function StatusIcon({ status }: { status: ActivityEvent['status'] }) {
 function statusMetaClass(status: ActivityEvent['status']) {
   switch (status) {
     case 'completed':
-      return 'text-[#1a7f37]'
+      return 'text-[#166534]'
     case 'failed':
       return 'text-[#b3261e]'
     default:
       return 'text-[#0050d7]'
   }
-}
-
-// A workflow run parked on an approval gate carries the pending review's uuid
-// in meta_summary. The status stays "running" (ActivityStatus has no paused
-// member), so this marker is what separates "waiting on a person" from
-// "waiting on a worker" everywhere in the rail.
-export function pendingReviewUuid(activity: ActivityEvent): string | null {
-  const uuid = (activity.meta_summary as { pending_review_uuid?: unknown } | undefined)
-    ?.pending_review_uuid
-  return typeof uuid === 'string' && uuid ? uuid : null
 }
 
 /** The review a row is *currently* waiting on, or null.
@@ -107,14 +107,21 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail() {
-  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
-  const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
+export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: () => void }) {
+  const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid, openWorkflowId, openExtractionId } = useWorkspace()
+  const { activities, loading, error, refresh, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { togglePanel, progress } = useCertificationPanel()
+  const { openPanel, progress, course } = useCertificationPanel()
+  // An outcome-based course awards its own credential; the legacy course keeps its title.
+  const certTitle = course?.credential_scope && course.course_title ? course.course_title : 'Vandal Workflow Architect'
   const confirm = useConfirm()
+  const deletePending = useRef(false)
+  const [deleting, setDeleting] = useState(false)
+  // The mobile drawer always needs its labels; a collapsed rail inside a
+  // full-width drawer would waste space and make the activity list opaque.
+  const visualDocked = forceExpanded ? false : forceDocked || railDocked
 
   const certLevel = progress?.level || 'novice'
   const certConfig = LEVEL_CONFIG[certLevel] || LEVEL_CONFIG.novice
@@ -125,6 +132,8 @@ export function ActivityRail() {
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
       e.stopPropagation()
+      if (deletePending.current) return
+      deletePending.current = true
       const activity = activities.find(a => a.id === id)
       const label = activity?.type === 'conversation'
         ? 'this conversation'
@@ -139,7 +148,8 @@ export function ActivityRail() {
         confirmLabel: 'Delete',
         destructive: true,
       })
-      if (!ok) return
+      if (!ok) { deletePending.current = false; return }
+      setDeleting(true)
       try {
         await deleteActivity(id)
         // If the deleted activity is the conversation currently open in
@@ -154,87 +164,227 @@ export function ActivityRail() {
         }
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to delete activity', 'error')
+      } finally {
+        deletePending.current = false
+        setDeleting(false)
       }
       refresh()
     },
     [refresh, toast, activities, confirm, currentConversationUuid, triggerNewChat],
   )
 
-  const handleClick = useCallback(
-    (activity: ActivityEvent) => {
-      if (activity.type === 'conversation' && activity.conversation_id) {
-        closeWorkflow()
-        closeExtraction()
-        closeAutomation()
-        setActiveRightTab('assistant')
-        setLoadConversationId(activity.conversation_id)
-      } else if (activity.type === 'workflow_run' && pendingReviewUuid(activity)) {
-        // The run is frozen at the gate — there is nothing to see in the editor
-        // that the review does not show, and the review is the only thing that
-        // moves it forward.
-        navigate({ to: '/reviews/$uuid', params: { uuid: pendingReviewUuid(activity)! } })
-      } else if (activity.type === 'workflow_run' && activity.workflow_id) {
-        openWorkflow(activity.workflow_id, activity.workflow_session_id ?? undefined)
-      } else if (activity.type === 'search_set_run' && activity.search_set_uuid) {
-        // Restore the extraction results from the activity snapshot so the
-        // editor re-opens with values rather than a blank slate.
-        const normalized = activity.result_snapshot?.normalized as Record<string, string> | undefined
-        const initialResults = normalized && typeof normalized === 'object' && Object.keys(normalized).length > 0
-          ? Object.fromEntries(Object.entries(normalized).map(([k, v]) => [k, v === null ? 'N/A' : String(v)]))
-          : undefined
-        const snapSources = activity.result_snapshot?.sources as import('../../api/extractions').ExtractionSourceMap | undefined
-        const initialSources = snapSources && typeof snapSources === 'object' && Object.keys(snapSources).length > 0
-          ? snapSources
-          : undefined
-        // The run's cross-field verdict is in the same snapshot. Restoring
-        // values without it re-opens a run that failed a budget rule looking
-        // exactly like one that passed.
-        type CFR = import('../../api/extractions').CrossFieldRunReport
-        type DW = import('../../api/extractions').DocumentWarning
-        const snap = activity.result_snapshot as {
-          cross_field?: CFR | null
-          cross_field_sets?: (CFR | null)[]
-          document_warnings?: DW[]
-        } | undefined
-        const snapCrossField = snap?.cross_field_sets
-          ?? (snap?.cross_field ? [snap.cross_field] : undefined)
-        const initialCrossField = snapCrossField?.length ? snapCrossField : undefined
-        // Same reasoning: values restored without the caveats attached to
-        // them re-open looking like values from documents read whole.
-        const initialWarnings = snap?.document_warnings?.length
-          ? snap.document_warnings
-          : undefined
-        openExtraction(
-          activity.search_set_uuid, initialResults, initialSources,
-          initialCrossField, initialWarnings,
-        )
-      }
-    },
-    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
+  // The chat being renamed in place, and the name typed so far.
+  const [renaming, setRenaming] = useState<{ id: string; value: string; original: string } | null>(null)
+  const renameSaving = useRef(false)
+
+  const saveRename = useCallback(async () => {
+    if (!renaming || renameSaving.current) return
+    const value = renaming.value.trim()
+    if (!value || value === renaming.original) { setRenaming(null); return }
+    renameSaving.current = true
+    try {
+      await renameActivity(renaming.id, value)
+      setRenaming(null)
+      refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not rename this chat', 'error')
+    } finally {
+      renameSaving.current = false
+    }
+  }, [renaming, refresh, toast])
+
+  // Chats the user opened or closed; the chat in use starts open.
+  const [chatOpen, setChatOpen] = useState<Record<string, boolean>>({})
+  const isChatExpanded = (group: ChatGroup) =>
+    chatOpen[group.chat.id] ?? (!!currentConversationUuid && group.chat.conversation_id === currentConversationUuid)
+  const [otherRunsOpen, setOtherRunsOpen] = useState(true)
+  const [errorOpen, setErrorOpen] = useState<Record<string, boolean>>({})
+  const { chats, otherRuns } = useMemo(
+    () => groupActivities(activities, currentConversationUuid),
+    [activities, currentConversationUuid],
   )
 
-  const isRunning = (status: ActivityEvent['status']) =>
-    status === 'running' || status === 'queued'
+  const { openActivity: handleClick } = useOpenActivity()
+  const [returnActivity, setReturnActivity] = useState(() => {
+    try { return sessionStorage.getItem('activity-return-id') } catch { return null }
+  })
+  const railRef = useRef<HTMLElement>(null)
+  const previousTool = useRef(openWorkflowId || openExtractionId)
+  useEffect(() => {
+    const tool = openWorkflowId || openExtractionId
+    if (previousTool.current && !tool) {
+      railRef.current?.querySelector<HTMLButtonElement>('[data-activity-return="true"]')?.focus({ preventScroll: true })
+    }
+    previousTool.current = tool
+  }, [openWorkflowId, openExtractionId])
+
+  const renderEntry = (activity: ActivityEvent, group?: ChatGroup, nested = false) => {
+    const awaitingReview = activeReviewUuid(activity)
+    const Icon = awaitingReview ? ClipboardCheck : activityIcon(activity.type)
+    const stale = isStale(activity, staleThresholdMinutes)
+    // A paused run is not "running": the shimmer would claim work is
+    // happening while it sits on a reviewer, possibly for days.
+    // "queued" renders the clock — the honest icon for a run parked on
+    // a person. The spinner would imply a worker is still churning.
+    const effectiveStatus: ActivityEvent['status'] =
+      stale ? 'failed' : awaitingReview ? 'queued' : activity.status
+    const staleTooltip = stale
+      ? `Timed out: no progress for over ${staleThresholdMinutes} minutes.`
+      : undefined
+    const rowTooltip = awaitingReview
+      ? 'Paused — waiting on your approval. Opens the review.'
+      : staleTooltip
+    const isChat = activity.type === 'conversation'
+    const aiTitleReady = (activity.meta_summary as { description_generated?: boolean } | undefined)
+      ?.description_generated === true
+    // Once a chat is done but the title generator hasn't finished yet, show a
+    // shimmering placeholder instead of the raw working title. Capped to ~2
+    // min after completion so a silently failed Celery task can't leave the
+    // row stuck on the placeholder. Runs keep their template's name.
+    const finishedAt = activity.finished_at ? new Date(activity.finished_at).getTime() : 0
+    const ageMs = finishedAt ? Date.now() - finishedAt : 0
+    const awaitingTitle =
+      isChat && activity.status === 'completed' && !aiTitleReady && ageMs < 120000
+    const displayTitle = awaitingTitle
+      ? 'Generating title…'
+      : isChat ? (activity.title || activity.type) : runName(activity)
+
+    const statusLabel = stale ? 'Timed out' : awaitingReview ? 'Awaiting approval' : {
+      queued: 'Queued', running: 'Running', completed: 'Completed', failed: 'Failed', canceled: 'Cancelled',
+    }[activity.status]
+    const failureReason = staleTooltip || (activity.status === 'failed' ? activity.error : '')
+    // What a run read and when, so two runs of one template can be told apart.
+    const runDetail = isChat ? '' : [
+      runKindLabel(activity), runDocumentLabel(activity), runTimeLabel(activity.started_at),
+    ].filter(Boolean).join(' · ')
+    const runCount = group?.runs.length ?? 0
+    const chatExpanded = group ? isChatExpanded(group) : false
+    if (renaming?.id === activity.id && !visualDocked) {
+      return (
+        <div key={activity.id} className="activity-entry">
+          <form
+            className="activity-entry__rename-form"
+            onSubmit={e => { e.preventDefault(); void saveRename() }}
+          >
+            <MessageSquare className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <input
+              autoFocus
+              aria-label="Chat name"
+              maxLength={120}
+              value={renaming.value}
+              onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+              onFocus={e => e.currentTarget.select()}
+              onBlur={() => void saveRename()}
+              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) } }}
+              className="activity-entry__rename-input"
+            />
+          </form>
+        </div>
+      )
+    }
+    return (
+      <div key={activity.id}>
+        <div className={cn('activity-entry', nested && 'activity-entry--nested')}>
+          {!visualDocked && group && runCount > 0 && (
+            <button
+              type="button"
+              aria-expanded={chatExpanded}
+              aria-label={`${chatExpanded ? 'Hide' : 'Show'} ${runCount} run${runCount === 1 ? '' : 's'} from ${displayTitle}`}
+              onClick={() => setChatOpen(prev => ({ ...prev, [activity.id]: !chatExpanded }))}
+              className="activity-entry__toggle"
+            >
+              {chatExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label={`Open ${isChat ? '' : `${runKindLabel(activity)} `}${displayTitle}: ${statusLabel}`}
+            data-activity-return={returnActivity === activity.id || undefined}
+            onClick={() => {
+              setReturnActivity(activity.id)
+              try { sessionStorage.setItem('activity-return-id', activity.id) } catch { /* Storage can be unavailable. */ }
+              onNavigate?.(); handleClick(activity)
+            }}
+            title={rowTooltip || `${displayTitle} — ${statusLabel}`}
+            className={cn('activity-entry__open', visualDocked && 'activity-entry__open--compact', nested && 'activity-entry__open--nested')}
+          >
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {!visualDocked && (
+              <span className="min-w-0 flex-1">
+                <span className={cn('block text-xs leading-[1.4] break-words', nested ? 'line-clamp-1' : 'line-clamp-2')}>{displayTitle}</span>
+                <span className={cn('flex items-center gap-1 mt-1 text-xs font-semibold', statusMetaClass(effectiveStatus))}>
+                  <StatusIcon status={effectiveStatus} />{statusLabel}
+                  {runCount > 0 && <span className="font-normal text-[#59616b]">· {runCount} run{runCount === 1 ? '' : 's'}</span>}
+                </span>
+                {runDetail && <span className="block truncate text-xs mt-0.5 text-[#59616b]">{runDetail}</span>}
+                {failureReason && <span className="block truncate text-xs mt-0.5 text-[#59616b]">{shortError(failureReason)}</span>}
+              </span>
+            )}
+          </button>
+          {!visualDocked && isChat && (
+            <button
+              type="button"
+              aria-label={`Rename chat: ${displayTitle}`}
+              onClick={e => {
+                e.stopPropagation()
+                const current = activity.title || ''
+                setRenaming({ id: activity.id, value: current, original: current })
+              }}
+              className="activity-entry__rename"
+              title="Rename chat"
+            ><Pencil className="h-4 w-4" aria-hidden="true" /></button>
+          )}
+          {!visualDocked && (
+            <button
+              type="button"
+              disabled={deleting}
+              aria-label={`Delete activity: ${displayTitle}`}
+              onClick={e => handleDelete(e, activity.id)}
+              className="activity-entry__delete"
+              title="Delete activity"
+            ><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+          )}
+        </div>
+        {!visualDocked && failureReason && (
+          <div className={cn('activity-entry__error', nested && 'activity-entry__error--nested')}>
+            <button
+              type="button"
+              aria-expanded={!!errorOpen[activity.id]}
+              onClick={() => setErrorOpen(prev => ({ ...prev, [activity.id]: !prev[activity.id] }))}
+              className="activity-entry__error-toggle"
+            >{errorOpen[activity.id] ? 'Hide details' : 'Details'}</button>
+            {errorOpen[activity.id] && <p className="activity-entry__error-text">{failureReason}</p>}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <aside
+      ref={railRef}
+      aria-label="Activity"
       className="flex h-full flex-col border-l border-[#d8d8d8] bg-panel-bg"
     >
       {/* Header */}
-      <div className="border-b border-[#ddd]" style={{ padding: '17px 12px' }}>
+      <div className="border-b border-[#ddd]" style={{ padding: "17px var(--workspace-space-12)" }}>
         <div className="flex items-center justify-between gap-2">
-          {!railDocked && (
+          {!visualDocked && (
             <div className="flex items-center gap-2">
               <Zap className="h-3.5 w-3.5" />
               <span className="text-sm font-bold">Activity</span>
             </div>
           )}
           <button
-            onClick={toggleRailDocked}
-            className="flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto"
-            title={railDocked ? 'Expand' : 'Collapse'}
+            onClick={forceDocked && onExpand ? onExpand : toggleRailDocked}
+            className={cn(
+              'flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto',
+              forceExpanded && 'hidden',
+            )}
+            title={visualDocked ? 'Expand' : 'Collapse'}
+            aria-label={visualDocked ? 'Expand activity' : 'Collapse activity'}
           >
-            {railDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+            {visualDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
@@ -243,232 +393,139 @@ export function ActivityRail() {
       <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
         <div className="flex flex-col gap-1">
           {/* New chat button - matches Flask _app_rail.html first item */}
-          <div
-            onClick={triggerNewChat}
+          <button
+            type="button"
+            aria-label="New chat"
+            title={visualDocked ? 'New chat' : undefined}
+            onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}
             className={cn(
               'flex items-center gap-2 rounded-lg cursor-pointer p-2',
               'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
               'transition-[background-color,box-shadow] duration-200',
-              railDocked ? 'justify-center' : '',
+              visualDocked ? 'justify-center' : '',
             )}
           >
             <div className="shrink-0 w-4 text-center text-[#333]">
               <SquarePen className="h-4 w-4" />
             </div>
-            {!railDocked && (
-              <div className="text-[11px] leading-[1.4] text-[#111]">New chat</div>
+            {!visualDocked && (
+              <div className="text-xs leading-[1.4] text-[#111]">New chat</div>
             )}
-          </div>
+          </button>
 
           {/* Pending reviews — only when something is actually waiting, so the
               rail stays quiet for the many users who never review anything.
               The always-present entry point is the account menu. */}
           {pendingReviews > 0 && (
-            <div
-              onClick={() => navigate({ to: '/reviews' })}
+            <button type="button" aria-label={`${pendingReviews} reviews waiting on you`}
+              onClick={() => { onNavigate?.(); navigate({ to: '/reviews' }) }}
               title={`${pendingReviews} approval${pendingReviews === 1 ? '' : 's'} waiting on you`}
               className={cn(
                 'flex items-center gap-2 rounded-lg cursor-pointer p-2',
                 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
                 'transition-[background-color,box-shadow] duration-200',
-                railDocked ? 'justify-center' : '',
+                visualDocked ? 'justify-center' : '',
               )}
             >
               <div className="relative shrink-0 w-4 text-center text-[#806600]">
                 <ClipboardCheck className="h-4 w-4" />
-                {railDocked && (
+                {visualDocked && (
                   <span
                     className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
                     style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
                   />
                 )}
               </div>
-              {!railDocked && (
+              {!visualDocked && (
                 <>
-                  <div className="min-w-0 flex-1 text-[11px] leading-[1.4] text-[#111]">
+                  <div className="min-w-0 flex-1 text-xs leading-[1.4] text-[#111]">
                     Reviews
                   </div>
                   <span
-                    className="shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
+                    className="shrink-0 rounded-full px-1.5 text-xs font-semibold text-[#111]"
                     style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
                   >
                     {pendingReviews}
                   </span>
                 </>
               )}
-            </div>
+            </button>
           )}
           <div className="h-[5px]" />
+          {loading && activities.length === 0 && <p role="status" className="px-2 text-xs text-[#59616b]">Loading activity…</p>}
+          {error && <div role="alert" className="px-2 text-xs text-red-800">
+            {!visualDocked && <p>{error} {activities.length > 0 ? 'Showing the last loaded activity.' : ''}</p>}
+            <button type="button" aria-label="Retry activity" disabled={loading} className="underline" onClick={() => void refresh()}>{visualDocked ? 'Retry' : 'Retry activity'}</button>
+          </div>}
+          {!loading && !error && activities.length === 0 && !visualDocked && <p className="px-2 text-xs text-[#59616b]">No activity yet. Start a conversation or run a tool to see it here.</p>}
 
-          {activities.map((activity) => {
-            const awaitingReview = activeReviewUuid(activity)
-            const Icon = awaitingReview ? ClipboardCheck : activityIcon(activity.type)
-            const stale = isStale(activity, staleThresholdMinutes)
-            // A paused run is not "running": the shimmer would claim work is
-            // happening while it sits on a reviewer, possibly for days.
-            const running = isRunning(activity.status) && !stale && !awaitingReview
-            const titleFresh = freshTitleIds.has(activity.id)
-            // "queued" renders the clock — the honest icon for a run parked on
-            // a person. The spinner would imply a worker is still churning.
-            const effectiveStatus: ActivityEvent['status'] =
-              stale ? 'failed' : awaitingReview ? 'queued' : activity.status
-            const staleTooltip = stale
-              ? `Timed out — no progress for over ${staleThresholdMinutes} minutes.`
-              : undefined
-            const rowTooltip = awaitingReview
-              ? 'Paused — waiting on your approval. Opens the review.'
-              : staleTooltip
-            const aiTitleReady = (activity.meta_summary as { description_generated?: boolean } | undefined)
-              ?.description_generated === true
-            // Once the activity is done but the title generator hasn't
-            // finished yet, show a shimmering placeholder instead of the
-            // raw working title — signals "we're cooking up a name".
-            // Cap to ~2 min after completion so a silently failed Celery
-            // task can't leave the row stuck on the placeholder.
-            const finishedAt = activity.finished_at ? new Date(activity.finished_at).getTime() : 0
-            const ageMs = finishedAt ? Date.now() - finishedAt : 0
-            const awaitingTitle =
-              activity.status === 'completed' && !aiTitleReady && ageMs < 120000
-            const displayTitle = awaitingTitle
-              ? 'Generating title…'
-              : (activity.title || activity.type)
 
+          {!visualDocked && chats.map(group => {
+            const expanded = !visualDocked && group.runs.length > 0 && isChatExpanded(group)
             return (
-              <div
-                key={activity.id}
-                onClick={() => handleClick(activity)}
-                title={rowTooltip}
-                className={cn(
-                  'rail-shimmer-running group relative flex items-center gap-2 rounded-lg cursor-pointer',
-                  'transition-[background-color,box-shadow] duration-200',
-                  railDocked ? 'justify-center p-2' : 'p-2',
-                  running
-                    ? 'text-white'
-                    : 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
-                )}
-                style={
-                  running
-                    ? {
-                        background: `linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%)`,
-                        backgroundSize: '200% 100%',
-                        animation: 'rail-shimmer 8s linear infinite',
-                      }
-                    : undefined
-                }
-              >
-                {/* Type icon */}
-                <div className={cn(
-                  'relative shrink-0 w-4 text-center',
-                  running ? 'text-white' : awaitingReview ? 'text-[#806600]' : railDocked ? 'text-[#999]' : 'text-[#333]',
-                )}>
-                  <Icon className="h-4 w-4" />
-                  {awaitingReview && railDocked && (
-                    <span
-                      className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
-                      style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
-                    />
-                  )}
-                </div>
-
-                {!railDocked && (
-                  <>
-                    {/* Title + status — clamp to 2 lines so AI titles can
-                        breathe without blowing out the rail width. */}
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          'text-[11px] leading-[1.4] break-words line-clamp-2',
-                          running ? 'text-white' : 'text-[#111]',
-                          // Shimmer when the AI title just arrived (one-shot)
-                          // or while we're waiting for it to generate (loops
-                          // via title-shimmer-loop).
-                          titleFresh && !running ? 'title-shimmer' : '',
-                          awaitingTitle ? 'title-shimmer-loop' : '',
-                        )}
-                        onAnimationEnd={titleFresh ? () => markTitleShimmered(activity.id) : undefined}
-                      >
-                        {displayTitle}
-                      </div>
-                      {awaitingReview && (
-                        <div className="text-[10px] leading-[1.4] font-semibold text-[#806600]">
-                          Awaiting approval →
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status icon */}
-                    <div
-                      className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(effectiveStatus))}
-                      title={rowTooltip ?? (activity.status === 'failed' && activity.error ? activity.error : undefined)}
-                    >
-                      <StatusIcon status={effectiveStatus} />
-                    </div>
-
-                    {/* Delete button - always visible for failed/canceled/stale, hover for others */}
-                    <button
-                      onClick={(e) => handleDelete(e, activity.id)}
-                      className={cn(
-                        'absolute right-1 top-1/2 -translate-y-1/2 z-[1]',
-                        'flex items-center justify-center',
-                        'rounded p-1',
-                        'transition-[opacity,color,background-color] duration-200',
-                        stale || activity.status === 'failed' || activity.status === 'canceled'
-                          ? 'opacity-70 pointer-events-auto hover:opacity-100'
-                          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-                        'text-[#7a7f87] hover:text-[#444]',
-                        running
-                          ? 'bg-white/30 backdrop-blur-sm hover:bg-white/50'
-                          : 'bg-white/90 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-white/95',
-                      )}
-                      title={staleTooltip
-                        ? `Delete - ${staleTooltip}`
-                        : activity.status === 'failed' && activity.error
-                          ? `Delete - Error: ${activity.error}`
-                          : 'Delete'}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </>
+              <div key={group.chat.id}>
+                {renderEntry(group.chat, group)}
+                {expanded && (
+                  <div role="group" aria-label={`Runs from ${group.chat.title || 'this chat'}`} className="activity-runs">
+                    {group.runs.map(run => renderEntry(run, undefined, true))}
+                  </div>
                 )}
               </div>
             )
           })}
+
+          {otherRuns.length > 0 && !visualDocked && (
+            <button
+              type="button"
+              aria-expanded={otherRunsOpen}
+              onClick={() => setOtherRunsOpen(open => !open)}
+              className="activity-section"
+              title="Runs started from the editors, automations or the API"
+            >
+              {otherRunsOpen ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+              <span className="flex-1">Other runs</span>
+              <span className="activity-count">{otherRuns.length}</span>
+            </button>
+          )}
+          {!visualDocked && otherRunsOpen && otherRuns.map(run => renderEntry(run))}
         </div>
       </div>
 
       {/* Certification badge footer */}
       <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
-        <div
-          onClick={togglePanel}
-          title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
+        <button
+          type="button"
+          aria-label="Open certification"
+          onClick={() => { onNavigate?.(); openPanel() }}
+          title={certCertified ? certTitle : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
           style={{
             borderRadius: 'var(--ui-radius, 12px)',
-            padding: railDocked ? '6px 10px' : '6px 12px',
+            padding: visualDocked ? '6px 10px' : '6px 12px',
             ...(certCertified
               ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
-              : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
+              : { background: '#fff', border: "1px solid var(--workspace-border)", boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
           }}
         >
           <Award
             className="h-3.5 w-3.5 shrink-0"
             style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-on-light, #806600)' }}
           />
-          {!railDocked && (
+          {!visualDocked && (
             certCertified ? (
-              <span className="text-[11px] font-semibold text-yellow-400 title-shimmer">
-                Vandal Workflow Architect
+              <span className="text-xs font-semibold text-yellow-400 title-shimmer">
+                {certTitle}
               </span>
             ) : certStarted ? (
               <>
-                <span className="text-[11px] font-semibold text-[#111]">{certConfig.label}</span>
-                <span className="text-[10px] text-[#999]">{certXp} XP</span>
+                <span className="text-xs font-semibold text-[#111]">{certConfig.label}</span>
+                <span className="text-xs text-[#59616b]">{certXp} XP</span>
               </>
             ) : (
-              <span className="text-[11px] font-semibold text-[#444]">Get Certified</span>
+              <span className="text-xs font-semibold text-[#444]">Get Certified</span>
             )
           )}
-        </div>
+        </button>
       </div>
     </aside>
   )

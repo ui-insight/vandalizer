@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAdminViewState } from './shared/AdminViewState'
+import { InventoryPages } from './shared/InventoryPages'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useCallback, useMemo, useState, useRef, useLayoutEffect, useId } from 'react'
 import { Search, RefreshCw, Pencil, Check, X, CheckCircle2, ArrowUpDown } from 'lucide-react'
 import {
   getAdminKnowledgeBases,
@@ -20,46 +24,21 @@ type SortKey = 'title' | 'updated'
  * in place (e.g. adding a date/version to the title). Source provenance per KB
  * is verified in the KB detail view; this surface is the bulk-rename overview. */
 export function KnowledgeBasesTab({ canEdit }: Props) {
-  const [kbs, setKbs] = useState<AdminKBSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<SortKey>('title')
-
-  const load = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    // Pull the whole inventory once and filter client-side — org KB counts are
-    // small enough that this is snappier than round-tripping every keystroke.
-    getAdminKnowledgeBases({ limit: 5000 })
-      .then(res => setKbs(res.knowledge_bases))
-      .catch(e => setError((e as Error).message || 'Failed to load knowledge bases'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = q
-      ? kbs.filter(kb =>
-          kb.title.toLowerCase().includes(q)
-          || (kb.owner_email ?? '').toLowerCase().includes(q)
-          || (kb.team_name ?? '').toLowerCase().includes(q)
-          || kb.tags.some(t => t.toLowerCase().includes(q)))
-      : kbs
-    const sorted = [...rows]
-    if (sort === 'title') {
-      sorted.sort((a, b) => a.title.localeCompare(b.title))
-    } else {
-      sorted.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
-    }
-    return sorted
-  }, [kbs, search, sort])
+  const [search, setSearch] = useAdminViewState('KnowledgeBasesTab.search', '')
+  const [view, setView] = useAdminViewState('KnowledgeBasesTab.inventory', { query: '', status: '', sort: 'title' as SortKey, offset: 0 })
+  const [renamed, setRenamed] = useState(false)
+  const pageSize = 100
+  const sort = view.sort
+  const request = useCallback(() => getAdminKnowledgeBases({ search: view.query, status: view.status, sort: view.sort, offset: view.offset, limit: pageSize }), [view])
+  const { data, setData, loading, error, load } = useAdminQuery(request)
+  const kbs = useMemo(() => data?.knowledge_bases ?? [], [data])
+  const refresh = () => { setRenamed(false); load() }
+  const setSort = (sort: SortKey) => { setRenamed(false); setView(previous => ({ ...previous, sort, offset: 0 })) }
 
   const applyRename = useCallback((uuid: string, title: string) => {
-    setKbs(prev => prev.map(kb => (kb.uuid === uuid ? { ...kb, title } : kb)))
-  }, [])
+    setData(prev => prev ? { ...prev, knowledge_bases: prev.knowledge_bases.map(kb => (kb.uuid === uuid ? { ...kb, title } : kb)) } : prev)
+    setRenamed(true)
+  }, [setData])
 
   return (
     <div>
@@ -68,26 +47,32 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#111827' }}>Knowledge Bases</h2>
           <p style={{ fontSize: 13, color: '#6b7280', margin: '2px 0 0 0' }}>
             Every KB across all users and teams. {canEdit
-              ? 'Click the pencil to rename — e.g. add a date/version.'
+              ? 'Click the pencil to rename, e.g. add a date/version.'
               : 'Read-only (renaming requires full admin).'}
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ position: 'relative' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: '100%' }}>
+          <form onSubmit={event => { event.preventDefault(); setRenamed(false); setView(previous => ({ ...previous, query: search.trim(), offset: 0 })) }} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', maxWidth: '100%' }}>
+          <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 0 }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               aria-label="Search knowledge bases"
               placeholder="Search title, owner, team, tag…"
+              maxLength={300}
               style={{
                 padding: '8px 10px 8px 30px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #e5e7eb', borderRadius: 8, width: 260, color: '#111827',
+                border: '1px solid #e5e7eb', borderRadius: 8, width: '100%', color: '#111827',
               }}
             />
           </div>
+          <button type="submit" className="admin-open-record">Search all records</button>
+          </form>
+          <label style={{ fontSize: 13 }}>Status <select aria-label="Knowledge base status" value={view.status} onChange={event => { setRenamed(false); setView(previous => ({ ...previous, status: event.target.value, offset: 0 })) }}><option value="">All statuses</option>{['empty', 'building', 'ready', 'error'].map(status => <option key={status} value={status}>{status}</option>)}</select></label>
           <button
-            onClick={load}
+            disabled={loading}
+            onClick={refresh}
             title="Refresh"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px',
@@ -101,8 +86,11 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
         </div>
       </div>
 
+      <p style={{ fontSize: 13, color: '#475569' }}>Search title, owner email, team and tags across every knowledge base. Status and sorting apply to all matching records.{view.query && <> Results for “{view.query}”.</>}</p>
+      <InventoryPages offset={view.offset} count={kbs.length} total={data?.total} hasMore={!!data && view.offset + kbs.length < data.total} busy={loading} onChange={offset => { setRenamed(false); setView(previous => ({ ...previous, offset })) }} pageSize={pageSize} scopeNote="Search, status and sorting cover the full inventory." />
+      {renamed && <p role="status">Title saved. Refresh to update its position and search matches.</p>}
       {error && (
-        <div style={{ padding: 12, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13 }}>
+        <div role="alert" style={{ padding: 12, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 8, fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -110,12 +98,12 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-        ) : filtered.length === 0 ? (
+        ) : kbs.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            {kbs.length === 0 ? 'No knowledge bases found.' : 'No matches.'}
+            {error ? 'Use Refresh to retry loading the inventory.' : view.query || view.status ? 'No knowledge bases match these filters.' : 'No knowledge bases found.'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Knowledge base inventory — scroll for more columns"><table className="admin-kb-table" style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <Th>#</Th>
@@ -138,15 +126,12 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((kb, i) => (
-                <KBRow key={kb.uuid} kb={kb} index={i} canEdit={canEdit} onRenamed={applyRename} />
+              {kbs.map((kb, i) => (
+                <KBRow key={kb.uuid} kb={kb} index={view.offset + i} canEdit={canEdit} onRenamed={applyRename} />
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
-      </div>
-      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-        {filtered.length} of {kbs.length} knowledge base{kbs.length === 1 ? '' : 's'}
       </div>
     </div>
   )
@@ -163,23 +148,40 @@ function KBRow({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(kb.title)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const renameRef = useRef<HTMLButtonElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const restoreFocus = useRef(false)
+  useLayoutEffect(() => {
+    if (editing) editorRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    if (!editing && restoreFocus.current) {
+      restoreFocus.current = false
+      renameRef.current?.focus()
+    }
+  }, [editing])
   const [rowError, setRowError] = useState<string | null>(null)
+  const errorId = useId()
 
   const startEdit = () => { setDraft(kb.title); setRowError(null); setEditing(true) }
-  const cancel = () => { setEditing(false); setRowError(null) }
+  const cancel = () => { if (savingRef.current) return; restoreFocus.current = true; setEditing(false); setRowError(null) }
 
   const save = async () => {
+    if (savingRef.current) return
     const next = draft.trim()
-    if (!next || next === kb.title) { setEditing(false); return }
+    if (!next) { setRowError('Enter a knowledge base title.'); return }
+    if (next === kb.title) { cancel(); return }
+    savingRef.current = true
     setSaving(true)
     setRowError(null)
     try {
       await updateKnowledgeBase(kb.uuid, { title: next })
       onRenamed(kb.uuid, next)
+      restoreFocus.current = true
       setEditing(false)
     } catch (e) {
       setRowError((e as Error).message || 'Rename failed')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -189,9 +191,13 @@ function KBRow({
       <Td style={{ color: '#6b7280', fontWeight: 600 }}>{index + 1}</Td>
       <Td>
         {editing ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div ref={editorRef} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               autoFocus
+              aria-label="Knowledge base title"
+              aria-invalid={!!rowError}
+              aria-describedby={rowError ? errorId : undefined}
+              disabled={saving}
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={e => {
@@ -200,14 +206,14 @@ function KBRow({
               }}
               maxLength={300}
               style={{
-                flex: 1, minWidth: 220, padding: '5px 8px', fontSize: 13, fontFamily: 'inherit',
+                flex: 1, minWidth: 0, width: 180, padding: '5px 8px', fontSize: 13, fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, color: '#111827',
               }}
             />
-            <button onClick={save} disabled={saving} title="Save" style={iconBtn('#16a34a')}>
+            <button onClick={save} disabled={saving} aria-label={`Save title for ${kb.title}`} title="Save" style={iconBtn('#16a34a')}>
               <Check size={15} />
             </button>
-            <button onClick={cancel} disabled={saving} title="Cancel" style={iconBtn('#6b7280')}>
+            <button onClick={cancel} disabled={saving} aria-label="Cancel rename" title="Cancel" style={iconBtn('#6b7280')}>
               <X size={15} />
             </button>
           </div>
@@ -220,13 +226,13 @@ function KBRow({
               </span>
             )}
             {canEdit && (
-              <button onClick={startEdit} title="Rename" style={{ ...iconBtn('#9ca3af'), opacity: 0.8 }}>
+              <button ref={renameRef} onClick={startEdit} aria-label={`Rename ${kb.title}`} title="Rename" style={iconBtn('#59616b')}>
                 <Pencil size={13} />
               </button>
             )}
           </div>
         )}
-        {rowError && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{rowError}</div>}
+        {rowError && <div id={errorId} role="alert" style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{rowError}</div>}
       </Td>
       <Td>
         {kb.tags.length > 0 ? (
@@ -241,7 +247,7 @@ function KBRow({
         ) : <span style={{ color: '#6b7280' }}>—</span>}
       </Td>
       <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.owner_email || kb.owner_id}</Td>
-      <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.team_name || '—'}</Td>
+      <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.team_name || '-'}</Td>
       <Td align="right" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{kb.total_sources}</Td>
       <Td align="right" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{kb.total_chunks}</Td>
       <Td><StatusPill status={kb.status} /></Td>
@@ -294,7 +300,7 @@ function Td({ children, align = 'left', style }: { children: React.ReactNode; al
 function iconBtn(color: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color,
+    background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, minWidth: 28, minHeight: 28, color,
   }
 }
 

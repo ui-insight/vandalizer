@@ -216,6 +216,35 @@ describe('LibraryTab last used', () => {
     const fresh = screen.getByText('Brand New Workflow')
     expect(ran.compareDocumentPosition(fresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+  it('opens legacy extraction entries without a set type or separate UUID', () => {
+    mockItems.current = [makePrompt({ id: 'legacy-item', item_id: 'extraction-id', item_uuid: null, set_type: null, name: 'Legacy extraction' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Legacy extraction' }))
+    expect(openExtraction).toHaveBeenCalledWith('extraction-id')
+  })
+  it('keeps content failures visible and prevents using a stale description until retry', async () => {
+    mockItems.current = [makePrompt({ description: 'Old fallback' })]
+    vi.mocked(listSearchSetItems).mockRejectedValueOnce(new Error('Content unavailable'))
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    await screen.findByText('Content unavailable')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry item content' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeEnabled()
+  })
+  it('ignores a late prompt read after closing and opening a different item', async () => {
+    let release!: (value: Awaited<ReturnType<typeof listSearchSetItems>>) => void
+    vi.mocked(listSearchSetItems).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    mockItems.current = [makePrompt(), makePrompt({ id: 'second', item_uuid: 'second-uuid', name: 'Second prompt' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Second prompt' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    release([{ id: 'old-item', searchphrase: 'Old response' }] as Awaited<ReturnType<typeof listSearchSetItems>>)
+    await waitFor(() => expect(screen.queryByText('Old response')).not.toBeInTheDocument())
+  })
 })
 
 describe('LibraryTab delete flow', () => {
@@ -287,8 +316,8 @@ describe('LibraryTab empty state', () => {
   it('suggests the catalog when the library has no items and links to it', async () => {
     mockItems.current = []
     render(<LibraryTab />)
-    expect(screen.getByText('Your library is empty')).toBeTruthy()
-    expect(screen.queryByText('No items found.')).toBeNull()
+    expect(screen.getByText('Your library is ready for its first tool')).toBeTruthy()
+    expect(screen.queryByText('No items match these filters')).toBeNull()
     fireEvent.click(screen.getByText('Browse the catalog →'))
     expect(await screen.findByText('Catalog browser')).toBeTruthy()
   })
@@ -297,14 +326,14 @@ describe('LibraryTab empty state', () => {
     mockItems.current = []
     render(<LibraryTab />)
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'zzz' } })
-    expect(screen.getByText('No items found.')).toBeTruthy()
+    expect(screen.getByText('No items match these filters')).toBeTruthy()
     expect(screen.queryByText('Browse the catalog →')).toBeNull()
   })
 
   it('does not show the nudge when a kind filter hides existing items', () => {
     render(<LibraryTab />)
-    fireEvent.click(screen.getByText(/^Workflows/))
-    expect(screen.getByText('No items found.')).toBeTruthy()
-    expect(screen.queryByText('Your library is empty')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Workflows/ }))
+    expect(screen.getByText('No items match these filters')).toBeTruthy()
+    expect(screen.queryByText('Browse the catalog →')).toBeNull()
   })
 })

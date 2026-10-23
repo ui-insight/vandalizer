@@ -223,6 +223,9 @@ async def accept_invite(token: str, user: User) -> Team:
     ).days > INVITE_EXPIRY_DAYS:
         raise ValueError("Invite has expired")
 
+    if not user.email or user.email.strip().casefold() != invite.email.strip().casefold():
+        raise ValueError("Sign in with the email address this invitation was sent to")
+
     team = await Team.get(invite.team)
     if not team:
         raise ValueError("Team not found")
@@ -232,6 +235,15 @@ async def accept_invite(token: str, user: User) -> Team:
         TeamMembership.team == team.id,
         TeamMembership.user_id == user.user_id,
     )
+    # A register-then-accept retry is harmless for a current member, but a
+    # consumed email invitation must not restore access after removal or reapply
+    # an old elevated role after an administrator changes it.
+    if invite.accepted:
+        if not existing:
+            raise ValueError("Invitation already used; ask a team administrator for a new invitation")
+        user.current_team = team.id
+        await user.save()
+        return team
     if not existing:
         membership = TeamMembership(
             team=team.id, user_id=user.user_id, role=invite.role

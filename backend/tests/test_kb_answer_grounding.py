@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from app.services.kb_answer_grounding import unsupported_citations, unsupported_figures
+from app.services.kb_answer_grounding import tool_output_as_source, unsupported_citations, unsupported_figures
 
 # The § 200.501 text the 2 CFR 200 KB actually holds (2024 revision).
 SNIPPETS = (
@@ -70,6 +70,44 @@ def test_no_snippets_means_every_figure_is_unsupported():
 
 def test_empty_answer():
     assert unsupported_figures("", SNIPPETS) == []
+
+
+# Support ticket: chat repeated what its validation and optimization tools
+# returned and flagged every number as possibly from general knowledge.
+VALIDATION_RESULT = json.dumps({
+    "extraction_set": "Award terms",
+    "num_runs": 3,
+    "accuracy": 0.8234,
+    "consistency": 0.92,
+    "score": 85.1,
+    "challenging_fields": [{"field": "PI", "accuracy": 0.77, "consistency": 0.96}],
+})
+
+
+def test_validation_scores_on_a_0_to_1_scale_support_their_percents():
+    answer = (
+        "Accuracy came in at 82% with 92% consistency (score 85.1%). "
+        "PI is the weakest field: 77% accurate, 96% consistent."
+    )
+    assert unsupported_figures(answer, tool_output_as_source(VALIDATION_RESULT)) == []
+
+
+def test_optimizer_score_percent_and_cost_are_supported():
+    result = json.dumps({"score_percent": 91, "estimated_cost_usd": 1.37, "tokens_used": 412000})
+    answer = "The best config scored 91% and cost about $1 ($1.37)."
+    assert unsupported_figures(answer, tool_output_as_source(result)) == []
+
+
+def test_figures_the_tool_did_not_return_are_still_flagged():
+    answer = "Accuracy was 88%, it ran 3 times, and it cost $412,000."
+    # num_runs and tokens_used are not percents or dollars, and 0.8234 is
+    # not 88%.
+    result = json.dumps({"accuracy": 0.8234, "num_runs": 3, "tokens_used": 412})
+    assert unsupported_figures(answer, tool_output_as_source(result)) == ["88%", "$412,000"]
+
+
+def test_a_plain_text_tool_result_still_reads_bare_amounts_as_dollars():
+    assert unsupported_figures("Budget: $1,250,000.", tool_output_as_source("budget 1250000")) == []
 
 
 # --- Citations: the cited source must contain what the answer credits to it ---
@@ -190,3 +228,59 @@ def test_corpus_off_topic_citations_are_mostly_flagged():
     # the cost of keeping faithful paraphrase unflagged (see _MIN_SUPPORT).
     missed = sorted(c["id"] for c in CASES if c["kind"] == "wrong_source" and not _flags(c))
     assert missed == ["w_308_travel", "w_332_mon"]
+
+
+# --- Passages the agent's own search_knowledge_base calls returned ---------
+#
+# The check read only the pre-fetched KB snippets. A correct citation of a
+# passage the agent searched for was flagged as not retrieved, and an answer
+# with no KB attached was never checked however the agent searched.
+
+
+def _kb_search(*entries: tuple[str, str]) -> dict:
+    return {
+        "tool_name": "search_knowledge_base",
+        "tool_call_id": "t1",
+        "content": [{"source_name": name, "content": text} for name, text in entries],
+    }
+
+
+def _miscited(answer: str, tool_results: list[dict], history=(), *, kbs_attached: bool):
+    from app.services.chat_service import _miscited_sources
+
+    return _miscited_sources(
+        answer, QUESTION, [], tool_results, list(history), kbs_attached=kbs_attached,
+    )
+
+
+def test_a_citation_of_a_passage_the_agent_searched_is_supported():
+    results = [_kb_search((STUB_332, RULE_TEXT))]
+    assert _miscited(GROUNDED, results, kbs_attached=True) == []
+
+
+def test_a_title_only_passage_the_agent_searched_is_flagged():
+    results = [_kb_search((STUB_332, STUB_TEXT))]
+    assert _miscited(RECALLED, results, kbs_attached=True) == [STUB_332]
+
+
+def test_checked_when_the_agent_searched_with_no_kb_attached():
+    results = [_kb_search((STUB_332, STUB_TEXT))]
+    assert _miscited(RECALLED, results, kbs_attached=False) == [STUB_332]
+    # Nothing attached and nothing searched: nothing to check against.
+    assert _miscited(RECALLED, [], kbs_attached=False) == []
+
+
+def test_an_earlier_turns_search_counts():
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+
+    history = [ModelRequest(parts=[ToolReturnPart(
+        tool_name="search_knowledge_base", tool_call_id="old",
+        content=[{"source_name": STUB_332, "content": STUB_TEXT}],
+    )])]
+    assert _miscited(RECALLED, [], history, kbs_attached=False) == [STUB_332]
+
+
+def test_other_tools_results_are_not_sources():
+    results = [{"tool_name": "fetch_url", "tool_call_id": "t2",
+                "content": [{"source_name": STUB_332, "content": RULE_TEXT}]}]
+    assert _miscited(GROUNDED, results, kbs_attached=True) == [STUB_332]

@@ -5,6 +5,8 @@ import json
 import logging
 import re
 from io import BytesIO
+from pathlib import Path
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -284,13 +286,37 @@ def _safe_paragraph(raw: str, style, **kwargs):
         return Paragraph(_xml_escape(raw), style, **kwargs)
 
 
+_WORKFLOW_FONT_LOCK = Lock()
+_WORKFLOW_FONTS_READY = False
+
+
+def _register_workflow_fonts():
+    """Embed bundled report text faces instead of relying on viewer substitutes."""
+    global _WORKFLOW_FONTS_READY
+    with _WORKFLOW_FONT_LOCK:
+        if _WORKFLOW_FONTS_READY:
+            return
+        import reportlab
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        folder = Path(reportlab.__file__).parent / 'fonts'
+        for suffix, filename in (('', 'Vera.ttf'), ('-Bold', 'VeraBd.ttf'),
+                                 ('-Italic', 'VeraIt.ttf'), ('-BoldItalic', 'VeraBI.ttf')):
+            pdfmetrics.registerFont(TTFont('WorkflowSans' + suffix, str(folder / filename)))
+        pdfmetrics.registerFontFamily('WorkflowSans', normal='WorkflowSans', bold='WorkflowSans-Bold',
+                                     italic='WorkflowSans-Italic', boldItalic='WorkflowSans-BoldItalic')
+        _WORKFLOW_FONTS_READY = True
+
+
 def _styles() -> dict:
     """Build the named ParagraphStyle dictionary used by the renderer."""
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    _register_workflow_fonts()
     base = getSampleStyleSheet()
-    body_font = "Helvetica"
+    body_font = "WorkflowSans"
     body_size = 10.5
     body_leading = 15
 
@@ -298,6 +324,7 @@ def _styles() -> dict:
         "title": ParagraphStyle(
             "WfTitle",
             parent=base["Title"],
+            fontName="WorkflowSans-Bold",
             fontSize=22,
             leading=26,
             spaceAfter=4,
@@ -307,6 +334,7 @@ def _styles() -> dict:
         "meta": ParagraphStyle(
             "WfMeta",
             parent=base["Normal"],
+            fontName=body_font,
             fontSize=9,
             leading=12,
             textColor=colors.HexColor("#6b7280"),
@@ -315,7 +343,7 @@ def _styles() -> dict:
         "h1": ParagraphStyle(
             "WfH1",
             parent=base["Heading1"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=18,
             leading=22,
             spaceBefore=14,
@@ -325,7 +353,7 @@ def _styles() -> dict:
         "h2": ParagraphStyle(
             "WfH2",
             parent=base["Heading2"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=15,
             leading=19,
             spaceBefore=12,
@@ -335,7 +363,7 @@ def _styles() -> dict:
         "h3": ParagraphStyle(
             "WfH3",
             parent=base["Heading3"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=13,
             leading=17,
             spaceBefore=10,
@@ -345,7 +373,7 @@ def _styles() -> dict:
         "h4": ParagraphStyle(
             "WfH4",
             parent=base["Heading4"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=11.5,
             leading=15,
             spaceBefore=8,
@@ -355,7 +383,7 @@ def _styles() -> dict:
         "h5": ParagraphStyle(
             "WfH5",
             parent=base["Heading5"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=11,
             leading=14,
             spaceBefore=6,
@@ -365,7 +393,7 @@ def _styles() -> dict:
         "h6": ParagraphStyle(
             "WfH6",
             parent=base["Heading6"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=10.5,
             leading=13,
             spaceBefore=6,
@@ -389,6 +417,7 @@ def _styles() -> dict:
             leading=body_leading,
             leftIndent=18,
             bulletIndent=6,
+            bulletFontName=body_font,
             spaceAfter=2,
             textColor=colors.HexColor("#111827"),
         ),
@@ -400,13 +429,14 @@ def _styles() -> dict:
             leading=body_leading,
             leftIndent=38,
             bulletIndent=26,
+            bulletFontName=body_font,
             spaceAfter=2,
             textColor=colors.HexColor("#111827"),
         ),
         "blockquote": ParagraphStyle(
             "WfQuote",
             parent=base["Normal"],
-            fontName="Helvetica-Oblique",
+            fontName="WorkflowSans-Italic",
             fontSize=body_size,
             leading=body_leading,
             leftIndent=16,
@@ -441,7 +471,7 @@ def _styles() -> dict:
         "table_header": ParagraphStyle(
             "WfTableHeader",
             parent=base["Normal"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=9.5,
             leading=12,
             # Black text on the gold (#eab308) header — see _build_table_flowable.
@@ -503,7 +533,7 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
         # Vandalizer brand gold header (#eab308) with black text.
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "WorkflowSans-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),
@@ -711,7 +741,7 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
         # Vandalizer brand gold header (#eab308) with black text.
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "WorkflowSans-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),

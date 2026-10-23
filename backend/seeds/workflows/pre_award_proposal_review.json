@@ -7,7 +7,6 @@
     "seed_id": "wf-pre-award-proposal-review",
     "display_name": "Proposal Readiness Review",
     "description": "Scans a proposal draft and produces a readiness checklist identifying missing sections, incomplete information, and formatting issues before submission.",
-    "quality_tier": "excellent",
     "collections": [
       "pre-award"
     ]
@@ -43,6 +42,34 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "844d540c-cee0-5901-a09d-795e158fb5a0",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every deadline, budget total, period and name in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "44acf272-0727-5a74-957e-b832500fcab1",
+          "name": "A component marked complete is present",
+          "category": "accuracy",
+          "description": "Every item rated Complete is actually present in the draft; a promised, planned or pending item (for example a letter not yet received) is not complete. FAIL for each item rated Complete that the draft does not contain."
+        },
+        {
+          "id": "904ca423-110d-560e-8693-49924d43e3e5",
+          "name": "Every missing component is flagged",
+          "category": "completeness",
+          "description": "Each required component the draft lacks is rated Missing or Incomplete with what is needed. FAIL for each absent component the review does not flag."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "0fe93112-82c1-58bc-bbaf-396b12ae51ee",
+          "type": "text",
+          "label": "Fictional solicitation, amendment and proposal draft. Answer key: the $200,000 direct-cost request exceeds the $180,000 cap by $20,000; budget arithmetic adds up (120,000 + 30,000 + 20,000 + 30,000 = 200,000; total 250,000) and indirect is 25% of direct; the budget justification is missing; the signed partner letter has not been received (a promise is not a letter); the draft still tracks the superseded November 12 deadline (now November 19, 2026, 5:00 p.m. Pacific Time); no page limit or exception is stated.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: notice-v1\nCommunity Resilience Pilot — original notice, October 1, 2026\n\n1. Eligibility\nAn application must be submitted by a university research office. Each university\nmay submit one application. This notice does not specify citizenship eligibility.\n\n2. Dates\nThe sponsor deadline is November 12, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline is November 9, 2026 at noon Pacific Time.\nThe project period is July 1, 2027 through June 30, 2028.\n\n3. Budget\nThe maximum direct-cost request is $180,000. Indirect costs are additional and\nmay not exceed 25% of direct costs. Equipment purchases are not permitted.\nTravel and subaward costs are allowed within the direct-cost limit.\nThis notice does not give an exception or waiver process.\n\n4. Required material\nInclude a project narrative, an itemized budget, a budget justification and one\nsigned community-partner letter. The letter must arrive with the application.\nThe notice does not specify a page limit for the budget justification.\n\nFICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: amendment-v2\nCommunity Resilience Pilot — official amendment, October 8, 2026\n\nThis amendment supersedes the sponsor deadline in section 2 of notice-v1.\nThe new sponsor deadline is November 19, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline remains November 9, 2026 at noon Pacific Time.\nAll other requirements, limits and project dates in notice-v1 remain unchanged.\n\nFICTIONAL QA MATERIAL — NOT A REAL PROPOSAL\nSource ID: proposal-draft\nCommunity Resilience Pilot — working proposal, October 6, 2026\nPrincipal investigator: Avery Example\nInternal tracking deadline: November 12, 2026 at 5:00 p.m. Pacific Time\nProject period: July 1, 2027 through June 30, 2028\n\nDraft budget\nPersonnel: $120,000\nTravel: $30,000\nSupplies: $20,000\nSubaward: $30,000\nDirect-cost total: $200,000\nIndirect costs: $50,000\nTotal request: $250,000\nEquipment: $0\n\nReadiness notes\nThe project narrative and itemized budget are attached to the internal record.\nThe budget justification is not yet attached. A partner has promised a letter,\nbut a signed letter has not been received. No sponsor exception is documented."
         }
       ]
     }

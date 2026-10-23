@@ -8,6 +8,10 @@ import type { ChatMessage as ChatMessageType, Citation } from '../../types/chat'
 // are sources; the rest were searched but not used.
 
 vi.mock('../../api/feedback', () => ({ submitChatFeedback: vi.fn() }))
+// ChatMessage calls useToast on this branch.
+vi.mock('../../contexts/ToastContext', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanel: () => ({ openPanel: vi.fn(), isOpen: false }),
 }))

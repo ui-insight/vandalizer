@@ -1,0 +1,31 @@
+[
+  {
+    "id": "scope_review",
+    "revision": 2,
+    "module_id": "foundations",
+    "outcome_id": "foundations.scoped_proposal",
+    "phase": "before_execution",
+    "question": "Review the saved assigned source, workspace and extraction fields for this run. Does this scope match the NSF task? Explain the correction you made or the mismatch that still needs attention. Your choice records this review; it does not start the run.",
+    "choices": {
+      "approve": "This saved scope is ready to run",
+      "revise": "I need to correct this scope before running",
+      "decline": "I will not run this proposal"
+    },
+    "required_fields": [],
+    "execution_choice": "approve"
+  },
+  {
+    "id": "value_review",
+    "revision": 1,
+    "module_id": "foundations",
+    "outcome_id": "foundations.verified_values",
+    "phase": "after_execution",
+    "question": "Compare all five extracted values from this saved run with the assigned source. Record the value, source passage and your decision for each field. If you cannot verify a value, leave it unresolved and explain what needs checking. Saving these checks does not by itself pass the assessment.",
+    "choices": {
+      "accept": "I checked every required value and accept the result",
+      "repair": "The result needs correction and another check",
+      "unresolved": "I cannot verify all required values yet"
+    },
+    "required_fields": ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"]
+  }
+]

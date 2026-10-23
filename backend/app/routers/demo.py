@@ -1,5 +1,7 @@
 """Trial/demo API endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.config import Settings
@@ -14,11 +16,13 @@ from app.schemas.demo import (
     DemoAdminStatsResponse,
     TrialEndInfoResponse,
     TrialExtensionRequest,
+    InAppTopUpInfoResponse,
     TrialExtensionResponse,
     TrialUsageResponse,
 )
 from app.services import demo_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -129,6 +133,44 @@ async def trial_usage(user: User = Depends(get_current_user)):
     from app.services import trial_budget
 
     return TrialUsageResponse(**await trial_budget.get_trial_usage(user))
+
+
+_IN_APP_TOPUP_REFUSALS = {
+    "not_metered": "This account doesn't have a trial token allowance to top up.",
+    "email_unverified": "Confirm your email address first — then you can top up here.",
+    "not_low": "You can top up once you've used most of your current tokens.",
+    "no_application": "This trial account can't be topped up here. Ask your administrator to add tokens.",
+}
+
+
+@router.get("/top-up", response_model=InAppTopUpInfoResponse)
+async def in_app_topup_info(user: User = Depends(get_current_user)):
+    """Whether the signed-in trial user can top up in the app, and what it asks."""
+    return InAppTopUpInfoResponse(**await demo_service.get_in_app_topup_info(user))
+
+
+@router.post("/top-up", response_model=TrialExtensionResponse)
+@limiter.limit("5/hour")
+async def in_app_topup(
+    request: Request,
+    body: TrialExtensionRequest,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """In-app token top-up for the signed-in trial user: the same grant and
+    feedback as the emailed link, with the session as the credential."""
+    result = await demo_service.topup_signed_in_trial(user, body.notes, settings)
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_IN_APP_TOPUP_REFUSALS.get(result.get("reason"), "This account can't be topped up right now."),
+        )
+    return TrialExtensionResponse(
+        ok=True,
+        message="Your tokens have been topped up.",
+        tokens_granted=result.get("tokens_granted"),
+        tokens_budget=result.get("tokens_budget"),
+    )
 
 
 @router.post("/resend-verification")

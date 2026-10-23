@@ -687,6 +687,7 @@ class TestExtractionsRoutes:
             patch("app.routers.extractions.access_control") as mock_ac,
             patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
             patch("app.services.extraction_optimizer.reap_stale_runs", new=AsyncMock()),
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)

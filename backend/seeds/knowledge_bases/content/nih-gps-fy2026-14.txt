@@ -1,0 +1,237 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 14: Support of Scientific Meetings (Conference Grants)
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+14 SUPPORT OF SCIENTIFIC MEETINGS
+(CONFERENCE GRANTS)
+14.1 GENERAL
+NIH supports scientific meetings, conferences, and workshops (hereafter “conferences”) that are relevant
+to its scientific mission and to public health under the R13 and U13 activity codes. NIH’s support of conferences is contingent on the interests and priorities of the individual ICs. Most ICs provide conference
+support although their budget guidelines may vary. Applicants are encouraged to review the NIH Highlighted Topics  prior to submission. Applications for conference support must be submitted based on the
+published receipt dates. In general, NIH will not issue a conference grant award unless the Federal award
+date can precede the conference start date. Awarding a conference grant after a conference has been held
+should only be done when an IC can determine or document that funding of post-conference activities is
+consistent with the approved application.
+14.2 APPLICABILITY
+This chapter applies to grants that support domestic and international conferences. If a policy is not
+addressed in this chapter, then IIA coverage applies.
+Questions concerning the allowability of conference activity under research grants should be directed to
+the GMO.
+14.3 DEFINITIONS
+Conference (in general). 2 CFR Part 200.432 defines a conference as an event whose primary purpose is
+to disseminate technical information beyond the recipient or subrecipient and is necessary and reasonable
+for successful performance under the Federal award.
+Scientific Meeting (Conference). A gathering, symposium, seminar, workshop, or any other organized,
+formal event where people assemble to coordinate, exchange, and disseminate information or to explore
+or clarify a defined subject, problem, or area of knowledge.
+International Conference. A scientific meeting so designated by its sponsor or one to which open invitations are issued on an equal basis to potential participants in two or more countries other than the
+United States or Canada. The meeting may be held in the United States or any country, subject to U.S.
+Department of State travel restrictions.
+Domestic Conference. A scientific meeting held in the United States or Canada primarily for U.S. or
+U.S.-Canadian participation (even if foreign speakers are invited).
+14.4 ELIGIBILITY
+Domestic institutions or organizations, including established scientific or professional societies, are eligible to apply for conference support. Both domestic and international conferences may be supported;
+however, an international conference may be supported only through the U.S. representative organization
+of an established international scientific or professional society. An individual is not eligible to receive a
+grant in support of a conference.
+(GPS page IIB-102)
+
+14.5 APPLICATION REQUIREMENTS
+Conference grant applications are electronically submitted using an application package that combines
+SF424 (R&R) and PHS398 components. Applications packages and instructions are provided with each
+NOFO. Applicants must complete and submit a detailed categorical budget using the Research & Related
+Budget component; however, no indirect costs may be requested. The appropriate contacts listed in the
+NOFO should be consulted for guidance regarding any IC-specific budget and project duration requirements.  Application requirements and further information on NIH support for conferences and scientific
+meetings (R13 and U13) may be found on the NIH Web site at Conference (R13) or in applicable
+NOFOs.
+14.6 PUBLIC POLICY REQUIREMENTS AND OBJECTIVES
+In addition to any applicable public policy requirements and objectives specified in Public Policy
+Requirements, Objectives, and Other Appropriation Mandates in IIA, the following apply to NIH Conference Grants.
+14.6.1 The United States Hotel and Motel Fire Safety Act of 1990
+The Hotel and Motel Fire Safety Act of 1990 (PL101-391) was passed into law by Congress to save
+lives and protect property by promoting fire and life safety in hotels, motels and other places of public
+accommodation. PL101-391 states that federally funded meetings and conferences cannot be held in
+properties that do not comply with the law. PL101-391 is applicable to all places of public accommodation, and requires that such properties are equipped with:
+ l hard-wired, single-station smoke detectors in each guestroom in accordance with the National
+Fire Protection Association (NFPA) standard 72;
+ l an automatic sprinkler system, with a sprinkler head in each guest room in compliance with
+NFPA standards 13 or 13R. Properties three stories or lower in height are exempt from the
+sprinkler requirement.
+The United States Fire Administration (USFA) is charged with carrying out FEMA's responsibilities with
+respect to the Hotel and Motel Fire Safety Act of 1990. In addition to compiling, maintaining and publishing the National Master List, USFA is also responsible for taking steps to encourage states to promote the use of automatic sprinkler systems and automatic smoke detection systems.
+14.6.2 Plans to Promote Safe Environments at Conferences
+Consistent with NIH Grants Policy Statement (Section 4.1.2 Civil Rights Protections) and Federal civil
+rights laws, it is expected that organizers of NIH-supported conferences and scientific meetings take
+steps to maintain a safe and respectful environment for all attendees by providing an environment free
+from discrimination and harassment. Conference grant applicants recommended for funding must
+provide to NIH as part of Just-In-Time materials the “safety plan” that will be communicated to all conference/meeting attendees.
+“Safety plans” are required to include the following elements:
+ l Statement of commitment to provide a safe environment
+ l Expectations of behavior
+ o Including list of behaviors considered harassing (specific emphasis on harassment,
+sexual, racial, ethnic, or otherwise)
+(GPS page IIB-103)
+
+l Instructions on how to confidentially report alleged violations of the expectations of behavior to
+conference organizers
+ l Description of how the organizers will assess allegations and the consequences for those who are
+found to violate the expectations of behavior
+ l Information explaining that individuals who have questions, concerns or complaints related to
+harassment are also encouraged to contact the conference organizer or the HHS Office for Civil
+Rights (OCR)
+ l Information about how to file a complaint with HHS OCR (see OCR’s webpage, Filing a Civil
+Rights Complaint).
+ l Information explaining that filing a complaint with the conference organizer is not required
+before filing a complaint of discrimination with HHS OCR, and that seeking assistance from the
+conference organizer in no way prohibits filing complaints with HHS OCR.
+ l Information explaining how individuals can notify NIH about concerns of harassment, including
+sexual harassment, discrimination, and other forms of inappropriate conduct at NIH-supported
+conferences (see NIH’s Find Help webpage).
+R13/U13 applicants recommended for funding must also provide to NIH as part of Just-in-Time materials:
+ l a description of the strategy that will be used to communicate the Safety Plan to conference
+attendees and a plan to document allegations and resulting actions.
+ l information on the steps the organizers will take to ensure a safe and respectful environment for
+all attendees, free from discrimination and harassment
+NIH staff will review all plans and must approve them prior to award. Safety Plans that are deemed
+incomplete or unsatisfactory will need to be corrected by the applicant and approved by NIH prior to
+award.
+14.7 APPLICATION REVIEW
+Applications for conference grants will be reviewed for programmatic relevance and for merit as
+described in The Peer Review Process in Part I and applicable NOFO.
+Reviewers will be asked to evaluate PD(s)/PI(s) Personal Statement of the Biographical Sketch:
+Is(are) the PD(s)/PI(s) well suited for organizing and fulfilling the goals of this conference? Are the qualifications and past performance of the PD(s)/PI(s) appropriate, and are they well suited for their
+described roles in the conference? Are the key personnel and selected speakers appropriate and well
+suited for their described roles in the conference?
+14.8 FUNDING
+Grants or cooperative agreements may be used to provide conference support. A cooperative agreement
+may be awarded if the NIH awarding IC determines that it needs to have substantial involvement in the
+planning and conduct of a conference.
+Grant funds may not be used to provide general support for international conferences held in the United
+States or Canada. Grant funds may be awarded to support only specific aspects of such conferences. An
+example would be a selected symposium, panel, or workshop, including the costs of planning and travel
+of U.S. participants.
+(GPS page IIB-104)
+
+Awards in support of a single conference will be made for a project period commensurate with the time
+involved in planning and conducting the conference and post-conference follow-up, usually 1 year. A
+conference grant made to a permanently sponsoring organization for conferences held annually or biennially on a recurring topic may be awarded for up to a total of 5 years and will be funded annually, based
+on the availability of funds. Continued funding beyond the first year will be contingent on a report of satisfactory progress submitted in accordance with SNAP instructions. A change in conference focus
+requires NIH awarding IC prior approval.
+14.9 ACKNOWLEDGMENT OF FUNDING SOURCE AND
+DISCLAIMER
+When a conference is funded by an NIH grant or cooperative agreement, recipients must include the following statement on conference materials (including promotional materials, agenda, and internet sites):
+“Funding for this conference was made possible (in part) by (Insert Grant/Cooperative Agreement #) from (insert name of NIH IC). The views expressed in written conference materials or
+publications and by speakers and moderators do not necessarily reflect the official policies of
+NIH; nor does mention by trade names, commercial practices, or organizations imply endorsement by the U.S. Government.”
+Appropriate use of the NIH or HHS logo on conference materials is of particular importance. Neither
+logo should be displayed if it would cause confusion as to the source of the conference or give the false
+appearance of government endorsement. Accordingly, unless specifically authorized by the award, any
+use of the HHS and/or NIH logo requires prior approval. Unauthorized use of the HHS or NIH name or
+logo may result in imposition of civil monetary penalties (as provided in 42 CFR Part 1003).
+14.10 ALLOWABLE AND UNALLOWABLE COSTS
+The following highlights allowable and unallowable costs under conference grants. No costs other than
+those specified in this subsection as allowable, including any qualifications on their allowability, are permitted under conference grants.
+14.10.1 Allowable Costs
+In general, consistent with 2 CFR Part 200.432, conference hosts/sponsors must exercise discretion and
+judgment in ensuring that conference costs are appropriate, necessary and managed in a manner that minimizes costs to the Federal award.
+Conference Services. Grant funds may be used for necessary recording of proceedings, simultaneous
+translation, and subsequent transcriptions.
+Consultant Services. Grant funds may be used to pay consultant fees, including travel and supporting
+costs (per diem or, where applicable, subsistence).
+Equipment Rental. Grant funds may be used for the rental of necessary equipment.
+Federal Employees. See Grants to Federal Institutions and Payments to Federal Employees under Grants
+chapter.
+Meals. When meals are justified by the applicant as an integral and necessary part of a conference (i.e., a
+working meal where business is transacted), grant funds may be used for such meals, provided that meal
+costs are not duplicated in participants’ per diem or subsistence allowances. See Travel below.
+(GPS page IIB-105)
+
+Publication Costs. When grant funds are awarded to pay for either the entire or partial cost of publication of proceedings or a book or pamphlet, allowable costs include special plates, charts, diagrams,
+printing, distribution, mailing, postage, and general handling, unless otherwise specified at the time the
+grant is awarded.
+Registration Fees. Grant funds may not be used for registration fees paid by the recipient to other organizations on behalf of attendees. Grant funds may be used to help defray registration costs for some select
+conference attendees.
+Salaries. In accordance with the policy of the recipient organization, grant funds may be used for all or
+part of the salaries of professional personnel, clerical assistants, editorial assistants, and other non-professional staff in proportion to the time or effort directly related to the conference.
+Speakers Fees. Speakers’ fees for services rendered are allowable.
+Supplies. Grant funds may be used for the purchase of supplies for the conference if the supplies are
+received and used during the budget period.
+Travel. Funds may be used for the travel of staff, speakers, participants, and attendees, if identified in the
+application and approved at the time of award. Travel expenses for employees of the recipient organization are governed by the recipient’s travel policies, consistently applied regardless of the source of
+funds.
+Any U.S. foreign travel restrictions that are in effect at the time of the award will be followed, such as
+ l limitations or restrictions on countries to which travel will be supported or
+ l budgetary or other limitations on availability of funds for foreign travel.
+Proposed per diem or subsistence allowances must be reasonable and limited to the days of attendance at
+the conference plus the actual travel time to reach the conference location by the most direct route. Local
+mileage costs only may be paid for local participants. Where meals and/or lodgings are furnished without
+charge or at a nominal cost (e.g., as part of the registration fee), the proposed per diem or subsistence
+allowance must take this into consideration.
+Transportation costs for attendees and participants at the conference may not exceed coach class fares. In
+all cases, U.S. flag carriers will be used where possible (see Cost Considerations—Allowability of Costs/Activities—Selected Items of Cost—Travel in IIA).
+In accordance with 2 CFR Part 200.475, temporary dependent care costs (as dependent is defined in 26
+USC § 152) above and beyond regular dependent care that directly results from travel to conferences is
+allowable provided that:
+ 1. The costs are a direct result of the individual's travel for the Federal award;
+ 2. The costs are consistent with the recipient or subrecipient's documented travel policy for all
+entity travel; and
+ 3. Are only temporary during the travel period.
+Travel costs for dependents are unallowable, except for travel of duration of six months or more with
+prior approval of the HHS awarding agency. However, as indicated in 2 CFR Part 200.432,  the costs of
+identifying and providing locally available dependent-care resources for participants are allowable as
+needed.
+14.10.2 Unallowable Costs
+A&R. Not allowable.
+(GPS page IIB-106)
+
+Entertainment and Personal Expenses. Costs of amusement, diversion, social activities, ceremonials,
+and related incidental costs, such as bar charges, tips, personal telephone calls, and laundry charges of
+participants or guests, are unallowable. However, meals may be allowable as provided under Allowable
+Costs—Meals above.
+Equipment Purchase. Grant funds may not be used for the purchase of equipment.
+Indirect costs. Not allowable.
+Honoraria. Honoraria or other payments given for the purpose of conferring distinction or to symbolize
+respect, esteem, or admiration may not be paid from grant funds.
+Local Participants’ Expenses. With the exception of local mileage as indicated under Allowable
+Costs—Travel above, grant funds may not be used to pay per diem or expenses for local participants in
+the conference.
+Membership Dues. Not allowable.
+Research Patient Care. Not allowable.
+Visas and Passports. Not Allowable.
+14.11 ADMINISTRATIVE REQUIREMENTS
+14.11.1 Intellectual Property: Publications, Copyright, and Public Disclosure
+If the recipient publishes material developed in whole or in part with NIH funds, the material may be distributed free of charge. If the recipient organization charges for the material, the sales proceeds are considered program income, and must be accounted for as specified in the NoA and reported on the FFR
+(see Administrative Requirements—Reporting and Record Retention in this chapter).
+Unless otherwise provided in the terms and conditions of the award, the recipient is free to arrange for
+copyright of any publication resulting from an NIH-supported conference. However, any such copyrighted publication shall be subject to a nonexclusive, irrevocable, royalty-free right to the Federal
+agency to reproduce,  publish, or otherwise use the work for Federal purposes  and to authorize others to
+do so. There is no copyright in any materials prepared by Federal employees as part of their official
+duties.
+The recipient is cautioned to remind conference participants that any presentation or discussion constitutes public disclosure of information. Any such public disclosure could seriously impact the degree to
+which any intellectual property rights could be protected.
+14.11.2 Reporting and Record Retention
+Upon completion or termination of a grant in support of a conference, recipients are responsible for submitting the final RPPR and the final FFR in accordance with the Closeout provisions described in Administrative Requirements—Closeout in IIA. Submission details of the final FFR and Final Progress Report
+are described in respective subsections of Closeout.
+14.11.2.1 Progress/Final Report
+For single conferences, a final report of the conference must be submitted electronically through the eRA
+Commons, or by paper submission to the NIH DCGP within 120 days after the end of the project period.
+(GPS page IIB-107)
+
+The report must include the following:
+ l Grant number
+ l Title, date, and place of the conference
+ l Name(s) of the person(s) shown on the application as the conference director or PD/PI(s)
+ l Name of the organization that conducted the conference
+ l A list of the individuals, and their organizational affiliations, who participated as speakers or discussants in the formally planned sessions of the meeting
+ l A summary of topics discussed/conclusions.
+Under multiple-year awards, i.e., ones that support more than one conference, NIH requires an annual
+progress report that contains a description of specific plans for the next budget period, in similar detail
+and format as for a single conference. The annual progress report must be submitted at least 6 months
+before the next scheduled conference. The final progress report should be submitted within 120 days
+after the end of the project period.
+With the approval of the NIH awarding IC, copies of proceedings or publications resulting from the conference(s) may be substituted for the final report, provided that they contain the information specified for
+inclusion in the final report.
+14.11.2.2 Federal Financial Report
+Electronic submission of the final FFR through PMS is required from the recipient within 120 days after
+the end of the project period. Records of expenditures and any program income generated must be maintained in accordance with the provisions of 2 CFR Part 200.328 (see Administrative Requirements—
+Monitoring—Record Retention and Access in IIA).
+(GPS page IIB-108)

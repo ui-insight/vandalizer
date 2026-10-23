@@ -3,6 +3,7 @@ from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.services import access_control
+from app.services.extraction_restarts import claim_extraction_restart
 
 
 #: Human-readable text for each stored ingestion-warning code. Kept beside the
@@ -114,7 +115,13 @@ async def list_contents(
         if not current_folder:
             return {"folders": [], "documents": []}
 
-        if current_folder.team_id:
+        project = await access_control.find_folder_project(current_folder.uuid)
+        if project:
+            candidate_folders = await SmartFolder.find({"parent_id": current_folder.uuid}).to_list()
+            folders = [f for f in candidate_folders if await access_control.get_authorized_folder(f.uuid, user, team_access=team_access)]
+            candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}}).to_list()
+            documents = [d for d in candidate_documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
+        elif current_folder.team_id:
             folders = await SmartFolder.find(
                 SmartFolder.parent_id == current_folder.uuid,
                 SmartFolder.team_id == current_folder.team_id,
@@ -228,6 +235,24 @@ async def collect_folder_document_uuids(
     )
     if not root:
         return None
+
+    project = await access_control.find_folder_project(root.uuid)
+    if project:
+        # Project collaborators may contribute files under different user IDs;
+        # traverse the authorized subtree rather than the current user's files.
+        folder_uuids = [root.uuid]
+        frontier = [root.uuid] if include_subfolders else []
+        seen = {root.uuid}
+        while frontier:
+            children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+            frontier = []
+            for child in children:
+                if child.uuid not in seen and await access_control.get_authorized_folder(child.uuid, user, team_access=team_access):
+                    seen.add(child.uuid)
+                    folder_uuids.append(child.uuid)
+                    frontier.append(child.uuid)
+        documents = await SmartDocument.find({"folder": {"$in": folder_uuids}, "soft_deleted": {"$ne": True}}).to_list()
+        return [d.uuid for d in documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
 
     # Resolve the set of folder uuids to scan (root + descendants).
     folder_uuids = [root.uuid]
@@ -351,20 +376,15 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
     missed_pages = "unread_pages" in (doc.ingestion_warnings or [])
     force_ocr = is_pdf and (doc.task_status == "error" or low_quality or missed_pages)
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
-    if ocr_required:
-        doc.text_layer_rejected = True
-
-    doc.task_status = "extracting"
-    doc.processing = True
-    doc.updated_at = _datetime.datetime.now()
-    doc.error_message = None
-    doc.error_retryable = None
-    doc.raw_text = ""
-    doc.token_count = 0
-    doc.text_markers = []
-    doc.extraction_nonletter_ratio = None
-    doc.ingestion_warnings = []
-    await doc.save()
+    await claim_extraction_restart(doc, {
+        'task_status': 'extracting', 'processing': True,
+        'validating': True, '_validation_heartbeat_at': _datetime.datetime.now(),
+        'updated_at': _datetime.datetime.now(), 'error_message': None,
+        'error_retryable': None,
+        'raw_text': '', 'token_count': 0, 'text_markers': [],
+        'extraction_nonletter_ratio': None, 'ingestion_warnings': [],
+        **({'text_layer_rejected': True} if ocr_required else {}),
+    })
 
     task_id = dispatch_upload_tasks(
         document_uuid=doc.uuid,
@@ -373,6 +393,7 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
         user_id=user_id,
         force_ocr=force_ocr,
         ocr_required=ocr_required,
+        extraction_revision=doc._extraction_restart_revision,
     )
     return {
         "task_id": task_id,

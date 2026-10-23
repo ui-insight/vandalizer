@@ -1,6 +1,6 @@
 import type { WorkflowStep, WorkflowTask } from '../../types/workflow'
 
-export type TaskInputSource = 'step_input' | 'select_document' | 'workflow_documents'
+export type TaskInputSource = 'step_input' | 'earlier_steps' | 'select_document' | 'workflow_documents'
 
 /**
  * Where a step's data comes from. This is a property of the *step*: every task
@@ -18,13 +18,14 @@ export const STEP_INPUT_KEYS = ['input_sources', 'input_source', 'selected_docum
 /** A task with this flag keeps its own input instead of the step's. */
 export const TASK_INPUT_OVERRIDE_KEY = 'override_step_input'
 
-const VALID_SOURCES: TaskInputSource[] = ['step_input', 'select_document', 'workflow_documents']
+const VALID_SOURCES: TaskInputSource[] = ['step_input', 'earlier_steps', 'select_document', 'workflow_documents']
 
 export const DEFAULT_STEP_INPUT: StepInputValue = { sources: ['step_input'], selectedDocUuid: '' }
 
 /** Human-readable name for each source — mirrors INPUT_SOURCE_LABELS in the engine. */
 export const INPUT_SOURCE_LABELS: Record<TaskInputSource, string> = {
   step_input: 'Step Input',
+  earlier_steps: 'All Earlier Steps',
   select_document: 'Selected Document',
   workflow_documents: 'Workflow Documents',
 }

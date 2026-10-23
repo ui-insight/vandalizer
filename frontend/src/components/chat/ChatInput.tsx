@@ -1,53 +1,101 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
-import { Send, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useId, type KeyboardEvent, type ReactNode } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
+import { Send, Square, X, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu, SquarePen } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
 import { useBranding } from '../../contexts/BrandingContext'
+import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface Props {
-  onSend: (message: string) => void
+  initialDraft?: string
+  draftInsertion?: { id: number; text: string }
+  onDraftChange?: (draft: string) => void
+  onSend: (message: string) => void | Promise<void>
   onAttachFile?: (files: File[]) => void
   onAttachLink?: (url: string) => void
   // Opens the knowledge base screen so the user can pick a KB to chat with.
   onAddKnowledge?: () => void
   disabled?: boolean
+  sendDisabled?: boolean
+  isStreaming?: boolean
+  onStop?: () => void
   selectedModel?: string
   onModelChange?: (model: string) => void
+  onModelsLoaded?: (models: ModelInfo[]) => void
   onExport?: (format: string) => void
+  /** Starts a fresh conversation; shown once this one has messages. */
+  onNewChat?: () => void
   hasMessages?: boolean
   hasDocuments?: boolean
   contextMeter?: ReactNode
+  memoryControl?: ReactNode
+  navigationControl?: ReactNode
   // Bumped by the workspace to pull focus into the composer (e.g. the file
   // browser's "Ask about folder" action).
   focusSignal?: number
 }
 
+const MIN_COMPOSER_TEXT_HEIGHT = 24
+
 export function ChatInput({
-  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled,
-  selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
-  contextMeter, focusSignal,
+  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
+  isStreaming, onStop,
+  selectedModel, onModelChange, onModelsLoaded, onExport, onNewChat, hasMessages, hasDocuments,
+  contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
 }: Props) {
   const branding = useBranding()
-  const [message, setMessage] = useState('')
+  const uploadPolicy = useUploadPolicy()
+  const [message, setMessage] = useState(initialDraft)
+  const messageRef = useRef(message)
+  const updateMessage = (value: string) => {
+    messageRef.current = value
+    setMessage(value)
+    onDraftChange?.(value)
+  }
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [models, setModels] = useState<ModelInfo[]>([])
+  const [modelError, setModelError] = useState(false)
+  const [modelsLoading, setModelsLoading] = useState(true)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const sending = useRef(false)
+  const modelRequest = useRef(0)
+  const helpId = useId()
+  const onModelsLoadedRef = useRef(onModelsLoaded)
+  onModelsLoadedRef.current = onModelsLoaded
   const fileInputRef = useRef<HTMLInputElement>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const draftChangeRef = useRef(onDraftChange)
+  draftChangeRef.current = onDraftChange
+  const insertedDraft = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!draftInsertion || insertedDraft.current === draftInsertion.id) return
+    insertedDraft.current = draftInsertion.id
+    const next = [messageRef.current, draftInsertion.text].filter(Boolean).join('\n\n')
+    messageRef.current = next
+    setMessage(next)
+    draftChangeRef.current?.(next)
+    textareaRef.current?.focus()
+  }, [draftInsertion])
 
   // Auto-grow the textarea to fit its content, capped by max-height (CSS).
   useEffect(() => {
     const ta = textareaRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = `${ta.scrollHeight}px`
+    // A zero scrollHeight can occur briefly while the workspace is laying out
+    // (and in a few browser/zoom combinations). Never let that collapse the
+    // empty composer and hide its placeholder.
+    ta.style.height = `${Math.max(ta.scrollHeight, MIN_COMPOSER_TEXT_HEIGHT)}px`
   }, [message])
 
   // Pull focus into the composer when the workspace requests it. Guard on the
@@ -60,7 +108,6 @@ export function ChatInput({
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (addMenuRef.current && !addMenuRef.current.contains(target)) setShowAddMenu(false)
-      if (modelMenuRef.current && !modelMenuRef.current.contains(target)) setShowModelMenu(false)
       if (exportMenuRef.current && !exportMenuRef.current.contains(target)) setShowExportMenu(false)
     }
     // Use 'click' instead of 'mousedown' so the handler fires AFTER React
@@ -69,22 +116,44 @@ export function ChatInput({
     return () => document.removeEventListener('click', handler)
   }, [])
 
-  // Fetch models eagerly so the button label resolves immediately
-  useEffect(() => {
-    if (models.length === 0) {
-      getModels().then(setModels).catch(() => {})
+  const loadModels = useCallback(async () => {
+    const request = ++modelRequest.current
+    setModelsLoading(true)
+    setModelError(false)
+    try {
+      const result = await getModels()
+      if (request !== modelRequest.current) return
+      setModels(result)
+      onModelsLoadedRef.current?.(result)
+    } catch {
+      if (request === modelRequest.current) setModelError(true)
+    } finally {
+      if (request === modelRequest.current) setModelsLoading(false)
     }
-  }, [models.length])
+  }, [])
+  const cancelModelRead = useCallback(() => { modelRequest.current++ }, [])
+  useEffect(() => { void loadModels(); return cancelModelRead }, [loadModels, cancelModelRead])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = message.trim()
-    if (!trimmed || disabled) return
-    onSend(trimmed)
-    setMessage('')
+    if (!trimmed || disabled || sendDisabled || sending.current) return
+    sending.current = true
+    setSubmitting(true)
+    setSendError(null)
+    try {
+      await onSend(trimmed)
+      // A new draft typed during submission belongs to the next message.
+      if (messageRef.current === message) updateMessage('')
+    } catch (reason) {
+      setSendError(reason instanceof Error ? reason.message : 'Could not send.')
+    } finally {
+      sending.current = false
+      setSubmitting(false)
+    }
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSend()
     }
@@ -113,7 +182,7 @@ export function ChatInput({
 
   return (
     <div
-      className="p-[15px] bg-white"
+      className="chat-composer shrink-0 px-[15px] py-[10px] bg-white"
       style={{ boxShadow: '0 0px 23px -8px rgb(211, 211, 211)', zIndex: 500 }}
     >
       {/* Link input row */}
@@ -143,39 +212,50 @@ export function ChatInput({
         </div>
       )}
 
+      {submitting && isStreaming && <p role="status" className="mb-2 text-sm text-gray-700">Queueing message…</p>}
+      {sendError && <p role="alert" className="mb-2 text-sm text-red-800">{sendError} Your draft is kept; try again.</p>}
+      <p id={helpId} className="sr-only">{isStreaming ? 'Enter queues your message for the current conversation.' : 'Enter sends your message.'} Shift+Enter adds a new line.</p>
       {/* Ask question container */}
       <div
-        className="flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
+        className="chat-composer-editor flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
         style={{ backgroundColor: '#19191913' }}
       >
         {/* Text input area */}
         <div
           className="cursor-text"
-          style={{ padding: '8px 6px 12px 6px' }}
+          style={{ padding: message ? "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-6)" : "var(--workspace-space-4) var(--workspace-space-6)" }}
           onClick={() => textareaRef.current?.focus()}
         >
           <textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => updateMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasDocuments ? "Ask anything about this document..." : `Ask ${branding.appName} anything...`}
+            placeholder={
+              hasDocuments
+                ? 'Ask about these documents…'
+                : `Ask ${branding.appName}…`
+            }
             aria-label="Message input"
+            aria-describedby={helpId}
             rows={1}
-            className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"
-            style={{ fontSize: 16, maxHeight: '25vh' }}
+            wrap="soft"
+            className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#626a75] placeholder:font-medium focus:outline-none focus-visible:outline-none"
+            style={{ fontSize: 'var(--workspace-font-card-title)', lineHeight: 1.5, minHeight: `${MIN_COMPOSER_TEXT_HEIGHT}px`, maxHeight: '25vh' }}
             disabled={disabled}
           />
         </div>
 
-        {/* Controls toolbar */}
-        <div className="flex items-center gap-2.5 pt-1 px-1">
+        {/* Controls toolbar — min-w-0 lets children shrink instead of overflowing on narrow screens */}
+        <div className="chat-composer-controls flex min-w-0 flex-wrap items-center gap-1.5 pt-1 px-1">
           {/* + Add button */}
           <div ref={addMenuRef} className="relative">
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
               aria-expanded={showAddMenu}
               aria-haspopup="menu"
+              aria-label="Add a source to this conversation: a document, a website or a knowledge base"
+              title="Add a source: a document, a website or a knowledge base"
               className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -199,7 +279,7 @@ export function ChatInput({
                   style={{ minHeight: 40 }}
                 >
                   <FileUp className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                  <span>Add Document</span>
+                  <span>Add Document<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>{uploadPolicy.description}</span></span>
                 </button>
                 <button
                   role="menuitem"
@@ -208,7 +288,7 @@ export function ChatInput({
                   style={{ minHeight: 40 }}
                 >
                   <Globe className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                  <span>Add Website</span>
+                  <span>Add Website<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>Reads the page at a link you paste</span></span>
                 </button>
                 {onAddKnowledge && (
                   <button
@@ -218,7 +298,7 @@ export function ChatInput({
                     style={{ minHeight: 40 }}
                   >
                     <BookOpen className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                    <span>Add Knowledge Base</span>
+                    <span>Add Knowledge Base<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>Answers from a collection, with references</span></span>
                   </button>
                 )}
               </div>
@@ -230,37 +310,38 @@ export function ChatInput({
             type="file"
             multiple
             aria-label="Attach files"
+            accept={uploadPolicy.accept}
             className="hidden"
             onChange={handleFileChange}
           />
 
           {/* Model selector */}
           {onModelChange && (
-            <div ref={modelMenuRef} className="relative">
+            <div ref={modelMenuRef} className="chat-model-control relative">
               <button
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 aria-expanded={showModelMenu}
-                aria-haspopup="true"
-                className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+                aria-haspopup="dialog"
+                aria-label={`Choose chat model: ${displayModel || 'default'}`}
+                className="flex min-w-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
               >
-                <Cpu className="h-3 w-3" />
-                {displayModel || 'Model'}
-                <ChevronDown className="h-3 w-3" />
+                <Cpu className="h-3 w-3 shrink-0" />
+                <span className="chat-model-name truncate max-w-[28vw] sm:max-w-[160px]">{displayModel || 'Model'}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
               </button>
 
               {showModelMenu && (
-                <div
-                  role="dialog"
-                  aria-label="Select model effort level"
-                  className="absolute left-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
-                  style={{ bottom: 'calc(100% + 8px)', width: 310, borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
-                  onKeyDown={(e) => { if (e.key === 'Escape') setShowModelMenu(false) }}
-                >
-                  <ModelEffortPicker
-                    models={uniqueModels}
-                    selectedModel={selectedModel ?? ''}
-                    onChange={(tag) => { onModelChange(tag); setShowModelMenu(false) }}
-                  />
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/20 p-4" onClick={e => { if (e.target === e.currentTarget) setShowModelMenu(false) }}>
+                  <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
+                    <div role="dialog" aria-modal="true" aria-label="Choose chat model" className="w-full max-w-md overflow-y-auto rounded-xl border border-gray-300 bg-white p-3 shadow-xl" style={{ maxHeight: 'calc(100dvh - 32px)' }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowModelMenu(false) } }}>
+                      <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-base font-semibold text-gray-900">Choose chat model</h2><button type="button" aria-label="Close model picker" className="rounded p-2 text-gray-700" onClick={() => setShowModelMenu(false)}><X size={18} /></button></div>
+                      <p className="mb-2 text-sm text-gray-700">The model writes this conversation's answers. Faster models suit quick questions; stronger ones suit long documents and careful comparisons. External models send your text to an outside provider. Your choice applies to new messages.</p>
+                      {modelsLoading ? <p role="status" className="p-3 text-sm text-gray-700">Loading models…</p>
+                        : modelError ? <div role="alert" className="p-3 text-sm text-red-800">Could not load available models. <button type="button" className="underline" onClick={() => void loadModels()}>Retry models</button></div>
+                        : uniqueModels.length === 0 ? <p className="p-3 text-sm text-gray-700">No models are currently available. Contact your administrator or <button type="button" className="underline" onClick={() => void loadModels()}>Refresh models</button>.</p>
+                        : <ModelEffortPicker models={uniqueModels} selectedModel={selectedModel ?? ''} onChange={tag => { onModelChange(tag); setShowModelMenu(false) }} />}
+                    </div>
+                  </FocusTrap>
                 </div>
               )}
             </div>
@@ -271,6 +352,24 @@ export function ChatInput({
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Assistant memory */}
+          {memoryControl}
+          {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
+
+          {/* The rail's New chat is an unlabeled icon when the rail is
+              collapsed, so the chat offers its own (support ticket). */}
+          {onNewChat && hasMessages && (
+            <button
+              type="button"
+              onClick={onNewChat}
+              title="Start a new conversation"
+              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+            >
+              <SquarePen className="h-3 w-3 shrink-0" aria-hidden="true" />
+              New chat
+            </button>
+          )}
 
           {/* Export button */}
           {onExport && hasMessages && (
@@ -310,16 +409,30 @@ export function ChatInput({
             </div>
           )}
 
-          {/* Send button */}
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!message.trim() || disabled}
-            aria-label="Send message"
-            className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          {/* A queued message is also available to touch users while Stop stays reachable. */}
+          {isStreaming && onStop && message.trim() && <button type="button" onClick={() => void handleSend()} disabled={disabled || sendDisabled || submitting} aria-label="Queue message" title="Queue message" className="shrink-0 rounded border border-gray-400 bg-white p-2 text-xs text-gray-800 disabled:opacity-50">Queue</button>}
+          {/* Send / Stop button */}
+          {isStreaming && onStop ? (
+            <button
+              type="button"
+              onClick={onStop}
+              aria-label="Stop response"
+              title="Stop"
+              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!message.trim() || disabled || sendDisabled || submitting}
+              aria-label="Send message"
+              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -30,6 +30,47 @@ vi.mock('../../api/client', () => ({
 
 beforeEach(() => vi.clearAllMocks())
 
+describe('AutomationCreationWizard draft safety', () => {
+  it('advances text-field Enter once, preserves input and confirms draft dismissal', () => {
+    const onClose = vi.fn()
+    render(<AutomationCreationWizard onClose={onClose} onCreate={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Proposal review' } })
+    const description = screen.getByPlaceholderText('What does this automation do?')
+    fireEvent.change(description, { target: { value: 'Review incoming proposals' } })
+    fireEvent.keyDown(description, { key: 'Enter' })
+    expect(screen.getByText(/Step 2 of/)).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByDisplayValue('Review incoming proposals')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/ }))
+    expect(screen.getByText('Discard this automation draft?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByDisplayValue('Proposal review')).toBeInTheDocument()
+  })
+
+  it('reuses the saved automation when activation fails, and supports saving disabled', async () => {
+    vi.mocked(createAutomation).mockResolvedValue({ id: 'saved-draft' } as never)
+    vi.mocked(updateAutomation).mockRejectedValueOnce(new Error('Connection interrupted')).mockResolvedValueOnce({} as never)
+    const onCreate = vi.fn()
+    render(<AutomationCreationWizard onClose={vi.fn()} onCreate={onCreate} />)
+    fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'API review' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('radio', { name: /API Endpoint/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: /Select Workflow/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'pick workflow' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('Review your automation')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Create & enable' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Retry to update the same automation'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save disabled' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith('saved-draft'))
+    expect(createAutomation).toHaveBeenCalledTimes(1)
+    expect(updateAutomation).toHaveBeenLastCalledWith('saved-draft', expect.objectContaining({ enabled: false, action_id: 'wf-1' }))
+  })
+})
+
 describe('AutomationCreationWizard file type filter', () => {
   // One render for the whole assertion set — the wizard is a heavy tree and
   // each mount costs seconds under jsdom.
@@ -91,7 +132,7 @@ describe('AutomationCreationWizard schedule trigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /Select Workflow/i }))
     fireEvent.click(screen.getByRole('button', { name: 'pick workflow' }))
     fireEvent.click(screen.getByRole('button', { name: /Next/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Create Automation/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Create & enable/i }))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith('auto-1'))
     const body = vi.mocked(createAutomation).mock.calls[0][0]
@@ -101,4 +142,47 @@ describe('AutomationCreationWizard schedule trigger', () => {
       frequency: 'weekly', weekday: 0, time: '09:00', source: 'folder', folder_id: 'folder-1', only_new: true,
     })
   }, 30000)
+})
+
+describe('AutomationCreationWizard branch drafts and requirements', () => {
+  it('retains folder filters across trigger changes but submits only the active API configuration', async () => {
+    vi.mocked(createAutomation).mockResolvedValue({ id: 'api-draft' } as never)
+    vi.mocked(updateAutomation).mockResolvedValue({} as never)
+    render(<AutomationCreationWizard onClose={vi.fn()} onCreate={vi.fn()} />)
+    expect(screen.getByLabelText(/Name/i)).toHaveAccessibleDescription(/Required/)
+    fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Branch draft' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByRole('option', { name: '/Inbox' })
+    fireEvent.change(screen.getByLabelText(/Watch Folder/), { target: { value: 'folder-1' } })
+    fireEvent.change(screen.getByLabelText(/Exclude Patterns/), { target: { value: 'draft*' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('radio', { name: /API Endpoint/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Folder Watch/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByLabelText(/Watch Folder/)).toHaveValue('folder-1')
+    expect(screen.getByLabelText(/Exclude Patterns/)).toHaveValue('draft*')
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('radio', { name: /API Endpoint/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('button', { name: /Select Workflow/ })).toHaveAccessibleDescription(/Required/)
+    fireEvent.click(screen.getByRole('button', { name: /Select Workflow/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'pick workflow' }))
+    // Clicking an already selected action type must not erase its selection.
+    fireEvent.click(screen.getByRole('radio', { name: /Run Workflow/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Save results to a folder/ }))
+    expect(screen.getByRole('button', { name: 'Save disabled' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Destination folder'), { target: { value: 'folder-1' } })
+    expect(screen.getByLabelText('Output format')).toHaveValue('text')
+    fireEvent.click(screen.getByRole('checkbox', { name: /Email results when complete/ }))
+    fireEvent.change(screen.getByLabelText('Email recipients'), { target: { value: 'invalid' } })
+    expect(screen.getByRole('button', { name: 'Save disabled' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Email recipients'), { target: { value: 'review@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save disabled' }))
+    await waitFor(() => expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({
+      trigger_type: 'api', trigger_config: undefined, action_id: 'wf-1',
+      output_config: expect.objectContaining({ storage: { enabled: true, destination_folder: 'folder-1', format: 'text' } }),
+    })))
+  })
 })

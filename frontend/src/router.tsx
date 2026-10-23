@@ -39,14 +39,15 @@ const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Present = lazy(() => import('./pages/present/Present'))
 
-// Certification is now a dockable panel — this redirect opens it from old bookmarks
+// Certification runs in chat — /certification (old bookmarks, emails, links)
+// opens the workspace chat and starts or continues the course there.
 function CertificationRedirect() {
   const { openPanel, setMode } = useCertificationPanel()
   const navigate = useNavigate()
   useEffect(() => {
-    // The panel's pop-out button opens this route in a fresh window; without
-    // this it would inherit whatever docked mode the origin window last used
-    // and show the whole workspace with a floating panel instead of the course.
+    // /certification opens the learning panel; the pop-out button's
+    // ?panel=fullscreen opens it full screen in its own window. The chat
+    // course isn't reliable for every module yet, so it isn't the entry.
     if (new URLSearchParams(window.location.search).get('panel') === 'fullscreen') setMode('fullscreen')
     openPanel()
     navigate({
@@ -83,7 +84,7 @@ const ROUTE_TITLES: Array<[string, string]> = [
   ['/support', 'Support'],
   ['/automation', 'Automations'],
   ['/docs', 'Docs'],
-  ['/landing', 'Sign in'],
+  ['/landing', 'Vandalizer 5.0'],
   ['/login', 'Sign in'],
   ['/register', 'Create account'],
   ['/reset-password', 'Reset password'],
@@ -116,10 +117,10 @@ const landingRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     error: (search.error as string) || undefined,
     invite_token: (search.invite_token as string) || undefined,
-    admin: (search.admin as string) || undefined,
+    admin: search.admin === 1 ? '1' : (search.admin as string) || undefined,
     next: (search.next as string) || undefined,
     // `register=1` opens the auth block in register mode (trial CTA, /register).
-    register: search.register === '1' ? ('1' as const) : undefined,
+    register: search.register === '1' || search.register === 1 ? ('1' as const) : undefined,
   }),
   component: Landing,
 })
@@ -202,6 +203,7 @@ const indexRoute = createRoute({
     // Optional, so the many links that spell out the full search needn't name them.
     ...(search.docs ? { docs: search.docs as string } : {}),
     ...(search.folders ? { folders: search.folders as string } : {}),
+    ...((search.courseEditor === '1' || search.courseEditor === 1) ? { courseEditor: '1' as const } : {}),
     // Project scope — present when arriving from "Chat with this project".
     project: (search.project as string) || undefined,
     // Share-link tokens — present when arriving from a "Copy share link" URL
@@ -260,6 +262,12 @@ const libraryRoute = createRoute({
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/admin',
+  validateSearch: (search: Record<string, unknown>): { tab?: string; status?: string; from?: string; until?: string } => ({
+    tab: typeof search.tab === 'string' ? search.tab : undefined,
+    status: typeof search.status === 'string' && ['completed', 'running', 'failed', 'queued', 'canceled', ''].includes(search.status) ? search.status : undefined,
+    from: typeof search.from === 'string' && Number.isFinite(Date.parse(search.from)) ? search.from : undefined,
+    until: typeof search.until === 'string' && Number.isFinite(Date.parse(search.until)) ? search.until : undefined,
+  }),
   component: () => (
     <ProtectedRoute>
       <Admin />

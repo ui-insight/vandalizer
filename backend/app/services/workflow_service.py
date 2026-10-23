@@ -313,6 +313,9 @@ async def delete_workflow(workflow_id: str, user: User) -> bool:
         att = await WorkflowAttachment.get(att_id)
         if att:
             await att.delete()
+    from app.services.workflow_versions import delete_versions
+
+    await delete_versions(str(wf.id))
     await wf.delete()
     return True
 
@@ -561,8 +564,13 @@ async def run_workflow(
     activity_id: str | None = None,
     user: User | None = None,
     share_token: str | None = None,
+    force_model: bool = False,
 ) -> str:
-    """Start workflow execution. Returns session_id for polling."""
+    """Start workflow execution. Returns session_id for polling.
+
+    ``force_model`` runs every step on ``model``, including steps that name
+    their own; without it ``model`` is only the default for steps that don't.
+    """
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user, share_token=share_token)
         if not wf:
@@ -609,6 +617,7 @@ async def run_workflow(
         num_steps_total=len(wf.steps),
         input_context={"doc_uuids": document_uuids},
         model=model,
+        model_forced=bool(force_model and model),
         celery_task_id=celery_task_id,
     )
     await result.insert()
@@ -685,8 +694,11 @@ async def get_workflow_status(
         "delivery_failures": getattr(result, "delivery_failures", None) or [],
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
+        "workflow_id": str(result.workflow) if result.workflow else None,
         "document_title": result.document_title,
         "start_time": result.start_time,
+        "model": result.model,
+        "models_used": list(getattr(result, "models_used", None) or []),
         # Which models actually answered and with what settings, plus the
         # configuration to reproduce the run (services/run_metadata.py).
         "run_metadata": describe_run(result),
@@ -1865,6 +1877,12 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                 url = data.get("url", "")
                 step_desc_parts.append(
                     f"**Website task** — fetches content from `{url}` and passes text to next step."
+                )
+
+            elif task_name == "WebSearch":
+                step_desc_parts.append(
+                    f"**Web Search task** — searches the web for `{data.get('query', '')}` and "
+                    "passes the results, each with its URL, to the next step."
                 )
 
             elif task_name == "AddDocument":

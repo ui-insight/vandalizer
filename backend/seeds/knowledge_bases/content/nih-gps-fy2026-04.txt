@@ -1,0 +1,2366 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 4: Public Policy Requirements, Objectives and Other Appropriation Mandates
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+4 PUBLIC POLICY REQUIREMENTS, OBJECTIVES
+AND OTHER APPROPRIATION MANDATES
+NIH grants are subject to requirements intended to ensure that recipient organizations handle their
+Federal awards responsibly. Recipients are required to adopt and enforce policies that minimize the
+opportunity for improper financial gain on the part of the organization, its employees, and organizations
+and individuals whom they may collaborate, and that limit the potential for research results to be tainted
+by possible financial or other gain. In addition, NIH recipients are expected to provide safe and healthful
+working conditions for their employees and foster work environments conducive to high-quality
+research.
+This chapter addresses public policy requirements, objectives, and other appropriation mandates applicable to NIH awards. The term “public policy” indicates that the requirement is based on social, economic, or other objectives or considerations that may be attached to the expenditure of Federal funds by
+recipients, subrecipients, and contractors, in general, or may relate to the expenditure of Federal funds
+for research or other specified activities.
+In addition to cross-cutting requirements that some or all Federal agencies must apply to their grant programs, NIH recipients and subrecipients are subject to requirements contained in the HHS annual appropriations act that apply to the use of NIH grant funds, applicable provisions in other Federal agencies’
+appropriations acts, including Treasury, and other Federal statutes. Some of those requirements are
+included here in a separate section titled Appropriation Mandates since they have been included in the
+appropriations acts for several years with little or no change. Those requirements may be changed or
+other requirements may be added in the future.
+The public policy requirements, objectives, and appropriation mandates listed in Exhibit 4 apply to all
+NIH awards with exceptions as noted.
+
+
+4.1 PUBLIC POLICY REQUIREMENTS AND OBJECTIVES
+NIH intends to uphold high ethical, health, and safety standards in both the conduct of the research it
+funds and the expenditure of public funds by its recipients. The public policy requirements specified in
+this section set many of those standards.  NIH will not accept forms or other documentation bearing generic departmental signatures or their electronic equivalent (e.g., Department of Sponsored Research).  All
+forms and documentation submitted to NIH must reflect the name of the individual, electronic or otherwise, with the appropriate institutional authority to submit such information. The signature of the AOR
+on the application certifies that the organization complies, or intends to comply, with all applicable
+policies, certifications and assurances referenced (and, in some cases, included) in the application instructions. The policies, certifications and assurances listed in this section may or may not be applicable to
+the project, program, or type of applicant organization. Requirements / objectives are listed in alphabetical order.
+As noted in this section, some requirements may necessitate the submission of a separate document (e.g.,
+human subjects assurance, certification of IRB approval or institutional exemption, civil rights assurance). Applicants and recipients should take particular note of these requirements (for example, see specific sections on Human Subjects Protections and Civil Rights Protections), the absence or inadequacy of
+which may delay an award or render an applicant ineligible for award.
+(GPS page IIA-3)
+
+The recipient is responsible for: 1) establishing and maintaining the necessary processes to monitor its
+compliance and that of its employees, consortium participants, and contractors with these requirements;
+2) taking appropriate action to meet the stated objectives; and, 3) informing NIH of any problems or concerns.
+If a grant is awarded on the basis of false or misrepresented information, or if a recipient does not comply with these public policy requirements, NIH may take any necessary and appropriate action, including
+using any of the remedies described in Administrative Requirements—Enforcement Actions or other
+available legal remedies.
+Exhibit 4 contains information to help the recipient determine what public policy requirements, objectives and appropriations mandates apply to its activities and whether a requirement should be included in
+a consortium agreement or a contract for routine goods or services under the grant (see Glossary in Part I
+for definitions). The exhibit distinguishes between these types of transactions under a grant and indicates
+(by “Y” for Yes or “NA” for Not Applicable) whether a given requirement normally would apply.
+However, even if the exhibit indicates that a requirement is not applicable that requirement potentially
+could be applicable in a specific situation, e.g., if a contract under a grant involves research activity.
+Therefore, this exhibit should be used as general guidance only. The recipient should consult the terms
+and conditions of its award and should contact the GMO if it has any question concerning the applicability of a particular public policy requirement or objective.
+Exhibit 4 also indicates where, in the NIHGPS, the individual public policy requirements, objectives and
+appropriation mandates are covered in more detail. The recipient should also consult its attorney, as
+appropriate, regarding particular questions about the governing statute or regulation as applied to its specific circumstances. Other cited policies or documents may provide additional information.
+Foreign direct recipients or those under a collaborative international award structure, must follow the
+recipient requirements in Exhibit 4, except when noted as not applicable to foreign awards, awards under
+a collaborative international award structure nor foreign component.  Additional guidance on public
+policy requirements and objectives and their applicability to foreign awards is covered in NIHGPS
+Chapter 16.4.
+In addition to the requirements addressed in this section, there are applicable NIH administrative requirements outlined in the Administrative Requirements chapter.
+Some programs may have special requirements and are covered in IIB.
+Exhibit 4.  Public Policy Requirements, Objectives and Appropriation Mandates *
+(GPS page IIA-4)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+Military Recruiting and ROTC Program Access to Institutions of
+Higher Education 4.1.19
+Y
+N
+N
+Seat Belt Use 4.1.28
+Y
+NA
+NA
+Labor Standards under Federally
+Assisted Construction 10.5.3
+Y
+(Construction Grants
+and major A&R Contracts Exceeding
+$100,000)
+NA
+Y
+Smoke-Free Workplace 4.1.29
+Y
+NA
+NA
+Drug-Free Workplace 4.1.7
+Y
+NA
+NA
+Flood Disaster Protection Act of
+1973 –- Flood Insurance 10.10.1
+Y
+(Construction grants
+only)
+NA
+NA
+National Environmental Policy Act
+of 1969 (including Public Disclosure) 4.1.20 and 10.10.1
+Y
+NA
+NA
+Intergovernmental Review of
+Federal Programs under EO 12372
+10.10.1
+Y
+(Construction grants
+only)
+NA
+NA
+Uniform Relocation Assistance and
+Real Property Acquisition Policies
+Act of 1970 10.10.1
+Y
+NA
+NA
+Standards of Conduct 4.1.30
+Y
+NA
+NA
+Federal Funding Accountability
+and Transparency Act (FFATA)
+4.1.8 and 8.4.1.5.5
+Y
+NA
+If under $30,000
+NA
+If under $30,000
+President’s Emergency Plan for
+AIDS Relief (PEPFAR Program
+4.1.22
+Y
+Y
+Y
+Nondelinquency on Federal Debt
+4.1.21
+Y
+Y
+NA
+(GPS page IIA-5)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+National Historic Preservation Act
+of 1966 — Archaeological and Historic Preservation Act of 1974
+10.10.1
+Y
+(Construction Grants;
+any award involving
+major or minor A&R,
+or any work resulting
+in physical changes to
+real property)
+Y
+Y
+Lead-Based Paint Poisoning Prevention Act 10.10.1
+Y
+(Construction grants
+only)
+Y
+Y
+Investigational New Drug Applications/Investigational Device
+Exceptions 4.1.16
+Y
+Y
+Y
+Inclusion of Women/Minorities as
+Subjects in Clinical Research
+4.1.15.8
+Y
+Y
+NA
+Metric System 4.1.18 and 10.10
+Y
+Y
+Y
+Lobbying (Appropriation Mandate)
+4.2.6
+Y
+Y
+Y
+Limited English Proficiency 4.1.2.5
+Y
+Y
+NA
+Pro-Children Act of 1994 4.1.23
+Y
+Y
+Y
+Safe Drinking Water Act 10.10.1
+Y
+(Construction grants
+only)
+Y
+Y
+Salary Limitation/Cap (Appropriation Mandate) 4.2.10
+Y
+Y
+NA
+Restriction on Distribution of Sterile
+Needles (Appropriation Mandate)
+4.2.9
+Y
+Y
+Y
+Select Agents (see Public Health
+Security & Bioterrorism Preparedness and Response Act)
+4.1.24.1.1
+Y
+Y
+Y
+USA Patriot Act 4.1.33
+Y
+Y
+Y
+U.S. Flag Air Carriers 7.9.1
+Y
+Y
+Y
+(GPS page IIA-6)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+Text Messaging While Driving
+4.1.31
+Y
+Y
+Y
+Restriction on Abortions & Exceptions (Appropriation Mandates)
+4.2.8 & 4.2.8.1
+Y
+Y
+Y
+Wild and Scenic Rivers Act of 1968
+10.10.1
+Y
+(Construction grants
+only)
+Y
+Y
+Protection of Wetlands (EO 11990)
+10.10.1
+Y
+(Construction grants
+only)
+Y
+Y
+Promotion or Legalization of Controlled Substances (Appropriation
+Mandate) 4.2.7
+Y
+Y
+Y
+Public Health Security and Bioterrorism Preparedness and
+Response Act (Select Agents)
+4.1.24.1.1
+Y
+Y
+Y
+Research Misconduct 4.1.27
+Y
+Y
+NA
+Research Involving Recombinant
+or Synthetic Nucleic Acid
+Molecules 4.1.26
+Y
+Y
+Y
+Reporting and Assurance Requirements for Institutions Receiving
+Awards for Training of Graduate
+Students for Doctoral Degrees
+4.1.25
+Y
+Y
+NA
+Inclusion of Individuals Across the
+Lifespan as Participants in
+Research 4.1.15.7
+Y
+Y
+NA
+Copeland Act, when required by
+statute 10.10.1
+Y
+ (Construction grants
+only)
+Y
+Y
+Controlled Substances 4.1.5
+Y
+Y
+Y
+(GPS page IIA-7)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+Conservation of Petroleum and
+Natural Gas (EO 12185) 10.10.1
+Y
+ (Construction grants
+only)
+Y
+Y
+Data and Safety Monitoring
+4.1.15.6
+Y
+Y
+Y
+Dual Use Research of Concern
+4.1.24.2
+Y
+Y
+Y
+Dissemination of False or Deliberately Misleading Information
+(Appropriation Mandate) 4.2.3
+Y
+Y
+Y
+Davis-Bacon Act, when required by
+statute 10.10.1
+Y
+ (Construction grants
+only)
+Y
+Y
+Confidentiality of Alcohol and Drug
+Abuse Patient/Client Records
+4.1.4.2
+Y
+Y
+Y
+Architectural Barriers Act of 1968
+10.10
+Y
+(Construction grants
+and any grant
+involving major A&R)
+Y
+Y
+Animal Welfare 4.1.1
+Y
+Y
+Y
+Acknowledgment of Federal
+Funding (Appropriation Mandate) 4.2.1
+Y
+Y
+NA
+Certificates of Confidentiality
+4.1.4.1
+Y
+Y
+Y
+Coastal Zone Management Act of
+1972 10.10
+Y
+ (Construction grants
+only)
+Y
+Y
+Clinical Trials.gov 4.1.3
+Y
+Y
+NA
+Clean Air and Clean Water Act
+10.10.1
+Y
+(Construction grants
+only); for contracts
+exceeding $100,000
+Y
+Y
+(GPS page IIA-8)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+Earthquake Hazards Reduction
+Act of 1977  and Seismic Safety of
+Federal and Federally Assisted or
+Regulated New Building Construction (EO 12699) 10.10
+Y
+(Construction grants
+only)
+Y
+NA
+Human Subjects Protections
+4.1.15
+Y
+Y
+Y
+Gun Control 4.2.4
+Y
+Y
+Y
+Fly America Act 4.1.11
+Y
+Y
+Y
+Hotel and Motel Fire Safety Act of
+1990 14.6.1
+Y
+(Conference Grants
+Only)
+Y
+Y
+Human Fetal Tissue Research
+(Including Transplantation
+Research) 4.1.14
+Y
+Y
+Y
+Human Stem Cell Research  4.1.13
+Y
+Y
+Y
+Human Embryo Research and
+Cloning Ban (Appropriation Mandate) 4.2.5
+Y
+Y
+Y
+Health and Safety Regulations and
+Guidelines 4.1.12
+Y
+Y
+Y
+Endangered Species Act of 1973
+10.10.1
+Y
+(Construction grants
+only)
+Y
+Y
+Equal Employment Opportunity
+10.5
+Y
+(Construction grants
+and any grant
+involving major A&R)
+Y
+NA
+If under $10,000
+Financial Conflict of Interest 4.1.10
+Y
+(NA to Phase I of the
+SBIR/STTR programs
+and to Federal institutions)
+Y
+NA
+Federal Information System Security Management Act 4.1.9
+Y
+Y
+Y
+(GPS page IIA-9)
+
+Requirement, Objective, or
+Appropriation Mandate
+Recipient
+Domestic
+Subaward / Subrecipient
+Contractor under
+Grant (routine goods/services)
+Age Discrimination Act of 1975
+4.1.2.4
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Civil Rights Act of 1964 (Title VI)
+4.1.2.1
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Health Insurance Portability and
+Accountability Act (HIPAA) 4.1.4.3
+Y
+(if a covered entity)
+Y
+(if a covered entity)
+Y
+(if a covered entity)
+Debarment and Suspension 4.1.6
+Y
+(NA to certain foreign
+organizations)
+Y
+(NA to certain foreign organizations)
+Y
+If contract equals or
+exceeds $25,000 (NA
+to certain foreign
+organizations)
+Education Amendments of 1972
+(Title IX) 4.1.2.2
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Rehabilitation Act of 1973 (section
+504) 4.1.2.3 and 10.10.1
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Y
+(NA to foreign and
+international organizations)
+Lobbying (Federalwide Certification) 4.1.17
+Y
+(Certification required
+if total costs expected
+to exceed $100,000)
+Y
+(Certification
+required if greater
+than $100,000 only)
+Y
+(Certification required
+on contracts greater
+than $100,000 only)
+Trafficking in Persons 4.1.32
+Y
+(Private entities)
+Y
+(Private entities)
+NA
+Never Contract with the Enemy
+4.1.36
+Y
+Y
+Y
+Prohibition on Certain Telecommunications and Video Surveillance Services or Equipment
+4.1.37
+Y
+Y
+Y
+(GPS page IIA-10)
+
+*  NA: A designation of NA in this table indicates that a particular requirement does not apply to an
+otherwise eligible recipient, consortium participant, or contractor or may not apply because the type
+of activity covered is one not normally performed by such an entity.
+Please note that the core set of National Policy Requirements for participating Federal research agencies
+is maintained by the National Science Foundation and is posted on Research Terms and Conditions website.
+4.1.1 Animal Welfare Requirements
+The Public Health Service (PHS) Policy on Humane Care and Use of Laboratory Animals (PHS Policy)
+requires that an approved Animal Welfare Assurance be on file with the Office of Laboratory Animal
+Welfare (OLAW) at the time of award for all  organizations involved in PHS-conducted or supported
+activities involving live vertebrate animals. This requirement includes organizations that are award recipients and organizations that serve as performance sites where animal activities will be conducted. Recipient organizations must establish appropriate policies and procedures to ensure the humane care and use
+of animals and bear ultimate responsibility for compliance with the PHS Policy in all PHS supported
+activities.
+The PHS Policy incorporates the U.S. Government Principles for the Utilization and Care of Vertebrate
+Animals used in Testing, Research, and Training, and requires the recipient to maintain an animal care
+and use program based on the Guide for the Care and Use of Laboratory Animals. An Institutional
+Animal Care and Use Committee (IACUC) appointed by the Chief Executive Officer or designee, is federally mandated to oversee the organization’s animal program, facilities, and procedures (Public Law 99-
+158, Sec. 495). Organizations in foreign countries must also comply with the PHS Policy on Humane
+Care and Use of Laboratory Animals or may provide evidence to the PHS (i.e. NIH) that acceptable
+standards for the humane care and use of the animals in PHS-conducted or supported activities will be
+met per Section II of the PHS Policy.
+The PHS Policy defines “animal” as any live, vertebrate animal used or intended for use in research,
+research training, experimentation, biological testing or related purposes.
+Applications from organizations proposing the use of animals are incomplete if they do not thoroughly
+address the use of vertebrate animals required in the Research Plan of the application. If the involvement
+of animals is not yet known and cannot be described in the application at the time of application, the
+applicant should provide an explanation and indicate when it is anticipated that animals will be used. If
+an award is made, prior to conducting any animal activities the recipient must submit to the NIH awarding IC for prior approval the detailed information about the use of animals as required in the Research
+Plan of the application and meet the Assurance and IACUC approval requirements of the PHS Policy.
+Noncompeting and competing awards are prohibited from using NIH funds to procure cats from USDA
+Class B dealers. The procurement of cats may only be from USDA Class A dealers or other approved
+legal sources.
+NIH funds may not be used to procure or support the use of dogs from Class B dealers.  Dogs used in
+NIH-supported research may only be from USDA Class A dealers or other approved legal sources.  Any
+costs incurred in violation of this policy are unallowable and will be subject to a cost disallowance.
+No activities with live vertebrate animals may begin and no costs for activities with live vertebrate animals may be charged to NIH if there is not a valid Animal Welfare Assurance and IACUC approval of the
+activity.
+(GPS page IIA-11)
+
+The PHS Policy does not supersede applicable State or local laws or regulations that impose more stringent standards for the care and use of animals in research. All recipient organizations are required to
+comply, as applicable, with the regulations (9 CFR, Subpart A) issued by the U.S. Department of Agriculture under the Animal Welfare Act, as amended, 7 U.S.C. 2131 et seq., and other Federal statutes and
+regulations relating to animals.
+4.1.1.1 Animal Welfare Assurance Requirements
+An Animal Welfare Assurance is the document submitted by an institution assuring institutional compliance with the PHS Policy. OLAW is responsible for requesting, negotiating, approving or disapproving, and, as necessary, restricting or withdrawing approval of Assurances.
+When an applicant institution does not have an Animal Welfare Assurance, the Authorized Organization
+Representative's signature on the application constitutes declaration that the institution will submit an
+Assurance when requested by OLAW. Upon such request, the institution shall prepare the Assurance as
+instructed by OLAW and in accordance with the PHS Policy, and the authorized IACUC shall review
+those components of the application related to the care and use of animals. Except in certain circumstances, the Assurance must be submitted to and approved by OLAW in order for the IC to award
+the grant. No activities with live vertebrate animals may be conducted and no costs for activities with
+live vertebrate animals may be charged to NIH grants in the absence of a valid Assurance on file with
+OLAW.
+Organizations where live, vertebrate animal work is performed onsite (i.e., serve as an animal performance site) must have an approved Domestic or Foreign Assurance. If the pass-through entity does
+not have an approved Domestic or Foreign Assurance and the animal activities will be conducted at an
+Assured institution named as a performance site, the recipient must obtain an Interinstitutional Assurance
+from OLAW. Under the Interinstitutional Assurance, the recipient and performance site agree that the
+research will be conducted under the auspices and program of animal care and use of the performance
+site's Assurance.
+4.1.1.2 Verification of IACUC Approval
+NIH will delay an award for research involving live vertebrate animals until the recipient organization
+and all performance sites are operating in accordance with approved Animal Welfare Assurances and the
+recipient has provided verification of IACUC approval of those sections of the application that involve
+use of vertebrate animals. IACUC approval must have been granted not more than three years prior to
+the budget period start date to be valid; however, IACUCs may determine that continuing review on a
+more frequent basis is appropriate.
+Verification of IACUC approval may be filed at any time before award in accord with Just-in-Time procedures, unless required earlier by the IC. Therefore, following peer review and notification of impact
+score/percentile, applicant organizations with approved Assurances may wish to proceed with IACUC
+review for those applications that have not yet received IACUC approval and that appear to be in a fundable range.
+It is an institutional responsibility to ensure that the research described in the application is congruent
+with any corresponding protocols approved by the IACUC. The applicant verifies that there is congruence between the application and the IACUC-approved protocol when it provides the IACUC
+approval date.
+No costs for activities with live vertebrate animals may be charged to NIH grants if there is not a valid
+IACUC approval.
+(GPS page IIA-12)
+
+4.1.1.3 Consortiums
+Under consortium (subaward) agreements in which the recipient collaborates with one or more other
+organizations, the recipient, as the direct and primary recipient of NIH grant funds, is accountable for the
+performance of the project, the appropriate expenditure of grant funds by all parties, and all other obligations of the recipient as specified in the NIHGPS (see Consortium Agreements chapter in IIB). The
+animal welfare requirements that apply to recipients also apply to consortium participants and subprojects.
+The primary recipient is responsible for including these requirements in its agreements with collaborating organizations, and for ensuring that all sites engaged in research involving the use of live vertebrate animals have an approved Animal Welfare Assurance and that the activity has valid IACUC
+approval. The approval of more than one IACUC is not required if the recipient and performance site(s)
+have Assurances; the institutions may exercise discretion in determining which IACUC reviews research
+protocols and under which institutional program the research will be conducted.
+The recipient is further responsible for complying with NIH prior approval requirements related to the
+addition of sites not included in the approved application (see Administrative Requirements—Changes in
+Project and Budget—Prior Approval Requirements).
+The list of domestic and foreign organizations with a PHS approved animal welfare assurance is available on OLAW’s website.
+4.1.1.4 Foreign Recipients and Foreign Performance Sites
+Foreign recipients that will perform live, vertebrate animal activity onsite must provide OLAW with an
+Animal Welfare Assurance for Foreign Institutions. This constitutes institutional assurance and certification of compliance with the applicable laws, regulations, and policies of the jurisdiction in which
+the research will be conducted, and a commitment to follow the International Guiding Principles for
+Biomedical Research Involving Animals. IACUC approval is not required of foreign recipients; however, OLAW encourages foreign recipients to use the standards in the Guide for the Care and Use of
+Laboratory Animals.
+When the recipient is a domestic institution and animal performance sites are foreign, the IACUC
+approval requirement applies. Accordingly, the domestic recipient remains responsible for animal activities conducted at the foreign site and must provide verification of IACUC approval (i.e., certification
+that the activities as conducted at the foreign performance site are acceptable to the recipient). The recipient IACUC may accept, as its own, the approval of a foreign organization's animal welfare committee or
+oversight body; however, the domestic recipient IACUC remains responsible for the review. Additionally, the foreign animal performance site must obtain an Animal Welfare Assurance for Foreign Institutions as described in the preceding paragraph.
+4.1.1.5 Reporting to OLAW
+Reporting requirements under the PHS Policy include an annual report to OLAW describing any change
+in the institution's program for animal care and use as described in the Assurance, changes in IACUC
+membership, and the dates the IACUC conducted its semiannual evaluations of the institution's program
+and facilities. The IACUC, through the institutional official signing the Assurance, must promptly report
+any serious or continuing noncompliance with the PHS Policy, serious deviations from the Guide for the
+Care and Use of Laboratory Animals, and any IACUC suspensions.
+Charges to NIH grant awards for the conduct of live vertebrate animal activities during periods of time
+that the terms and conditions of the grant award are not upheld are not allowable. Specific situations
+under which charges are not allowable are:
+(GPS page IIA-13)
+
+1. The conduct of animal activities in the absence of a valid Animal Welfare Assurance on file with
+OLAW.
+ 2. The conduct of animal activities in the absence of a valid IACUC approval of the activities.
+Absence of IACUC approval includes failure to obtain IACUC approval, expiration, or suspension of IACUC approval.
+Instances of serious noncompliance with section IV.F.3. of the PHS Policy, such as those mentioned
+above, are to be reported to OLAW and the IC supporting the grant award. In cases where charges have
+been made for unauthorized animal activities, appropriate adjustments must be made to the grant to
+remove those charges. NIH requires that reports contain a certification that no unallowable costs were
+charged to NIH grant funds during a period of noncompliance. If such a certification cannot be made, a
+detailed accounting of unallowable charges made to each affected grant should be included with the
+report. If a detailed accounting has not been completed at the time of reporting, a date when it will be
+provided should be included.
+NIH expects recipients to continue to maintain and care for animals during periods when animal activities are conducted in the absence of a valid Animal Welfare Assurance and/or IACUC approval. ICs
+may allow expenditure of NIH grant funds for maintenance and care of animals on a case-by-case basis.
+Consultation with the IC is encouraged regarding questions concerning allowable costs.
+Information about the PHS Policy, Animal Welfare Assurances, and other relevant topics is available on
+the OLAW website.
+4.1.2 Civil Rights Protections
+Recipients are required to administer NIH-funded projects in compliance with federal civil rights laws
+that prohibit discrimination on the basis of race, color, national origin, disability, age, and sex, which
+includes discrimination on the basis of  pregnancy, and comply with applicable conscience protections.
+Before NIH may make an award to a domestic organization, the AOR must certify, by means of the signature on the application, that the organization has on file with the HHS OCR a one-time Assurance of
+Compliance with the statutes described in this subsection. The Assurance, HHS Form 690, is filed for the
+organization and is not required for each application. If the application has been recommended for funding and the applicant organization does not have an Assurance of Compliance on file, it will receive the
+required form and instructions for completion and submission from the awarding IC. The HHS Form 690
+also is available from GrantsInfo@nih.gov or by telephone at 301-435-0714.
+Domestic organizations that receive funding from recipients (including consortium participants and contractors under grants) rather than directly from NIH, also are required to file an HHS 690. The applicant/recipient is responsible for determining whether those organizations have the required Assurance on
+file and, if not, ensuring that it is filed with OCR.  This includes ensuring that entities take meaningful
+steps to ensure effective communication with all persons, including those with disabilities. The HHS
+Office for Civil Rights provides guidance on complying with civil rights laws enforced by HHS.
+4.1.2.1 Civil Rights Act of 1964
+Title VI of the Civil Rights Act of 1964 provides that no person in the United States shall, on the
+grounds of race, color, or national origin, be excluded from participation in, be denied the benefits of, or
+be subjected to discrimination under any program or activity receiving Federal financial assistance. The
+HHS implementing regulations are codified at 45 CFR Part 80.
+(GPS page IIA-14)
+
+4.1.2.2 Educational Amendments of 1972
+Title IX of the Education Amendments of 1972 provides that no person in the United States shall, on the
+basis of sex, be excluded from participation in, be denied the benefits of, or be subjected to discrimination under any educational program or activity receiving Federal financial assistance. The HHS
+implementing regulations are codified at 45 CFR Part 86.
+4.1.2.3 Rehabilitation Act of 1973
+Section 504 of the Rehabilitation Act of 1973, as amended, provides that no otherwise qualified handicapped individual in the United States shall, solely by reason of the physical or mental impairment, be
+excluded from participation in, be denied the benefits of, or be subjected to discrimination under any program or activity receiving Federal financial assistance. These requirements pertain to the provision of
+benefits or services as well as to employment. The HHS implementing regulations are codified at 45
+CFR Parts 84 and 85.
+4.1.2.4 Age Discrimination Act of 1975
+The Age Discrimination Act of 1975 prohibits discrimination on the basis of age in any program or activity receiving Federal financial assistance. The HHS implementing regulations are codified at 45 CFR
+Part 91.
+4.1.2.5 Limited English Proficiency
+HHS provides guidance on the obligations of recipients to provide meaningful access to health and social
+services on the Limited English Proficiency (LEP) page of the HHS website. A program of language
+assistance should provide for effective communication between the service provider and the person with
+limited English proficiency to facilitate participation in, and meaningful access to, services.
+4.1.2.6 Nondiscrimination in Health Programs or Activities
+The Patient Protection and Affordable Care Act (ACA) (42 U.S.C. 18116) prohibits discrimination on
+the basis of race, color, national origin, sex, age, and disability in certain health programs and activities.
+Section 1557 provides that, except as otherwise provided in title I of the ACA, an individual shall not, on
+the grounds prohibited under title VI of the Civil Rights Act of 1964, title IX of the Education Amendments of 1972, the Age Discrimination Act of 1975, or section 504 of the Rehabilitation Act of 1973, be
+excluded from participation in, be denied the benefits of, or be subjected to discrimination under, any
+health program or activity, any part of which is receiving Federal financial assistance, including credits,
+subsidies, or contracts of insurance, or under any program or activity that is administered by an executive agency or any entity established under title I of the ACA. This applies to health programs or activities administered by recipients of Federal financial assistance from NIH. The HHS implementing
+regulations are codified at 45 CFR Part 92.
+4.1.3 Clinical Trials Registration and Reporting in ClinicalTrials.gov
+Requirement
+4.1.3.1 NIH Policy on Dissemination of NIH-Funded Clinical Trial Information
+For grant applications  that request support for the conduct of a clinical trial, the NIH Policy on Dissemination of NIH-funded Clinical Trial Information establishes the expectation that all NIH-funded
+recipients  and investigators conducting clinical trials, funded in whole or in part by NIH, will ensure that
+their clinical trials are registered at, and that summary results information is submitted to, ClinicalTrials.gov for public posting. The purpose of the policy is to promote broad and responsible
+(GPS page IIA-15)
+
+dissemination of information from NIH-funded clinical trials through ClinicalTrials.gov. Disseminating
+this information supports the NIH mission to advance the translation of research results into knowledge,
+products, and procedures that improve human health.
+Effective May 25, 2026, Basic Experimental Studies in Humans (BESH) are no longer considered clinical trials by the NIH. BESH studies must follow all other applicable clinical research laws, regulations,
+and policies, including, but not limited to human subjects protections and the NIH Data Management and
+Sharing Policy.
+This policy is complementary to requirements in the Clinical Trial Registration and Results Information
+Submission regulation at 42 CFR Part 11, hereinafter referred to as the regulation.
+This policy applies to all NIH-funded clinical trials regardless of study phase, type of intervention, or
+whether they are subject to the regulation.  For example, NIH-funded phase 1 clinical trials of an FDA-
+regulated product are covered by this policy as are clinical trials studying interventions not regulated by
+the FDA, such as behavioral interventions.  As such, the policy encompasses all NIH-funded clinical trials, including applicable clinical trials subject to the regulation.  All NIH-funded clinical trials will be
+expected to register and submit results information to ClinicalTrials.gov according to the timelines
+described in the regulation.
+This policy does not apply to a clinical trial that uses NIH-supported infrastructure but does not receive
+NIH funds to support its conduct.
+Applicants seeking NIH funding for clinical trials will be required to submit a plan that will address how
+the expectations of this policy will be met.  Recipients and investigators conducting clinical trials funded
+in whole or in part by NIH are required to comply with all terms and conditions of award, including following their plan for the dissemination of NIH-funded clinical trial information.
+The signature of the AOR on the grant application or progress report form certifies that, for any clinical
+trials funded under the NIH award, the recipient and all investigators are in compliance with the recipient’s clinical trial information dissemination plan.
+Responsibilities of recipients and investigators will fall within one of the following three categories:
+ 1. If the NIH-funded clinical trial is an applicable clinical trial under the regulation and the recipient is the responsible party, the recipient will ensure that all regulatory requirements are met.
+ 2. If the NIH-funded clinical trial is an applicable clinical trial under the regulation but the recipient is not the responsible party, the recipient will coordinate with the responsible party to ensure
+that all regulatory requirements are met.
+ 3. If the NIH-funded clinical trial is not an applicable clinical trial under the regulation, the recipient will be responsible for carrying out the tasks and meeting the timelines described in regulation.  Such tasks include registering the clinical trial in ClinicalTrials.gov and submitting
+results information to ClinicalTrials.gov.
+Recipients of NIH funding conducting non-exempt research involving human subjects research subject to
+the revised Common Rule and conducting a clinical trial as defined in 45 CFR Part 46.102(b) should be
+aware that for each funded trial, one IRB-approved consent form must be posted on a designated public
+federal website in accordance with 45 CFR Part 46.116(h).  The forms must be posted on a designated
+public federal website after recruitment closes and no later than 60 days after the last study visit by any
+subject, as required by the protocol. More information about these requirements is available on Posting
+Clinical Trial Informed Consent Forms webpage.
+ l NIH-funded recipients using an English-language informed consent form to enroll participants may either:
+(GPS page IIA-16)
+
+Submit an IRB-approved English-language informed consent form to ClinicalTrials.gov. Documents
+that are uploaded to ClinicalTrials.gov should be uploaded in accordance with these instructions. ClinicalTrials.gov does not currently support upload of non-English documents. Or:
+Submit an IRB-approved informed consent form to Regulations.gov following the instructions in the
+paragraph below. NIH recipients submitting informed consent forms to Regulations.gov must maintain a copy of their Regulations.gov receipt and tracking number and make it available to NIH upon
+request.
+ l NIH-funded recipients using only non-English informed consent forms to enroll participants:
+ Submit an IRB-approved informed consent form to Docket ID: HHS-OPHS-2018-0021 on the Regulations.gov website in accordance with guidance issued by the Office for Human Research Protections. NIH recipients submitting informed consent forms to Regulations.gov must maintain a copy
+of their Regulations.gov receipt and tracking number and make it available to NIH upon request.
+Institutions submitting documents to either ClinicalTrials.gov or Regulations.gov must protect participant
+privacy in accordance with applicable federal, state, and local laws and regulations (e.g., the HIPAA Privacy Rule, Certificates of Confidentiality) and any applicable terms of their NIH award.
+Each NIH-funded clinical trial should have only one entry in ClinicalTrials.gov that contains its registration and results information.  Recipients need not and should not create a separate record of the applicable clinical trial to comply with this policy.
+4.1.3.2 Food and Drug Administration Amendments Act (FDAAA)
+Applicants and recipients should familiarize themselves with the requirements of 42 U.S.C. 282(j), also
+known as Sec. 801 of Public Law 110-85 (the FDA Amendments Act of 2007 or FDAAA), as implemented in regulation by 42 CFR Part 11, with respect to registration and results, information submission
+requirements that apply to certain clinical trials. Of particular note is that, in general, results information
+of applicable clinical trials are due not later than 12 months after the primary completion date. If this
+date occurs after the period of performance has ended, results information submission  is still required in
+accordance with FDAAA and the terms and conditions of grant award.
+The signature of the AOR on the grant or progress report form certifies that, for applicable clinical trials
+funded in whole or part by the award, the responsible party has made all registration and results submissions required by 42 CFR Part 11.
+4.1.3.3 Good Cause Extension (GCE) Request Requirements
+Section 402(j) of the Public Health Service Act (PHS Act) and the Final Rule for Clinical Trials Registration and Results Information Submission establish requirements and deadlines for the submission of
+clinical trial results information for Applicable Clinical Trials (ACTs). In general, the standard submission deadline for clinical trials results information is no later than 1 year after the primary completion
+date. However, in rare instances, a good cause extension (GCE) request may be sought for the following
+categories of trials:
+ l ACTs that are subject to the Final Rule (42 CFR 11.42).
+ l NIH Clinical trials subject to the complementary policy in Section 4.1.3.1.
+Therefore, GCE requests must be submitted through the ClinicalTrials.gov Protocol Registration and Results System (PRS) prior to (i.e., the day before) the standard submission deadline or granted extended
+deadline. Late submissions, or requests submitted outside of the PRS, will not be accepted. If NIH
+(GPS page IIA-17)
+
+determines the request does not constitute “good cause,” the GCE request will be denied. If the request is
+denied, the responsible party must either (1) submit clinical trial results information by the later of the
+date on which clinical trial results information would otherwise be due, or 30 calendar days after the date
+that the PRS GCE denial notification was issued by NIH; or (2) submit an appeal.
+Special Considerations for NIH Recipients
+For NIH-funded and supported clinical trials, recipients should be aware that any GCE request could
+impact other aspects of the grant award. Therefore, the submission of a “Request for an Extension for
+Good Cause” does not constitute a prior approval request submission (e.g., No Cost Extension and Carryover).
+Each GCE request must include
+ 1.  a complete description of the reason(s) why clinical trial results information cannot be provided
+according to the deadline, with sufficient detail to justify good cause for the extension and to
+allow for the evaluation of the request; and
+ 2.  an estimated date on which the clinical trial results information will be submitted.
+Extension requests will be evaluated on a case-by-case basis using the following general criteria to support a determination of "good cause." These include, but are not limited to:
+General Criteria:
+ 1. The circumstances and their impact leading to the GCE request, including steps the responsible
+party is taking to mitigate the impact of those circumstances.
+ 2. The extent to which the factors underlying the GCE request are outside of the responsible party’s
+control.
+ 3. What steps will be taken during the requested extension, why they are necessary to mitigate the
+circumstances leading to the GCE request, and whether the requested submission date is commensurate with the explanation provided in the request.
+ 4. Whether information is internally consistent with relevant data element definitions and is consistent with information provided in other sections of the study record.
+ 5. The number of, and explanations for, previous GCE request(s), and the proposed reporting deadline in previous requests.
+General Formatting Criteria and Considerations:
+ 1. The request must be in English.
+ 2. Acronyms and abbreviations should be spelled out, with the acronym or abbreviation provided in
+parentheses immediately after, at least the first time they are used in the request.
+ 3. The responsible party should not include specific personal health information in the request.
+Sufficient detail should be provided, including the steps that will be taken to meet the estimated submission date, a description of mitigating steps to avoid future delay, and any other information needed to
+address the criteria listed above. Requests that do not provide sufficient information may be denied.
+More than one GCE request may be submitted for the same ACT or NIH Clinical Trial after a previous
+GCE request was granted. When a GCE is granted, the results submission deadline is updated to align
+with the approved extension. Any subsequent GCE request must be submitted prior to the granted extended deadline.
+Appeals
+(GPS page IIA-18)
+
+Responsible parties or Recipients, as appropriate, may appeal denied GCE requests or the NIH-identified
+earlier deadline specified in a granted extension request. An appeal must provide an explanation of the
+reason(s) why the initial decision to deny the GCE request or grant the GCE request with a shorter deadline than requested should be overturned or revised, with sufficient detail to allow for the evaluation of
+the appeal. Responsible parties or Recipients, as appropriate, should provide further elaboration of the
+grounds for the request or highlight factors that justify an extension. The appeal should only address why
+the initial decision was incorrect; new bases for an extension request should not be presented for the first
+time in an appeal and will not be considered.
+Only one appeal may be submitted for a denied GCE request. The appeal must be submitted via the PRS
+not later than 30 calendar days after the date that the PRS notification was issued by NIH. NIH will
+provide an electronic notification to the responsible party or recipient, as appropriate, communicating the
+determination of whether the appeal is granted or denied.
+If the appeal is granted, the responsible party or recipient, as appropriate, has until the extended date specified in the electronic notification to submit clinical trial results information. If NIH denies the appeal of
+a denied GCE request, the responsible party or recipient, as appropriate, must submit clinical trial results
+information by the later of the date on which clinical trial results information would otherwise be due, or
+30 calendar days after the electronic notification denying the appeal was sent by NIH.
+The GCE request process and criteria can be found in the ClinicalTrials.gov NIH Good Cause Extension
+FAQs
+4.1.4 Confidentiality
+4.1.4.1 Certificates of Confidentiality
+In keeping with Section 301(d) of the PHS Act, as amended by Section 2012 of the 21st Century Cures
+Act, P.L. 114-255, and as enacted December 13, 2016 Certificates of Confidentiality (Certificates) are
+issued automatically to any NIH funded investigators or institutions engaged in biomedical, behavioral,
+clinical, or other research activities in which identifiable, sensitive information is collected or used.
+At the time of enactment, all NIH-funded and conducted research that was commenced or ongoing on or
+after December 13, 2016 was deemed to be issued a Certificate and was therefore required to protect the
+privacy of individuals who are subjects of such research in accordance with subsection 301(d) of the
+Public Health Service Act. Per the PHS Act, subsection 301(d)(1), the Certificates protect identifiable,
+sensitive information collected and all copies, in perpetuity.
+Institutions and their investigators are responsible for determining whether research they conduct is subject to the requirement and therefore issued a Certificate. Certificates issued in this manner will not be
+issued as a separate document.
+For the purposes of this Policy, NIH considers research in which identifiable, sensitive information is collected or used, to include:
+ l Human subjects research as defined in the Federal Policy for the Protection of Human Subjects
+(45 CFR Part 46), including exempt research except for human subjects research that is determined to be exempt from all or some of the requirements of 45 CFR Part 46 if the information
+obtained is recorded in such a manner that human subjects cannot be identified or the identity of
+the human subjects cannot readily be ascertained, directly or through identifiers linked to the subjects;
+(GPS page IIA-19)
+
+l Research involving the collection or use of biospecimens that are identifiable to an individual or
+for which there is at least a very small risk that some combination of the biospecimen, a request
+for the biospecimen, and other available data sources could be used to deduce the identity of an
+individual;
+ l Research that involves the generation of individual level, human genomic data from biospecimens, or the use of such data, regardless of whether the data is recorded in such a manner
+that human subjects can be identified or the identity of the human subjects can readily be ascertained as defined in the Federal Policy for the Protection of Human Subjects (45 CFR Part 46);
+or
+ l Any other research that involves information about an individual for which there is at least a
+very small risk, as determined by current scientific practices or statistical methods, that some
+combination of the information, a request for the information, and other available data sources
+could be used to deduce the identity of an individual, as defined in subsection 301(d) of the
+Public Health Service Act.
+Recipient Responsibilities
+To determine if the requirement applies to research conducted or supported by NIH, investigators will
+need to ask, and answer the following question:
+ l Is the activity biomedical, behavioral, clinical, or other research?
+If the answer to this question is no, then the activity is not issued a Certificate. If the answer is yes, then
+investigators will need to answer the following questions:
+ l Does the research involve Human Subjects as defined by 45 CFR Part 46?
+ l Are you collecting or using biospecimens that are identifiable to an individual as part of the
+research?
+ l If collecting or using biospecimens as part of the research, is there a small risk that some combination of the biospecimen, a request for the biospecimen, and other available data sources
+could be used to deduce the identity of an individual?
+ l Does the research involve the generation of individual level, human genomic data?
+If the answer to any one of these questions is yes, then the requirement will apply to the research and
+therefore, in accordance with subsection 301(d) of the Public Health Service Act, the recipient of the Certificate shall not:
+ l Disclose or provide, in any Federal, State, or local civil, criminal, administrative, legislative, or
+other proceeding, the name of such individual or any such information, document, or biospecimen that contains identifiable, sensitive information about the individual and that was created or compiled for purposes of the research, unless such disclosure or use is made with the
+consent of the individual to whom the information, document, or biospecimen pertains; or
+ l Disclose or provide to any other person not connected with the research the name of such an individual or any information, document, or biospecimen that contains identifiable, sensitive information about such an individual and that was created or compiled for purposes of the research.
+Disclosure is permitted only when:
+(GPS page IIA-20)
+
+l Required by Federal, State, or local laws (e.g., as required by the Federal Food, Drug, and Cosmetic Act, or state laws requiring the reporting of communicable diseases to State and local
+health departments), excluding instances of disclosure in any Federal, State, or local civil, criminal, administrative, legislative, or other proceeding;
+ l Necessary for the medical treatment of the individual to whom the information, document, or biospecimen pertains and made with the consent of such individual;
+ l Made with the consent of the individual to whom the information, document, or biospecimen pertains; or
+ l Made for the purposes of other scientific research that is in compliance with applicable Federal
+regulations governing the protection of human subjects in research.
+As set forth in  NIHGPS Chapter 8.3, recipients conducting NIH supported research applicable to the
+Policy are required to establish and maintain effective internal controls (e.g., policies and procedures)
+that provide reasonable assurance that the award is managed in compliance with Federal statutes, regulations, and the terms and conditions of award.
+Recipients of Certificates are required to ensure that any investigator or institution not funded by NIH
+who receives a copy of identifiable, sensitive information protected by a Certificate issued by the Policy,
+understand they are also subject to the requirements of subsection 301(d) of the Public Health Service
+Act.  In accordance with NIHGPS Chapter 15.2.1, recipients are also responsible for ensuring that any
+subrecipient that receives funds to carry out part of the NIH award involving a copy of identifiable, sensitive information protected by a Certificate issued by the Policy understand they are also subject to subsection 301(d) of the Public Health Service Act.
+For studies in which informed consent is sought, NIH expects investigators to inform research participants of the protections and the limits to protections provided by a Certificate issued by the Policy.
+Information on CoCs is available on the NIH Web site at Grants and Funding’s Certificates of Confidentiality (CoC) webpage.
+4.1.4.2 Confidentiality of Alcohol and Substance Use Patient Records
+Section 543 of the PHS Act, as implemented in 42 CFR Part 2, requires that records of substance abuse
+patients be kept confidential except under specific circumstances and purposes. These protections differ
+from those available to patients under HIPAA and are intended to ensure that a patient in a substance or
+alcohol use program is not made more vulnerable than a similar patient who does not seek treatment.
+The covered records are any information, written or not, of a patient who has applied for or been given
+diagnosis or treatment for substance or drug use at a federally assisted program and includes any individual who, after arrest on a criminal charge, is identified as a substance or drug user in order to determine that individual’s eligibility to participate in a program. This includes records of the identity,
+diagnosis, or treatment of any patient which are maintained in connection with the performance of any
+program or activity relating to substance abuse education, training, treatment, rehabilitation, or research,
+which is conducted under an NIH grant. Except as authorized under a court order, no patient record may
+be used to initiate or substantiate any criminal charges against a patient or to conduct any investigation
+of a patient. The regulations also describe procedures to allow for nonvoluntary disclosure of certain
+information by persons engaged in research on mental health, including research on the use and effect of
+alcohol and other psychoactive substances.
+(GPS page IIA-21)
+
+4.1.4.3 Confidentiality of Patient Records: Health Insurance Portability and
+Accountability Act
+HHS issued the final version of the “Standards for Privacy of Individually Identifiable Health Information”—the Privacy Rule—on August 14, 2002. The Privacy Rule is a Federal regulation under the
+Health Insurance Portability and Accountability Act (HIPAA) of 1996 that governs the protection of individually identifiable health information. It is administered and enforced by OCR, HHS.
+Decisions about applicability and implementation of the Privacy Rule reside with the researcher and the
+recipient organization. The OCR web site provides information on the Privacy Rule, including the complete text of the regulation and a set of decision tools for determining whether a particular entity is subject to the rule. An educational booklet, Protecting Heath Information in Research: Understanding the
+HIPAA Privacy Rule, is available through OCR’s web site. That web site also includes other educational
+materials including information specific to grants.
+4.1.5 Controlled Substances
+If controlled substances are proposed to be administered as part of a research protocol or if research is to
+be conducted on the substances themselves, applicants/recipient must ensure that the DEA requirements,
+including registration, inspection, and certification, as applicable, are met. Regional DEA offices can supply forms and information concerning the type of registration required for a particular substance for
+research use. The main registration office in Washington, DC may be reached at 800-882-9539. Information also is available from the National Institute on Drug Abuse at 301-443-6441.
+4.1.6 Debarment and Suspension
+HHS regulations published in 2 CFR Part 376 implement the government-wide debarment and suspension system guidance (2 CFR Part 180) for HHS’ non-procurement programs and activities. “Nonprocurement transactions” include, among other things, grants, cooperative agreements, scholarships, fellowships, and loans. NIH implements the HHS Debarment and Suspension regulations as a term and condition of award. Accordingly, recipients of NIH grants (“primary covered transactions”), including
+sponsoring institutions for Kirschstein-NRSA individual fellowships, are required to determine whether
+it or any of its principals (as defined in 2 CFR Part 180.995 and 2 CFR Part 376.995) is excluded or disqualified from participating in a covered transaction (i.e., grant or cooperative agreement) prior to entering into the covered transaction, i.e., prior to the drawdown of funds which signals acceptance of the
+grant award. Recipients may decide the method and frequency by which this determination is made and
+may check excluded parties in SAM, although checking SAM is not required.
+Prior to the drawdown of funds for each grant award, recipients must report to the funding IC if the recipient or any of its principals:
+ l Are presently excluded or disqualified;
+ l Have been convicted within the preceding three years of any of the offenses listed in 2 CFR Part
+180.800(a) or had a civil judgment for one of those offenses within that time period;
+ l Are presently indicted for or otherwise criminally or civilly charged by a governmental entity
+(Federal, State, or local) with commission of any of the offenses listed in 2 CFR Part 180.800(a);
+or
+ l Have had one or more public transactions (Federal, State, or local) terminated within the preceding three years or default.
+(GPS page IIA-22)
+
+Disclosure of unfavorable information by recipients under this requirement will not necessarily cause
+NIH to deny participation in the grant. NIH will consider the information when determining whether to
+enter into the covered transaction. NIH will also consider any additional information or explanation that
+recipients elect to submit with the disclosed information. However, if it is later determined that a recipient failed to disclose information that it knew at the time it accepted the NIH grant award, NIH may (a)
+terminate the transaction for material failure to comply with the terms and conditions of the award or (b)
+pursue any other available remedies, including suspension and debarment.
+Recipients must immediately report to the NIH funding IC if at any time during the project period,
+including periods of no-cost extension, they discover that they (a) failed to disclose information prior to
+the drawdown of funds or (b) due to changed circumstances the recipient or any of its principals for the
+grant now meet the reporting criteria.
+“Lower tier” transactions (e.g., consortiums, subcontracts, consultants, collaborators, and contractors that
+require the provision of goods or services that will equal or exceed $25,000) also are subject to the HHS
+regulations. Prior to entering into a lower tier covered transaction with a participant (as defined in 2 CFR
+Part 180.980), recipients must verify that the person (as defined in 2 CFR Part 180.985) is not excluded
+or disqualified. Recipients may not enter into any transaction with a person who is disqualified from that
+transaction unless an exception under the disqualifying statue, Executive Order, or regulation has been
+obtained from HHS.
+Recipients must require participants at the next lower tier to (a) comply with the HHS Debarment and
+Suspension regulations as a condition of participation in the transaction and (b) pass the requirement to
+comply with the HHS Debarment and Suspension regulations to each person involved in the covered
+transaction at the next lower tier. Likewise, before entering into such a transaction lower tier participants
+and contractors under grants (where the contract requires the provision of goods or services that will
+equal or exceed $25,000) must report to the recipient if it or any participants are presently excluded or
+disqualified.
+Recipients also are required to assure compliance for each trainee under a Kirschstein-NRSA institutional research training grant, or other similar NIH-supported institutional training grant, before their
+appointment.
+Organizations or individuals that are suspended, debarred, or voluntarily excluded from eligibility cannot
+receive NIH grants, be paid from NIH grant funds, whether under a primary or lower-tier transaction
+(including trainees on NIH-supported training grants), or otherwise participate during the period of suspension, debarment, or exclusion. Because individuals who have been debarred, suspended, declared
+ineligible, or voluntarily excluded from covered transactions may not receive Federal funds for a specified period, charges made to NIH grants for such individuals (e.g., salary) are unallowable.
+4.1.7 Drug-Free Workplace
+The Drug-Free Workplace Act of 1988 (41 U.S.C. § 701 et seq.) requires that all organizations receiving
+grants from any Federal agency agree to maintain a drug-free workplace. By signing the application, the
+AOR agrees that the recipient will provide a drug-free workplace and will comply with the requirement
+to notify NIH if an employee is convicted of violating a criminal drug statute. Failure to comply with
+these requirements may be cause for debarment. Government wide requirements for Drug-Free Workplace for Financial Assistance are found in 2 CFR Part 182; HHS implementing regulations are set forth
+in 2 CFR Part 382.400. All recipients of NIH grant funds must comply with the requirements in Subpart
+B (or Subpart C if the recipient is an individual) of Part 382. Foreign applicants and recipients may be
+exempted from the drug-free workplace requirements of 2 CFR Part 182 based on a documented finding
+(GPS page IIA-23)
+
+by the NIH awarding IC that application of those requirements is inconsistent with U.S. international
+obligations or the laws and regulations of a foreign government.
+4.1.8 Federal Funding Accountability and Transparency Act (FFATA)
+Public Law 109-282, the Federal Funding Accountability and Transparency Act of 2006 as amended
+(FFATA), requires full disclosure of all entities and organizations receiving Federal funds including
+grants, contracts, loans and other assistance and payments through a single publicly accessible web site,
+USASpending.gov. The Web site includes information on each Federal financial assistance award and
+contract over $30,000, including such information as:
+ 1. The name of the entity receiving the award
+ 2. The amount of the award
+ 3. Information on the award including FAIN, transaction type, funding agency, etc.
+ 4. The location of the entity receiving the award
+ 5. A unique identifier of the entity receiving the award; and
+ 6. Names and compensation of highly-compensated officers (as applicable)
+Compliance with this law is primarily the responsibility of the Federal agency. However, two elements
+of the law require information to be collected and reported by recipients: 1) information on executive
+compensation when not already reported through the Central Contractor Registry; and 2) similar information on all subawards/subcontracts/consortiums over $30,000. Information on the recipient reporting
+requirement for this law can be found in Monitoring—Reporting—Financial Reports—Recipient Reporting of Subrecipient Data for FFATA.
+Full text of the award term is available at 2 CFR Part 170.
+4.1.9 Federal Information Security Management Act
+All information systems, electronic or hard copy which contain Federal data need to be protected from
+unauthorized access. This also applies to information associated with NIH grants and contracts. Congress
+and the OMB have instituted laws, policies and directives that govern the creation and implementation of
+federal information security practices that pertain specifically to grants and contracts. The current regulations are pursuant to the Federal Information Security Management Act (FISMA), 44 U.S.C. 3541 et
+seq. The applicability of FISMA to NIH recipients applies only when recipients collect, store, process,
+transmit or use information on behalf of HHS or any of its component organizations. In all other cases,
+FISMA is not applicable to recipients of grants, including cooperative agreements. The recipient retains
+the original data and intellectual property, and is responsible for the security of this data, subject to all
+applicable laws protecting security, privacy, and research. If and when information collected by a recipient is provided to HHS, responsibility for the protection of the HHS copy of the information is transferred to HHS and it becomes the agency’s responsibility to protect that information and any derivative
+copies as required by FISMA.
+4.1.10 Financial Conflict of Interest
+NIH requires recipient institutions (except Phase I SBIR/STTR applicants and recipients) to comply with
+the requirements of 42 CFR Part 50, Subpart F, “Responsibility of Applicants for Promoting Objectivity
+in Research for which PHS Funding is Sought.” (FCOI Regulation), as implemented in the 2011 Final
+Rule for grants and cooperative agreements. FCOI requirements are aligned with 42 CFR Part 50--Subpart F and the overarching goal for reporting is to promote and encourage transparency in order to avoid
+(GPS page IIA-24)
+
+distorting NIH funding decisions;  NIH staff consider reports in light of other disclosures, e.g. other support, biographical sketch data, and foreign components, etc., and provide a holistic approach to award
+and risk management principles.
+The requirements under the 2011 revised regulation promote objectivity in research by establishing standards that provide a reasonable expectation that the design, conduct, or reporting of research funded under
+PHS grants or cooperative agreements will be free from bias by any conflicting financial interest of an
+Investigator, defined as the PD/PI and any other person, regardless of title or position, who is responsible
+for the design, conduct, or reporting of research funded by PHS, or proposed for such funding, which
+may include, for example, collaborators or consultants. These requirements do not apply to Federal
+employees or Federal agencies. Federal agencies have their own set of rules governing FCOI for employees. When submitting a grant application, the signature of the AOR certifies the applicant Institution’s
+compliance with the requirements of the FCOI regulations, including that:
+ 1. There is in effect at the Institution an up-to-date, written and enforced administrative process to
+identify and manage FCOI with respect to all research projects for which NIH funding is sought
+or received;
+ 2. The Institution shall promote and enforce Investigator compliance with the regulation’s requirements including those pertaining to disclosure of Significant Financial Interests (SFI);
+ a. Institutions must review an Investigator’s SFI to determine if the SFI is related to the
+NIH-funded research (i.e., could the SFI be affected by the research or is the SFI in an
+entity whose financial interest could be affected by the research). A FCOI exists when
+the institution, through its designated official(s), reasonably determines that the SFI
+could directly and significantly affect the design, conduct, or reporting of the NIH-funded research.
+ 3. The Institution shall identify and manage FCOIs and provide initial and ongoing FCOI reports to
+NIH;
+ 4. When requested, the Institution will promptly make information available to the NIH/HHS relating to any Investigator disclosure of financial interests and the Institution’s review of, and
+response to, such disclosure, whether or not the disclosure resulted in the Institution’s determination of an FCOI;
+ 5. The Institution must fully comply with the requirements of the regulation.
+When the Institution determines that an FCOI exists, the Institution must report to the NIH awarding IC
+through the submission of an initial and annual FCOI report using the eRA Commons FCOI Module.
+The initial FCOI report will include the following information:
+ l Grant number and PD/PI or Contact PD/PI if the grant is awarded under the multiple PI model;
+ l Name of Investigator (if different from the PD/PI) with the FCOI;
+ l Name of the entity with which the Investigator has an FCOI;
+ l Nature of the FCOI (e.g., consulting fees, honoraria, paid authorship, equity interest, intellectual
+property rights and interests, and reimbursed or sponsored travel);
+ l Value of the financial interest $0-4,999; $5,000-9,999; $10,000-19,999; amounts between
+$20,000-100,000 by increments of $20,000; amounts above $100,000 by increments of $50,000
+or a statement that a value cannot be readily determined;
+ l A description how the financial interest relates to NIH-funded research and the basis for the Institution’s determination that the financial interest conflicts with such research; and
+(GPS page IIA-25)
+
+l Key elements of the Institution’s management plan, including:
+ 1. Role and principal duties of the conflicted Investigator in the research project;
+ 2. Conditions of the management plan;
+ 3. How the management plan is designed to safeguard objectivity in the research project;
+ 4. Confirmation of the Investigator’s agreement to the management plan;
+ 5. How the management plan will be monitored to ensure Investigator compliance; and
+ 6. Other information as needed.
+The annual FCOI report must be submitted to NIH through the eRA Commons FCOI Module each year
+within a competitive segment or until the Institution reports that the FCOI no longer exists.  The annual
+FCOI report will  include the following information:
+ l Status of the FCOI
+ l Changes to the management plan, if applicable
+The Institution must enter into a formal written agreement, signed and agreed to by the recipient and
+each consortium participant and/or subrecipient. The agreement must establish whether the FCOI policy
+of the recipient Institution or that of the subrecipient will apply to subrecipient Investigators and in either
+case, the agreement must include required significant financial interest disclosure, review, and FCOI
+reporting timelines to ensure compliance with the FCOI regulations. Subrecipient Institutions who rely
+on their FCOI policy must report identified FCOIs to the recipient Institution in sufficient time to allow
+the recipient Institution to report the FCOI to NIH to meet its reporting obligations. (See Consortium
+Agreements, 15.2.1 Written Agreement.)
+NIH will not support any agreement that does not meet the minimum requirements. If a subrecipient is
+unwilling to accept the requirements of the written agreement by signing the agreement, then the agreement cannot be issued. NIH reserves the right to request copies of the written agreement and relevant
+supporting documentation as needed as part of its oversight responsibilities. Failure to provide requested
+documentation may lead to remedies for noncompliance and potential enforcement actions (See 8.5, Specific Award Conditions and remedies for noncompliance).
+The Institution will make certain information available concerning identified FCOI held by senior/key
+personnel as defined in the regulation via a publicly accessible web site or by a written response to any
+requestor within five business days of a request and update such information as specified in the regulation.
+Each Institution shall maintain an up-to-date, written, enforced policy on FCOI that complies with the
+regulation, and make the policy available via a publicly accessible web site. NIH funded recipients are
+required to submit their publicly accessible FCOI policy to NIH via the eRA Commons Institution Profile (IPF) Module (IPF Module).  The information is provided on an institutional level as part of an institution’s IPF, rather than on a grant-specific level, so it is not necessary to submit the FCOI policy with
+each grant application.
+The Institution must require each Investigator to disclose their (and their spouse and dependent children)
+domestic and foreign SFIs that are related to their Institutional responsibilities to the Institution’s designated official(s).
+Investigators must disclose all foreign financial interests (which includes income from seminars, lectures,
+or teaching engagements, income from service on advisory committees or review panels, and reimbursed
+or sponsored travel) received from any foreign entity, including foreign Institutions of higher education
+and foreign governments (which includes local, provincial, or equivalent governments of another
+(GPS page IIA-26)
+
+country) when such income meets the threshold for disclosure (e.g., income in excess of $5,000).  Institutions are strongly encouraged to review their FCOI policy and make any necessary changes to ensure
+Investigators fully understand their disclosure responsibilities.
+The Institution must require each Investigator (including subrecipient Investigators) to complete training
+prior to engaging in NIH-supported research and at least every four years, and immediately under the designated circumstances:
+ l Institutional FCOI policies change in a manner that affects Investigator requirements
+ l An Investigator is new to an Institution
+ l An Institution finds an Investigator noncompliant with the Institution’s FCOI policy or management plan.
+As described in the regulation, examples of how FCOIs might be managed include but are not limited to,
+the following:
+ l Public disclosure of FCOI (e.g., when presenting or publishing the research);
+ l Disclosure of FCOI directly to human subjects research participants;
+ l Monitoring of research by independent reviewer(s);
+ l Modification of the research plan;
+ l Change of personnel or personnel responsibilities, or disqualification of personnel from participation in all or a portion of the research;
+ l Reduction or elimination of SFIs (e.g., sale of an equity interest)
+ l Severance of relationships that create FCOIs.
+The information above is only a sample of the regulatory requirements found in 42 CFR Part 50--Subpart F. Applicants and recipients must review the regulation in its entirety to ensure compliance with all
+of the requirements. Resources applicable to FCOI, including Frequently Asked Questions, etc. can be
+found on the NIH Financial Conflict of Interest website.
+4.1.11 Fly America Act
+The Fly America Act (49 U.S.C. 40118) generally provides that foreign air travel funded by Federal government money may only be conducted on U.S. flag air carriers. A “U.S. flag air carrier” is an air carrier
+that holds a certificate under 49 U.S.C. 41102 but does not include a foreign air carrier operating under a
+permit. There are limited circumstances under which use of a foreign-flag air carrier is permissible.
+These circumstances are outlined below:
+ 1. Airline "Open Skies" Agreement. A foreign flag air carrier may be used if the transportation is
+provided under an air transportation agreement between the United States and a foreign government, which the Department of Transportation has determined meets the requirements of the
+Fly America Act. For example, in 2008, the U.S. entered into an "Open Skies" Agreement with
+the European Union (EU). This Agreement gives European Community airlines (airlines of Member States) the right to transport passengers and cargo on flights funded by the U.S. government,
+when the transportation is between a point in the United States and any point in a Member State
+or between any two points outside the United States.
+The U.S.-EU Open Skies Agreement was amended effective June 24, 2010. GSA issued Guidance October 6, 2010. Pursuant to the amendment, federal contractors and recipients (not U.S.
+Government employees) need not be concerned about city-pair contract fares. However,
+(GPS page IIA-27)
+
+contractors and recipients must check with the airline to ensure that the airline is covered by the
+U.S.-EU Open Skies agreement which may change periodically.
+Additionally, pursuant to the amendment, EU airlines are no longer limited to flying passengers
+between points in the United States and points in the EU. Instead, EU airlines are authorized to
+transport passengers between points in the United States and points outside the EU if the EU airline is authorized to serve the route under the U.S.-EU Open Skies Agreement. This includes
+flights that originate, arrive, or stop in the European Union. For additional information, please
+see GSA Bulletin FTR 11-02. For information on other "open skies" agreements in which the
+United States has entered, refer to the Fly America Act page on GSA’s website
+ 2. Involuntary Rerouting. Travel on a foreign-flag carrier is permitted if a U.S.-flag air carrier
+involuntarily reroutes the traveler via a foreign-flag air carrier, notwithstanding the availability
+of alternative U.S.-flag air carrier service.
+ 3. Travel To and From the U.S.  Use of a foreign-flag air carrier is permissible if the airport abroad
+is: (a) the traveler's origin or destination airport, and use of U.S.-flag air carrier service would
+extend the time in a travel status by at least 24 hours more than travel by a foreign-flag air carrier; or (b) an interchange point, and use of U.S.-flag air carrier service would increase the number of aircraft changes the traveler must make outside of the U.S. by two or more, would require
+the traveler to wait four hours or more to make connections at that point, or would extend the
+time in a travel status by at least six hours more than travel by a foreign-flag air carrier.
+ 4. Travel Between Points Outside the U.S. Use of a foreign-flag air carrier is permissible if: (a)
+travel by a foreign-flag air carrier would eliminate two or more aircraft changes en route; (b)
+travel by a U.S.-flag air carrier would require a connecting time of four hours or more at an overseas interchange point; or (c) the travel is not part of the trip to or from the U.S., and use of a
+U.S.-flag air carrier would extend the time in a travel status by at least six hours more than travel
+by a foreign-flag air carrier.
+ 5. Short Distance Travel. For all short distance travel, regardless of origin and destination, use of a
+foreign-flag air carrier is permissible if the elapsed travel time on a scheduled flight from origin
+to destination airport by a foreign-flag air carrier is three hours or less and service by a U.S.-flag
+air carrier would double the travel time.
+4.1.12 Health and Safety Regulations and Guidelines
+Recipients are responsible for meeting applicable Federal, State, and local health and safety standards
+and for establishing and implementing necessary measures to minimize their employees’ risk of injury or
+illness in activities related to NIH grants. In addition to applicable Federal, State, and local laws and regulations, the following regulations must be followed when developing and implementing health and
+safety operating procedures and practices for both personnel and facilities:
+ l 29 CFR Part 1910.1030, Blood borne pathogens; 29 CFR Part 1910.1450, Occupational exposure to hazardous chemicals in laboratories; and other applicable occupational health and safety
+standards issued by the Occupational Health and Safety Administration (OSHA) and included in
+29 CFR Part 1910.
+ l Nuclear Regulatory Commission Standards and Regulations, pursuant to the Energy Reorganization Act of 1974 (42 U.S.C. 5801 et seq.). Copies may be obtained from the U.S. Nuclear
+Regulatory Commission, Washington, DC 20555-0001.
+(GPS page IIA-28)
+
+The following guidelines are recommended for use in developing and implementing health and safety
+operating procedures and practices for both personnel and facilities:
+ l Biosafety in Microbiological and Biomedical Laboratories, CDC and NIH, HHS. This publication is available at on CDC’s Strengthening Lab Safety webpage.
+ l Prudent Practices for Safety in Laboratories (2011), National Research Council, National
+Academies Press, 500 Fifth Street, NW, Lockbox 285, Washington, DC 20055 (ISBN 978-0-
+309-13864-2).
+Recipient organizations are not required to submit documented assurance of their compliance with or
+implementation of these regulations and guidelines. However, if requested by the awarding IC, recipients
+should be able to provide evidence that applicable Federal, State, and local health and safety standards
+have been considered and have been put into practice.
+4.1.13 Human Biospecimens Security Measures
+As of October 24, 2025, NIH recipients must comply with the NIH Policy on Enhancing Security Measures for Human Biospecimens (“NIH Biospecimens Security Policy”).
+The NIH Biospecimens Security Policy applies to ongoing or new NIH funding instruments (for the purposes of the NIH GPS grants and cooperative agreements) regardless of NIH funding level, used to
+obtain human clinical and research biospecimens from U.S. persons (regardless of identifiability) that are
+collected, obtained, stored, used, or distributed. Note that for the purposes of this policy. The NIH Biospecimens Security Policy does not apply to cell derivative products or cell lines derived from human
+biospecimens of U.S. persons collected, obtained, stored, used, or distributed using on-going or new NIH
+funds that are commercially or publicly available prior to October 24, 2025.
+The entity (e.g., biorepository, institution, investigator) that holds human biospecimens of U.S. persons
+collected, obtained, stored, used, or distributed using ongoing or new NIH funds are prohibited from directly or indirectly distributing the human biospecimens to institutions or parties located in countries of
+concern. For the purposes of the NIH Biospecimens Security Policy, countries of concern are defined as
+those determined under 28 CFR § 202.601 (Subpart F: Determination of Countries of Concern). NIH
+expects the research community to recognize the risks posed by the sharing or distribution of U.S. persons biospecimens that were collected, obtained, stored, used, or distributed with previous NIH funds or
+support with countries of concern.
+In limited circumstances, the human biospecimens may be shared or distributed to countries of concern
+only if use of the human biospecimens is:
+ 1. to meet transactions required or authorized by Federal law or international agreements, including
+Global health, or necessary for compliance with Federal law; or
+ 2. needed in rare and compelling circumstances where the facility and personnel in the country of
+concern possess needed capabilities and/or expertise not available elsewhere, the use of the biospecimen cannot be delayed to a time when capability and/or expertise is available elsewhere,
+and done with the consent of the individual from whom the biospecimen was collected; or
+ 3. at the request of the individual whose biospecimen was collected, obtained, or stored using NIH-
+funds; for purposes of diagnosis, prevention or treatment of that individual; and in compliance
+with applicable Federal laws, regulations, and policies.
+As a reminder, the export of human biospecimens must follow all applicable export administration regulations.
+(GPS page IIA-29)
+
+NIH requires all recipients to retain documentation related to sharing or distributing biospecimens to
+countries of concern under one of the allowable limited circumstances and further document the quantity
+and content of the biospecimen material that was shared or distributed. In accordance with 2 C.F.R. Part
+200.337, Access to Records, recipients are required to provide these records to NIH upon request.
+4.1.14 Human Stem Cell Research
+Under Executive Order 13505 NIH may support and conduct responsible, scientifically worthy human
+stem cell research, including human embryonic stem cell (hESC) research, to the extent permitted by
+law. NIH Guidelines on Human Stem Cell Research,  implement the Executive Order. The Guidelines
+apply to the expenditure of NIH funds for research using hESCs and certain uses of induced pluripotent
+stem cells.
+For the purpose of NIH Guidelines, "human embryonic stem cells (hESCs)" are cells that are derived
+from the inner cell mass of blastocyst stage human embryos, are capable of dividing without differentiating for a prolonged period in culture and are known to develop into cells and tissues of the three
+primary germ layers. Although hESCs are derived from embryos, such stem cells are not themselves
+human embryos.
+NIH recipients may use hESCs that have been approved by NIH in accord with NIH Guidelines and are
+posted on the NIH Human Embryonic Stem Cell Registry, or may establish eligibility of specific cell
+lines for NIH funding by submitting a Request for Human Embryonic Stem Cell Line to be Approved
+for Use in NIH Funded Research (NIH Form 2890). Prior to the use of NIH funds, applicants and recipients must provide assurances, when endorsing applications and progress reports submitted to NIH for
+projects using hESCs, that the hESCs to be used are listed on the NIH Registry and will be used in
+accordance with any restrictions associated with the line as cited on the Registry. If a specific line from
+the NIH Registry cannot be identified at the time of submission, the applicant/recipient must provide a
+strong justification why one cannot be identified at that time and a certification that one from the NIH
+Registry will be used.
+DHHS regulations for Protection of Human Subjects, 45 CFR Part 46, Subpart A, establish safeguards
+for individuals who are the sources of many human tissues used in research, including non-embryonic
+human adult stem cells and human induced pluripotent stem cells. When research involving human adult
+stem cells or induced pluripotent stem cells constitutes human subject research, Institutional Review
+Board review may be required and informed consent may need to be obtained per the requirements
+detailed in 45 CFR Part 46, Subpart A.
+In addition, 45 CFR Part 46, Subpart A, may apply to certain research using hESCs. This regulation
+applies, among other things, to research involving individually identifiable private information about a
+living individual, 45 CFR Part 46.102(f). The HHS Office for Human Research Protections (OHRP) considers biological material, such as cells derived from human embryos, to be individually identifiable
+when they can be linked to specific living individuals by the investigators either directly or indirectly
+through coding systems. Thus, in certain circumstances, IRB review may be required, in addition to compliance with these Guidelines. Applicant institutions are urged to consult OHRP guidance.
+4.1.14.1 Human Pluripotent Stem Cell Research Prohibited with NIH Funding
+The following uses of hESCs, even if derived from embryos donated in accordance with NIH Guidelines
+and listed on the NIH Registry, or human induced pluripotent stem cells, are prohibited:
+ l Research in which hESCs or human induced pluripotent stem cells are introduced into nonhuman primate blastocysts.
+(GPS page IIA-30)
+
+l Research involving the breeding of animals where the introduction of hESCs or human induced
+pluripotent stem cells may contribute to the germ line.
+In addition, the derivation of stem cells from human embryos is prohibited in NIH funded research by
+the annual appropriations ban on funding of human embryo research known as the Dickey Wicker
+Amendment. NIH funding for research using hESCs derived from other sources, including somatic cell
+nuclear transfer, parthenogenesis, and/or IVF embryos created for research purposes, is also prohibited.
+NIH will also not fund research in which human pluripotent cells are introduced into non-human vertebrate animal pre-gastrulation stage embryos.
+4.1.15 Human Fetal Tissue Research
+Human fetal tissue is defined as tissue or cells obtained from a dead human embryo or fetus after a spontaneous or induced abortion or stillbirth. This definition does not include established human fetal cell
+lines.
+Sections 498A and 498B of the PHS Act (42 U.S.C. 289g-1 and 289g-2) set forth specific requirements
+and prohibitions on research involving human fetal tissue.  Research involving human fetal tissue is also
+subject to the HHS Regulations for the Protection of Human Subjects. 45 C.F.R. 46.204 and 46.206 may
+be specifically relevant.
+The scientific and ethical challenges associated with research utilizing human fetal tissue make it imperative that researchers and their organizations be fully aware of and in compliance with the Federal
+requirements. When an application involving human fetal tissue research is submitted to NIH, the AOR’s
+signature certifies that researchers using these tissues are in compliance with  the PHS Act. The statute
+specifically prohibits any person from knowingly acquiring, receiving, or transferring any human fetal tissue for valuable consideration. The term “valuable consideration” is a concept similar to profit and does
+not include reasonable payment for costs associated with the collection, processing, preservation, storage, quality control, or transportation of these tissues. Violation of this statute carries criminal penalties
+that apply to both those that supply and those that acquire human fetal tissue.
+Current federal laws and regulations require informed consent for research involving the transplantation
+of human fetal tissue and for research with human fetal material associated with information that can
+identify a living individual.  Most states require informed consent for the use of fetal tissue in research.
+Accordingly, NIH expects informed consent to have been obtained from the donor for any NIH-funded
+research using human fetal tissue.
+When obtaining primary human fetal tissue for research purposes, NIH expects recipients to maintain
+appropriate documentation.
+4.1.15.1 Research on Transplantation of Human Fetal Tissue
+Sections 498A and 498B contain additional requirements for research on the transplantation of human
+fetal tissue for therapeutic purposes conducted or supported by NIH. Research involving the transplantation of human fetal tissue must be conducted in accordance with applicable Federal, State and local
+laws as well as the following NIH guidance.
+Under section 498A, the official who signs the application is certifying that the research on transplantation of human fetal tissue will adhere to the following provisions:
+(GPS page IIA-31)
+
+l The woman who donates the fetal tissue must sign a statement declaring that the donation is
+being made:
+ o for therapeutic transplantation research,
+ o without any restriction regarding the identity of individuals who may receive the transplantation, and
+ o without the donor knowing the identity of the recipient.
+ l The attending physician must sign a statement that they have:
+ o obtained the tissue in accordance with the donor’s signed statement and
+ o fully disclosed to the donor their intent, if any, to use the tissue in research and any
+known medical risks to the donor or risks to her privacy associated with the donation
+that are in addition to risks associated with the woman’s medical care.
+ l In the case of tissue obtained pursuant to an induced abortion, the physician’s statement also
+must state that they:
+ o obtained the woman’s consent for the abortion before requesting or obtaining consent for
+the tissue to be used;
+ o did not alter the timing, method, or procedures used to terminate the pregnancy solely
+for the purpose of obtaining the tissue for research; and
+ o performed the abortion in accordance with applicable State and local laws.
+ l The PD/PI must sign a statement certifying that they are  aware that the tissue is human fetal tissue obtained in a spontaneous or induced abortion, or pursuant to a stillbirth and that the tissue
+was donated for research purposes. The PD/PI also must certify that this information has been
+shared with others who have responsibilities regarding the research and, before eliciting
+informed consent from the transplantation recipient, will obtain written acknowledgment that the
+patient is aware of the aforementioned information.
+ l The PD/PI must certify in writing that they have had no part in any decisions as to the timing,
+method, or procedures used to terminate the pregnancy.
+In submitting an application to NIH, the AOR that signs the application is certifying that, if research on
+the transplantation of human fetal tissue is conducted under the grant-supported project, the organization
+will make available for audit by the HHS Secretary or designee, the physician statements, the PD/PI’s
+statements, and informed consents required by subsections 498A(b)(2) and (c) of the PHS Act or will
+ensure HHS access to those records, if maintained by an entity other than the recipient. This requirement
+is in addition to the requirements concerning human subjects in research.
+In addition, FDA has jurisdiction over fetal cells and tissues intended for use in humans and requests that
+investigators contact them to determine whether any planned or ongoing clinical research would require
+submission of an IND application. Additional information and FDA contact information is available on
+FDA’s Safety & Availability (Biologics) webpage.
+4.1.15.2 Non-Transplantation Research on Human Fetal Tissue from Elective Abortions
+For the purposes of this section, HFT from elective abortions is defined as research involving the study,
+analysis, or use of primary HFT, cells, and derivatives, and human fetal primary cell cultures obtained
+from elective abortions and includes the following:
+• human fetal primary or secondary cell cultures, whether derived by the investigator or obtained from a
+vendor.
+(GPS page IIA-32)
+
+• animal models incorporating HFT from elective abortions, including obtaining such models from a
+vendor.
+• derivative products from elective abortion tissues or cells such as protein or nucleic acid extracts.
+• any human extra-embryonic cells and tissue, such as umbilical cord tissue, cord blood, placenta, amniotic fluid, and chorionic villi, if obtained from the process of elective abortion.
+ l The definition of research involving HFT from elective abortions does not include
+the following:
+ l human fetal primary or secondary cell cultures, if cells were not derived
+from an elective abortion
+ l already-established (as of June 5, 2019) human fetal cell lines (e.g.,
+induced pluripotent stem cell lines from human fetal tissue, immortalized
+cell lines, differentiated cell lines).
+ l derivative products from human fetal tissue or cells (e.g., DNA, RNA, protein) if not derived from elective abortion.
+ l human extra-embryonic cells and tissue, including, but not limited to,
+umbilical cord tissue, cord blood, placenta, amniotic fluid, and chorionic
+villi if not derived from elective abortion.
+ l human fetal cells present in maternal blood or other maternal sources
+ l human embryonic stem cells or human embryonic cell lines.
+ l research on transplantation of HFT for therapeutic purposes (because of the
+statutory provision(s) addressing such research).”
+Effective January 22, 2026, NIH funds are not permitted for research using HFT from elective abortions.
+4.1.16 Human Subjects Protections
+The HHS regulations for the protection of human subjects, in 45 CFR Part 46, implement Section 491(a)
+of the PHS Act and provide a framework, based on established, internationally recognized ethical principles, to safeguard the rights and welfare of individuals who participate as subjects in research activities
+supported or conducted by NIH or other HHS components.
+The HHS regulations state that institutions (whether domestic or foreign) that are engaged in nonexempt
+research involving human subjects and institutional boards (IRBs) reviewing research that is subject to
+the HHS regulations must comply with the regulations at 45 CFR 46 (Revised Common Rule §46.101(a)
+and Pre-2018 Common Rule §46.101(a)). Recipient institutions "engaged" in human subjects research
+must provide written assurance that it will comply with the regulatory requirements (Revised Common
+Rule §46.103(a) and Pre-2018 Common Rule §46.103(a)). The recipient institution provides written
+assurance by obtaining a Federalwide Assurance (FWA) with the HHS Office for Human Research Protections (OHRP) and establishing appropriate policies and procedures for the protection of human subjects (Revised Common Rule §46.108(a)(3) & (4) and Pre-2018 Common Rule §46.103(b)(4) & (5)). An
+institution is engaged in human subjects research if:
+ 1. the institution's employees or agents intervene or interact with human subjects for research purposes;
+(GPS page IIA-33)
+
+2. the institution's employees or agents obtain individually identifiable private information or identifiable biospecimens about human subjects for research purposes; or
+ 3. the institution receives a direct HHS award to conduct human subjects research, even where all
+activities involving human subjects are carried out by a subcontractor or collaborator.
+The OHRP's document entitled Engagement of Institutions in Human Subjects Research provides additional guidance on "engagement".
+The HHS regulations at Subparts B, C, and D include additional protections for specific populations as
+follows:
+ 1. pregnant women, human fetuses and neonates (45 CFR Part 46, Subpart B);
+ 2. prisoners (45 CFR Part 46, Subpart C); and
+ 3. children (45 CFR Part 46, Subpart D).
+Certain research activities are exempt from regulatory requirements for an FWA and IRB oversight
+(Revised Common Rule 46.104(d) and Pre-2018 Common Rule 46.101(b). OHRP guidance states that
+institutions must adopt clear procedures under which the IRB (or some authority other than the investigator) determines whether proposed research is exempt from the human subjects regulations. NIH will
+review the materials submitted by the institution, including the  PHS Human Subjects Clinical Trails
+Information Form of the application, to determine if it can concur with the institution that the proposed
+activities are covered by the regulations or are in one or more exempt category. For research potentially
+subject to an exemption, this includes reviewing which category of exemption applies. NIH's review
+does not relieve the institution of any of its regulatory responsibility to accurately make and implement
+correct determinations about the research for the entirety of the project or otherwise speak for regulatory
+entities within HHS.
+Unless all research activities meet the criteria for one or more exemptions from 45 CFR Part 46, research
+involving human subjects may only be conducted under an HHS award if the organization has a current
+OHRP approved FWA and provides certification that an Institutional Review Board (IRB) registered
+with OHRP has reviewed and approved the proposed activity in accordance with the HHS regulations.
+In accepting an award that supports human subjects research, the recipient institution assumes responsibility for all research conducted under the award, including protection of human subjects at all participating and consortium sites. The recipient institution also assumes responsibility for ensuring that all
+institutions under the award engaged in nonexempt research involving human subjects have a current,
+approved FWA and must obtain certification of approval by an IRB registered with OHRP, of all nonexempt research involving human subjects before research may begin. When consultants are performing
+research involving human subjects on NIH-funded projects, the consultant’s institution must obtain an
+FWA.
+The Human Subjects Research page of the NIH Grants & Funding website contains additional information and Frequently Asked Questions that are available to help investigators understand how these
+Federal requirements apply to their research.
+Applications will be considered incomplete if they do not address the involvement of human subjects in
+the PHS Human Subjects and Clinical Trials Information Form of the application. If human subjects
+research is anticipated within the period of the award but definite plans for involvement of human subjects cannot be described in the application (referred to as “delayed onset human subjects research” in
+the NIH grant application instructions), applicants must provide a detailed explanation of why it is not
+possible to develop definite plans. Prior to the involvement of human subjects the recipient must submit
+to the NIH awarding IC for prior approval either (1) detailed information as required in the PHS Human
+(GPS page IIA-34)
+
+Subjects and Clinical Trials Information Form of the application, and meet the FWA and IRB certification requirements, or (2) if all of the research meets the criteria for one or more exemptions, identification of which exemptions(s) is/are applicable to the research, and a justification for the exemption
+with sufficient information about the involvement of human subjects to allow a determination that the
+claimed exemption is appropriate. Typically, recipients that are part of large clinical research networks
+or consortia that plan to add new protocols after the award must follow the awarding IC’s procedures for
+approval of new protocols. Institutions with award mechanisms that allow them to select new projects,
+typically small future research projects (e.g., pilot projects), for support by their NIH award are responsible for ensuring that the selected projects follow all relevant regulations and policies including those
+governing the involvement of human subjects in research, including prior approval from the  IRB if
+applicable. They must follow the awarding IC’s procedures for prior approval of new protocols and
+updating the IC on the status of funded projects in annual progress reports which are typically described
+in the NOFO and/or NoA.
+Recipients may not draw funds from the payment system, request funds from the paying office, or make
+obligations against Federal funds for research involving human subjects at any site engaged in nonexempt research for any period not covered by both an FWA and IRB approval consistent with 45 CFR
+Part 46. Costs associated with IRB review of human research protocols are not allowable as direct
+charges to NIH-funded research unless such costs are not covered by the organization’s indirect cost rate.
+
+The use of autopsy materials is governed by applicable State and local law and is not  regulated by 45
+CFR Part 46.
+4.1.16.1 Federalwide Assurance Requirements
+The Federalwide Assurance (FWA) commits the organization to compliance with the requirements set
+forth in 45 CFR Part 46, and the Terms of Assurance. Each institution that is engaged in HHS supported
+human subjects research must be covered by an FWA approved by OHRP.
+When an applicant organization proposes nonexempt research involving human subjects and does not
+have an FWA, the AOR signature on the application constitutes declaration that the organization will
+comply with 45 CFR Part 46 and proceed to obtain an FWA. The NIH awarding component will place a
+restriction in the NoA so that no human subjects research may be conducted under the award until the
+FWA and certification of IRB review and approval (or certification of institutional determination of
+exemption, if applicable) have been obtained and accepted by NIH.
+Each recipient institution must file its own FWA even if the organization does not operate its own IRB
+and designates another IRB for that purpose. IRBs must be registered with OHRP before the IRB may be
+designated on an FWA as reviewing proposed research for the FWA-holding institution.
+Organizations that will serve as additional performance sites that are engaged in nonexempt research
+involving human subjects under the award must obtain an FWA, or, under specified circumstance, may
+be covered by the recipient's FWA in accordance with the OHRP's Guidance on Extension of an FWA to
+Cover Collaborating Individual Investigators and Introduction of the Individual Investigator Agreement.
+It is the recipient organization’s responsibility to ensure that all sites engaged in research involving
+human subjects are covered by an appropriate FWA and have IRB approval consistent with 45 CFR Part
+46. It also is the recipient’s responsibility to comply with NIH prior approval requirements related to the
+addition of sites not included in the approved application (see Administrative Requirements—Changes in
+Project and Budget—Prior Approval Requirements). A list of organizations with approved assurances is
+available at the OHRP web site.
+(GPS page IIA-35)
+
+No individual may receive NIH grant funds for nonexempt research involving human subjects unless the
+individual is affiliated with or sponsored by an organization that assumes responsibility for the research
+under an FWA or the individual makes other arrangements with OHRP.
+Detailed information concerning FWAs is available on the OHRP web site.
+4.1.16.2 Certification of IRB Approval
+Recipients must provide a certification to NIH that all nonexempt research involving human subjects has
+been reviewed and approved by an appropriate IRB, consistent with 45 CFR Part 46 and OHRP guidance. NIH-funded sites in the United States cannot  rely on a non-US IRB; therefore, NIH will not accept
+an approval from a non-US IRB. The date of final IRB approval is the date that all protocols in the proposed research application received IRB review and approval (i.e., the date of the last protocol approval).
+When human subjects research is anticipated within the period of the award but definite plans for
+involvement of human subjects cannot be described in the application or proposal (referred to as
+"delayed onset human subjects research"), prior to the involvement of human subjects in nonexempt
+research, the recipient must submit to the NIH awarding IC for prior approval (1) detailed information as
+required in the Human Subjects and Clinical Trials Information Form of the application, as well as the
+certification and date of final IRB approval.  Note that NIH requires the date of final IRB approval; conditional IRB approval is not sufficient.  According to OHRP, in the case of IRB approval with conditions,
+IRB approval only becomes effective when the IRB has approved all information submitted in response
+to their conditions.
+Certification of IRB approval may be filed at any time before award in accord with Just-in-Time procedures, unless required earlier by the IC. Therefore, following peer review and notification of impact
+score/percentile, applicant organizations with OHRP FWAs may wish to proceed with IRB review for
+those protocols that have not yet received IRB approval and that apply to applications  in a fundable
+range.
+Under no circumstances may NIH-supported nonexempt research involving human subjects be initiated
+prior to obtaining IRB approval and providing the final IRB approval date to NIH. NIH will not allow
+any funds to be used by recipients where a certification and an IRB approval date has not been provided
+to the funding IC.
+Recipients are also reminded that any changes to study protocols that have been subject to peer review,
+as well as the addition of new study protocols, require the prior approval of the NIH awarding Institute
+or Center consistent with Section 8.1.2.5 of the NIHGPS.  Such requirements are also generally described
+in the Notice of Funding Opportunity and/or the Notice of Award.
+4.1.16.3 Reporting to Funding Agency and OHRP
+Under the HHS regulations, recipient institutions must establish and follow written procedures for ensuring prompt reporting to the IRB, appropriate institutional officials, and NIH of any unanticipated problem involving risks to subjects or others or any serious or continuing noncompliance with 45 CFR Part
+46 or IRB requirements or determinations; and any suspension or termination of IRB approval(revised
+Common Rule 45 CFR Part 46.108(a)(4) and pre-2018 Common Rule 45 CFR Part 46.103(b)(5)). Any
+IRB suspension or termination of approval must include a statement of the reasons for the IRB's action
+and must be reported promptly to the investigator, appropriate institutional officials, and NIH (45 CFR
+Part 46.113). Recipient institutions must also file incident reports promptly with OHRP of unanticipated
+problems involving risks to subjects or others, serious or continuing noncompliance with 45 CFR Part 46
+or with the requirements or determinations of the IRB, and suspension or termination of IRB approval.
+See OHRP's website, Guidance on Reporting Incidents to OHRP for more information.
+(GPS page IIA-36)
+
+4.1.16.4 OHRP Oversight
+OHRP has regulatory responsibility for oversight of recipient compliance with the HHS human subjects
+regulations. In carrying out this responsibility, OHRP evaluates all written allegations or indications of
+non-compliance with the HHS regulations it receives from any source. All compliance oversight evaluations are predicated on the HHS regulations and the organization’s assurance of compliance. Any corrective actions imposed as a result of a compliance oversight evaluation are intended to remedy
+identified non-compliance and prevent reoccurrence. Because each case is different, OHRP tailors corrective actions to foster the best interest of human research subjects and, to the extent possible, of the
+organization, research community, and HHS. Most compliance oversight evaluations and resultant corrective actions are resolved at the OHRP level. However, OHRP may recommend actions to be taken by
+other HHS officials.
+Information about the FWA submission process and about OHRP activities related to oversight and compliance, as well as copies of the human subjects regulations, may be obtained from OHRP at the address
+shown in Part III or from the OHRP home page.
+4.1.16.5 Education in the Protection of Human Research Participants
+Before funds are awarded for competing applications involving human subjects, applicants must submit
+documentation that all senior/key personnel involved in human subjects research have received training
+in the protection of human subjects. Senior/key personnel include all individuals responsible for the
+design or conduct of the study, including senior/key personnel of all sites involved in research activities.
+This documentation should be included in the cover letter signed by the AOR that accompanies the
+description of other support, IRB and IACUC approval, and other information submitted prior to funding
+in accordance with Just-in-Time procedures. For non-competing continuation awards, the description of
+education for new senior/key personnel should be part of the progress report submitted as a prerequisite
+to award. Additional information about this education requirement is available on the Training &
+Resources – Human Subjects page of the NIH Grants & Funding website.
+4.1.16.6 Data and Safety Monitoring
+The NIH policy for data and safety monitoring requires oversight and monitoring of all NIH-conducted
+or -supported human biomedical and behavioral intervention studies (clinical trials) to ensure the safety
+of participants and the validity and integrity of the data. NIH policies on data and safety monitoring specify that the level and frequency of monitoring should be commensurate with the risks, nature, size, and
+complexity of the clinical trial, and are in addition to any monitoring requirements imposed by FDA.
+There are a number of options for monitoring clinical trials including, but not limited to, monitoring by
+a/an:
+ l PD/PI (required),
+ l IRB (required),
+ l Independent individual/safety officer,
+ l Designated medical/research monitor,
+ l Internal committee or board with explicit guidelines,
+ l DSMB (required for multi-site trials).
+Applications that include clinical trials must include a general description of the data and safety monitoring plan. The description of the data and safety monitoring plan in competing applications will be
+reviewed by the SRG. A general description of a monitoring plan establishes the overall framework for
+data and safety monitoring. It must describe the entity that will be responsible for monitoring how
+(GPS page IIA-37)
+
+adverse events will be reported to the IRB and NIH and, when appropriate, how NIH Guidelines and
+FDA regulations for INDs and IDEs will be satisfied.
+A detailed monitoring plan must be included as part of the research protocol, be submitted to the  IRB,
+and be reviewed and approved by the NIH awarding IC prior to the accrual of human subjects. The
+awarding IC may specify the reporting requirements for adverse events, which are in addition to the
+annual report to the IRB. The clinical trial monitoring function is above and beyond that traditionally
+provided by IRBs; however, the IRB must be cognizant of the procedures used by clinical trial monitoring entities and the monitor must provide periodic reports to investigators for transmittal to the IRB.
+NIH specifically requires the establishment of DSMBs for multi-site clinical trials involving interventions that entail potential risk to the participants, and generally for Phase III clinical trials. Although
+Phase I and Phase II clinical trials also may use DSMBs, smaller clinical trials may not require this oversight format, and alternative monitoring plans may be appropriate.
+For multi-site Phase I and II trials, investigators should organize a central reporting entity that will be
+responsible for preparing timely summary reports of adverse events for distribution among sites and the
+IRBs of participating sites. The frequency of summary reports will depend on the nature of the trial.
+Organizations with a large number of clinical trials may develop standard monitoring plans for Phase I
+and II clinical trials. However, such plans always should be evaluated for appropriateness for the particular investigation.
+All multi-site trials with DSMBs are expected to forward summary reports of adverse events to each
+responsible IRB so they can address as appropriate to their responsibility reports related to the site.
+Recipients should address questions on this subject to the NIH PO.
+Further information concerning these requirements is found on the NIH Human Subjects Research website and in the SF424 (R&R) application instructions, see section G.500 – PHS Human Subjects and Clinical Trials Information.
+4.1.16.7 Inclusion of Individuals Across the Lifespan as Participants in Research
+Involving Human Subjects
+For all competing grant applications, individuals of all ages, including children (i.e. individuals under the
+age of 18) and older adults (i.e., individuals 65 years of age or older), must be included in all human subjects research, conducted or supported by NIH, unless there are scientific or ethical reasons not to
+include them.  The inclusion of individuals across the lifespan as subjects in research must be in compliance with all applicable subparts of 45 CFR Part 46 as well as with other pertinent federal laws and
+regulations.
+Applications or proposals for research involving human subjects must address the age-appropriate inclusion or exclusion of individuals in the proposed research project.  Applications must include a description
+of plans for including individuals across the lifespan, including a rationale for selecting the specific age
+range justified in the context of the scientific question proposed.  If individuals will be excluded from the
+research based on age, the recipient / offeror must provide an acceptable justification for the exclusion.
+Scientific review groups at NIH will assess each application as being "acceptable" or "unacceptable"
+with regard to the age-appropriate inclusion or exclusion of individuals in the research project, in addition to evaluating the plans for conducting the research in accord with these provisions.  NIH staff will
+monitor implementation of this policy during the development, review, award and conduct of research;
+and manage the NIH research portfolio to comply with the policy.
+NIH recipients must submit data on participant age at enrollment in progress reports.  Investigators planning to conduct research involving human subjects should design their studies in such a way that de-
+(GPS page IIA-38)
+
+identified individual-level participant data on sex, race, ethnicity, and age at enrollment may be provided
+to NIH in progress reports.
+4.1.16.8 Inclusion of Women and Members of Racial and/or Ethnic Minority
+Groups in Clinical Research
+In accordance with Public Health Service Act sec. 492B, 42 U.S.C. sec. 289a-2, All NIH-funded or supported clinical research projects must address the inclusion of women and members of racial and/or ethnic minority groups and their subgroups developing a research design appropriate to the scientific
+objectives of the study. The research plan/proposal should describe the composition of the proposed
+study populations in terms of sex and race and/or ethnicity groups and provide a rationale for selection
+of such participants. Investigators should also plan for appropriate outreach programs and activities to
+recruit the proposed study population consistent with the purposes of the research project. This policy
+applies to research participants of all ages in all NIH-supported clinical research studies (see definition
+of clinical research).
+Exceptions to this inclusion requirement may be granted the relevant NIH Institute / Center / Office
+(IC/ICO) Director if a clear rationale and compelling justification establishes that inclusion is inappropriate with respect to the health of the participants or the purpose of the research. Exclusion under
+other circumstances may be made by the NIH Director, upon the recommendation of an IC/ICO Director
+based on a compelling rationale and justification.
+Cost is not an acceptable reason for exclusion, except when inclusion would duplicate existing data from
+other sources. Women of childbearing potential should not be routinely excluded from participation in
+clinical research. The policy applies to research subjects of all ages in NIH-supported clinical research
+studies (see definition of clinical research). The inclusion of individuals on the basis of sex, race, and ethnicity  must be addressed in developing a research design appropriate to the scientific objectives of the
+study. A proposed outreach program for recruiting should also be included.
+If the proposed research project includes an NIH-defined Phase III clinical trial, investigators must comply with the special considerations related to the application / proposal, progress reports, and registering
+and reporting in ClinicalTrials.gov requirements and consider whether clinically important sex, racial,
+and/or ethnic differences in the intervention effect are to be expected and plan the research accordingly.
+When registering in Clincialtrials.gov, applicable clinical trials as defined in 42 C.F.R. Part 11, that are
+also NIH-defined Phase III clinical trials must specify outcomes on sex and race and/or ethnicity, as
+required based on prior evidence, and as explained in the Inclusion of Women and Members of Racial
+and/or Ethnic Minority Groups in Clinical Research topic page.  For applicable clinical trials that are also
+NIH-defined Phase III clinical trials, submissions of results to Clinicaltrials.gov must include results of
+valid analyses by sex and/or ethnicity, as required based on prior evidence.
+Investigators must also collect and annually report information on sex, race, and ethnicity in clinical
+research studies. The OMB minimum standards for maintaining, collecting, and presenting data on race
+and ethnicity for all grant projects are described in OMB Directive No. 15 update.
+For more information on policies and procedures related to inclusion: Inclusion Procedures
+4.1.16.9 Good Clinical Practice Training for NIH Recipients Involved in NIH-funded
+Clinical Trials
+NIH expects that all NIH-funded investigators and staff who are involved in the conduct, oversight, or
+management of clinical trials to be trained in Good Clinical Practice (GCP), consistent with principles of
+the International Conference on Harmonization (ICH) E6 (R3).
+(GPS page IIA-39)
+
+The principles of GCP help assure the safety, integrity, and quality of clinical trials. GCP provides a
+standard for ensuring clinical trial compliance, implementation, data collection, monitoring, and reporting (e.g., safety data, accrual reports, study status, protocol deviations, or final data), and outline the
+responsibilities of Institutional Review Boards (IRBs), investigators, sponsors and monitors.  GCP
+addresses elements related to the design, conduct and reporting of clinical trials.
+GCP principles constitute an international ethical and scientific quality standard for designing, conducting, recording, and reporting clinical trials.  The principles were developed in 1996 by the ICH in collaboration with representatives from the European Union, Japan, and the United States.  The U.S. Food
+and Drug Administration (FDA) requires GCP compliance for studies conducted under an investigational
+new drug application or investigational device exemption.
+GCP describes the responsibilities of investigators, sponsors, monitors and IRBs in the conduct of clinical trials.  Compliance with GCP provides assurance that the rights, safety and well-being of human subjects are protected, that clinical trials are conducted in accordance with approved plans with rigor and
+integrity, and that data derived from clinical trials are reliable.
+GCP training complements other required training on protections for human research participants.  Since
+June 2000, the NIH Extramural Research Program has required training on protections for human
+research participants for all NIH-funded investigators and individuals responsible for the design or conduct of NIH funded research involving human subjects.
+The GCP policy applies to NIH-funded investigators and clinical trial site staff who are responsible for
+the conduct, management and oversight of NIH-funded clinical trials. GCP training includes the Principles of ICH GCP found in Section 2 of ICH E6. GCP training may be achieved through a class or
+course, academic training program, or certification from a recognized clinical research professional
+organization. See the NIH Grants & Funding Good Clinical Practice Training page for examples of
+acceptable GCP courses. Completion of GCP training will demonstrate that individuals have attained the
+fundamental knowledge of clinical trial quality standards for designing, conducting, recording and reporting trials that involve human research participants.  GCP training should be refreshed at least every three
+years in order remain current with regulations, standards and guidelines. Recipients of GCP training are
+expected to retain documentation of their training, and make it available to NIH upon request.
+For purposes of Good Clinical Practice training the following definitions apply:
+Investigator: The individual responsible for the conduct of the clinical trial at a trial site. If a clinical
+trial is conducted by a team of individuals at a trial site, the investigator is the responsible leader of the
+team and may be called the principal investigator.
+Clinical trial staff: Individuals, identified by the investigator, who are responsible for study coordination, data collection and data management. The central focus of clinical trial staff is to manage participant recruitment and enrollment, to maintain consistent study implementation, data management, and
+to ensure integrity and compliance with regulatory and reporting requirements. These individuals may
+also seek informed consent from prospective participants, enroll and meet with research participants, and
+collect and record information from research participants. Clinical trial staff may also be called the
+research coordinator, study coordinator, research nurse, study nurse or sub-investigator.
+4.1.16.10 NIH Policy on the Use of a Single Institutional Review Board for Multi-
+Site Research
+NIH requires sites located in the United States engaged in NIH-funded, multi-site research conducted at
+more than one domestic site to rely upon approval by a single Institutional Review Board (sIRB) as
+required by the Revised Common Rule (rCR) at 45 CFR Part 46.114 and NIH sIRB Policy, including
+projects supported by career development (K) and fellowship (F) awards with initial IRB approval on or
+(GPS page IIA-40)
+
+after January 20, 2020. NIH expects the domestic sites in NIH-funded, multi-site studies to rely on a US
+sIRB (located in the United States). Foreign sites participating in NIH-funded, multi-site studies will not
+be expected to use a single IRB. This includes collaborative international research projects
+NIH applicants whose research is subject to the sIRB requirements must provide the name of the sIRB
+during the Just-in-Time period, before the award is issued. If, in delayed-onset research, an sIRB has not
+yet been identified, the recipient will provide the name of the sIRB to the funding NIH Institute/Center
+(IC) prior to initiating the multi-site research study/project.
+The applicant may request direct cost funding for the additional costs associated with the establishment
+and review of the multi-site study/project by the sIRB, with appropriate justification; all such costs must
+be reasonable and consistent with cost principles, as described in Chapter 7 (Cost Consideration) and in
+case of for-profit organizations the Federal Acquisition Regulation (FAR) 31.302 (Direct Costs) and
+FAR 31.203 (Indirect Costs).
+Recipients are responsible for ensuring that authorization agreements are in place. Copies of authorization agreements and other necessary documentation should be maintained to document compliance, as
+needed. As appropriate, recipients are responsible for ensuring that a mechanism for communication
+between the sIRB and participating sites is established.
+All sites participating in multi-site research studies/projects subject to the sIRB requirements are expected to rely on an sIRB to carry out the functions that are required for institutional compliance with IRB
+review set forth in the HHS regulations at 45 CFR Part 46. Participating sites are responsible for meeting
+all other regulatory obligations.
+NIH sIRB policy does not prohibit participating sites from also reviewing the research under the applicable regulatory framework. This additional review, even if performed by the institution's IRB, is not the
+regulatory review of the research as that responsibility still remains with the sIRB. If this approach is
+taken, NIH funds may not be used to pay for the cost of the duplicate review
+4.1.17 Investigational New Drug Applications/Investigational Device
+Exceptions
+To be eligible for NIH funding, all clinical research involving investigational drugs and devices, or other
+products regulated by the FDA, must comply with all applicable FDA requirements, including those for
+INDs, IDEs, and human subjects protections. Among other provisions, FDA regulations for human subjects protections are published in 21 CFR Parts 50 and 56 with additional standards found in Parts 312
+and 812.
+When applicable, the sponsor of the IND/IDE, whether NIH, a recipient, or a third party, is legally
+responsible for meeting the FDA requirements for sponsors. If the sponsor is also the PI, then the sponsor will need to satisfy FDA’s requirements for sponsor-investigators. If the IND/IDE sponsor is a third
+party, such as a pharmaceutical company or research organization under contract to a recipient or to a
+pharmaceutical company, the legal responsibility for monitoring the clinical trial and reporting to FDA
+rests with the sponsor rather than the recipient. This generally will be the case for larger, multi-site clinical trials. If the recipient is the IND/IDE holder, commonly referred to as an “investigator-initiated
+IND/IDE,” the recipient or the investigator serves as the sponsor and assumes the legal responsibility. In
+any case, the recipient is ultimately responsible to NIH for ensuring compliance with the applicable
+requirements for protection of human subjects, including compliance with FDA’s requirements.
+Following the filing of an IND, FDA has a 30-day period in which to review it. FDA may allow the IND
+to proceed or may defer approval of the IND until changes it deems acceptable are made. FDA also may
+(GPS page IIA-41)
+
+order a clinical trial to be suspended or terminated, at any time, based on information it receives about
+that clinical trial.
+When NIH funds any part of a clinical study involving an IND or an IDE, NIH must be knowledgeable
+about any significant communications with FDA concerning the study. The recipient organization must
+report certain types of FDA communications to the NIH awarding IC within 72 hours of receiving a
+copy of, or upon being informed of, the FDA communication (through the PD/PI or another person acting on behalf of the recipient), whichever occurs first. This notification requirement applies to any of the
+following communications from FDA with the sponsor of the IND or IDE:
+ l Warning letters (whether sent to the recipient or to the for-profit sponsor)
+ l Notices of Initiation of Disqualification Proceedings and Opportunity to Explain
+ l Notice of Opportunity for Hearing
+ l Notice of Disqualification
+ l Consent Agreements
+ l Clinical hold letters that pertain to breaches of good manufacturing practices, good clinical practices, or other major issue requiring significant changes in the protocol.
+The notification should be made in writing, but also may be done by telephone if a written notice would
+delay the notification. It should include a statement of the action taken or contemplated and the assistance needed to resolve the situation. These requirements apply to the recipient even if the recipient or the
+NIH-funded PD/PI is the sponsor. Failure to comply with this requirement may result in NIH imposing a
+corrective and/or enforcement action (see Administrative Requirements—Enforcement Actions). FDA
+communications are considered grant-related records for purposes of retention and access (see Administrative Requirements—Monitoring—Record Retention and Access).
+4.1.18 Lobbying Prohibition
+Recipients of Federal grants, cooperative agreements, contracts, and loans are prohibited by 31 U.S.C.
+1352, “Limitation on use of appropriated funds to influence certain Federal contracting and financial
+transactions,” from using appropriated Federal funds to pay any person for influencing or attempting to
+influence any officer or employee of an agency, a Member of Congress, an officer or employee of Congress, or an employee of a Member of Congress with respect to the award, continuation, renewal, amendment, or modification of any of these instruments. These requirements are implemented for HHS in 45
+CFR Part 93, which also describes types of activities, such as legislative liaison activities and professional and technical services, which are not subject to this prohibition under certain circumstances.
+Applicants for NIH awards are required to certify and disclose that they:
+ l have not made, and will not make, such a prohibited payment;
+ l used or will use non-appropriated funds if they have made or agreed to make such payment; and
+ l will include these requirements in consortium agreements and contracts under grants that will
+exceed $100,000 and obtain necessary certifications from those consortium participants and contractors.
+Certifications and disclosures must be filed at the times prescribed in the regulations based on the expected total costs.
+(GPS page IIA-42)
+
+The signature of the AOR on the application serves as the required certification of compliance for the
+applicant organization. Disclosure reporting is addressed in Administrative Requirements—Monitoring—
+Reporting.
+See also Appropriation Public Policy Requirements Mandates Lobbying—Appropriation Prohibition for
+additional restrictions.
+4.1.19 Metric System
+Consistent with EO 12770 (July 25, 1991), Metric Usage in Federal Government Programs, measurement values in applications and recipient-prepared reports, publications, and other grant-related documents should be in metric. See Construction Grants chapter in IIB for requirements for metric usage in
+construction activities.
+4.1.20 Military Recruiting and Reserve Officer Training Corps Program
+Access to Institutions of Higher Education
+Section 588 of the National Defense Authorization Act of 1995, amended (10 U.S.C. §983), precludes
+NIH grant awards to institutions of higher education that DoD determines have an anti-Reserve Officer
+Training Corps (ROTC) policy or practice (regardless of when implemented) that either prohibits or, in
+effect, prevents the Secretary of Defense from gaining entry to campuses or access to students or information for military recruiting. DoD publishes each determination of ineligibility in the Federal Register as
+well as publishing, once every 6 months, a list of all currently ineligible schools. If DoD determines that
+an institution is ineligible during an ongoing project period, NIH will suspend support of current and
+future grant awards as provided in Administrative Requirements—Enforcement Actions—Suspension,
+Termination, and Withholding of Support. Funding eligibility may be restored on the basis of new
+information provided by DoD.
+4.1.21 National Environmental Policy Act
+All NIH grants, whether or not they include construction or major A&R activities, are subject to the
+requirements of the National Environmental Policy Act (NEPA) of 1969, as amended. This Act requires
+Federal agencies to consider the reasonably foreseeable environmental consequences of all grant-supported activities. As part of NIH’s implementation of this Act, recipients are required to promptly notify
+NIH of any reasonably foreseeable impacts on the environment from grant-supported activities, or certify
+that no such impacts will arise upon receipt of a grant award. In addition, NIH has determined that most
+NIH research grants are not expected to individually or cumulatively have a significant effect on the
+environment unless any part of the proposed research and/or project includes one or more of the following categorical exclusions listed below:
+ 1. The potential environmental impacts of the proposed research may be of greater scope or size
+than other actions included within a category.
+ 2. The proposed research threatens to violate a Federal, State, or local law established for the protection of the environment or for public health and safety.
+ 3. Potential effects of the proposed research are unique or highly uncertain.
+ 4. Use of especially hazardous substances or processes is proposed for which adequate and accepted controls and safeguards are unknown or not available.
+ 5. The proposed research may overload existing waste treatment plants due to new loads (volume,
+chemicals, toxicity, additional hazardous wasted, etc.)
+(GPS page IIA-43)
+
+6. The proposed research may have a possible impact on endangered or threatened species.
+ 7. The proposed research may introduce new sources of hazardous/toxic wastes or require storage
+of wastes pending new technology for safe disposal.
+ 8. The proposed research may introduce new sources of radiation or radioactive materials.
+ 9. Substantial and reasonable controversy exists about the environmental effects of the proposed
+research.
+This requirement is in addition to other public policy requirements for grants for construction and alteration and renovation activities discussed more fully in the Construction chapter — Construction, Modernization, or Major Alteration and Renovation of Research Facilities—Public Policy Requirements.
+4.1.22 Nondelinquency on Federal Debt
+The Federal Debt Collection Procedures Act of 1990 (Act), 28 U.S.C. 3201(e), provides that an organization or individual that is indebted to the United States, and has a judgment lien filed against it, is
+ineligible to receive a Federal grant. NIH cannot award a grant unless the AOR of the applicant organization (or individual in the case of a Kirschstein-NRSA individual fellowship) certifies, by means of
+their signature on the application, that the organization (or individual) is not delinquent in repaying any
+Federal debt. If the applicant discloses delinquency on a debt owed to the Federal government, NIH may
+not award the grant until the debt is satisfied or satisfactory arrangements are made with the agency to
+which the debt is owed. In addition, once the debt is repaid or satisfactory arrangements made, NIH will
+take that delinquency into account when determining whether the applicant would be a responsible NIH
+grant recipient.
+Anyone who has been judged to be in default on a Federal debt and who has had a judgment lien filed
+against them should not be listed as a participant in an application for an NIH grant until the judgment is
+paid in full or is otherwise satisfied. No funds may be used for or rebudgeted following an award to pay
+such an individual. NIH will disallow costs charged to awards that provide funds to individuals in violation of this Act.
+These requirements apply to all types of organizations and awards, including foreign grants.
+4.1.23 President's Emergency Plan for AIDS Relief (PEPFAR) Program
+4.1.23.1 PEPFAR Agreements
+Specific terms and conditions concerning prostitution and sex trafficking apply to all grants awarded
+under the U.S. President’s Emergency Plan for AIDs Relief (PEPFAR) program.  These are:
+ A. The U.S. Government is opposed to prostitution and related activities, which are inherently harmful and dehumanizing, and contribute to the phenomenon of trafficking in persons. None of the
+funds made available under this agreement may be used to promote or advocate the legalization
+or practice of prostitution or sex trafficking. Nothing in the preceding sentence shall be construed to preclude the provision to individuals of palliative care, treatment, or post-exposure pharmaceutical prophylaxis, and necessary pharmaceuticals and commodities, including test kits,
+condoms, and, when proven effective, microbicides.
+(GPS page IIA-44)
+
+B. The following definitions apply for purposes of this provision:
+ 1. “Commercial sex act” means any sex act on account of which anything of value is given
+to or received by any person.
+ 2. “Prostitution” means procuring or providing any commercial sex act and the “practice of
+prostitution” has the same meaning.
+ 3. “Sex trafficking” means the recruitment, harboring, transportation, provision, or obtaining of a person for the purpose of a commercial sex act.
+ C. The Recipient must insert this provision, which is a standard provision, in all subawards or subcontracts.
+ D. This provision includes express terms and conditions of the award and any violation of it is
+grounds for unilateral termination of the award by NIH prior to the end of its term.
+4.1.23.2 PEPFAR Agreements Between the U.S. Government and Foreign Non-
+Governmental Organizations (NGOs)
+Additional requirements regarding the opposition to prostitution and sex trafficking may be applied to
+grants awarded under PEPFAR and issued to foreign Non-Governmental Organizations (NGOs) directly
+supported by or subrecipients of U.S. public or private NGOs.  Subject to the United States Supreme
+Court’s decision in Agency for International Development, et al., v. Alliance for Open Society International, Inc., et al.,  133 S. Ct. 2321 (2013) and subsequent proceedings, the terms and conditions for
+such agreements with foreign NGOs may include the following:
+ A. The U.S. Government is opposed to prostitution and related activities, which are inherently harmful and dehumanizing, and contribute to the phenomenon of trafficking in persons. None of the
+funds made available under this agreement may be used to promote or advocate the legalization
+or practice of prostitution or sex trafficking. Nothing in the preceding sentence shall be construed to preclude the provision to individuals of palliative care, treatment, or post-exposure pharmaceutical prophylaxis, and necessary pharmaceuticals and commodities, including test kits,
+condoms, and, when proven effective, microbicides.
+(GPS page IIA-45)
+
+B.
+ 1. Except as provided in (B)(2) and (B)(3), by accepting this award or any subaward, a
+non-governmental organization or public international organization recipient / subrecipient agrees that it is opposed to the practices of prostitution and sex trafficking
+because of the psychological and physical risks they pose for women, men, and children.
+Any enforcement of this clause is subject to Agency for International Development, et
+al., v. Alliance for Open Society International, Inc., et al.,  133 S. Ct. 2321 (2013) and
+subsequent proceedings.
+ 2. The following organizations are exempt from (B)(1): the Global Fund to Fight AIDS,
+Tuberculosis and Malaria; the World Health Organization; the International AIDS Vaccine Initiative; and any United Nations agency.
+ 3. Contractors and subcontractors are exempt from (B)(1) if the contract or subcontract is
+for commercial items and services as defined in FAR 2.101, such as pharmaceuticals,
+medical supplies, logistics support, data management, and freight forwarding.
+ 4. Notwithstanding section (B)(3), not exempt from (B)(1) are recipients, subrecipients,
+contractors, and subcontractors that implement HIV/AIDS programs under this assistance award, any subaward, or procurement contract or subcontract by:
+ i. Providing supplies or services directly to the final populations receiving such supplies or services in host countries;
+ ii. Providing technical assistance and training directly to host country individuals or
+entities on the provision of supplies or services to the final populations receiving
+such supplies and services; or
+ iii. Providing the types of services listed in FAR 37.203(b)(1)-(6) that involve giving
+advice about substantive policies of a recipient, giving advice regarding the activities referenced in (i) and (ii), or making decisions or functioning in a recipient’s
+chain of command (e.g., providing managerial or supervisory services approving
+financial transactions, personnel actions).
+ C. The following definitions apply for purposes of this provision:
+ 1. “Commercial sex act” means any sex act on account of which anything of value is given
+to or received by any person.
+ 2. “Prostitution” means procuring or providing any commercial sex act and the “practice of
+prostitution” has the same meaning.
+ 3. “Sex trafficking” means the recruitment, harboring, transportation, provision, or obtaining
+of a person for the purpose of a commercial sex act. 22 U.S.C. 7102(9).
+ D. The recipient shall insert this provision, which is a standard provision, in all subawards, procurement contracts or subcontracts.
+ E. This provision includes express terms and conditions of the award and any violation of it shall
+be grounds for termination of the award by NIH prior to the end of its term.
+4.1.24 Pro-Children Act of 1994
+Public Law 103-227, Title X, Part C, Environmental Tobacco Smoke, also known as the Pro-Children
+Act of 1994, imposes restrictions on smoking in facilities where federally funded children’s services are
+provided. NIH grants are subject to these requirements only if they meet the Act’s specified coverage.
+The Act specifies that smoking is prohibited in any indoor facility (owned, leased, or contracted for)
+used for the routine or regular provision of kindergarten, elementary, or secondary education or library
+(GPS page IIA-46)
+
+services to children under the age of 18. In addition, smoking is prohibited in any indoor facility or portion of a facility (owned, leased, or contracted for) used for the routine or regular provision of federally
+funded health care, day care, or early childhood development (Head Start) services to children under the
+age of 18. The statutory prohibition also applies if such facilities are constructed, operated, or maintained
+with Federal funds. The statute does not apply to children’s services provided in private residences, facilities funded solely by Medicare or Medicaid funds, portions of facilities used for inpatient substance or
+alcohol treatment, or facilities where Women, Infants and Children (WIC) coupons are redeemed. Failure
+to comply with the provisions of the law may result in the imposition of a civil monetary penalty of up
+to $1,000 per violation and/or the imposition of an administrative compliance order on the responsible
+entity.
+Because of the nature of NIH programs and funding, individual transactions, rather than entire programs,
+may be subject to these requirements. The signature of the AOR will indicate the intent to comply. Any
+questions concerning the applicability of these provisions to an NIH grant should be directed to the
+GMO.
+4.1.25 Public Health Security
+4.1.25.1 Public Health Security and Bioterrorism Preparedness and Response Act
+(Select Agents)
+The Public Health Security and Bioterrorism Preparedness and Response Act of 2002, 42 U.S.C. 201, is
+designed to provide protection against misuse of select agents and toxins whether inadvertent or the result of terrorist acts against the U.S. homeland or other criminal acts. The Act was implemented, in part,
+through regulations published by HHS and USDA at 42 CFR Part 73, 9 CFR Part 121 and 7 CFR Part
+331 or commonly referred to as “Select Agent Regulations.” Copies of these regulations are available
+here, or can be obtained from CDC, 1600 Clifton Road, MS A-46, Atlanta, GA 30333; telephone: 404-
+718-2000.
+Research involving select agents and recombinant or synthetic nucleic acid molecules also is subject to
+NIH Guidelines for Research Involving Recombinant or Synthetic Nucleic Acid Molecules (NIH
+Guidelines).  NIH Guidelines apply to all research projects (NIH-funded and non-NIH-funded) that
+involve recombinant or synthetic nucleic acid molecules and are conducted at or sponsored by an organization that receives NIH support for recombinant or synthetic nucleic acid molecule research.
+4.1.25.1.1 Select Agents
+4.1.25.1.1.1 Select Agent Awards to U.S. Institutions
+Domestic recipients who conduct research involving select agents or toxins (see Section 3 and 4 of 42
+CFR Part 73 and 9 CFR Part 121 and Section 3 of 7 CFR Part 331) must maintain a registration with
+CDC (or USDA, depending on the agent) before using NIH funds. No funds can be used for research
+involving select agents or toxins if the registration certificate maintained by CDC or USDA is suspended
+or revoked.
+4.1.25.1.1.2 Select Agent Awards to Foreign Organizations and International Organizations
+Foreign Organizations and International Organizations who conduct research involving select agents (see
+42 CFR Part 73 for the select agent list; and 7 CFR Part 331 and 9 CFR Part 121 for the relevant animal
+and plant pathogens) must provide information satisfactory to NIH that a process equivalent to that
+described in 42 CFR Part 73 for U.S. institutions is in place and will be administered on behalf of all
+(GPS page IIA-47)
+
+select agent work sponsored by NIH funds before using these funds for any work directly involving
+select agents. Recipients must be willing to address the following key elements appropriate for their institutions: safety, security, training, procedures for ensuring that only approved/appropriate individuals
+have access to the select agents, and any applicable laws, regulations and policies equivalent to 42 CFR
+Part 73. If this work will not, in fact, involve select agents (e.g. excluded strains), and you provide documentation satisfactory to NIH that your work does not now nor will it in the future (i.e. throughout the
+life of the award) involve select agents, no further action will be necessary.
+4.1.25.1.1.3 Select Agent Awards to U.S. Institutions with Foreign Subcomponents
+Recipients who conduct research involving select agents (see 42 CFR Part 73 for the select agent list;
+and 7 CFR Part 331 and 9 CFR Part 121 for the relevant animal and plant pathogens) must complete
+registration with CDC (or USDA, depending on the agent) before using NIH funds for any work directly
+involving the select agent at the U.S. institution. No funds can be used for research involving select
+agents if the final registration certificate is denied. Before using NIH funds for any work directly
+involving the select agents at a foreign subrecipient, the U.S. recipient must provide information from
+the foreign organization satisfactory to NIH that a process equivalent to that described in 42 CFR Part 73
+for U.S. institutions is in place and will be administered on behalf of all select agent work sponsored by
+these funds. Recipients must be willing to address the following key elements appropriate for the foreign
+organization: safety, security, training, procedures for ensuring that only approved/appropriate individuals have access to the select agents, and any applicable laws, regulations and policies equivalent to
+42 CFR Part 73 are followed. If this work will not, in fact, involve select agents (e.g. excluded strains),
+and you provide documentation satisfactory to NIH that your work does not now nor will it in the future
+(i.e. throughout the life of the award) involve select agents, no further action will be necessary.
+4.1.25.2 Dual Use Research of Concern
+On September 24, 2014, the Federal government issued a policy for the oversight of life sciences “Dual
+Use Research of Concern” (DURC).  DURC is defined as life sciences research that, based on current
+understanding, can be reasonably anticipated to provide knowledge, information, products, or technologies that could be directly misapplied to pose a significant threat with broad potential consequences
+to public health and safety, agricultural crops and other plants, animals, the environment, materiel, or
+national security.
+The DURC policy applies to recipient institutions and its investigators in the United States that receive
+Federal funding for life sciences research and that conduct or sponsor research involving one or more of
+the 15 agents or toxins listed in the policy and to foreign recipients that receive Federal funding to conduct or sponsor research involving one of these 15 agents or toxins.  Institutions must establish an Institutional Review Entity (IRE) which must review research involving these agents or toxins to determine if
+it involves one or more of the listed experimental effects and if so, whether it meets the definition of
+DURC. Recipients also must establish an Institutional Contact for Dual Use Research (ICDUR), as
+required by the U.S. Government’s DURC Policy, to serve as an internal resource for issues regarding
+compliance with and implementation of the requirements for the oversight of research that falls within
+the scope of the DURC policy role. The award recipient must maintain records of institutional DURC
+reviews and completed risk mitigation plans for the term of the research grant or contract plus three
+years after its completion, but no less than eight years, unless a shorter period is required by law or regulation.
+For research that may be considered DURC, NIH will work collaboratively with the institution and
+investigators to develop a risk mitigation plan, which may be implemented through a term of award and
+that NIH must approve.
+(GPS page IIA-48)
+
+4.1.25.3 Agents Regulated Under the Chemical Weapons Convention
+The United States is one of 175 States Parties to the Chemical Weapons Convention (CWC), which prohibits the development, production, stockpiling, and use of chemical weapons (CW). The CWC does not
+prohibit production, processing, consumption, or trade of related chemicals for peaceful purposes, but it
+does establish a verification regime to ensure such activities are consistent with the object and purpose of
+the treaty.
+NIH researchers engaged in activities involving these chemicals, especially Schedule 1 chemicals, may
+be required to submit declarations and/or reports to the Bureau of Industry and Security (BIS) and may
+be subject to inspection by the Organization for the Prohibition of Chemical Weapons, which administers
+the CWC. In addition, trade in certain chemicals with States not Party to the CWC may be prohibited or
+subject to an export license and or end-use certificate.
+Schedule 1 chemicals include, but are not limited to, the toxic chemicals sarin, soman, tabun, VX, sulfur
+mustards, Lewisites, saxitoxin, ricin, and nitrogen mustards.  More information about the U.S. CWC,
+including complete lists of Schedule 1, 2, and 3 chemicals under the CWC may be found at on the U.S.
+Chemical Weapons Convention website. Federal regulations that apply to the CWC are 15 CFR
+CHAPTER VII, SUBCHAPTER B, PARTS 710-722, SUBCHAPTER C, PARTS 730-774; 22 CFR
+CHAPTER I, PART 103, PARTS 120-130. These CRFs and other applicable safety standards issued by
+the Department of Commerce and Department of State are available on the Chemical Weapons Conventions Regulations webpage.
+4.1.25.4 Procurement of Synthetic Nucleic Acids and Benchtop Nucleic Acid Synthesis Equipment
+Effective April 26, 2025, NIH funds may only be used to procure synthetic nucleic acids or benchtop
+nucleic acid synthesis equipment from sources adhering to the 2024 OSTP Framework for Nucleic Acid
+Synthesis Screening (Framework), or successor frameworks. NIH requires recipients to maintain appropriate documentation at the time of procurement in accordance with record retention requirements (See 2
+CFR 200.334). Supporting documentation must be made available to NIH upon request, in accordance
+with 2 CFR 200.337. For more information, and definitions for synthetic nucleic acids and benchtop nucleic acid synthesis equipment subject to these requirements, see the Framework or successor frameworks.
+Further guidance can be found in the HHS 2023 Screening Framework Guidance for Providers and Users
+of Synthetic Nucleic Acids and Companion Guide.
+4.1.26 Reporting and Assurance Requirements for Institutions Receiving Awards for Training of Graduate Students for Doctoral Degrees
+As required by Section 403C of the Public Health Service Act, each institution receiving an NIH award
+for the training of graduate students for doctoral degrees must provide information on completion rates
+and time to degree to all applicants to doctoral programs supported by NIH training awards. Specifically,
+institutions must provide applicants with the following information for the programs to which they
+apply:
+ l The percentage of students admitted for study who successfully attain a doctoral degree, and
+ l The average time (not including any leaves of absence) between the beginning of graduate study
+and the receipt of a doctoral degree.
+Institutions affected by this Assurance and information disclosure requirement are doctoral degree granting institutions that receive any of the following institutional training grant awards or cooperative agreements from NIH for the doctoral training of graduate students:
+(GPS page IIA-49)
+
+l D43, TU2, T15, T32, T37, T90, U2R, U90, and U54/TL1
+Institutions are not affected by this requirement if they:
+ l Receive only individual NIH fellowship awards.
+ l Provide training only to undergraduate or master’s level students supported through one of the
+activity codes listed above.
+ l Provide only short-term training to doctoral-level health professional students through one of the
+activity codes listed above.
+ l Receive an award for one or more of the activity codes for doctoral training of graduate students,
+but do not confer doctoral degrees themselves (e.g., teaching hospitals).
+ l Receive an institutional training grant award for doctoral training of graduate students from a
+Public Health Service Agency other than NIH.
+In complying with this Assurance and information disclosure requirement, institutions may decide how
+best to present the required information to applicants and may wish to consider consolidating data by
+department or broad program to which candidates apply, or providing additional information in order to
+provide context.
+Recipients with awards for any of the activity codes listed above are also required to provide corresponding information on trainees supported by each of their awards when submitting a renewal application or RPPR.
+4.1.27 Research Involving Recombinant or Synthetic Nucleic Acid
+Molecules
+4.1.27.1 Scope and Availability
+The NIH Guidelines for Research Involving Recombinant or Synthetic Nucleic Acid Molecules (NIH
+Guidelines) (April 2024 or latest revision) apply to all research projects  (NIH-funded and non-NIH-funded) that involve recombinant or synthetic nucleic acid molecules and are conducted at or sponsored by
+an organization that receives NIH support for recombinant or synthetic nucleic acid molecules.
+According to NIH Guidelines, recombinant and synthetic nucleic acid molecules are defined as (1)
+molecules that a) are constructed by joining nucleic acid molecules and b) can replicate in a living cell,
+i.e. recombinant nucleic acids, or (2) nucleic acid molecules that are chemically or by other means synthesized or amplified, including those that are chemically or otherwise modified but can base pair with
+naturally occurring nucleic acid molecules, i.e. synthetic nucleic acids, or (3)molecules that result from
+the replication of those described in (1) or (2). NIH Guidelines apply to both basic and clinical research
+studies.
+Failure to comply with these requirements may result in suspension or termination of an award for recombinant or synthetic nucleic acid molecule research at the organization, or a requirement for NIH prior
+approval of any or all recombinant or synthetic nucleic acid molecule projects at the organization. The
+recipient should carefully review NIH Guidelines in its entirety to ensure compliance with all of the
+requirements for projects involving recombinant or synthetic nucleic acid molecules.
+Research involving recombinant or synthetic nucleic acid molecules and  select agents also is subject to
+pertinent CDC and USDA regulations, 42 CFR Part 73, Select Agents and Toxins; and 7 CFR Part 331
+and 9 CFR Part 121, Possession, Use, and Transfer of Biological Agents and Toxins.
+(GPS page IIA-50)
+
+4.1.27.2 Institutional Biosafety Committee
+Each organization that conducts research involving recombinant or synthetic nucleic acid molecules,
+including contractors under grants, must have policies and procedures to ensure compliance with NIH
+Guidelines and must establish a standing IBC. The IBC is required to review experiments involving
+recombinant or synthetic nucleic acid molecules to ensure that the procedures, project, personnel, and
+facilities are adequate and in compliance with NIH Guidelines. All IBC minutes resulting from meetings
+taking place on or after June 1, 2025, must be posted on a public-facing institutional website immediately after approval and once all appropriate and allowable redactions have been made. Section IV of
+NIH Guidelines specifies the composition of IBCs. A roster of the IBC members and biosketches for
+each member must be submitted to NIH. At a minimum, the roster should indicate the name of each IBC
+member, as well as which IBC members are serving as the chairperson, contact person, and, as applicable, experts in biosafety or plant, animal, or human experimentation. Biosketches should include a
+description of the occupation and professional qualifications of each member. Organizations can register
+their IBC with NIH on-line by utilizing the IBC Registration Management System (RMS).
+4.1.27.3 Investigators and Institutional Staff
+Section IV of NIH Guidelines also specifies the roles and responsibilities of PIs, biological safety
+officers (BSOs) and recipient institutions with respect to the safe conduct and oversight of recombinant
+or synthetic nucleic acid molecules. Investigators, laboratory staff, BSOs, and institutional officials are
+strongly encouraged to review and comply with these requirements, as described by the NIH Guidelines
+for Research Involving Recombinant or Synthetic Nucleic Acid Molecules.
+4.1.28 Research Misconduct
+Title 42 CFR Part 93, PHS Policies on Research Misconduct (the “PHS regulation”), Subpart C,
+“Responsibilities of Institutions” specifies recipient responsibilities to have written policies and procedures for addressing allegations of research misconduct, to file an Assurance of Compliance with the
+HHS Office of Research Integrity (ORI), and take all reasonable and practical steps to foster research
+integrity. Research misconduct is defined by Subpart A of 42 CFR Part 93 as fabrication, falsification, or
+plagiarism in proposing, performing, or reviewing research, or in reporting research results. Subpart D,
+“Responsibilities of the U.S. Department of Health and Human Services,” specifies that ORI has responsibility for addressing research integrity and misconduct, monitors institutional investigations of research
+misconduct and facilitates the responsible conduct of research through education, preventive, and regulatory activities.
+To be eligible for PHS funding, domestic and foreign institutions must have approved assurances and
+required renewals on file with ORI. The responsible institutional official must assure on behalf of the
+institution that the institution  (1) has written policies and procedures in compliance with 42 CFR Part 93
+for inquiring into and investigating allegations of research misconduct in PHS-supported research and (2)
+complies with its own policies and procedures and the requirements of 42 CFR Part 93. In addition,
+recipient institutions must foster a research environment that promotes the responsible conduct of
+research. Domestic subrecipient institutions and institutions funded through linked international research
+projects must also maintain an assurance by submitting form PHS-6315 to ORI. An institution establishes an assurance when an official signs the face-page (SF 424 (R&R) or PHS 398) of the grant application form or when the institution files a separate assurance form. Once established, institutions maintain
+their assurance by filing the Annual Report on Possible Research Misconduct (between January 1 and
+April 30 each year), submitting their policy for responding to allegations of research misconduct for
+review when requested by ORI, revising their policy when requested by ORI to bring the policy into
+compliance with the PHS regulation, and complying with the PHS regulation.
+(GPS page IIA-51)
+
+As stated throughout the NIHGPS, the recipient has primary responsibility for ensuring that it is conducting its NIH-funded project in accordance with the approved application and budget and the terms
+and conditions of the award. The recipient must carry out its responsibilities with extra care where
+research misconduct has been found or where a research misconduct investigation has been initiated, as
+specified in 42 CFR Part 93, Subpart C. The recipient must report promptly to ORI any decision to initiate an investigation of research misconduct.
+The regulations specify the timing of an institutional investigation, related reporting to ORI, notice to the
+respondent, custody of records, documentation, opportunity for respondent to comment on the report,
+and the components on a final institutional investigative report.
+If a misconduct investigation is initiated, the recipient must take any necessary steps, in addition to its
+normal and ongoing responsibilities under the grant, to protect the scientific integrity of the project, protect human subjects and live vertebrate animals, provide reports to ORI, and ensure the proper expenditure of funds and continuation of the project during the investigation, if appropriate. ORI staff members
+are available to provide technical assistance to any institution that is responding to an allegation of
+research misconduct involving PHS funds. NIH IC staff members are available to provide guidance and
+to work with recipient institutions to protect funded projects from the adverse effects of research misconduct.
+The recipient institution’s engagement with ORI as provided in 42 CFR Part 93 does not substitute for
+its engagement with NIH to ensure ongoing compliance with the terms and conditions of award. When
+the recipient institution finds, learns of, or suspects research misconduct that impacts or might impact the
+conduct or performance of an NIH-supported project(s), whether at the recipient organization or at a
+third-party subrecipient organization, the recipient must work with NIH to assess the effect on the ability
+to continue the project, as originally approved by NIH. If the recipient institution determines that a
+change of scope or a change of PD/PI or other senior/key personnel is required, the institution must
+promptly obtain approval from the NIH funding Institute or Center Grants Management Officer. When a
+recipient institution finds, learns, or suspects that falsified, fabricated, or plagiarized information has
+affected the integrity of NIH-supported research, including but not limited to, applications for funding
+and progress reports, or published research or research products supported by NIH funds, NIH has a
+need to know this information, and the institution must immediately provide information on the affected
+research to the NIH Office of Extramural Research – Research Integrity (OER-RI), in a manner consistent with the ORI confidentiality provision at, 42 CFR Part 93.108. The final institutional investigation report must be submitted to ORI, as outlined in Subpart C of 42 CFR Part 93.
+NIH retains the authority to provide oversight regarding the management of grants and cooperative agreements. Accordingly, NIH may take action(s) to protect the health and safety of the public, including
+research participants, to promote the integrity of the PHS supported research and research process, and to
+conserve public funds. When a recipient fails to comply with the terms and conditions of award, NIH
+may take one or more enforcement actions including disallowance of costs, withholding of further support, or suspension or termination of the grant. These actions are described in Administrative Requirements—Enforcement Actions.
+Where research misconduct has affected data validity or reliability, ORI or NIH may request that the
+recipient and its employee/collaborator authors submit a correction or retraction of the data to a journal,
+publish the corrected data, or both. If the recipient does not comply, NIH may invoke its rights, under 2
+CFR Part 200.315, to access the data (including copyrightable material developed under the award), and
+may then  have the data reviewed, and notify the journal.
+(GPS page IIA-52)
+
+4.1.29 Seat Belt Use
+Pursuant to EO 13043 (April 16, 1997), Increasing the Use of Seat Belts in the United States, NIH
+encourages recipients to adopt and enforce on-the-job seat belt policies and programs for their employees
+when operating vehicles, whether organizationally owned or rented or personally owned.
+4.1.30 Smoke-Free Workplace
+NIH strongly encourages recipients to provide smoke-free workplaces and to promote the nonuse of
+tobacco products. NIH defines the term “workplace” to mean office space (including private offices and
+other workspace), conference or meeting rooms, corridors, stairways, lobbies, rest rooms, cafeterias, and
+other public spaces.
+4.1.31 Standards of Conduct
+NIH requires recipients to establish safeguards to prevent employees, consultants, members of governing
+bodies, and others who may be involved in grant-supported activities from using their positions for purposes that are, or give the appearance of being, motivated by a desire for private financial gain for themselves or others, such as those with whom they have family, business, or other ties. These safeguards
+must be reflected in written standards of conduct. Except as provided below, NIH does not require a
+recipient to establish separate standards of conduct if it maintains such standards for its non-grant-supported activities, as long as those standards are consistent with State and local laws and cover, at a minimum, expected conduct in regard to financial interests, gifts, gratuities and favors, nepotism, and such
+other areas as political participation and bribery. The standards also must do the following:
+ l Address the conditions under which outside activities, relationships, or financial interests are
+proper or improper.
+ l Provide for advance notification of outside activities, relationships, or financial interests to a
+responsible organizational official.
+ l Include a process for notification and review by the responsible official of potential or actual
+violations of the standards.
+ l Specify the nature of penalties that the recipient may impose. These penalties would be in addition to any penalties that NIH or a cognizant Federal agency may impose for infractions that also
+violate the terms or conditions of award.
+The recipient is not required to submit its general standards of conduct to NIH for review or approval.
+However, a copy must be made available to each of its officers, each employee and consultant working
+on the grant-supported project or activity, each member of the governing board, if applicable, and, upon
+request, to NIH. The recipient is responsible for enforcing its standards of conduct, taking appropriate
+action on individual infractions, and, in the case of financial conflict of interest, the recipient is required
+to notify the NIH of an identified financial conflict of interest (FCOI) by submitting the FCOI report to
+NIH via the eRA Commons FCOI Module (see 4.1.10, Financial Conflict of Interest). If a suspension or
+separation action is taken by a recipient against a PD/PI or other senior/key personnel under an NIH
+grant, the recipient must request prior approval of the proposed replacement as specified in Administrative Requirements—Changes in Project and Budget—Prior Approval Requirements.
+The recipient must promptly report issues involving potential criminal violations, such as misappropriation of Federal funds, to the HHS OIG .
+(GPS page IIA-53)
+
+4.1.32 Text Messaging While Driving
+Executive Order 13513 (E.O. 13513) requires each Federal agency to encourage contractors, subcontractors, and grant and cooperative agreement recipients and subrecipients to adopt and enforce
+policies that ban text messaging while driving company-owned or -rented vehicles or Government
+Owned Vehicles, or while driving Personally Owned Vehicles when on official Government business or
+when performing any work for or on behalf of the Government.
+To further the requirement of encouraging such policies, NIH encourages recipients to consider new
+rules and programs, reevaluate existing programs to prohibit text messaging while driving, and conduct
+education, awareness, and other outreach for employees about the risks associated with texting while
+driving. These initiatives should encourage voluntary compliance with the recipient agency’s text messaging policy while off duty.
+For the purposes of this policy and pursuant to E.O. 13513, the following definitions apply:
+ a. ‘‘Texting’’ or ‘‘Text Messaging’’ means reading from or entering data into any handheld or
+other electronic device, including for the purpose of SMS texting, e-mailing, instant messaging,
+obtaining navigational information, or engaging in any other form of electronic data retrieval or
+electronic data communication.
+ b. ‘‘Driving’’ means operating a motor vehicle on an active roadway with the motor running,
+including while temporarily stationary because of traffic, a traffic light or stop sign, or otherwise.
+It does not include operating a motor vehicle with or without the motor running when one has
+pulled over to the side of, or off, an active roadway and has halted in a location where one can
+safely remain stationary.
+4.1.33 Trafficking in Persons
+This government-wide award term implements Section 106 (g) of the Trafficking Victims Protection Act
+(TVPA) of 2000, as amended (22 U.S.C. 7104), located at 2 CFR Part 175.A Final Notice is expected to
+be issued in the future; however, HHS agencies have implemented this award term based on the Interim
+Final Guidance.
+In accordance with the statutory requirement, in each agency award under which funding is provided to a
+private entity, section 106(g) of the TVPA, as amended, requires the agency to include a condition that
+authorizes the agency to terminate the award, without penalty, if the recipient or a subrecipient —
+ a. Engages in severe forms of trafficking in persons during the period of time that the award is in
+effect;
+ b. Procures a commercial sex act during the period of time that the award is in effect; or
+ c. Uses forced labor in the performance of the award or subawards under the award.
+4.1.34 USA Patriot Act
+The Uniting and Strengthening America by Providing Appropriate Tools Required to Intercept and
+Obstruct Terrorism Act (USA PATRIOT Act) (P.L. 107-56) amends 18 U.S.C. 10 and provides criminal
+penalties for possession of any biological agent, toxin, or delivery system of a type or in a quantity that
+is not reasonably justified by a prophylactic, protective, bona fide research, or other peaceful purpose.
+The Act also establishes restrictions on access to specified materials. “Restricted persons,” as defined by
+the Act, may not possess, ship, transport, or receive any biological agent or toxin that is listed as a select
+agent (see Public Health Security and Bioterrorism Preparedness and Response Act in this section).
+(GPS page IIA-54)
+
+4.1.35 Responsibility/Qualification Information in SAM.gov
+NIH award recipients are subject to the reporting requirements established by Public Law 112-239,
+National Defense Authorization Act for Fiscal Year 2013 and provided in Appendix XII to 2 CFR Part
+200, NIH recipients that have currently active Federal grants, cooperative agreements, and procurement
+contracts from all Federal awarding agencies with a cumulative total value greater than $10,000,000
+must report and maintain information in the System for Award Management (SAM) about civil, criminal, and administrative proceedings in connection with the award or performance of a Federal award
+that reached final disposition within the most recent five-year period. The recipient must also make semiannual disclosures regarding such proceedings. Proceedings information will be made publicly available
+in the designated integrity and performance system. Full reporting requirements and procedures are
+found in Appendix XII to 2 CFR Part 200.
+4.1.36 Mandatory Disclosures
+Consistent with 2 CFR Part 200.113, NIH applicants, recipients, or subrecipients must promptly disclose
+in writing to the NIH awarding IC, the HHS Office of Inspector General (OIG), and the pass-through
+entity (if applicable) whenever, in connection with the Federal award (including any activities or subawards), it has credible evidence of the commission of a violation  of Federal criminal law involving
+fraud, conflict of interest, bribery, or gratuity violations found in Title 18 of the United States Code or a
+violation of the civil False Claims Act (31 U.S.C. 3729–3733). Disclosures must be sent in writing to the
+NIH awarding IC and to the HHS OIG at the following address:
+NIH CGMO listed on the NoA for the IC that funded the grant (See Part III:  Points of Contact 20
+INSTITUTES AND CENTERS)
+AND
+Office of Counsel to the Inspector General
+Office of Inspector General
+U.S. Department of Health and Human Services
+Grant Self-Disclosure
+330 Independence Avenue, SW, Cohen Building
+Room 5527
+Washington, DC 20201
+URL: https://oig.hhs.gov/compliance/self-disclosure-info/hhs-oig-grant-self-disclosure-program/
+Email: grantdisclosures@oig.hhs.gov
+Failure to make required disclosures can result in any of the remedies described in 2 CFR Part 200.339.
+Remedies  for noncompliance and Administrative Requirements – Enforcement Actions, including suspension or debarment (See 2 CFR Part 180 and 376, 31 U.S.C.3321 and Public Policy Requirements and
+Objectives— Debarment and Suspension), as necessary and appropriate.
+(GPS page IIA-55)
+
+4.1.37 Never Contract with the Enemy
+Federal awarding agencies and recipients are subject to the regulations implementing Never Contract
+with the Enemy in 2 CFR Part 183. The regulations in 2 CFR Part 183 affect covered contracts, grants
+and cooperative agreements that are expected to exceed $50,000 within the period of performance, are
+performed outside the United States and its territories, and are in support of a contingency operation in
+which members of the Armed Forces are actively engaged in hostilities.
+4.1.38 Prohibition on Certain Telecommunications and Video Surveillance Equipment or Services
+Recipients and subrecipients are  prohibited from expending  loan or grant funds to:  (1) Procure or obtain
+covered telecommunications equipment or services;  (2) Extend or renew a contract to  procure or obtain
+covered telecommunications equipment or services; or  (3) Enter into a contract (or extend or  renew a
+contract) to procure or obtain  covered  telecommunications equipment or services.
+As described in section 889 of Public Law 115-232, “covered telecommunications equipment or services” means any of the following:
+(1) Telecommunications equipment produced by Huawei Technologies Company or ZTE Corporation
+(or any subsidiary or affiliate of such entities);
+(2) For the purpose of public safety,  security of government facilities,  physical security surveillance of
+critical  infrastructure, and other national  security purposes, video surveillance  and telecommunications
+equipment  produced by Hytera Communications  Corporation, Hangzhou Hikvision  Digital Technology
+Company, or Dahua  Technology Company (or any subsidiary  or affiliate of such entities).
+(3) Telecommunications or video surveillance services provided by such entities or using such equipment;
+(4) Telecommunications or video  surveillance equipment or services  produced or provided by an entity
+that  the Secretary of Defense, in consultation  with the Director of the National  Intelligence or the Director of the  Federal Bureau of Investigation,  reasonably believes to be an entity  owned or controlled by,
+or otherwise  connected to, the government of a  covered foreign country.
+COVERED FOREIGN COUNTRY means the People’s Republic of China.
+For the purposes of this section, “covered telecommunications equipment or services” also include systems that use covered telecommunications equipment or services as a substantial or essential component
+of any system, or as critical technology as part of any system.
+In implementing the prohibition  under section 889 of Public Law 115-232, heads of  executive agencies
+administering loan,  grant, or subsidy programs must  prioritize available funding and  technical support to
+assist affected  businesses, institutions, and  organizations as is reasonably necessary  for those affected
+entities to transition  from covered telecommunications  equipment or services, to procure  replacement
+equipment or services,  and to ensure that communications  service to users and customers is  sustained.
+When the recipient or subrecipient accepts a loan or grant, it is certifying that it will comply with the prohibition on covered telecommunications equipment and services in this section. The recipient or subrecipient is not required to certify that funds will not be expended on covered telecommunications
+equipment or services beyond the certification provided upon accepting the loan or grant and those
+provided upon submitting payment requests and financial reports.
+(GPS page IIA-56)
+
+4.1.39 Whistleblower Protections
+An employee of a recipient or subrecipient must not be discharged, demoted, or otherwise discriminated
+against as a reprisal for disclosing to a person or body described in paragraph (a)(2) of 41 U.S.C. 4712
+information that the employee reasonably believes is evidence of gross mismanagement of a Federal contract or grant, a gross waste of Federal funds, an abuse of authority relating to a Federal contract or
+grant, a substantial and specific danger to public health or safety, or a violation of law, rule, or regulation
+related to a Federal contract (including the competition for or negotiation of a contract) or grant. The
+recipient and subrecipient must inform their employees in writing of employee whistleblower rights and
+protections under 41 U.S.C. 4712. See statutory requirements for whistleblower protections at 10 U.S.C.
+4701, 41 U.S.C. 4712, 41 U.S.C. 4304, and 10 U.S.C. 4310.
+4.2 APPROPRIATION MANDATES
+The following statutory provisions limit the use of funds on NIH grants, cooperative agreements, and
+contract awards. These are provided separately in this section since they are subject to change annually
+based on specific appropriation language that restricts the use of grant funds. References to “Act” in
+these sections refer to the governing HHS annual appropriation Act. A list of Appropriation Mandates
+applicable to each fiscal year can be found on the NIH Fiscal Policies page.
+4.2.1 Acknowledgment of Federal Funding
+In accordance with the Steven's Amendment, all HHS recipients must acknowledge Federal funding
+when issuing statements, press releases, requests for proposals, bid invitations, and other documents
+describing projects or programs funded in whole or in part with Federal money. Recipients are required
+to state (1) the percentage and dollar amounts of the total program or project costs financed with Federal
+money and (2) the dollar amount of the total costs financed by nongovernmental sources.
+4.2.2 Dissemination of False or Deliberately Misleading Information
+None of the funds made available in the governing appropriations Act may be used to disseminate
+information that is deliberately false or misleading.
+4.2.3 Gun Control
+NIH funds may not be used, in whole or in part, to advocate or promote gun control.
+4.2.4 Human Embryo Research and Cloning Ban
+NIH funds may not be used for (1) the creation of a human embryo or embryos for research purposes; or
+(2) for research in which a human embryo or embryos are destroyed, discarded, or knowingly subjected
+to risk of injury or death greater than that allowed for research on fetuses in utero under 45 CFR Part
+46.204(b) and subsection 498(b) of the PHS Act (42 U.S.C. 289g(b)). The term “human embryo or
+embryos” includes any organism not protected as a human subject under 45 CFR Part 46, as of the date
+of enactment of the governing appropriations act, that is derived by fertilization, parthenogenesis, cloning, or any other means from one or more human gametes or human diploid cells. Furthermore, per the
+NIH Director’s Statement of April 28, 2015, NIH will not fund any use of gene-editing technologies in
+human embryos.
+(GPS page IIA-57)
+
+In addition to the statutory restrictions on human fetal research under subsection 498(b) of the PHS Act,
+by Presidential memorandum of March 4, 1997, NIH is prohibited from using Federal funds for cloning
+of human beings.
+4.2.5 Lobbying—Appropriation Prohibition
+NIH appropriated funds may not be used, other than for normal and recognized executive-legislative relationships for publicity or propaganda purposes, for the preparation, distribution, or use of a kit, pamphlet,
+booklet, publication, electronic communication, radio, television, or video presentation designed to support or defeat the enactment of legislation before the Congress or any State or local legislature or legislative body, except in presentation to the Congress or any State legislature or local legislature itself or
+designed to support or defeat any proposed or pending regulation administrative action, or order issued
+by the executive branch of any State or local government, except in presentation to the executive branch
+of any State or local government itself. No part of any governing appropriation act shall be used to pay
+the salary or expenses of any grant or contract recipient, or agent acting for such recipient, related to any
+activity designed to influence the enactment of legislation, appropriations, regulation, administrative
+action, or Executive Order proposed or pending before the Congress or any State government, State legislature or local legislature or legislative body other than for normal and recognized executive-legislative
+relationships or participation by an agency or officer of a State, local or tribal government in policymaking and administrative processes within the executive branch of that government. No part of any
+governing appropriation Act shall be used for any activity to advocate or promote any proposed, pending
+or future Federal, State or local tax increase, or any proposed, pending, or future requirement or restriction on any legal consumer product, including its sale or marketing, including but not limited to the
+advocacy or promotion of gun control, except as described above.  Also see Public Policy Requirements
+and Objectives—Lobbying Prohibition, Appropriation Mandates—Gun Control and Cost Considerations—Allowability of Costs and Activities.
+4.2.6 Promotion or Legalization of Controlled Substances
+Recipients are prohibited from knowingly using appropriated funds to support activities that promote the
+legalization of any drug or other substance included in Schedule I of the schedules of controlled substances established by section 202 of the Controlled Substances Act, 21 U.S.C. 812 except for normal
+and recognized executive-congressional communications. This limitation does not apply if the recipient
+notifies the GMO that there is significant medical evidence of a therapeutic advantage to the use of such
+drug or other substance or that federally sponsored clinical trials are being conducted to determine therapeutic advantage (see also 4.1.5 Controlled Substances).
+4.2.7 Restriction on Abortion Funding
+NIH appropriated funds and funds in any trust fund to which funds are appropriated in the governing
+appropriation Act may not be spent for any abortion. None of the funds appropriated in the governing
+appropriation Act, and none of the funds in any trust fund to which funds are appropriated in this Act,
+shall be expended for health benefits coverage that includes coverage of abortion. The term ‘‘health benefits coverage’’ means the package of services covered by a managed care provider or organization pursuant to a contract or other arrangement.
+(GPS page IIA-58)
+
+4.2.7.1 Exceptions to Restrictions on Abortions
+ A. The limitations established in the preceding section shall not apply to an abortion —
+ 1. If the pregnancy is the result of an act of rape or incest; or
+ 2. In the case where a woman suffers from a physical disorder, physical injury, or physical
+illness, including a life endangering physical condition caused by or arising from the
+pregnancy itself, that would, as certified by a physician, place the woman in danger of
+death unless an abortion is performed.
+ B. Nothing in the preceding section shall be construed as prohibiting the expenditure by a State, locality, entity, or private person of State, local, or private funds (other than a State’s or locality’s
+contribution of Medicaid matching funds).
+ C. Nothing in the preceding section shall be construed as restricting the ability of any managed care
+provider from offering abortion coverage or the ability of a State or locality to contract separately with such a provider for such coverage with State funds (other than a State’s or locality’s
+contribution of Medicaid matching funds).
+ D.
+ 1. None of the funds appropriated to NIH may be made available to a Federal agency or
+program, or to a State or local government, if such agency, program, or government subjects any institutional or individual health care entity to discrimination on the basis that
+the health care entity does not provide, pay for, provide coverage of, or refer for abortions.
+ 2. In this subsection, the term ‘‘health care entity’’ includes an individual physician or
+other health care professional, a hospital, a provider-sponsored organization, a health
+maintenance organization, a health insurance plan, or any other kind of health care facility, organization, or plan.
+4.2.8 Restriction on Distribution of Sterile Needles
+NIH appropriated funds may not be used to carry out any program of distributing sterile needles or syringes for the hypodermic injection of any illegal drug. However, this limitation does not apply to the use
+of funds for elements of a program other than making such purchases if the relevant State or local health
+department, in consultation with the Centers for Disease Control and Prevention, determines that the
+State or local jurisdiction, as applicable, is experiencing, or is at risk for, a significant increase in hepatitis infections or an HIV outbreak due to injection drug use, and such program is operating in accordance with State and local law
+4.2.9 Salary Cap/Salary Limitation
+None of the funds appropriated in the governing appropriation Act for NIH (the Act), shall be used to
+pay direct salaries  (individuals working directly on NIH projects) or indirect salaries (executive salaries
+in various uncapped cost pools) through a grant or other extramural mechanism at a rate in excess of that
+prescribed in the Act. Applications and proposals  reflecting salaries of individuals in excess of the rate
+prescribed in the Act will be adjusted in accordance with the legislative salary limitation. Recipients may
+not draw down funds, whether direct or indirect, to pay salaries above the salary rate limitation, and
+recipients must have established policies and procedures that are consistently applied regardless of the
+source of funds. Current and historical information on the applicable salary cap for each fiscal year is on
+the Salary Cap Summary page of the NIH Grants & Funding website.
+(GPS page IIA-59)
+
+4.2.10 Restriction of Pornography on Computer Networks
+“(a) None of the funds made available in this Act may be used to maintain or establish a computer network unless such network blocks the viewing, downloading, and exchanging of pornography.
+(b) Nothing in subsection (a) shall limit the use of funds necessary for any Federal, State, tribal, or local
+law enforcement agency or any other entity carrying out criminal investigations, prosecution, or adjudication activities.”
+4.2.11 Restriction on Disclosure of Political Affiliation for Federal
+Scientific Advisory Committee Candidates
+Section 515 of the FY2014 Consolidated Appropriations Act included an additional legislative mandate
+regarding this requirement:
+“None of the funds made available in this Act may be used to request that a candidate for appointment to
+a Federal scientific advisory committee disclose the political affiliation or voting history of the candidate
+or the position that the candidate holds with respect to political issues not directly related to and necessary for the work of the committee involved.”
+(GPS page IIA-60)

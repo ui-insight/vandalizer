@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, type ChatHistory } from '../api/chat'
+import { streamChat, getHistory, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
-import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, SuggestedModel } from '../types/chat'
+import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -12,14 +12,58 @@ export interface ContextNotice {
 export interface ChatError {
   message: string
   code?: string
-  suggestedAction?: 'convert_to_kb'
+  suggestedAction?: 'convert_to_kb' | 'continue'
   oversizeDocuments?: OversizeDocument[]
 }
+
+/** Longest Stop waits for the server to record it before aborting anyway. */
+const STOP_NOTICE_WAIT_MS = 1500
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
 
-export function useChat() {
+/** Stable identity for a citation so repeated `sources` chunks don't duplicate chips. */
+function citationKey(c: Citation): string {
+  return (
+    c.chunk_id ||
+    `${c.document_id ?? ''}|${c.page ?? ''}|${c.sheet ?? ''}|${(c.content_preview ?? '').slice(0, 40)}`
+  )
+}
+
+/** Map raw fetch/stream failures to a message a first-time user can act on. */
+function toFriendlyError(e: unknown): string {
+  if (e instanceof Error) {
+    const m = e.message || ''
+    if (/failed to fetch|load failed|networkerror|network error|err_|connection|stalled/i.test(m)) {
+      return m && /stalled/i.test(m)
+        ? m
+        : 'Connection lost before the response finished. Check your network and try again.'
+    }
+    return m || 'Chat failed'
+  }
+  return 'Chat failed'
+}
+
+type SendArgs = [
+  message: string,
+  documentUuids?: string[],
+  model?: string,
+  knowledgeBaseUuids?: string[],
+  includeOnboardingContext?: boolean,
+  folderUuids?: string[],
+  isFirstSession?: boolean,
+  runDemo?: boolean,
+  projectUuid?: string,
+]
+
+interface ChatEvents {
+  /** Called only from the incoming stream, never while loading/replaying history. */
+  onLiveToolResult?: (result: ToolResultInfo) => void
+}
+
+export function useChat({ onLiveToolResult }: ChatEvents = {}) {
+  const liveResultHandler = useRef(onLiveToolResult)
+  liveResultHandler.current = onLiveToolResult
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
   const [thinkingContent, setThinkingContent] = useState('')
@@ -28,6 +72,9 @@ export function useChat() {
   const [conversationUuid, setConversationUuid] = useState<string | null>(null)
   const [activityId, setActivityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([])
+  const [toolResults, setToolResults] = useState<ToolResultInfo[]>([])
+  const [segments, setSegments] = useState<StreamSegment[]>([])
   const [errorDetails, setErrorDetails] = useState<ChatError | null>(null)
   const [contextTokens, setContextTokens] = useState(0)
   const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
@@ -37,47 +84,144 @@ export function useChat() {
   // privacy rule. The context dialog offers it only when it is set.
   const [suggestedModel, setSuggestedModel] = useState<SuggestedModel | null>(null)
   const [contextNotices, setContextNotices] = useState<ContextNotice[]>([])
+  // Latest backend-computed meter. Deliberately NOT cleared on send — the new
+  // turn's meter arrives within the first stream chunks and replacing beats a
+  // flash of "no meter" every turn.
+  const [contextMeter, setContextMeter] = useState<ContextMeterInfo | null>(null)
+  // Auto-compaction lifecycle for the in-flight turn ('started' while the
+  // backend summarizes older messages — can take a while, so the UI shows a
+  // status line instead of dead air).
+  const [compactionStatus, setCompactionStatus] = useState<'started' | 'done' | 'failed' | null>(null)
+  // Live checklist from update_plan (Phase 8). Survives across turns of the
+  // same conversation (a follow-up "continue" resumes it); cleared on reset
+  // and seeded from history on load.
+  const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
+  // Messages typed while a turn streams (Phase 10). Shown with a "Queued"
+  // badge until the backend consumes them (queue_consumed chunk), at which
+  // point they become regular transcript messages.
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const historyLoadVersion = useRef(0)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
   const thinkingDurationRef = useRef<number | null>(null)
+  const toolCallsRef = useRef<ToolCallInfo[]>([])
+  const toolResultsRef = useRef<ToolResultInfo[]>([])
+  const segmentsRef = useRef<StreamSegment[]>([])
+  const abortRef = useRef<AbortController | null>(null)
   const citationsRef = useRef<Citation[]>([])
+  const lastSendArgsRef = useRef<SendArgs | null>(null)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
-  // Bumped whenever the panel moves to another conversation (open or new).
-  // A stream from an earlier generation keeps running server-side and is
-  // saved to its own conversation, but must not write into this one.
-  const viewGeneration = useRef(0)
 
-  /** Drop the in-flight turn's live display. */
+  /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
+    abortRef.current = null
     setIsStreaming(false)
     setStreamingContent('')
     setThinkingContent('')
     setThinkingDuration(null)
+    setActiveToolCalls([])
+    setToolResults([])
+    setSegments([])
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, projectUuid?: string) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
+      if (isLoadingHistory) return
+      if (conversationUuid && !activityId) {
+        setError('This conversation could not be resumed. Reopen it from Activity before sending.')
+        return
+      }
+      const deliveredResults = new Set<string>()
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
+      setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
       setIsStreaming(true)
       setStreamingContent('')
       setThinkingContent('')
       setThinkingDuration(null)
+      setActiveToolCalls([])
+      setToolResults([])
+      setSegments([])
       setContextPlan(null)
       setContextNotices([])
+      setCompactionStatus(null)
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
+      toolCallsRef.current = []
+      toolResultsRef.current = []
+      segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
-      const generation = viewGeneration.current
-      const ownsView = () => viewGeneration.current === generation
 
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message }])
+      setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+
+      // Build and append an assistant message from whatever has accumulated so
+      // far. Shared by the normal-completion, user-stop, and network-failure
+      // paths so a partial response is never silently discarded.
+      const commitAssistantMessage = (interruption?: 'stopped' | 'connection') => {
+        // Expanded the same way the server stores it, so a reload reads the same.
+        const finalContent = expandSnippetRefs(
+          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
+          citationsRef.current,
+        )
+        if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(interruption ? { interruption } : {}) }
+        if (thinkingRef.current) {
+          assistantMsg.thinking = thinkingRef.current
+          if (thinkingDurationRef.current != null) {
+            assistantMsg.thinking_duration = thinkingDurationRef.current
+          }
+        }
+        if (toolCallsRef.current.length > 0 || toolResultsRef.current.length > 0) {
+          assistantMsg.tool_calls = [
+            ...toolCallsRef.current,
+            ...toolResultsRef.current.map((r) => ({
+              tool_name: r.tool_name,
+              tool_call_id: r.tool_call_id,
+              args: {},
+            })),
+          ]
+          assistantMsg.tool_results = [...toolResultsRef.current]
+        }
+        if (segmentsRef.current.length > 0) {
+          assistantMsg.segments = segmentsRef.current
+            .map((seg) =>
+              seg.kind === 'text'
+                ? { ...seg, content: expandSnippetRefs(seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''), citationsRef.current) }
+                : seg,
+            )
+            .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+        }
+        if (citationsRef.current.length) {
+          assistantMsg.citations = citationsRef.current
+        }
+        if (unsupportedFiguresRef.current.length) {
+          assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+        }
+        if (silenceInferencesRef.current.length) {
+          assistantMsg.silence_inferences = silenceInferencesRef.current
+        }
+        if (unsupportedCitationsRef.current.length) {
+          assistantMsg.unsupported_citations = unsupportedCitationsRef.current
+        }
+        setMessages((prev) => [...prev, assistantMsg])
+      }
+
+      const controller = new AbortController()
+      abortRef.current = controller
+      // Opening another conversation detaches this stream (abortRef moves on)
+      // without aborting it, so the server still finishes this turn in its own
+      // conversation. Nothing a detached stream does may touch the open chat.
+      const ownsView = () => abortRef.current === controller
 
       try {
         const result = await streamChat(
@@ -93,12 +237,59 @@ export function useChat() {
                 .replace(THINK_BLOCK_RE, '')
                 .replace(THINK_TRAILING_RE, '')
               setStreamingContent(expandSnippetRefs(display, citationsRef.current))
+
+              // Build ordered segments
+              const segs = segmentsRef.current
+              const last = segs[segs.length - 1]
+              if (last && last.kind === 'text') {
+                last.content += chunk.content
+              } else {
+                segs.push({ kind: 'text', content: chunk.content })
+              }
+              setSegments([...segs])
             } else if (chunk.kind === 'thinking') {
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
             } else if (chunk.kind === 'thinking_done') {
               thinkingDurationRef.current = chunk.duration ?? null
               setThinkingDuration(chunk.duration ?? null)
+            } else if (chunk.kind === 'tool_call') {
+              // update_plan renders as the pinned checklist (plan_update
+              // chunk), not as a tool status line.
+              if (chunk.tool_name === 'update_plan') return
+              const call: ToolCallInfo = {
+                tool_name: chunk.tool_name!,
+                tool_call_id: chunk.tool_call_id!,
+                args: chunk.args || {},
+              }
+              toolCallsRef.current = [...toolCallsRef.current, call]
+              setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_call', call })
+              setSegments([...segmentsRef.current])
+            } else if (chunk.kind === 'tool_result') {
+              if (chunk.tool_name === 'update_plan') return
+              const res: ToolResultInfo = {
+                tool_name: chunk.tool_name!,
+                tool_call_id: chunk.tool_call_id!,
+                content: chunk.content,
+                quality: chunk.quality || null,
+              }
+              // Dispatch before rendering: React may batch the call, result and
+              // end-of-stream into one mount. Transcript replay never enters here.
+              const eventKey = JSON.stringify([res.tool_name, res.tool_call_id, res.content])
+              if (!deliveredResults.has(eventKey)) {
+                deliveredResults.add(eventKey)
+                liveResultHandler.current?.(res)
+              }
+              toolResultsRef.current = [...toolResultsRef.current, res]
+              setToolResults([...toolResultsRef.current])
+              // Remove from active calls
+              toolCallsRef.current = toolCallsRef.current.filter(
+                (c) => c.tool_call_id !== chunk.tool_call_id,
+              )
+              setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_result', result: res })
+              setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'usage') {
               setContextTokens(chunk.request_tokens ?? 0)
             } else if (chunk.kind === 'context_budget') {
@@ -110,14 +301,46 @@ export function useChat() {
                   setContextTokens(chunk.plan.total_input_tokens)
                 }
               }
+            } else if (chunk.kind === 'context_meter') {
+              if (chunk.meter) {
+                setContextMeter(chunk.meter)
+              }
+            } else if (chunk.kind === 'compaction') {
+              setCompactionStatus(chunk.status ?? null)
+            } else if (chunk.kind === 'plan_update') {
+              if (chunk.plan_tasks) {
+                setPlanTasks(chunk.plan_tasks)
+              }
+            } else if (chunk.kind === 'queue_consumed') {
+              const consumed = chunk.content
+              setQueuedMessages((prev) => {
+                const idx = prev.indexOf(consumed)
+                if (idx === -1) return prev
+                const next = [...prev]
+                next.splice(idx, 1)
+                return next
+              })
+              // Promote to a regular transcript message — it now lives in
+              // the turn the model is answering.
+              setMessages((prev) => [...prev, { role: 'user', content: consumed }])
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
-                citationsRef.current = [...citationsRef.current, ...chunk.sources]
+                const seen = new Set(citationsRef.current.map(citationKey))
+                const merged = [...citationsRef.current]
+                for (const s of chunk.sources) {
+                  const k = citationKey(s)
+                  if (!seen.has(k)) {
+                    seen.add(k)
+                    merged.push(s)
+                  }
+                }
+                citationsRef.current = merged
               }
             } else if (chunk.kind === 'sources_used') {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
@@ -143,7 +366,14 @@ export function useChat() {
           includeOnboardingContext,
           folderUuids,
           isFirstSession,
+          runDemo,
+          controller.signal,
           projectUuid,
+          identity => {
+            if (controller.signal.aborted || !ownsView()) return
+            setConversationUuid(identity.conversationUuid)
+            setActivityId(identity.activityId)
+          },
         )
         if (!ownsView()) return
 
@@ -151,75 +381,90 @@ export function useChat() {
         setActivityId(result.activityId)
 
         // Add assistant message from accumulated stream
-        // Expanded the same way the server stores it, so a reload reads the same.
-        const finalContent = expandSnippetRefs(
-          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
-          citationsRef.current,
-        )
-        if (finalContent) {
-          const assistantMsg: ChatMessage = {
-            role: 'assistant',
-            content: finalContent,
-          }
-          if (thinkingRef.current) {
-            assistantMsg.thinking = thinkingRef.current
-            if (thinkingDurationRef.current != null) {
-              assistantMsg.thinking_duration = thinkingDurationRef.current
-            }
-          }
-          if (citationsRef.current.length) {
-            assistantMsg.citations = citationsRef.current
-          }
-          if (unsupportedFiguresRef.current.length) {
-            assistantMsg.unsupported_figures = unsupportedFiguresRef.current
-          }
-          if (unsupportedCitationsRef.current.length) {
-            assistantMsg.unsupported_citations = unsupportedCitationsRef.current
-          }
-          setMessages((prev) => [...prev, assistantMsg])
-        }
+        commitAssistantMessage()
       } catch (e) {
-        if (ownsView()) setError(e instanceof Error ? e.message : 'Chat failed')
+        if (!ownsView()) return
+        const wasAborted =
+          (e instanceof DOMException && e.name === 'AbortError') ||
+          (e instanceof Error && e.name === 'AbortError')
+        if (wasAborted) {
+          // Keep partial output locally. Stopping the stream does not establish
+          // whether an already-started server action completed or was canceled.
+          commitAssistantMessage('stopped')
+        } else {
+          // Network drop or stalled stream. Preserve the partial response (same
+          // as the Stop path) so the user doesn't lose a half-written answer,
+          // then surface a recoverable, plain-language error.
+          commitAssistantMessage('connection')
+          const friendly = toFriendlyError(e)
+          setError(friendly)
+          setErrorDetails({ message: friendly })
+        }
       } finally {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, clearLiveTurn],
+    [activityId, conversationUuid, isLoadingHistory, clearLiveTurn],
   )
+
+  /** Hand the view over to another conversation. The in-flight stream keeps
+   * running server-side and its turn is saved there; it just stops writing
+   * into this hook's state. */
+  const detachLiveTurn = useCallback(() => {
+    clearLiveTurn()
+    setQueuedMessages([])
+  }, [clearLiveTurn])
+
+  const stop = useCallback(() => {
+    const controller = abortRef.current
+    if (!controller) return
+    // Tell the server first, so the turn is saved as stopped rather than as a
+    // lost connection. Don't let a slow or failed request hold up the abort.
+    const told = conversationUuid
+      ? Promise.race([
+          stopChatTurn(conversationUuid).catch(() => undefined),
+          new Promise((resolve) => setTimeout(resolve, STOP_NOTICE_WAIT_MS)),
+        ])
+      : Promise.resolve()
+    void told.then(() => controller.abort())
+  }, [conversationUuid])
 
   // Resolves to the loaded history so the caller can restore what the
   // conversation was attached to; null on failure, or when another chat was
   // opened before this one's history arrived.
   const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
-    const generation = ++viewGeneration.current
-    clearLiveTurn()
-    setMessages([])
+    const version = ++historyLoadVersion.current
+    detachLiveTurn()
+    setIsLoadingHistory(true)
     setError(null)
     setErrorDetails(null)
-    // Until history says which activity this chat belongs to, a send must not
-    // reuse the previous chat's activity.
     setActivityId(null)
     setConversationUuid(uuid)
+    setMessages([])
+    lastSendArgsRef.current = null
     try {
       const data = await getHistory(uuid)
-      if (generation !== viewGeneration.current) return null
+      if (version !== historyLoadVersion.current) return null
       setMessages(data.messages)
-      // Without it the next question would start a new conversation.
       setActivityId(data.activity_id ?? null)
-      if (data.context_mode) setContextMode(data.context_mode)
-      if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      setContextMode(data.context_mode ?? 'full')
+      setContextCutoffIndex(data.context_cutoff_index ?? 0)
+      setPlanTasks(data.active_plan ?? null)
       return data
     } catch (e) {
-      if (generation === viewGeneration.current) {
+      if (version === historyLoadVersion.current) {
         setError(e instanceof Error ? e.message : 'Failed to load history')
       }
       return null
+    } finally {
+      if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }
-  }, [clearLiveTurn])
+  }, [detachLiveTurn])
 
   const reset = useCallback(() => {
-    viewGeneration.current += 1
-    clearLiveTurn()
+    historyLoadVersion.current += 1
+    detachLiveTurn()
+    setIsLoadingHistory(false)
     setMessages([])
     setConversationUuid(null)
     setActivityId(null)
@@ -230,12 +475,64 @@ export function useChat() {
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
-  }, [clearLiveTurn])
+    setContextMeter(null)
+    setCompactionStatus(null)
+    setPlanTasks(null)
+  }, [detachLiveTurn])
 
   const clearError = useCallback(() => {
     setError(null)
     setErrorDetails(null)
   }, [])
+
+  /** Re-send without discarding a partial reply or its completed artifacts. */
+  const retry = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    setMessages((prev) => {
+      const next = [...prev]
+      // With no assistant output, replace the unanswered user message. If
+      // partial output exists, retain that exchange as the record of work
+      // already attempted; send() appends the explicitly requested retry.
+      if (next.length && next[next.length - 1].role === 'user') next.pop()
+      return next
+    })
+    send(...args)
+  }, [send])
+
+  /** Queue a message typed while a turn is streaming (Phase 10). Optimistic:
+   * the badge shows immediately; a failed POST rolls it back. If the stream
+   * ends before the drain point, the backend folds leftovers into the next
+   * turn — the badge clears when that turn's queue_consumed chunk arrives. */
+  const queueMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || !conversationUuid) throw new Error('This conversation is still starting. Keep your message and try again shortly.')
+    setQueuedMessages((prev) => [...prev, trimmed])
+    try {
+      await queueChatMessage(conversationUuid, trimmed)
+    } catch (e) {
+      setQueuedMessages((prev) => {
+        const idx = prev.indexOf(trimmed)
+        if (idx === -1) return prev
+        const next = [...prev]
+        next.splice(idx, 1)
+        return next
+      })
+      throw new Error(e instanceof Error ? e.message : 'Could not queue the message')
+    }
+  }, [conversationUuid])
+
+  /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
+   * Unlike retry(), this keeps the partial exchange — the backend armed a
+   * one-shot "resume directly, no recap" instruction for the next turn. */
+  const continueRun = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    const [, ...contextArgs] = args
+    setError(null)
+    setErrorDetails(null)
+    send('Continue', ...contextArgs)
+  }, [send])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
     setActivityId(newActivityId)
@@ -252,19 +549,31 @@ export function useChat() {
     conversationUuid,
     activityId,
     error,
+    activeToolCalls,
+    toolResults,
+    segments,
     errorDetails,
     clearError,
+    retry,
+    continueRun,
     contextTokens,
     contextMode,
     contextCutoffIndex,
     contextPlan,
     suggestedModel,
     contextNotices,
+    contextMeter,
+    compactionStatus,
+    planTasks,
+    queuedMessages,
+    queueMessage,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
     send,
+    stop,
     loadHistory,
+    isLoadingHistory,
     reset,
     setActivity,
   }

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { uploadFile } from '../api/files'
-import { SUPPORTED_EXTENSIONS } from '../utils/fileTypes'
+import { readUploadPolicy, uploadFileError } from '../utils/uploadPolicy'
 
 export interface UploadProgress {
   id: number
@@ -12,7 +12,7 @@ export interface UploadProgress {
 }
 
 // Re-exported for the existing import sites; `utils/fileTypes` is the source.
-export { SUPPORTED_EXTENSIONS }
+export { SUPPORTED_EXTENSIONS } from '../utils/fileTypes'
 
 let nextUploadId = 0
 
@@ -23,9 +23,10 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
   const upload = useCallback(
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files)
+      const policy = await readUploadPolicy()
       const batch = fileArray.map((file) => {
-        const ext = (file.name.split('.').pop() || '').toLowerCase()
-        const supported = file.name.includes('.') && SUPPORTED_EXTENSIONS.includes(ext)
+        const error = uploadFileError(file, policy)
+        const supported = !error
         const item: UploadProgress = supported
           ? { id: nextUploadId++, fileName: file.name, progress: 0, done: false }
           : {
@@ -33,7 +34,7 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
               fileName: file.name,
               progress: 0,
               done: true,
-              error: `Unsupported file type${ext ? ` (.${ext})` : ''} — supported: ${SUPPORTED_EXTENSIONS.join(', ')}`,
+              error: error!,
             }
         return { file, item, supported }
       })

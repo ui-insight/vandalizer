@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react'
 import { CloudUpload } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
+import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface UploadZoneProps {
   onFilesSelected: (files: FileList) => void
@@ -9,6 +9,7 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
+  const { accept, description } = useUploadPolicy()
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const active = dragOver || highlighted
@@ -43,36 +44,35 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         }
       }}
       className={cn(
-        'group relative flex cursor-pointer flex-col items-center gap-1 rounded-[var(--ui-radius)] border-2 border-dashed',
+        'file-upload-zone group relative cursor-pointer border border-dashed',
         active
           ? 'border-[var(--highlight-color,#eab308)] bg-[var(--highlight-color,#eab308)]/[0.06] scale-[1.01]'
           : 'border-[#17181a30] hover:border-[#17181a60] hover:bg-[#17181a06]',
       )}
       style={{
-        height: 100, margin: '30px 0', justifyContent: 'center',
         transition: 'border-color 0.2s, background-color 0.2s, transform 0.2s',
       }}
     >
       <CloudUpload
-        className="h-6 w-6 transition-transform duration-200 group-hover:scale-110"
-        style={{ color: active ? 'var(--highlight-color, #eab308)' : '#17181abb' }}
+        className="file-upload-icon h-5 w-5 transition-transform duration-200 group-hover:scale-110"
+        style={{ color: active ? 'var(--highlight-on-light, #806600)' : '#17181abb' }}
       />
-      <div style={{
-        fontSize: 14, fontWeight: 500, padding: '0 15px', textAlign: 'center',
-        color: active ? 'var(--highlight-color, #eab308)' : '#17181abb',
+      <div className="file-upload-title" style={{
+        fontSize: 'var(--workspace-font-body)', fontWeight: 500,
+        color: active ? 'var(--highlight-on-light, #806600)' : '#17181abb',
         transition: 'color 0.2s',
       }}>
-        {active ? 'Drop files here' : 'Drag & Drop to Upload Files'}
+        {active ? 'Drop files here' : 'Upload files or drop them here'}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 300, color: '#5d5d5d78' }}>
-        <i>pdf, doc, docx, xls, xlsx, csv, txt, md</i>
+      <div className="file-upload-description" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 400, color: '#58616d', lineHeight: 1.5 }}>
+        {description}
       </div>
       <input
         ref={inputRef}
         type="file"
         multiple
         aria-label="Upload files"
-        accept={SUPPORTED_ACCEPT_ATTR}
+        accept={accept}
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onFilesSelected(e.target.files)

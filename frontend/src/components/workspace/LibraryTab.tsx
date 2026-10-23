@@ -1,5 +1,9 @@
+import { TaskHelpLink } from '../shared/TaskHelpLink'
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
+import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -7,6 +11,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
+import { OrganizationHelp } from '../library/OrganizationHelp'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -41,6 +46,7 @@ import {
 } from 'lucide-react'
 import type { LibraryItem, VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
+import { useRefreshOnChatWrite } from '../../lib/chatWrites'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
 type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
@@ -55,6 +61,14 @@ function matchesKindFilter(item: { kind: string; set_type: string | null }, filt
   if (item.kind !== 'search_set') return false
   return (item.set_type || 'extraction') === filter
 }
+const KIND_FILTERS = [
+  { value: 'all', label: 'All types' },
+  { value: 'workflow', label: 'Workflows' },
+  { value: 'extraction', label: 'Extractions' },
+  { value: 'prompt', label: 'Prompts' },
+  { value: 'formatter', label: 'Formatters' },
+] as const
+
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
@@ -68,6 +82,7 @@ export function LibraryTab() {
 
   const [scope, setScope] = useState('mine' as ScopeTab)
   const [search, setSearch] = useState('')
+  const [mobileViewsOpen, setMobileViewsOpen] = useState(false)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('recent')
@@ -111,7 +126,7 @@ export function LibraryTab() {
 
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
-  const { folders, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  const { folders, loading: foldersLoading, error: foldersError, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
   const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null)
   const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 }) // folder uuid with open menu
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
@@ -119,6 +134,26 @@ export function LibraryTab() {
   const [newFolderMode, setNewFolderMode] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const folderMenuRef = useRef<HTMLDivElement>(null)
+  const folderMenuTrigger = useRef<HTMLButtonElement>(null)
+  const [folderSaving, setFolderSaving] = useState(false)
+  const folderSavingRef = useRef(false)
+  const [folderSaveError, setFolderSaveError] = useState<string | null>(null)
+  const currentScope = useRef(`${scope}:${teamId}`)
+  currentScope.current = `${scope}:${teamId}`
+  const submitFolder = async (uuid?: string) => {
+    const name = normalizeName(uuid ? renameValue : newFolderName)
+    if (!name || folderSavingRef.current) return
+    const scopeAtStart = currentScope.current
+    folderSavingRef.current = true; setFolderSaving(true); setFolderSaveError(null)
+    try {
+      if (uuid) await renameFolder(uuid, name)
+      else await createFolder(name)
+      if (currentScope.current !== scopeAtStart) return
+      setRenamingFolder(null); setNewFolderMode(false); setNewFolderName('')
+    } catch (reason) {
+      if (currentScope.current === scopeAtStart) setFolderSaveError(reason instanceof Error ? reason.message : 'Could not save this folder.')
+    } finally { folderSavingRef.current = false; setFolderSaving(false) }
+  }
 
   // Collections (Explore tab)
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
@@ -146,6 +181,7 @@ export function LibraryTab() {
   // Close folder context menu on outside click
   useEffect(() => {
     if (!folderMenuOpen) return
+    folderMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     const handler = (e: MouseEvent) => {
       if (folderMenuRef.current && !folderMenuRef.current.contains(e.target as Node)) {
         setFolderMenuOpen(null)
@@ -157,13 +193,12 @@ export function LibraryTab() {
 
   // Reset folder view when scope changes
   useEffect(() => {
-    if (viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned') {
-      setViewFilter('all')
-    }
+    setViewFilter(current => ['all', 'favorites', 'pinned'].includes(current) ? current : 'all')
     setFolderMenuOpen(null)
     setRenamingFolder(null)
     setNewFolderMode(false)
-  }, [scope])
+    setFolderSaveError(null)
+  }, [scope, teamId])
 
   // Find the library matching current scope
   const activeLibrary =
@@ -176,14 +211,15 @@ export function LibraryTab() {
   // Items — pass folder filter when a folder is selected
   const isCollectionFilter = viewFilter.startsWith('collection:')
   const selectedFolder = viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned' && !isCollectionFilter ? viewFilter : undefined
-  const { items, loading: itemsLoading, refresh: refreshItems, update, remove } = useLibraryItems(
+  const { items, loading: itemsLoading, error: itemsError, refresh: refreshItems, update, remove } = useLibraryItems(
     activeLibrary?.id ?? null,
     {
       // Kind is filtered client-side so we can show per-kind counts on the filter chips.
-      search: search || undefined,
+      search: search.trim() || undefined,
       folder: selectedFolder,
     },
   )
+  const hasActiveFilters = Boolean(search || viewFilter !== 'all' || kindFilter !== 'all')
 
   // The tab stays mounted (hidden) while a workflow/extraction/automation
   // editor is open in the right panel, so filters and search survive the
@@ -200,21 +236,39 @@ export function LibraryTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorOpen])
 
+  // Workflows and extractions the Assistant creates land in the personal library.
+  useRefreshOnChatWrite('library', refreshItems)
+
   // Delete-choice dialog: set when the user can permanently delete the
   // underlying workflow/extraction (not just remove the bookmark).
   const [deleteTarget, setDeleteTarget] = useState<LibraryItem | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [itemAction, setItemAction] = useState<{ scope: string; label: string; pending: boolean; error: string | null; retry: () => void } | null>(null)
+  const itemActionBusy = useRef(false)
+  const performItemAction = async (itemId: string, verb: string, action: () => Promise<unknown>) => {
+    if (itemActionBusy.current) return
+    const actionScope = currentScope.current
+    const label = `${verb}: ${items.find(item => item.id === itemId)?.name || 'Library item'}`
+    const retry = () => { void performItemAction(itemId, verb, action) }
+    itemActionBusy.current = true
+    setItemAction({ scope: actionScope, label, pending: true, error: null, retry })
+    try {
+      await action()
+      if (currentScope.current === actionScope) setItemAction({ scope: actionScope, label, pending: false, error: null, retry })
+    } catch (reason) {
+      if (currentScope.current === actionScope) setItemAction({ scope: actionScope, label, pending: false, error: reason instanceof Error ? reason.message : 'Could not update this item.', retry })
+    } finally { itemActionBusy.current = false }
+  }
 
   // Actions
   const handlePin = async (itemId: string, pinned: boolean) => {
-    await update(itemId, { pinned })
+    await performItemAction(itemId, pinned ? 'Pin item' : 'Unpin item', () => update(itemId, { pinned }))
   }
   const handleFavorite = async (itemId: string, favorited: boolean) => {
-    await update(itemId, { favorited })
+    await performItemAction(itemId, favorited ? 'Favorite item' : 'Unfavorite item', () => update(itemId, { favorited }))
   }
   const handleClone = async (itemId: string) => {
-    await cloneToPersonal(itemId)
-    refreshItems()
+    await performItemAction(itemId, 'Copy to My Library', async () => { await cloneToPersonal(itemId); await refreshItems() })
   }
   const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
   const handleShare = (itemId: string) => {
@@ -232,39 +286,28 @@ export function LibraryTab() {
     if (!shareDialogItem || !targetTeamId) return
     const { id, name } = shareDialogItem
     const teamName = teams.find((t) => t.id === targetTeamId)?.name ?? 'the team'
-    setShareDialogItem(null)
     try {
       await shareToTeam(id, targetTeamId, comment || undefined)
-      toast(`Shared to ${teamName}'s library`, 'success')
-      refreshItems()
     } catch (err) {
-      // 409: this item was already shared to the team — re-sharing would
-      // create an independent duplicate, so ask before forcing it.
-      if (err instanceof ApiError && err.status === 409) {
-        const ok = await confirm({
-          title: 'Already shared to team',
-          message: (
-            <>
-              <strong>{name}</strong> is already in {teamName}'s library. Sharing again
-              creates a separate copy that can be edited independently of the first.
-            </>
-          ),
-          confirmLabel: 'Share a copy',
-        })
-        if (!ok) return
-        try {
-          await shareToTeam(id, targetTeamId, comment || undefined, true)
-          toast(`Shared a new copy to ${teamName}'s library`, 'success')
-          refreshItems()
-        } catch (err2) {
-          const msg = err2 instanceof ApiError ? err2.message : 'Failed to share to team'
-          toast(msg, 'error')
-        }
-        return
-      }
-      const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
-      toast(msg, 'error')
+      // Sharing again creates another independent copy, so retain the draft
+      // while asking whether that is intended. Failures reach the open dialog.
+      if (!(err instanceof ApiError) || err.status !== 409) throw err
+      const ok = await confirm({
+        title: 'Already shared to team',
+        message: (
+          <>
+            <strong>{name}</strong> is already in {teamName}'s library. Sharing again
+            creates a separate copy that can be edited independently of the first.
+          </>
+        ),
+        confirmLabel: 'Share a copy',
+      })
+      if (!ok) return
+      await shareToTeam(id, targetTeamId, comment || undefined, true)
     }
+    setShareDialogItem(null)
+    toast(`Shared to ${teamName}'s library`, 'success')
+    void refreshItems()
   }
   // Prompts/formatters are search_set items — label them by set_type.
   const itemKindLabel = (item: { kind: string; set_type: string | null }) =>
@@ -322,9 +365,10 @@ export function LibraryTab() {
     }
   }
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
-    await moveFolderItems([itemId], folderUuid)
-    refreshItems()
-    refreshFolders()
+    await performItemAction(itemId, folderUuid ? `Move to ${folders.find(folder => folder.uuid === folderUuid)?.name || 'folder'}` : 'Remove from folder', async () => {
+      await moveFolderItems([itemId], folderUuid)
+      await Promise.all([refreshItems(), refreshFolders()])
+    })
   }
 
   // Apply view filter + sort (folder filtering is handled server-side via useLibraryItems)
@@ -337,7 +381,7 @@ export function LibraryTab() {
   // belongs to that folder only — it should not also appear in the root list.
   // Favorites/Pinned and folder views are intentionally left untouched: the
   // first two span folders, and folder views are already server-side scoped.
-  const scopedItems = viewFilter === 'all' ? items.filter((i) => !i.folder) : items
+  const scopedItems = viewFilter === 'all' && !search.trim() ? items.filter((i) => !i.folder) : items
 
   const filtered = scopedItems.filter((item) => {
     if (!matchesKindFilter(item, kindFilter)) return false
@@ -440,8 +484,11 @@ export function LibraryTab() {
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [editLoadError, setEditLoadError] = useState<string | null>(null)
+  const editLoadVersion = useRef(0)
 
   const openPromptModal = async (item: import('../../types/library').LibraryItem, mode: 'preview' | 'edit') => {
+    const version = ++editLoadVersion.current
     setEditingItem(item)
     setEditMode(mode)
     setEditTitle(item.name)
@@ -451,23 +498,29 @@ export function LibraryTab() {
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditError(null)
+    setEditLoadError(null)
     setEditItemId(null)
     if (item.item_uuid) {
       setEditLoading(true)
       try {
         const items = await listSearchSetItems(item.item_uuid)
+        if (version !== editLoadVersion.current) return
         if (items.length > 0) {
           setEditItemId(items[0].id)
           if (items[0].searchphrase?.trim() || !(item.description || '').trim()) {
             setEditContent(items[0].searchphrase)
           }
         }
-      } catch { /* ignore — keep the description fallback */ }
-      setEditLoading(false)
-    }
+      } catch (reason) {
+        if (version === editLoadVersion.current) setEditLoadError(reason instanceof Error ? reason.message : 'Could not load this item.')
+      }
+      if (version === editLoadVersion.current) setEditLoading(false)
+    } else setEditLoading(false)
   }
 
   const closeEditModal = () => {
+    if (editSaving) return
+    editLoadVersion.current++
     setEditingItem(null)
     setEditTitle('')
     setEditContent('')
@@ -480,7 +533,7 @@ export function LibraryTab() {
   }
 
   const usePromptInAssistant = () => {
-    if (!editingItem) return
+    if (!editingItem || editLoading || editLoadError) return
     const content = editContent.trim()
     if (!content) return
     markUsed(editingItem.id)
@@ -491,7 +544,7 @@ export function LibraryTab() {
   }
 
   const handleEditSave = async () => {
-    if (!editingItem?.item_uuid) return
+    if (!editingItem?.item_uuid || editLoading || editLoadError || editSaving) return
     const titleError = getNameError(editTitle, 'Title')
     if (titleError) {
       setEditError(titleError)
@@ -603,17 +656,17 @@ export function LibraryTab() {
     },
   }
 
-  if (libLoading) {
+  if (libLoading && !libraries.length) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ fontSize: 13, color: '#888' }}>
+      <div className="flex items-center justify-center h-full" style={{ fontSize: 'var(--workspace-font-control)', color: '#666' }}>
         Loading...
       </div>
     )
   }
 
-  if (error) {
+  if (error && !libraries.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 13, color: '#888' }}>
+      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 'var(--workspace-font-control)', color: '#666' }}>
         <p>{error}</p>
         <button
           onClick={refresh}
@@ -621,8 +674,8 @@ export function LibraryTab() {
             borderRadius: 'var(--ui-radius, 12px)',
             background: 'var(--highlight-color, #eab308)',
             color: 'var(--highlight-text-color, #000)',
-            padding: '6px 12px',
-            fontSize: 13,
+            padding: "var(--workspace-space-6) var(--workspace-space-12)",
+            fontSize: 'var(--workspace-font-control)',
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
@@ -636,90 +689,29 @@ export function LibraryTab() {
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="library-workspace flex flex-col h-full overflow-y-auto"
       style={{
         position: 'relative',
         backgroundColor: '#fff',
         ['--library-highlight' as string]: 'var(--highlight-color, #eab308)',
-        ['--library-highlight-ink' as string]: 'color-mix(in srgb, var(--library-highlight) 65%, #1f2937)',
+        ['--library-highlight-ink' as string]: 'color-mix(in srgb, var(--library-highlight) 30%, #1f2937)',
         ['--library-highlight-soft' as string]: 'color-mix(in srgb, var(--library-highlight) 18%, #ffffff)',
         ['--library-highlight-muted' as string]: 'color-mix(in srgb, var(--library-highlight) 10%, #f8f9fa)',
       }}
     >
-      {/* ── Header ── */}
-      <div
-        style={{
-          flexShrink: 0,
-          borderBottom: '1px solid #e0e0e0',
-          backgroundColor: '#fff',
-          padding: '14px 24px 6px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
-        {/* Row 1: Title + Search + New */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#202124', whiteSpace: 'nowrap' }}>
-            Library
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-            {/* Search */}
-            <div style={{ position: 'relative', flex: 1, maxWidth: 400, minWidth: 0 }}>
-              <Search
-                style={{
-                  position: 'absolute',
-                  left: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 16,
-                  height: 16,
-                  color: '#5f6368',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                style={{
-                  width: '100%',
-                  background: '#f1f3f4',
-                  border: '1px solid transparent',
-                  borderRadius: 8,
-                  padding: '8px 16px 8px 38px',
-                  fontSize: 14,
-                  outline: 'none',
-                  transition: 'all 0.2s',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.background = '#fff'
-                  e.currentTarget.style.borderColor = '#dadce0'
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.background = '#f1f3f4'
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              />
-            </div>
-
-            {/* + New button with dropdown */}
-            <div ref={newMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <WorkspaceSectionHeader title="Library" actions={
+<div ref={newMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
               <button
                 onClick={() => setNewMenuOpen(!newMenuOpen)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 4,
+                  gap: 'var(--workspace-space-4)',
                   borderRadius: 30,
                   backgroundColor: 'var(--highlight-color, #eab308)',
                   border: 'none',
-                  padding: '6px 14px',
-                  fontSize: 13,
+                  padding: "var(--workspace-space-6) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-control)',
                   fontWeight: 700,
                   color: 'var(--highlight-text-color, #000)',
                   cursor: 'pointer',
@@ -743,7 +735,7 @@ export function LibraryTab() {
                     border: '1px solid rgba(0,0,0,0.14)',
                     background: '#fff',
                     boxShadow: '0 10px 28px rgba(0,0,0,0.16)',
-                    padding: 6,
+                    padding: 'var(--workspace-space-6)',
                   }}
                 >
                   <NewMenuItem icon={<Workflow style={{ width: 18, height: 18 }} />} label="New Workflow" onClick={() => { setNewMenuOpen(false); openCreateModal('workflow') }} />
@@ -753,20 +745,19 @@ export function LibraryTab() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* Row 2: Scope tabs */}
-        <div style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
+      }>
+        {/* Saved ownership views and shared discovery. */}
+        <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, margin: 0 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
-            { key: 'explore' as const, label: 'Everyone' },
+            { key: 'explore' as const, label: 'Explore' },
           ]).map(({ key, label }) => {
             const active = scope === key
             return (
               <button
                 key={key}
+                aria-pressed={active}
                 onClick={() => {
                   setScope(key)
                   setViewFilter('all')
@@ -775,9 +766,9 @@ export function LibraryTab() {
                   setNewFolderMode(false)
                 }}
                 style={{
-                  padding: '0 14px',
+                  padding: "0 var(--workspace-space-16)",
                   fontWeight: 500,
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 0,
                   lineHeight: '1.2',
@@ -785,7 +776,7 @@ export function LibraryTab() {
                   background: 'none',
                   border: 'none',
                   borderBottom: active ? '2px solid var(--library-highlight, #eab308)' : '2px solid transparent',
-                  color: active ? 'var(--library-highlight, #eab308)' : '#5f6368',
+                  color: active ? 'var(--library-highlight-ink, #665000)' : '#5f6368',
                   cursor: 'pointer',
                   transition: 'color 0.15s',
                   whiteSpace: 'nowrap',
@@ -797,16 +788,64 @@ export function LibraryTab() {
           })}
         </div>
 
-        {/* Row 3: Filter chips + sort (hidden when Explore is active — it has its own) */}
-        <div style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {([
-              { value: 'all' as const, label: 'All' },
-              { value: 'workflow' as const, label: 'Workflows' },
-              { value: 'extraction' as const, label: 'Extractions' },
-              { value: 'prompt' as const, label: 'Prompts' },
-              { value: 'formatter' as const, label: 'Formatters' },
-            ]).map(({ value, label }) => {
+        <SavedScopeHint scope={scope} kind="tools" />
+        {scope !== 'explore' && <details className="text-sm text-gray-600">
+          <summary className="cursor-pointer py-1">Find a tool for an RA task</summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {([{ label: 'Review requirements', query: 'review', kind: 'workflow' }, { label: 'Extract budget details', query: 'budget', kind: 'extraction' }, { label: 'Summarize award conditions', query: 'award', kind: 'prompt' }] as const).map(task => <button type="button" key={task.label} className="rounded border border-gray-300 bg-white px-2 py-1 text-left" onClick={() => { setSearch(task.query); setKindFilter(task.kind) }}>{task.label}</button>)}
+          </div>
+          <p className="mt-2">These search your current library. Review the tool’s inputs and description; matching a task name does not establish quality.</p>
+          <TaskHelpLink topic="library-tools">Choosing and reusing a Library tool</TaskHelpLink>
+        </details>}
+        {scope !== 'explore' && <div style={{ position: 'relative', minWidth: 0 }}>
+              <Search
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 16,
+                  height: 16,
+                  color: '#5f6368',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search library"
+                placeholder="Search library…"
+                style={{
+                  width: '100%',
+                  background: '#f1f3f4',
+                  border: '1px solid transparent',
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16) var(--workspace-space-8) 38px",
+                  fontSize: 'var(--workspace-font-body)',
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.background = '#fff'
+                  e.currentTarget.style.borderColor = '#dadce0'
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.background = '#f1f3f4'
+                  e.currentTarget.style.borderColor = 'transparent'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>}
+        {/* Row 3: Filter chips + sort (Explore has its own) */}
+        <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--workspace-space-12)', paddingBottom: 'var(--workspace-space-2)' }}>
+          <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
+            {KIND_FILTERS.map(({ value, label }) => <option key={value} value={value}>{label} ({kindCounts[value]})</option>)}
+          </select>
+          <div className="library-kind-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', alignItems: 'center' }}>
+            {KIND_FILTERS.map(({ value, label }) => {
               const active = kindFilter === value
               const count = kindCounts[value]
               return (
@@ -816,13 +855,13 @@ export function LibraryTab() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 'var(--workspace-space-6)',
                     height: 32,
-                    padding: '0 12px',
+                    padding: "0 var(--workspace-space-12)",
                     borderRadius: 16,
                     border: active ? '1px solid var(--library-highlight-soft)' : '1px solid #dadce0',
                     backgroundColor: active ? 'var(--library-highlight-soft)' : '#fff',
-                    fontSize: 13,
+                    fontSize: 'var(--workspace-font-control)',
                     fontFamily: 'inherit',
                     color: active ? 'var(--library-highlight-ink)' : '#3c4043',
                     cursor: 'pointer',
@@ -833,9 +872,9 @@ export function LibraryTab() {
                   <span>{label}</span>
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 'var(--workspace-font-meta)',
                       fontWeight: 500,
-                      color: active ? 'var(--library-highlight-ink)' : '#888',
+                      color: active ? 'var(--library-highlight-ink)' : '#666',
                       opacity: active ? 0.85 : 1,
                     }}
                   >
@@ -847,15 +886,16 @@ export function LibraryTab() {
           </div>
           <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', minWidth: 150 }}>
             <select
+              aria-label="Sort library items"
               value={sortOption}
               onChange={(e) => setSortOption(e.target.value as SortOption)}
               style={{
                 borderRadius: 999,
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
-                padding: '0 32px 0 12px',
+                padding: "0 var(--workspace-space-32) 0 var(--workspace-space-12)",
                 height: 32,
-                border: '1px solid #dadce0',
+                border: "1px solid var(--workspace-border)",
                 background: '#fff',
                 color: '#3c4043',
                 cursor: 'pointer',
@@ -866,37 +906,41 @@ export function LibraryTab() {
             </select>
           </div>
         </div>
-      </div>
+      </WorkspaceSectionHeader>
 
-      {/* ── Body: Explore tab gets its own view; mine/team keep sidebar + results ── */}
+      {/* ── Body: Explore has its own view; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: '1 0 0', minHeight: 'min(320px, 100%)', overflow: 'hidden' }}>
           <ExploreTab />
         </div>
       ) : (
-      <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="library-body" style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
+        <button type="button" className="library-views-toggle" aria-expanded={mobileViewsOpen} aria-controls="library-saved-views" onClick={() => setMobileViewsOpen(open => !open)}>{mobileViewsOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : 'Folder'} · Change`}</button>
         {/* Sidebar */}
         <div
           ref={sidebarRef}
+          id="library-saved-views"
+          className="library-sidebar"
+          data-open={mobileViewsOpen}
           style={{
             width: sidebarWidth,
             flexShrink: 0,
             minHeight: 0,
             borderRight: '1px solid #f0f0f0',
             backgroundColor: '#fafafa',
-            padding: '14px 0',
+            padding: "var(--workspace-space-16) 0",
             overflowY: 'auto',
           }}
         >
           {/* Saved Views */}
           <div
             style={{
-              padding: '0 12px',
-              marginBottom: 6,
-              fontSize: 10,
+              padding: "0 var(--workspace-space-12)",
+              marginBottom: 'var(--workspace-space-6)',
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 700,
               textTransform: 'uppercase',
-              color: '#888',
+              color: '#666',
               letterSpacing: '0.5px',
             }}
           >
@@ -916,15 +960,18 @@ export function LibraryTab() {
                   ? items.filter((i) => i.pinned).length
                   : 0
             return (
-              <div
+              <button
+                type="button"
                 key={view}
-                onClick={() => setViewFilter(view)}
+                aria-pressed={isActive}
+                onClick={() => { setViewFilter(view); setMobileViewsOpen(false) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '7px 10px 7px 12px',
+                  width: '100%', border: 0, textAlign: 'left', fontFamily: 'inherit',
+                  padding: "var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-12)",
                   cursor: 'pointer',
-                  fontSize: 12,
+                  fontSize: 'var(--workspace-font-meta)',
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
                   backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
@@ -935,42 +982,44 @@ export function LibraryTab() {
                 <Icon style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{label}</span>
                 {count > 0 && (
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{count}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>{count}</span>
                 )}
-              </div>
+              </button>
             )
           })}
 
+          <OrganizationHelp />
           {/* Folders section — personal and team scopes */}
           {(
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 'var(--workspace-space-16)' }}>
               {/* Folders header row */}
               <div
                 style={{
-                  padding: '0 8px 0 12px',
-                  marginBottom: 4,
+                  padding: "0 var(--workspace-space-8) 0 var(--workspace-space-12)",
+                  marginBottom: 'var(--workspace-space-4)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
                   Folders
                 </span>
                 <button
                   type="button"
                   title="New folder"
                   aria-label="New folder"
-                  onClick={() => { setNewFolderMode(true); setNewFolderName('') }}
+                  disabled={folderSaving}
+                  onClick={() => { setNewFolderMode(true); setNewFolderName(''); setFolderSaveError(null) }}
                   style={{
                     background: 'none',
                     border: 'none',
-                    padding: '2px 4px',
+                    padding: "var(--workspace-space-2) var(--workspace-space-4)",
                     cursor: 'pointer',
                     color: '#6b7280',
                     display: 'flex',
                     alignItems: 'center',
-                    borderRadius: 4,
+                    borderRadius: 'var(--workspace-radius-small)',
                     lineHeight: 1,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#555' }}
@@ -980,47 +1029,48 @@ export function LibraryTab() {
                 </button>
               </div>
 
+              {foldersError && <div role="alert" style={{ padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>Folders unavailable. {foldersError} <button type="button" onClick={() => void refreshFolders()}>Retry folders</button></div>}
+              {folderSaveError && <p role="alert" style={{ padding: "0 var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{folderSaveError}</p>}
+              {foldersLoading && <p role="status" style={{ padding: "0 var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)' }}>Loading folders…</p>}
               {/* New folder input */}
               {newFolderMode && (
-                <div style={{ padding: '4px 8px 4px 12px' }}>
+                <div style={{ padding: "var(--workspace-space-4) var(--workspace-space-8) var(--workspace-space-4) var(--workspace-space-12)" }}>
                   <input
                     autoFocus
                     type="text"
+                    aria-label="New Library folder name"
+                    disabled={folderSaving}
                     value={newFolderName}
                     maxLength={MAX_NAME_LENGTH}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="Folder name"
-                    onKeyDown={async (e) => {
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return
                       if (e.key === 'Enter' && newFolderName.trim()) {
-                        await createFolder(normalizeName(newFolderName))
-                        setNewFolderMode(false)
-                        setNewFolderName('')
-                      } else if (e.key === 'Escape') {
+                        e.preventDefault(); void submitFolder()
+                      } else if (e.key === 'Escape' && !folderSaving) {
                         setNewFolderMode(false)
                         setNewFolderName('')
                       }
                     }}
-                    onBlur={() => {
-                      setNewFolderMode(false)
-                      setNewFolderName('')
-                    }}
                     style={{
                       width: '100%',
-                      fontSize: 12,
-                      padding: '4px 6px',
-                      border: '1px solid #dadce0',
-                      borderRadius: 5,
+                      fontSize: 'var(--workspace-font-meta)',
+                      padding: "var(--workspace-space-4) var(--workspace-space-6)",
+                      border: "1px solid var(--workspace-border)",
+                      borderRadius: 'var(--workspace-radius-small)',
                       outline: 'none',
                       fontFamily: 'inherit',
                       boxSizing: 'border-box',
                     }}
                   />
+                  <div className="library-folder-form-actions"><button type="button" disabled={folderSaving || !newFolderName.trim()} onClick={() => void submitFolder()}>{folderSaving ? 'Saving…' : 'Create folder'}</button><button type="button" disabled={folderSaving} onClick={() => { setNewFolderMode(false); setFolderSaveError(null) }}>Cancel</button></div>
                 </div>
               )}
 
               {/* Folder list */}
-              {folders.length === 0 && !newFolderMode && (
-                <div style={{ padding: '4px 12px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
+              {folders.length === 0 && !newFolderMode && !foldersLoading && !foldersError && (
+                <div style={{ padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic' }}>
                   No folders yet
                 </div>
               )}
@@ -1034,48 +1084,44 @@ export function LibraryTab() {
                     style={{ position: 'relative' }}
                   >
                     {isRenaming ? (
-                      <div style={{ padding: '4px 8px 4px 12px' }}>
+                      <div style={{ padding: "var(--workspace-space-4) var(--workspace-space-8) var(--workspace-space-4) var(--workspace-space-12)" }}>
                         <input
                           autoFocus
                           type="text"
+                          aria-label="Rename Library folder"
+                          disabled={folderSaving}
                           value={renameValue}
                           maxLength={MAX_NAME_LENGTH}
                           onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={async (e) => {
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing) return
                             if (e.key === 'Enter' && renameValue.trim()) {
-                              await renameFolder(folder.uuid, normalizeName(renameValue))
-                              setRenamingFolder(null)
-                            } else if (e.key === 'Escape') {
+                              e.preventDefault(); void submitFolder(folder.uuid)
+                            } else if (e.key === 'Escape' && !folderSaving) {
                               setRenamingFolder(null)
                             }
-                          }}
-                          onBlur={async () => {
-                            if (renameValue.trim()) {
-                              await renameFolder(folder.uuid, normalizeName(renameValue))
-                            }
-                            setRenamingFolder(null)
                           }}
                           style={{
                             width: '100%',
-                            fontSize: 12,
-                            padding: '4px 6px',
-                            border: '1px solid #dadce0',
-                            borderRadius: 5,
+                            fontSize: 'var(--workspace-font-meta)',
+                            padding: "var(--workspace-space-4) var(--workspace-space-6)",
+                            border: "1px solid var(--workspace-border)",
+                            borderRadius: 'var(--workspace-radius-small)',
                             outline: 'none',
                             fontFamily: 'inherit',
                             boxSizing: 'border-box',
                           }}
                         />
+                        <div className="library-folder-form-actions"><button type="button" disabled={folderSaving || !renameValue.trim()} onClick={() => void submitFolder(folder.uuid)}>{folderSaving ? 'Saving…' : 'Save folder name'}</button><button type="button" disabled={folderSaving} onClick={() => { setRenamingFolder(null); setFolderSaveError(null) }}>Cancel</button></div>
                       </div>
                     ) : (
                       <div
-                        onClick={() => setViewFilter(isActive ? 'all' : folder.uuid)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          padding: '7px 6px 7px 12px',
+                          padding: "7px var(--workspace-space-6) 7px var(--workspace-space-12)",
                           cursor: 'pointer',
-                          fontSize: 12,
+                          fontSize: 'var(--workspace-font-meta)',
                           fontWeight: isActive ? 600 : 500,
                           color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
                           backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
@@ -1096,6 +1142,7 @@ export function LibraryTab() {
                           }
                         }}
                       >
+                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setMobileViewsOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: "var(--workspace-space-4) 0", textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
                         {isActive
                           ? <FolderOpen style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                           : <Folder style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
@@ -1103,31 +1150,34 @@ export function LibraryTab() {
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {folder.name}
                         </span>
-                        <span style={{ fontSize: 11, color: '#999', marginRight: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginRight: 'var(--workspace-space-4)', flexShrink: 0 }}>
                           {folder.item_count}
                         </span>
+                        </button>
                         <button
                           type="button"
-                          aria-label="Folder actions"
+                          aria-label={`Folder actions: ${folder.name}`}
+                          aria-expanded={isMenuOpen}
                           className="folder-menu-btn"
                           onClick={(e) => {
                             e.stopPropagation()
+                            folderMenuTrigger.current = e.currentTarget
                             if (!isMenuOpen) {
                               const rect = e.currentTarget.getBoundingClientRect()
-                              setFolderMenuPos({ top: rect.bottom + 4, left: rect.left })
+                              setFolderMenuPos({ top: Math.min(rect.bottom + 4, window.innerHeight - 108), left: Math.min(rect.left, window.innerWidth - 160) })
                             }
                             setFolderMenuOpen(isMenuOpen ? null : folder.uuid)
                           }}
                           style={{
                             background: 'none',
                             border: 'none',
-                            padding: '2px 3px',
+                            padding: "var(--workspace-space-2) var(--workspace-space-4)",
                             cursor: 'pointer',
-                            color: '#888',
+                            color: '#666',
                             display: 'flex',
                             alignItems: 'center',
-                            borderRadius: 4,
-                            opacity: isMenuOpen ? 1 : 0,
+                            borderRadius: 'var(--workspace-radius-small)',
+                            opacity: 1,
                             transition: 'opacity 0.1s',
                             flexShrink: 0,
                           }}
@@ -1141,17 +1191,22 @@ export function LibraryTab() {
                     {isMenuOpen && createPortal(
                       <div
                         ref={folderMenuRef}
+                        role="group"
+                        aria-label={`Actions for folder ${folder.name}`}
+                        onKeyDown={e => {
+                          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setFolderMenuOpen(null); folderMenuTrigger.current?.focus() }
+                        }}
                         style={{
                           position: 'fixed',
                           left: folderMenuPos.left,
                           top: folderMenuPos.top,
                           zIndex: 9999,
                           minWidth: 140,
-                          borderRadius: 8,
+                          borderRadius: 'var(--workspace-radius-medium)',
                           border: '1px solid rgba(0,0,0,0.14)',
                           background: '#fff',
                           boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
-                          padding: 4,
+                          padding: 'var(--workspace-space-4)',
                         }}
                       >
                         <button
@@ -1159,20 +1214,21 @@ export function LibraryTab() {
                             e.stopPropagation()
                             setRenamingFolder(folder.uuid)
                             setRenameValue(folder.name)
+                            setFolderSaveError(null)
                             setFolderMenuOpen(null)
                           }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
+                            gap: 'var(--workspace-space-8)',
                             width: '100%',
                             background: 'none',
                             border: 'none',
-                            padding: '8px 10px',
-                            fontSize: 12,
+                            padding: "var(--workspace-space-8) var(--workspace-space-12)",
+                            fontSize: 'var(--workspace-font-meta)',
                             color: '#1f2937',
                             cursor: 'pointer',
-                            borderRadius: 5,
+                            borderRadius: 'var(--workspace-radius-small)',
                             textAlign: 'left',
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
@@ -1198,22 +1254,32 @@ export function LibraryTab() {
                               setFolderMenuOpen(null)
                               return
                             }
-                            await removeFolder(folder.uuid)
-                            if (viewFilter === folder.uuid) setViewFilter('all')
-                            setFolderMenuOpen(null)
+                            if (folderSavingRef.current) return
+                            const scopeAtStart = currentScope.current
+                            folderSavingRef.current = true; setFolderSaving(true); setFolderSaveError(null)
+                            try {
+                              await removeFolder(folder.uuid)
+                              await refreshItems()
+                              if (currentScope.current === scopeAtStart) {
+                                setViewFilter(current => current === folder.uuid ? 'all' : current)
+                                setFolderMenuOpen(null)
+                              }
+                            } catch (reason) {
+                              if (currentScope.current === scopeAtStart) { setFolderSaveError(reason instanceof Error ? reason.message : 'Could not delete this folder.'); setFolderMenuOpen(null) }
+                            } finally { folderSavingRef.current = false; setFolderSaving(false) }
                           }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
+                            gap: 'var(--workspace-space-8)',
                             width: '100%',
                             background: 'none',
                             border: 'none',
-                            padding: '8px 10px',
-                            fontSize: 12,
+                            padding: "var(--workspace-space-8) var(--workspace-space-12)",
+                            fontSize: 'var(--workspace-font-meta)',
                             color: '#dc2626',
                             cursor: 'pointer',
-                            borderRadius: 5,
+                            borderRadius: 'var(--workspace-radius-small)',
                             textAlign: 'left',
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2' }}
@@ -1233,7 +1299,7 @@ export function LibraryTab() {
         </div>
 
         {/* Drag handle — resize the sidebar */}
-        <div
+        <div className="library-sidebar-resizer"
           onMouseDown={(e) => {
             sidebarLeftRef.current = sidebarRef.current?.getBoundingClientRect().left ?? 0
             setResizing(true)
@@ -1254,14 +1320,14 @@ export function LibraryTab() {
         />
 
         {/* Results pane */}
-        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
+        <div className="library-results" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
           {/* Collection filter banner */}
           {selectedCollection && (
-            <div style={{ padding: '12px 24px', background: '#f8f9fa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-24)", background: '#f8f9fa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{selectedCollection.title}</div>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{selectedCollection.title}</div>
                 {selectedCollection.description && (
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{selectedCollection.description}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#666', marginTop: 'var(--workspace-space-2)' }}>{selectedCollection.description}</div>
                 )}
               </div>
               <button
@@ -1271,15 +1337,15 @@ export function LibraryTab() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  padding: 4,
+                  padding: 'var(--workspace-space-4)',
                   cursor: 'pointer',
-                  color: '#888',
+                  color: '#666',
                   display: 'flex',
                   alignItems: 'center',
-                  borderRadius: 4,
+                  borderRadius: 'var(--workspace-radius-small)',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#333' }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#666' }}
               >
                 <X style={{ width: 16, height: 16 }} />
               </button>
@@ -1287,14 +1353,14 @@ export function LibraryTab() {
           )}
 
           {/* List header */}
-          <div
+          <div className="library-list-header"
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 100px',
-              padding: '10px 24px',
+              padding: "var(--workspace-space-12) var(--workspace-space-24)",
               backgroundColor: '#fff',
               borderBottom: '1px solid #f0f0f0',
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 500,
               color: '#5f6368',
               textTransform: 'uppercase',
@@ -1306,43 +1372,63 @@ export function LibraryTab() {
           </div>
 
           {/* Items list */}
-          <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
-            {itemsLoading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading...</div>
-            ) : items.length === 0 && !search && viewFilter === 'all' ? (
-              // The whole library is empty (not a search, kind, or folder miss):
-              // point at the catalog under Everyone instead of "No items found."
-              <div style={{ padding: '48px 24px', textAlign: 'center', color: '#5f6368', fontSize: 13, lineHeight: 1.5 }}>
-                <Layers size={28} style={{ color: '#c4c7c5', marginBottom: 10 }} />
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#3c4043', marginBottom: 4 }}>
-                  {scope === 'team' ? 'Your team library is empty' : 'Your library is empty'}
-                </div>
-                <div style={{ maxWidth: 340, margin: '0 auto 14px' }}>
-                  Not sure where to start? The catalog has ready-made workflows and extractions you can try and add here.
-                </div>
-                <button
-                  onClick={() => setScope('explore')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    fontFamily: 'inherit',
-                    color: 'var(--library-highlight, #eab308)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Browse the catalog →
-                </button>
+          <div role="region" aria-label="Saved Library items" style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
+            <div className="library-recovery-feedback">
+            {error && <div role="alert" className="library-feedback">{error} <button type="button" onClick={() => void refresh()}>Retry libraries</button></div>}
+            {itemsError && <div role="alert" className="library-feedback">Items unavailable. {itemsError} <button type="button" onClick={() => void refreshItems()}>Retry items</button></div>}
+            {itemAction?.scope === currentScope.current && <div role={itemAction.error ? 'alert' : 'status'} className="library-feedback">{itemAction.pending ? 'Saving… ' : itemAction.error ? 'Not saved. ' : 'Saved. '}{itemAction.label}{itemAction.error && <> — {itemAction.error} <button type="button" onClick={itemAction.retry}>Retry item action</button></>}</div>}
+            {itemsLoading && items.length > 0 && <div role="status" className="library-feedback">Refreshing items…</div>}
+            </div>
+            {itemsLoading && !items.length ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 'var(--workspace-font-control)' }}>Loading...</div>
+            ) : itemsError && !items.length ? null : sorted.length === 0 ? (
+              <div style={{ maxWidth: 360, margin: '0 auto', padding: "64px var(--workspace-space-32)", textAlign: 'center' }}>
+                <h2 style={{ margin: 0, color: '#303030', fontSize: 'var(--workspace-font-card-title)', fontWeight: 700 }}>
+                  {selectedFolder && !search.trim() && kindFilter === 'all' ? 'This folder is empty' : hasActiveFilters ? 'No items match these filters' : 'Your library is ready for its first tool'}
+                </h2>
+                <p style={{ margin: "var(--workspace-space-12) 0 var(--workspace-space-20)", color: '#5f6368', fontSize: 'var(--workspace-font-control)', lineHeight: 1.55 }}>
+                  {hasActiveFilters
+                    ? selectedFolder && !search.trim() && kindFilter === 'all' ? 'Move tools here from their item actions, or return to all items.' : 'Try clearing a filter or searching with a different term.'
+                    : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work, or start from a ready-made one in the catalog.'}
+                </p>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('')
+                      setViewFilter('all')
+                      setKindFilter('all')
+                    }}
+                    style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-8) var(--workspace-space-12)", background: '#fff', color: '#303030', fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 'var(--workspace-space-16)', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCreateModal('workflow')}
+                      style={{ border: 0, borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-8) var(--workspace-space-12)", background: 'var(--library-highlight, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 'var(--workspace-font-control)', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Create a workflow
+                    </button>
+                    {/* Ready-made starting points live under Everyone (#961). */}
+                    <button
+                      type="button"
+                      onClick={() => setScope('explore')}
+                      style={{ border: 0, padding: 0, background: 'none', color: '#303030', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+                    >
+                      Browse the catalog →
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : sorted.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>No items found.</div>
             ) : (
               sorted.map((item) => (
                 <LibraryItemRow
                   key={item.id}
                   item={item}
+                  busy={itemAction?.scope === currentScope.current && itemAction.pending}
                   scope={scope}
                   onPin={handlePin}
                   onFavorite={handleFavorite}
@@ -1365,8 +1451,8 @@ export function LibraryTab() {
                       // Assistant (an LLM call) from the modal's Use button,
                       // which is also what bumps last-used.
                       openPromptModal(it, 'preview')
-                    } else if (it.set_type === 'extraction' && it.item_uuid) {
-                      openExtraction(it.item_uuid)
+                    } else if (it.kind === 'search_set') {
+                      openExtraction(it.item_uuid || it.item_id)
                     }
                   }}
                 />
@@ -1400,31 +1486,31 @@ export function LibraryTab() {
             style={{
               backgroundColor: '#fff',
               borderRadius: 'var(--ui-radius, 12px)',
-              padding: '28px 32px',
+              padding: "28px var(--workspace-space-32)",
               width: '90%',
               maxWidth: 480,
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
-            <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 600, color: '#202124', textAlign: 'left' }}>
+            <h2 style={{ margin: "0 0 var(--workspace-space-12)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', textAlign: 'left' }}>
               Delete {itemKindLabel(deleteTarget)}?
             </h2>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#5f6368', lineHeight: 1.5 }}>
+            <p style={{ margin: "0 0 var(--workspace-space-20)", fontSize: 'var(--workspace-font-body)', color: '#5f6368', lineHeight: 1.5 }}>
               <strong style={{ color: '#202124' }}>{deleteTarget.name}</strong> can be removed from
               this library only — it still exists, keeps its name, and can be added back later.
               Or delete it permanently, which removes the {itemKindLabel(deleteTarget)} and its run
               history everywhere and cannot be undone.
             </p>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => handleDeleteChoice(true)}
                 disabled={deleting}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
-                  borderRadius: 8,
+                  borderRadius: 'var(--workspace-radius-medium)',
                   border: 'none',
                   backgroundColor: '#dc2626',
                   color: '#fff',
@@ -1438,11 +1524,11 @@ export function LibraryTab() {
                 onClick={() => handleDeleteChoice(false)}
                 disabled={deleting}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  borderRadius: 8,
-                  border: '1px solid #dadce0',
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  border: "1px solid var(--workspace-border)",
                   backgroundColor: '#fff',
                   color: '#202124',
                   cursor: deleting ? 'not-allowed' : 'pointer',
@@ -1455,10 +1541,10 @@ export function LibraryTab() {
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  borderRadius: 8,
+                  borderRadius: 'var(--workspace-radius-medium)',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: '#5f6368',
@@ -1492,16 +1578,16 @@ export function LibraryTab() {
             style={{
               backgroundColor: '#fff',
               borderRadius: 'var(--ui-radius, 12px)',
-              padding: '28px 32px',
+              padding: "28px var(--workspace-space-32)",
               width: '90%',
               maxWidth: 480,
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
-            <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124', textAlign: 'left' }}>
+            <h2 style={{ margin: "0 0 var(--workspace-space-20)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', textAlign: 'left' }}>
               {modalConfig[createModalType].title}
             </h2>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <input
                 type="text"
                 value={createName}
@@ -1511,22 +1597,22 @@ export function LibraryTab() {
                 maxLength={MAX_NAME_LENGTH}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  border: '1px solid #dadce0',
-                  borderRadius: 8,
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
                   outline: 'none',
                   boxSizing: 'border-box',
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && !modalConfig[createModalType].showDesc && handleCreate()}
               />
-              <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: createName.length >= MAX_NAME_LENGTH ? '#dc2626' : '#9aa0a6' }}>
+              <div style={{ marginTop: 'var(--workspace-space-4)', textAlign: 'right', fontSize: 'var(--workspace-font-meta)', color: createName.length >= MAX_NAME_LENGTH ? '#dc2626' : '#9aa0a6' }}>
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
             {modalConfig[createModalType].showDesc && (
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 'var(--workspace-space-20)' }}>
                 <textarea
                   value={createDesc}
                   onChange={(e) => setCreateDesc(e.target.value)}
@@ -1534,11 +1620,11 @@ export function LibraryTab() {
                   rows={createModalType === 'workflow' ? 5 : 10}
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
-                    fontSize: 14,
+                    padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                    fontSize: 'var(--workspace-font-body)',
                     fontFamily: 'inherit',
-                    border: '1px solid #dadce0',
-                    borderRadius: 8,
+                    border: "1px solid var(--workspace-border)",
+                    borderRadius: 'var(--workspace-radius-medium)',
                     outline: 'none',
                     resize: 'vertical',
                     boxSizing: 'border-box',
@@ -1547,20 +1633,20 @@ export function LibraryTab() {
               </div>
             )}
             {createError && (
-              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              <div style={{ marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-16)", backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#dc2626' }}>
                 {createError}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', alignItems: 'center' }}>
               <button
                 onClick={handleCreate}
                 disabled={creating || uploading || !createName.trim()}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
-                  borderRadius: 8,
+                  borderRadius: 'var(--workspace-radius-medium)',
                   border: 'none',
                   backgroundColor: 'var(--highlight-color, #eab308)',
                   color: 'var(--highlight-text-color, #000)',
@@ -1578,11 +1664,11 @@ export function LibraryTab() {
               <button
                 onClick={closeCreateModal}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  borderRadius: 8,
-                  border: '1px solid #dadce0',
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  border: "1px solid var(--workspace-border)",
                   backgroundColor: '#fff',
                   color: '#5f6368',
                   cursor: 'pointer',
@@ -1600,12 +1686,12 @@ export function LibraryTab() {
                       marginLeft: 'auto',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 10px',
-                      fontSize: 12,
+                      gap: 'var(--workspace-space-6)',
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)",
+                      fontSize: 'var(--workspace-font-meta)',
                       fontFamily: 'inherit',
-                      borderRadius: 6,
-                      border: '1px solid #dadce0',
+                      borderRadius: 'var(--workspace-radius-small)',
+                      border: "1px solid var(--workspace-border)",
                       backgroundColor: '#fff',
                       color: '#5f6368',
                       cursor: creating || uploading ? 'not-allowed' : 'pointer',
@@ -1639,40 +1725,51 @@ export function LibraryTab() {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            paddingTop: '8%',
+            padding: 'var(--workspace-space-12)',
             backgroundColor: 'rgba(0,0,0,0.4)',
           }}
           onClick={closeEditModal}
         >
+          <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${editMode === 'edit' ? 'Edit' : 'Preview'} ${editingItem.name}`}
+            onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeEditModal() } }}
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#fff',
               borderRadius: 'var(--ui-radius, 12px)',
-              padding: '28px 32px',
-              width: '90%',
+              padding: 'var(--workspace-space-20)',
+              width: '100%',
+              maxHeight: '100%',
+              overflowY: 'auto',
               maxWidth: 480,
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
+            {editLoadError && <div role="alert" className="library-feedback">{editLoadError} <button type="button" onClick={() => void openPromptModal(editingItem, editMode)}>Retry item content</button></div>}
             {editMode === 'preview' ? (
               <>
-                <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
+                <h2 style={{ margin: "0 0 var(--workspace-space-4)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
                   {editingItem.name}
                 </h2>
-                <div style={{ fontSize: 12, color: '#70757a', marginBottom: 16 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#70757a', marginBottom: 'var(--workspace-space-16)' }}>
                   {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
                 </div>
                 <div
+                  role="region"
+                  aria-label="Library item content"
+                  tabIndex={0}
                   style={{
-                    marginBottom: 20,
-                    padding: '12px 14px',
-                    fontSize: 14,
+                    marginBottom: 'var(--workspace-space-20)',
+                    padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                    fontSize: 'var(--workspace-font-body)',
                     lineHeight: 1.5,
-                    color: !editLoading && editContent.trim() ? '#3c4043' : '#9aa0a6',
+                    color: '#3c4043',
                     backgroundColor: '#f8f9fa',
                     border: '1px solid #e8eaed',
-                    borderRadius: 8,
+                    borderRadius: 'var(--workspace-radius-medium)',
                     whiteSpace: 'pre-wrap',
                     overflowWrap: 'anywhere',
                     maxHeight: '45vh',
@@ -1685,16 +1782,16 @@ export function LibraryTab() {
                       ? editContent
                       : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'prompt'} has no content yet — click Edit to add some.`}
                 </div>
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
                   <button
                     onClick={usePromptInAssistant}
-                    disabled={editLoading || !editContent.trim()}
+                    disabled={editLoading || !!editLoadError || !editContent.trim()}
                     style={{
-                      padding: '10px 20px',
-                      fontSize: 14,
+                      padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                      fontSize: 'var(--workspace-font-body)',
                       fontWeight: 700,
                       fontFamily: 'inherit',
-                      borderRadius: 8,
+                      borderRadius: 'var(--workspace-radius-medium)',
                       border: 'none',
                       backgroundColor: 'var(--highlight-color, #eab308)',
                       color: 'var(--highlight-text-color, #000)',
@@ -1705,13 +1802,14 @@ export function LibraryTab() {
                     Use in Assistant
                   </button>
                   <button
+                    disabled={editLoading || !!editLoadError}
                     onClick={() => setEditMode('edit')}
                     style={{
-                      padding: '10px 20px',
-                      fontSize: 14,
+                      padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                      fontSize: 'var(--workspace-font-body)',
                       fontFamily: 'inherit',
-                      borderRadius: 8,
-                      border: '1px solid #dadce0',
+                      borderRadius: 'var(--workspace-radius-medium)',
+                      border: "1px solid var(--workspace-border)",
                       backgroundColor: '#fff',
                       color: '#5f6368',
                       cursor: 'pointer',
@@ -1722,11 +1820,11 @@ export function LibraryTab() {
                   <button
                     onClick={closeEditModal}
                     style={{
-                      padding: '10px 20px',
-                      fontSize: 14,
+                      padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                      fontSize: 'var(--workspace-font-body)',
                       fontFamily: 'inherit',
-                      borderRadius: 8,
-                      border: '1px solid #dadce0',
+                      borderRadius: 'var(--workspace-radius-medium)',
+                      border: "1px solid var(--workspace-border)",
                       backgroundColor: '#fff',
                       color: '#5f6368',
                       cursor: 'pointer',
@@ -1738,42 +1836,46 @@ export function LibraryTab() {
               </>
             ) : (
               <>
-            <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124' }}>
+            <h2 style={{ margin: "0 0 var(--workspace-space-20)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124' }}>
               Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
             </h2>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => { setEditTitle(e.target.value); if (editError) setEditError(null) }}
                 placeholder="Title"
                 autoFocus
+                aria-label="Library item title"
+                disabled={editLoading || !!editLoadError || editSaving}
                 maxLength={MAX_NAME_LENGTH}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  border: '1px solid #dadce0',
-                  borderRadius: 8,
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
                   outline: 'none',
                   boxSizing: 'border-box',
                 }}
               />
             </div>
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 'var(--workspace-space-20)' }}>
               <textarea
+                aria-label="Library item content"
+                disabled={editLoading || !!editLoadError || editSaving}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder={editingItem.set_type === 'formatter' ? 'Write your formatting instructions here' : 'Write your prompt here'}
                 rows={10}
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  border: '1px solid #dadce0',
-                  borderRadius: 8,
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
                   outline: 'none',
                   resize: 'vertical',
                   boxSizing: 'border-box',
@@ -1781,20 +1883,20 @@ export function LibraryTab() {
               />
             </div>
             {editError && (
-              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              <div style={{ marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-16)", backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#dc2626' }}>
                 {editError}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
               <button
                 onClick={handleEditSave}
-                disabled={editSaving || !editTitle.trim()}
+                disabled={editLoading || !!editLoadError || editSaving || !editTitle.trim()}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
-                  borderRadius: 8,
+                  borderRadius: 'var(--workspace-radius-medium)',
                   border: 'none',
                   backgroundColor: 'var(--highlight-color, #eab308)',
                   color: 'var(--highlight-text-color, #000)',
@@ -1807,11 +1909,11 @@ export function LibraryTab() {
               <button
                 onClick={closeEditModal}
                 style={{
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: "var(--workspace-space-12) var(--workspace-space-20)",
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
-                  borderRadius: 8,
-                  border: '1px solid #dadce0',
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  border: "1px solid var(--workspace-border)",
                   backgroundColor: '#fff',
                   color: '#5f6368',
                   cursor: 'pointer',
@@ -1823,11 +1925,13 @@ export function LibraryTab() {
               </>
             )}
           </div>
+          </FocusTrap>
         </div>
       )}
 
       {shareDialogItem && (
         <ShareWithTeamDialog
+          createsIndependentCopy
           itemName={shareDialogItem.name}
           teams={teams.map((t) => ({ id: t.id, name: t.name }))}
           defaultTeamId={teamId}
@@ -1847,13 +1951,13 @@ function NewMenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: s
         display: 'flex',
         width: '100%',
         alignItems: 'center',
-        gap: 10,
-        borderRadius: 8,
-        padding: '10px 12px',
+        gap: 'var(--workspace-space-12)',
+        borderRadius: 'var(--workspace-radius-medium)',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        fontSize: 14,
+        fontSize: 'var(--workspace-font-body)',
         color: '#1f2937',
         textAlign: 'left',
         minHeight: 40,

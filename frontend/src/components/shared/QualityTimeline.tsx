@@ -19,6 +19,7 @@ const POLL_INTERVAL_MS = 4000
 
 export interface QualityHistoryItem {
   uuid?: string
+  result_snapshot?: unknown
   score?: number
   grade?: string | null
   created_at?: string
@@ -91,6 +92,8 @@ interface Props {
    *  that exports the run's per-query results. Optimizer-apply rows carry no
    *  per-query results, so they never show the menu. */
   onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
+  onOpenRun?: (item: QualityHistoryItem) => void
+  canOpenRun?: (item: QualityHistoryItem) => boolean
   /** Why this item can't be validated yet (e.g. a KB with no sources). When
    *  set and there is no history, the empty state states that plainly rather
    *  than pitching a Validate & improve run the item can't do. */
@@ -101,21 +104,27 @@ export type QualityRunExportFormat = 'csv' | 'xlsx' | 'json'
 
 export function QualityTimeline({
   fetchHistory, itemKindLabel, itemKindPluralLabel, onSwitchToAutovalidate, sampleNoun = 'items',
-  refreshKey, polling = false, onExportRun, blockedReason,
+  refreshKey, polling = false, onExportRun, onOpenRun, canOpenRun, blockedReason,
 }: Props) {
   const [items, setItems] = useState<QualityHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   // Only the first fetch drives the spinner; background refreshes (poll ticks,
   // refreshKey bumps) swap rows in place rather than flashing the loader.
   const firstLoadRef = useRef(true)
 
   useEffect(() => {
     let cancelled = false
+    let pending = false
     const load = () => {
+      if (pending) return
+      pending = true
       fetchHistory()
-        .then(out => { if (!cancelled) setItems((out.history || []).slice(0, 30)) })
-        .catch(e => console.error('QualityTimeline fetchHistory failed', e))
+        .then(out => { if (!cancelled) { setItems((out.history || []).slice(0, 30)); setError(false) } })
+        .catch(() => { if (!cancelled) setError(true) })
         .finally(() => {
+          pending = false
           if (!cancelled && firstLoadRef.current) {
             firstLoadRef.current = false
             setLoading(false)
@@ -125,11 +134,11 @@ export function QualityTimeline({
     load()
     const timer = polling ? setInterval(load, POLL_INTERVAL_MS) : undefined
     return () => { cancelled = true; if (timer) clearInterval(timer) }
-  }, [fetchHistory, refreshKey, polling])
+  }, [fetchHistory, refreshKey, polling, retryKey])
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} aria-hidden="true" style={{ animation: 'spin 1s linear infinite' }} />
         <span style={{
           position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
@@ -141,12 +150,20 @@ export function QualityTimeline({
     )
   }
 
+  const recovery = error && (
+    <div role="alert" style={{ padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', border: '1px solid #835b32', borderRadius: 'var(--workspace-radius-small)', color: 'var(--workspace-warning)', fontSize: 'var(--workspace-font-control)' }}>
+      <p style={{ margin: "0 0 var(--workspace-space-8)" }}>{items.length ? 'History could not refresh. Previously loaded runs are still shown.' : 'History could not load. Your saved runs have not been changed.'}</p>
+      <button type="button" onClick={() => setRetryKey(k => k + 1)} style={actionStyle}>Retry history</button>
+    </div>
+  )
+  if (error && items.length === 0) return recovery
+
   if (items.length === 0 && blockedReason) {
     // Nothing to show and nothing the user could run from here: state the
     // absence, in the register of the "No prior optimization runs" note, and
     // leave the pitch to the Validate tab.
     return (
-      <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#888', padding: '12px 8px', lineHeight: 1.6 }}>
+      <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-12) var(--workspace-space-8)", lineHeight: 1.6 }}>
         No validation runs yet for this {itemKindLabel}. {blockedReason}
       </div>
     )
@@ -155,17 +172,17 @@ export function QualityTimeline({
   if (items.length === 0) {
     return (
       <div role="status" aria-live="polite" style={{
-        padding: 20, margin: '12px 0',
-        background: 'linear-gradient(135deg, #1f1f2e 0%, #1a1a1a 100%)',
-        border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
+        padding: 'var(--workspace-space-20)', margin: "var(--workspace-space-12) 0",
+        background: 'var(--workspace-canvas)',
+        border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 'var(--workspace-radius-medium)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Sparkles size={16} style={{ color: '#a78bfa' }} />
-          <h3 style={{ margin: 0, fontSize: 14, color: '#fff', fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
+          <Sparkles size={16} style={{ color: 'var(--workspace-info)' }} />
+          <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)', fontWeight: 600 }}>
             No quality history yet for this {itemKindLabel}
           </h3>
         </div>
-        <p style={{ margin: '0 0 14px 0', fontSize: 13, color: '#bbb', lineHeight: 1.55 }}>
+        <p style={{ margin: "0 0 var(--workspace-space-16) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
           Each Validate &amp; improve run records a quality score here so you can
           watch {itemKindPluralLabel} improve over time. Nothing is mutated until
           you choose to apply a winning configuration.
@@ -175,11 +192,11 @@ export function QualityTimeline({
             type="button"
             onClick={onSwitchToAutovalidate}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#fff',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-              border: '1px solid #7c3aed', borderRadius: 6, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              color: 'var(--highlight-text-color, #000)',
+              background: 'var(--highlight-color, #eab308)',
+              border: '1px solid var(--workspace-accent-ink)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <Sparkles size={12} />
@@ -213,17 +230,19 @@ export function QualityTimeline({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-        <div style={{ fontSize: 11, color: '#888' }}>
+      {recovery}
+      <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6 }}>Compare runs with the same test set, scoring mode, and grader. Selected-question checks do not update the quality score.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Last {ordered.length} runs
         </div>
         {judgeModelChanged && (
           <span
             title={`Judge model changed across this window: ${[...judgeModels].join(', ')}`}
             style={{
-              fontSize: 9, fontWeight: 600,
-              padding: '1px 6px', borderRadius: 4,
-              color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+              padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
+              color: 'var(--workspace-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)',
               border: '1px solid rgba(245, 158, 11, 0.3)',
             }}
           >
@@ -234,9 +253,9 @@ export function QualityTimeline({
           <span
             title={`Model under test changed across this window: ${[...taskModels].join(', ')} — score changes may reflect the model swap, not the content`}
             style={{
-              fontSize: 9, fontWeight: 600,
-              padding: '1px 6px', borderRadius: 4,
-              color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+              padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
+              color: 'var(--workspace-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)',
               border: '1px solid rgba(245, 158, 11, 0.3)',
             }}
           >
@@ -245,19 +264,19 @@ export function QualityTimeline({
         )}
       </div>
       <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: 2,
-        height: 80, padding: 8, backgroundColor: '#1a1a1a',
-        border: '1px solid #2e2e2e', borderRadius: 6, marginBottom: 12,
+        display: 'flex', alignItems: 'flex-end', gap: 'var(--workspace-space-2)',
+        height: 80, padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)',
+        border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', marginBottom: 'var(--workspace-space-12)',
         position: 'relative',
       }}>
         {ordered.map((it, i) => {
           const score = it.score ?? 0
           const heightPct = max === min ? 50 : ((score - min) / (max - min)) * 100
-          const c = scoreColor(score)
+          const c = it.score == null ? 'var(--workspace-muted)' : scoreColor(score)
           const sigmaPts = (it.judge_variance ?? 0) * 100
           const ciHalfPct = max === min ? 0 : ((sigmaPts * 1.96) / (max - min)) * 100
           const titleBits: string[] = []
-          titleBits.push(`${score.toFixed(0)}%`)
+          titleBits.push(it.score == null ? 'Score unavailable' : `${score.toFixed(0)}%`)
           if (it.created_at) titleBits.push(new Date(it.created_at).toLocaleString())
           if (it.judge_model) titleBits.push(`judge: ${it.judge_model}`)
           const nq = it.num_queries_judged ?? it.num_test_queries ?? it.num_test_cases ?? it.num_checks
@@ -288,7 +307,7 @@ export function QualityTimeline({
               aria-label={title}
               data-source={it.source || undefined}
               style={{
-                flex: 1, minWidth: 6, position: 'relative',
+                flex: 1, minWidth: 0, position: 'relative',
                 height: `${Math.max(4, heightPct)}%`,
                 display: 'flex', flexDirection: 'column-reverse',
                 // A smoke-test bar is faded with a dashed outline so a
@@ -321,14 +340,15 @@ export function QualityTimeline({
           )
         })}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {items.slice(0, 10).map((it, i) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+        {items.map((it, i) => (
           <Row
             key={it.uuid || i}
             item={it}
             setChanged={setChanges[i]}
             sampleNoun={sampleNoun}
             onExportRun={onExportRun}
+            onOpenRun={canOpenRun?.(it) ? onOpenRun : undefined}
           />
         ))}
       </div>
@@ -336,100 +356,48 @@ export function QualityTimeline({
   )
 }
 
-function Row({ item, setChanged = false, sampleNoun, onExportRun }: {
+const actionStyle = {
+  fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "7px var(--workspace-space-12)",
+  borderRadius: 'var(--workspace-radius-small)', color: '#d5eaff', background: '#253447', border: '1px solid #52657e', cursor: 'pointer',
+} as const
+
+function Row({ item, setChanged = false, sampleNoun, onExportRun, onOpenRun }: {
   item: QualityHistoryItem
-  /** This run measured a different question set than the one before it. */
   setChanged?: boolean
   sampleNoun: string
   onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
+  onOpenRun?: (item: QualityHistoryItem) => void
 }) {
-  const score = item.score ?? 0
   const sigmaPts = (item.judge_variance ?? 0) * 100
   const nq = item.num_queries_judged ?? item.num_test_queries ?? item.num_test_cases ?? item.num_checks
   const isApply = item.source === 'optimizer_apply'
-  const isPassive = item.source === 'passive_monthly'
-  const isSmoke = item.source === 'smoke_test'
-  // Apply rows record a config change, not a measurement — nothing to export.
-  const exportable = !!onExportRun && !!item.uuid && !isApply
+  const isSmoke = item.source === SMOKE_TEST_SOURCE
+  const source = isApply ? 'Optimizer configuration applied' : isSmoke ? 'Selected-question check' : item.source === 'passive_monthly' ? 'Monthly automatic check' : item.source || 'Source not recorded'
+  const date = item.created_at ? new Date(item.created_at).toLocaleString() : 'Date not recorded'
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '6px 10px', fontSize: 11, color: '#aaa',
-      backgroundColor: '#1f1f1f', borderRadius: 4,
+    <article aria-label={`Validation run ${date}${item.uuid ? ` · ${item.uuid}` : ''}`} style={{
+      padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-surface)', border: '1px solid #393939', borderRadius: 'var(--workspace-radius-small)', overflowWrap: 'anywhere',
     }}>
-      <span style={{
-        width: 8, height: 8, borderRadius: '50%',
-        backgroundColor: scoreColor(score),
-      }} />
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
-        {isApply && (
-          <span title="Recorded when an optimizer winning config was applied" style={{ marginLeft: 6, color: '#a78bfa' }}>
-            · apply
-          </span>
-        )}
-        {isPassive && (
-          <span title="Monthly auto-re-judge of the applied tuning — catches quiet regressions after Apply" style={{ marginLeft: 6, color: '#7dd3fc' }}>
-            · auto-monthly
-          </span>
-        )}
-        {isSmoke && (
-          <span
-            title={`Run over selected ${sampleNoun} only — a smoke test. Exportable, but not the quality score.`}
-            style={{ marginLeft: 6, color: '#fbbf24' }}
-          >
-            · selected{item.query_selection ? ` ${item.query_selection.selected}/${item.query_selection.total}` : ''}
-          </span>
-        )}
-        {item.question_set && (
-          <span
-            title={
-              `Question set ${item.question_set.fingerprint}` +
-              (item.question_set.count != null ? ` · ${item.question_set.count} ${sampleNoun}` : '') +
-              (item.question_set.category_counts && Object.keys(item.question_set.category_counts).length
-                ? ` · ${Object.entries(item.question_set.category_counts).map(([c, k]) => `${c} ${k}`).join(', ')}`
-                : '') +
-              '. Runs with the same set scored the same questions, expected answers, categories and source labels.'
-            }
-            style={{ marginLeft: 6, color: '#666' }}
-          >
-            · set <code style={{ fontSize: 10 }}>{item.question_set.fingerprint.slice(0, 6)}</code>
-          </span>
-        )}
-        {setChanged && (
-          <span
-            title={`This run measured a different question set than the previous ${item.source === SMOKE_TEST_SOURCE ? 'subset' : 'full'} run — ${sampleNoun} were added, removed or edited, so the two scores are not directly comparable.`}
-            style={{ marginLeft: 6, color: '#f59e0b' }}
-          >
-            · different {sampleNoun}
-          </span>
-        )}
-      </span>
-      {item.judge_model && (
-        <span
-          title="Judge model"
-          style={{
-            color: '#666', fontSize: 10,
-            maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}
-        >
-          {item.judge_model}
-        </span>
-      )}
-      {nq != null && <span style={{ color: '#666' }}>n={nq} {sampleNoun}</span>}
-      {item.mode && <span style={{ color: '#666' }}>{item.mode}</span>}
-      {sigmaPts > 0 && (
-        <span title="95% noise-floor band" style={{ color: '#666' }}>
-          ±{(sigmaPts * 1.96).toFixed(1)}
-        </span>
-      )}
-      <span style={{ fontWeight: 600, color: '#e5e5e5', minWidth: 38, textAlign: 'right' }}>
-        {score.toFixed(0)}%
-      </span>
-      {exportable && (
-        <RowExportMenu onExport={format => onExportRun!(item.uuid!, format)} />
-      )}
-    </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', justifyContent: 'space-between' }}>
+        <strong style={{ color: 'var(--workspace-text)' }}>{date}</strong>
+        <strong style={{ color: 'var(--workspace-text)' }}>{item.score == null ? 'Score unavailable' : `${item.score.toFixed(0)}%`}</strong>
+      </div>
+      <div style={{ marginTop: 'var(--workspace-space-6)', lineHeight: 1.7 }}>
+        <div>{source}{isSmoke && <> · {item.query_selection ? `${item.query_selection.selected} of ${item.query_selection.total} ${sampleNoun} · ` : ''}Does not update quality score</>}</div>
+        <div>{nq == null ? 'Sample size not recorded' : `${nq} ${sampleNoun}`} · Mode: {item.mode || 'not recorded'}</div>
+        <div>Grader: {item.judge_model || 'not recorded'}{item.model && <> · Answer model: {item.model}</>}</div>
+        {item.question_set ? <div>Question set: <code>{item.question_set.fingerprint}</code>
+          {item.question_set.category_counts && <div>{Object.entries(item.question_set.category_counts).map(([c, n]) => `${c}: ${n}`).join(' · ')}</div>}
+        </div> : (sampleNoun === 'queries' || sampleNoun === 'questions') && <div>Question set not recorded; question-level comparison is unavailable.</div>}
+        {setChanged && <div style={{ color: 'var(--workspace-warning)' }}>Different {sampleNoun} from the previous {isSmoke ? 'selected-question' : 'full'} run. These scores are not directly comparable.</div>}
+        {sigmaPts > 0 && <div>95% noise-floor band: ±{(sigmaPts * 1.96).toFixed(1)} points{item.judge_variance_meta?.n ? ` (estimated from ${item.judge_variance_meta.n} samples)` : ''}</div>}
+        {item.uuid && <div style={{ color: 'var(--workspace-muted)' }}>Run: <code>{item.uuid}</code></div>}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', alignItems: 'center', marginTop: 'var(--workspace-space-8)' }}>
+        {onOpenRun && <button type="button" style={actionStyle} onClick={() => onOpenRun(item)}>Open results</button>}
+        {onExportRun && item.uuid && !isApply && <RowExportMenu onExport={format => onExportRun(item.uuid!, format)} />}
+      </div>
+    </article>
   )
 }
 
@@ -438,15 +406,21 @@ function Row({ item, setChanged = false, sampleNoun, onExportRun }: {
 function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat) => void | Promise<void> }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(false)
+  const busyRef = useRef(false)
 
   const run = async (format: QualityRunExportFormat) => {
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
+    setError(false)
     try {
       await onExport(format)
       setOpen(false)
-    } catch (e) {
-      console.error('Validation-run export failed', e)
+    } catch {
+      setError(true)
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -458,9 +432,9 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
       disabled={busy}
       onClick={() => void run(format)}
       style={{
-        fontFamily: 'inherit', fontSize: 9, fontWeight: 600,
-        padding: '2px 6px', borderRadius: 4,
-        color: busy ? '#555' : '#7dd3fc', background: 'transparent',
+        fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+        padding: "7px var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
+        color: busy ? 'var(--workspace-muted)' : 'var(--workspace-info)', background: 'transparent',
         border: '1px solid #2e3a52', cursor: busy ? 'wait' : 'pointer',
       }}
     >
@@ -469,10 +443,12 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
   )
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', maxWidth: '100%' }}>
+      {error && <span role="alert" style={{ color: 'var(--workspace-danger)', flexBasis: '100%' }}>Export failed. Choose a format to retry.</span>}
+      {busy && <span role="status">Preparing download…</span>}
       {open && (
         busy
-          ? <Loader2 size={11} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+          ? <Loader2 size={11} style={{ color: 'var(--workspace-muted)', animation: 'spin 1s linear infinite' }} aria-hidden="true" />
           : <>
               {fmtButton('csv', 'CSV')}
               {fmtButton('xlsx', 'Excel')}
@@ -481,25 +457,26 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
       )}
       <button
         type="button"
+        disabled={busy}
         aria-expanded={open}
         aria-label="Export run results"
         title="Export this run's per-query results"
         onClick={() => setOpen(o => !o)}
         style={{
           display: 'inline-flex', alignItems: 'center',
-          padding: 3, background: 'transparent', border: 'none',
-          color: open ? '#7dd3fc' : '#666', cursor: 'pointer',
+          gap: 'var(--workspace-space-6)', padding: "7px var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', background: 'transparent', border: 'none',
+          color: open ? 'var(--workspace-info)' : 'var(--workspace-muted)', cursor: 'pointer',
         }}
       >
-        <Download size={12} aria-hidden="true" />
+        <Download size={12} aria-hidden="true" /> Export
       </button>
     </span>
   )
 }
 
 function scoreColor(s: number) {
-  if (s >= 90) return '#22c55e'
+  if (s >= 90) return 'var(--workspace-success)'
   if (s >= 70) return '#3b82f6'
-  if (s >= 50) return '#f59e0b'
-  return '#ef4444'
+  if (s >= 50) return 'var(--workspace-warning)'
+  return 'var(--workspace-danger)'
 }

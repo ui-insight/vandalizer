@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+from pymongo import IndexModel
 
 
 class WorkflowTriggerEvent(Document):
@@ -54,6 +55,7 @@ class WorkflowTriggerEvent(Document):
 
     class Settings:
         name = "workflow_trigger_event"
+        indexes = [IndexModel([("trigger_context.automation_id", 1), ("created_at", -1), ("_id", -1)])]
 
 
 class ExtractionTriggerEvent(Document):
@@ -89,6 +91,7 @@ class ExtractionTriggerEvent(Document):
 
     class Settings:
         name = "extraction_trigger_event"
+        indexes = [IndexModel([("automation_id", 1), ("created_at", -1), ("_id", -1)])]
 
 
 class GraphSubscription(Document):

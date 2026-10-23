@@ -24,7 +24,7 @@ async def create_folder(
 ) -> SmartFolder:
     parent_folder: SmartFolder | None = None
     if parent_id != "0":
-        parent_folder = await access_control.get_authorized_folder(parent_id, user)
+        parent_folder = await access_control.get_authorized_folder(parent_id, user, contribute=True)
         if not parent_folder:
             raise ValueError("Parent folder not found.")
 
@@ -281,7 +281,7 @@ async def expand_folders_to_document_uuids(
     for doc in docs:
         if doc.uuid in seen_docs:
             continue
-        if access_control.can_view_document(doc, user, team_access, allow_admin=True):
+        if await access_control.get_authorized_document(doc.uuid, user, team_access=team_access, allow_admin=True):
             result.append(doc.uuid)
             seen_docs.add(doc.uuid)
     return result

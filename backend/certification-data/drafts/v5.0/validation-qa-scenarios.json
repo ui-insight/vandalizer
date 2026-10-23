@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "bank_id": "v5.0.validation_qa.scenarios",
+  "revision": 1,
+  "rubric_id": "v5.0-competency-draft.1",
+  "module_id": "validation_qa",
+  "outcome_ids": [
+    "validation_qa.quality_meaning"
+  ],
+  "questions": [
+    {
+      "id": "validation_qa.consistent_wrong_amount",
+      "outcome_id": "validation_qa.quality_meaning",
+      "prompt": "A source shows a first-year request of 178,000 and a full project request of 485,000. The field requires the full project request. Three runs return 178,000, and the consistency measure is high. What does that evidence support?",
+      "choices": [
+        {
+          "id": "accept",
+          "text": "Accept the amount because repeated agreement establishes accuracy.",
+          "feedback": "The repeated value answers the wrong period. Agreement does not make it accurate."
+        },
+        {
+          "id": "repeatable_error",
+          "text": "Treat it as a repeatable error and repair the field interpretation before using the total.",
+          "feedback": "The source and field definition establish a mismatch even though the runs agree."
+        },
+        {
+          "id": "average",
+          "text": "Average the two source amounts to produce a safer total.",
+          "feedback": "Averaging distinct annual and full-period values invents an unsupported answer."
+        }
+      ],
+      "correct_choice_id": "repeatable_error"
+    },
+    {
+      "id": "validation_qa.historical_score_scope",
+      "outcome_id": "validation_qa.quality_meaning",
+      "prompt": "A template has a high quality score from three clean, short documents tested last month. Today you use a longer document with an unfamiliar layout, and the deadline has no visible source support. What is justified?",
+      "choices": [
+        {
+          "id": "certified",
+          "text": "Treat the current deadline as certified because the template has a high score.",
+          "feedback": "The historical measurement does not establish an unsupported value in a different input."
+        },
+        {
+          "id": "ignore_all",
+          "text": "Discard every earlier measurement as useless because it is historical.",
+          "feedback": "Earlier measurements still describe their tested conditions; assess their relevance and limits."
+        },
+        {
+          "id": "check_current",
+          "text": "Keep the deadline unresolved, inspect its source and test relevant cases for the new input type.",
+          "feedback": "Use the score within its measured scope and obtain evidence for the current value and input type."
+        }
+      ],
+      "correct_choice_id": "check_current"
+    },
+    {
+      "id": "validation_qa.changed_prompt_old_run",
+      "outcome_id": "validation_qa.quality_meaning",
+      "prompt": "You saved a repair to an extraction prompt. Workflow validation then reports a passing result, but its execution record predates the edit. Which claim can you make?",
+      "choices": [
+        {
+          "id": "repair_proven",
+          "text": "The new prompt passed because validation was run after the edit.",
+          "feedback": "The evaluation time does not change which execution produced the assessed output."
+        },
+        {
+          "id": "historical_only",
+          "text": "The older execution passed those checks; execute the saved repair and evaluate its actual result.",
+          "feedback": "The new behavior needs a new linked execution. Preserve the older result as historical evidence."
+        },
+        {
+          "id": "model_promise",
+          "text": "The assistant says the repair is sound, so a new run is unnecessary.",
+          "feedback": "A predicted improvement does not establish the changed workflow's result."
+        }
+      ],
+      "correct_choice_id": "historical_only"
+    },
+    {
+      "id": "validation_qa.skipped_expectation",
+      "outcome_id": "validation_qa.quality_meaning",
+      "prompt": "You finalize a guided verification session after approving four fields and skipping an uncertain project-period field. Later validation is strong on the saved expected values. What does that establish?",
+      "choices": [
+        {
+          "id": "all_fields",
+          "text": "Every original field, including project period, was checked successfully.",
+          "feedback": "The skipped field was omitted from expected values, so the score cannot establish its accuracy."
+        },
+        {
+          "id": "coverage_gap",
+          "text": "The included expectations were measured; the skipped field still needs source-checked coverage.",
+          "feedback": "Finalization saves approved/corrected expectations. Skipped fields remain a coverage limitation."
+        },
+        {
+          "id": "optional_forever",
+          "text": "Project period has become optional for every future task.",
+          "feedback": "Skipping one unconfirmed expectation does not redefine the workflow or course requirements."
+        }
+      ],
+      "correct_choice_id": "coverage_gap"
+    }
+  ]
+}

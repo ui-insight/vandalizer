@@ -1,0 +1,306 @@
+{
+  "schema_version": 1,
+  "id": "budget-method-arithmetic-and-dependencies",
+  "revision": 2,
+  "module_id": "advanced_nodes",
+  "provenance": "authored_budget_method_case_not_execution",
+  "source_filename": "budget-justification.pdf",
+  "source_sha256": "5ce1ba24c588532002129a30a011041dec4e82382f498140950bf21560116240",
+  "notice": "This is an authored synthetic training assignment and flawed proposal, not a learner run, institutional policy source or budget approval. Only your preserved owned evidence can support an assessment.",
+  "task": "Review the assigned synthetic budget as an internal exception memo. Select supported methods, preserve exact arithmetic checks and demonstrate safe ordering of independent source work and dependent synthesis using actual saved execution evidence.",
+  "intended_output": "An internal memo separating supported arithmetic from source discrepancies, missing assumptions and unresolved policy or period claims, with traceable calculations and actual task results.",
+  "instructions": [
+    "Use only the assigned synthetic budget justification. Keep its original amounts and wording visible, including disagreements; do not silently repair the source or treat it as current institutional policy.",
+    "Separate source reading, interpretation and arithmetic. This bounded runner supports one or two source-review Prompt tasks followed by one internal memo Prompt or Formatter task. It does not execute Deep Analysis, API, crawler or Code tasks. Use an available model; do not enable restricted nodes, supply external credentials or request staff access. Explicit learner arithmetic with a reproducible record is supported.",
+    "Record three checks in USD: add the three Equipment amounts; add the seven Budget Summary categories from Senior Personnel through Subaward; then add those seven categories and the separately listed estimated indirect cost. Name every source row, page and amount, show the operation and preserve the result. These sums check printed figures, not their common time period or policy eligibility.",
+    "Compare the checks with the printed Equipment total, Budget Summary TOTAL and the direct-cost/indirect-cost narrative. Preserve disagreements and missing assumptions. Do not transform a matching addition into a claim that the rates, periods, institution policy or entire budget are approved.",
+    "Inspect the saved two-step workflow and exact task inputs. Source-review Prompt tasks must use Workflow documents. The later memo task must use both the preceding step’s results and Workflow documents, including the saved calculation evidence supplied by the challenge. Two independent review prompts may cover source purposes and inconsistencies; one combined review prompt is the supported alternative when parallel work is unavailable. The memo waits for every actual preceding review result.",
+    "Approve the exact bounded revision and assigned source before running it. Preserve the owned execution, actual task inputs/results, calculation record and final internal memo. Reject missing branch evidence rather than claiming a complete analysis from the remaining outputs.",
+    "If a capability is unavailable, select a supported alternative and preserve why. If execution is incomplete or its outcome is unknown, inspect saved results before any new action. Do not fabricate receipts, repeat external actions or treat an authored example as your execution.",
+    "Submit your method decision, actual calculation evidence and explanation of the observed dependencies. End at an internal exception memo. No email, external update, sharing, live policy lookup, budget approval or staff review is part of this exercise."
+  ],
+  "exclusions": [
+    "No external sends, updates, sharing, approvals or schedules.",
+    "No live policy lookup or claim that a printed rate is current institutional policy.",
+    "No restricted Code Node activation or staff review requirement.",
+    "No node-count, task-count, reflection-presence or model-assurance credit."
+  ],
+  "flawed_proposal": "Authored flawed proposal, not an execution: ask Deep Analysis to certify that all arithmetic and institutional policy are correct, require Code Node access if it is unavailable, and place a budget-check task beside a memo task that already states the check passed. Send that memo as soon as either sibling finishes. The proposal assumes sibling outputs are available immediately and that any failure undoes completed actions; neither assumption grants authority or proves completion.",
+  "questions": [
+    {
+      "id": "method_choice",
+      "outcome_id": "advanced_nodes.appropriate_method",
+      "phase": "before_execution",
+      "response_kind": "method_and_availability",
+      "prompt": "Which available operation will handle interpretation, and which permitted route will check arithmetic? Explain their different evidence, identify any unavailable capability and the supported alternative, and bound the saved design to the assigned source and internal draft."
+    },
+    {
+      "id": "calculation_review",
+      "outcome_id": "advanced_nodes.checked_computation",
+      "phase": "after_execution",
+      "response_kind": "source_bound_calculation_review",
+      "prompt": "Open your three saved calculations and the actual intermediate/final results. Explain the named source inputs, units, formulas and numerical comparisons. Which claims do the calculations support, which source statements disagree, and which period or policy conclusions remain unresolved? A final number or model assurance alone is insufficient."
+    },
+    {
+      "id": "dependency_review",
+      "outcome_id": "advanced_nodes.parallel_safety",
+      "phase": "after_execution",
+      "response_kind": "dependencies_and_actual_results",
+      "prompt": "Use the saved revision and actual task receipts to explain which operations are independent and which require earlier results. Show where the final memo receives each required branch and calculation record. Identify any missing result or unsafe parallel claim, preserve unresolved work, and explain the boundary before a dependent action."
+    }
+  ],
+  "calculation_methods": [
+    "recorded_deterministic_arithmetic",
+    "explicit_learner_arithmetic"
+  ],
+  "execution_rule": "owned_revision_assigned_source_actual_task_inputs_results_and_order_not_node_counts",
+  "arithmetic_rule": "exact_named_source_inputs_units_formula_result_and_limits_not_model_assurance",
+  "availability_rule": "use_available_permitted_operations_no_code_enablement_or_staff_requirement",
+  "parallel_rule": "independent_reads_may_overlap_dependent_synthesis_waits_for_all_required_results",
+  "scope_policy": "assigned_source_internal_draft_no_external_actions_or_staff_queue",
+  "assessment_policy": "automatic_structured_review_with_checked_arithmetic_no_presence_credit",
+  "review_guidance": [
+    {
+      "outcome_id": "advanced_nodes.appropriate_method",
+      "passing_conditions": [
+        "The chosen method is available and identifies deterministic or explicit human arithmetic verification."
+      ],
+      "critical_failures": [
+        "Claim that an LLM analysis node alone proves numerical correctness or require unavailable code execution."
+      ],
+      "case_application": "Accept available model operations for bounded interpretation plus a reproducible deterministic or explicit learner arithmetic record. Do not require Code Node activation, Deep Analysis access, external integrations or staff help. A claimed capability must agree with actual saved configuration and availability evidence; fluent model arithmetic is not a verified calculation."
+    },
+    {
+      "outcome_id": "advanced_nodes.checked_computation",
+      "passing_conditions": [
+        "Inputs match the source and the stored calculation supports the accepted numerical result."
+      ],
+      "critical_failures": [
+        "Verify the wrong inputs or supply only a final number without reproducible calculation evidence."
+      ],
+      "case_application": "Require the exact named source amounts, USD, explicit addition and stored results for all three checks. The Equipment sum is 45000, the seven listed direct categories sum to 517424, and including the separately estimated indirect cost gives 542800. Matching the summary total does not reconcile the narrative or validate its indirect rate, time basis or policy. Preserve source conflicts rather than blessing the whole budget."
+    },
+    {
+      "outcome_id": "advanced_nodes.parallel_safety",
+      "passing_conditions": [
+        "Independent tasks may run together; required dependencies remain ordered and outputs are reconciled before delivery."
+      ],
+      "critical_failures": [
+        "Parallelize a dependent task or accept missing branch results as complete."
+      ],
+      "case_application": "Require actual owned revision/run evidence and learner interpretation of consumed inputs. Independent source-reading drafts may overlap; synthesis that uses a checked calculation and branch results must wait for and receive them. A justified fully sequential design is acceptable. Missing branches, unrelated runs, an authored proposal or a narrative written before its claimed check cannot establish completion."
+    }
+  ],
+  "amounts": [
+    {
+      "id": "weather_station",
+      "label": "Weather station array",
+      "value": "18000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 1,
+        "quote": "Portable weather station array (6 units): $18,000"
+      }
+    },
+    {
+      "id": "soil_system",
+      "label": "Soil measurement system",
+      "value": "12000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 1,
+        "quote": "Soil CO2 flux measurement system: $12,000"
+      }
+    },
+    {
+      "id": "drone",
+      "label": "Drone with sensor",
+      "value": "15000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 1,
+        "quote": "DJI Matrice 350 RTK drone with multispectral sensor: $15,000"
+      }
+    },
+    {
+      "id": "senior_personnel",
+      "label": "Senior Personnel",
+      "value": "43333.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Senior Personnel $43,333"
+      }
+    },
+    {
+      "id": "other_personnel",
+      "label": "Other Personnel",
+      "value": "139800.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Other Personnel $139,800"
+      }
+    },
+    {
+      "id": "fringe",
+      "label": "Fringe Benefits",
+      "value": "38291.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Fringe Benefits $38,291"
+      }
+    },
+    {
+      "id": "equipment",
+      "label": "Equipment",
+      "value": "45000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Equipment $45,000"
+      }
+    },
+    {
+      "id": "travel",
+      "label": "Travel",
+      "value": "40000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Travel $40,000"
+      }
+    },
+    {
+      "id": "supplies",
+      "label": "Supplies",
+      "value": "26000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Supplies $26,000"
+      }
+    },
+    {
+      "id": "subaward",
+      "label": "Subaward",
+      "value": "185000.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Subaward $185,000"
+      }
+    },
+    {
+      "id": "estimated_indirect",
+      "label": "Indirect Costs (estimated)",
+      "value": "25376.00",
+      "unit": "USD",
+      "basis": "USD amounts as printed in the named source row; no period normalization or policy validation is inferred.",
+      "anchor": {
+        "page": 2,
+        "quote": "Indirect Costs (estimated) $25,376"
+      }
+    }
+  ],
+  "calculations": [
+    {
+      "id": "equipment_subtotal",
+      "operation": "sum",
+      "inputs": [
+        "weather_station",
+        "soil_system",
+        "drone"
+      ],
+      "unit": "USD",
+      "expected_value": "45000.00",
+      "interpretation_limit": "This is addition of the named printed amounts only. It does not establish compatible periods, current policy, an approved indirect rate or a corrected overall project budget."
+    },
+    {
+      "id": "listed_direct_subtotal",
+      "operation": "sum",
+      "inputs": [
+        "senior_personnel",
+        "other_personnel",
+        "fringe",
+        "equipment",
+        "travel",
+        "supplies",
+        "subaward"
+      ],
+      "unit": "USD",
+      "expected_value": "517424.00",
+      "interpretation_limit": "This is addition of the named printed amounts only. It does not establish compatible periods, current policy, an approved indirect rate or a corrected overall project budget."
+    },
+    {
+      "id": "listed_summary_total",
+      "operation": "sum",
+      "inputs": [
+        "senior_personnel",
+        "other_personnel",
+        "fringe",
+        "equipment",
+        "travel",
+        "supplies",
+        "subaward",
+        "estimated_indirect"
+      ],
+      "unit": "USD",
+      "expected_value": "542800.00",
+      "interpretation_limit": "This is addition of the named printed amounts only. It does not establish compatible periods, current policy, an approved indirect rate or a corrected overall project budget."
+    }
+  ],
+  "source_issues": [
+    {
+      "id": "direct_vs_summary",
+      "meaning": "The seven direct categories sum to 517424, while the source uses 542800 in its direct-cost narrative and MTDC calculation. The summary reaches 542800 only after its separate estimated indirect-cost row is included. Preserve that conflict instead of calling 542800 verified direct costs.",
+      "anchors": [
+        {
+          "page": 2,
+          "quote": "Note: The total project budget of $542,800 includes all direct costs listed above."
+        },
+        {
+          "page": 2,
+          "quote": "Indirect Costs (estimated) $25,376 TOTAL $542,800"
+        },
+        {
+          "page": 2,
+          "quote": "MTDC base = $542,800 - $45,000 - $160,000 = $337,800"
+        }
+      ]
+    },
+    {
+      "id": "rate_and_period_limits",
+      "meaning": "The stated 52% rate and MTDC base do not explain the separately estimated indirect cost. Annual personnel rates and three-year travel amounts also require period interpretation. Do not invent a governing policy, normalize missing periods silently or infer an approved budget from exact addition.",
+      "anchors": [
+        {
+          "page": 2,
+          "quote": "UI negotiated rate: 52% MTDC (effective 7/1/2023)"
+        },
+        {
+          "page": 2,
+          "quote": "Indirect costs not yet applied separately in this justification."
+        },
+        {
+          "page": 2,
+          "quote": "$3,000/year x 3 years = $9,000"
+        },
+        {
+          "page": 1,
+          "quote": "$110,000/yr $27,500"
+        }
+      ]
+    }
+  ]
+}

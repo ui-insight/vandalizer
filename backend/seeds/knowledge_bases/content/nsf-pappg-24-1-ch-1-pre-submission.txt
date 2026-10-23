@@ -1,0 +1,219 @@
+NSF PAPPG (NSF 24-1) — Chapter I: Pre-Submission Information
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-1-pre-submission
+
+Part I sets forth NSF's proposal preparation and submission guidelines. The coverage provides guidance for the preparation and submission of proposals to NSF. Some NSF programs have program solicitations that modify the general provisions of the PAPPG, and, in such cases, the guidelines provided in the solicitation must be followed.
+
+### A. NSF Proposal Preparation and Submission
+
+Unless specified in an NSF program solicitation, proposals submitted to NSF must be submitted via use of Research.gov or Grants.gov. Further information on each system is provided below.
+
+Proposal Preparation and Submission via Research.gov. Research.gov may be used for proposal preparation, submission, proposal file updates, and budgetary revisions. The policy and procedural guidance contained in Part I of the PAPPG pertains to proposals submitted via Research.gov.
+
+Proposal Preparation and Submission via Grants.gov. Grants.gov may be used for proposal preparation and submission. The policy and procedural guidance contained in the NSF Grants.gov Application Guide pertains specifically to proposals submitted via Grants.gov. Detailed information about Grants.gov is available from the Grants.gov website.
+
+### B. NSF Programs and Funding Opportunities
+
+The NSF website provides the most comprehensive source of information on NSF Directorates/Offices (including contact information), programs, and funding opportunities. See Section C below for more information on Categories of Funding Opportunities. Use of this website by potential proposers is strongly encouraged. In addition, "NSF Update" is an information-delivery system designed to keep potential proposers and other interested parties apprised of new NSF funding opportunities and publications, important changes in proposal and award policies and procedures, and upcoming NSF Grants Conferences. Subscribers are informed each time new publications are issued that match their identified interests.
+
+### C. Categories of Funding Opportunities
+
+NSF utilizes a variety of mechanisms to communicate opportunities for research and education support, as well as to generate proposals. A brief description of each category of funding opportunity follows.
+
+#### 1. Program Descriptions
+
+The term "program description" includes broad, general descriptions of programs and activities in NSF Directorates/Offices and Divisions. Program descriptions are posted on Directorate/Division websites to encourage the submission of proposals in specific program areas of interest to NSF.
+
+Program descriptions utilize the generic eligibility and proposal preparation instructions specified in Part I of the PAPPG, as well as the NSB-approved merit review criteria. See Chapter III for additional information.
+
+#### 2. Program Announcements
+
+The term "program announcement" refers to formal NSF publications that announce NSF programs. Program announcements utilize the generic eligibility and proposal preparation guidelines specified in Part I of the PAPPG and incorporate the NSB-approved merit review criteria.
+
+#### 3. Program Solicitations
+
+The term "program solicitation" refers to formal NSF publications that encourage the submission of proposals in specific program areas of interest to the Foundation. They generally are more focused than program announcements, and normally apply for a specified period of time. Competition among proposals is more precisely defined than with program announcements, and proposals received compete directly with each other for NSF funding. Program solicitations are issued when the funding opportunity has one or more of the following features:
+
+- deviates from (or restricts) the standard categories of proposers specified in Section E. below;
+- limits the number of proposals that may be submitted by an organization[3] and/or Principal Investigator (PI) or co-Principal Investigator (co-PI);
+- provides supplemental proposal preparation guidance or deviates from the guidelines established in Part I of the PAPPG;
+- requires submission of a letter of intent, or preliminary proposal (see Chapter I.D.1-3)
+- contains additional review criteria relevant to the program;
+- requires cost sharing;
+- requires a limitation in indirect (Facilities & Administrative (F&A)) costs or other budgetary limitations;
+- specifies additional award conditions and/or reporting requirements; and/or
+- anticipates use of a cooperative agreement.
+
+#### 4. Dear Colleague Letters (DCLs)
+
+DCLs are intended to provide general information to the community, clarify or amend an existing policy or document, or inform the NSF proposer community about upcoming opportunities or special competitions for supplements to existing awards. They may be used to request information from the community. DCLs also may be used to announce NSF’s interest in receiving proposals in specified topical areas for the following proposal types contained in Chapter II.E: Planning, Rapid Response Research (RAPID); Early-concept Grants for Exploratory Research (EAGER); Research Advanced by Interdisciplinary Science and Engineering (RAISE); and Conference.
+
+### D. Types of Submissions
+
+#### 1. Concept Outlines
+
+Some NSF proposal types (see Chapter II.F for additional information) or funding opportunities may require submission of a Concept Outline prior to submission of a full proposal. A Concept Outline is a concise summary of a project idea that contains a title, the proposed proposal type, information about the prospective PI(s), potentially germane NSF organizational unit(s), keywords, a brief narrative description of the idea, and a brief description of how the idea fits the proposed proposal type or funding opportunity. The narrative description of the idea may outline the goals and general approaches of the project, anticipated uses of funding, and how the work satisfies the NSB-approved Intellectual Merit and Broader Impacts criteria.
+
+The primary purposes of requiring a Concept Outline are to ensure that the concept being proposed by the prospective PI is appropriate for the proposal type/funding opportunity, and to help reduce the administrative burden associated with submission of a full proposal. Concept Outlines are considered by cognizant NSF program officers to determine the appropriateness of the work to the proposal type/funding opportunity. The prospective PI will receive an email that specifies whether a full proposal may be submitted. Full proposals submitted without the requisite "Program Officer Concurrence Email" for proposal types/funding opportunities requiring a Concept Outline will be returned without review or not accepted. See Chapter II.F for additional information. Concept Outlines also may be voluntarily submitted at any time by prospective PIs seeking early feedback on the general appropriateness and potentially relevant funding opportunities for a project idea prior to developing a full proposal. For voluntary submissions, the prospective PI will receive feedback by email or follow-up discussion with a cognizant NSF program officer, however, a "Program Officer Concurrence Email" is typically not provided.
+
+Concept Outlines are submitted either by email to a designated address or via the Program Suitability and Proposal Concept Tool (ProSPCT). An NSF funding opportunity that requires a Concept Outline will provide directions on use of email or ProSPCT and specific guidance on length limitations[4] and email formatting or the completion of the webform to facilitate consistent identification and consideration of the respective Concept Outlines.
+
+ProSPCT consists of a dashboard and webform for prospective PIs to prepare, send, and track the status of their Concept Outline submissions. The ProSPCT webform uses structured fields, drop-down selections, validations, and text entry fields with character count limits to ensure users have provided the minimal complete information and met formatting requirements based on the selected proposal type prior to submitting the Concept Outline. ProSPCT users must have a valid Login.gov account to access the tool.
+
+#### 2. Letters of Intent (LOI)
+
+Some NSF program solicitations require or request submission of an LOI in advance of submission of a full proposal. An LOI is not a binding document. The predominant reason for its use is to help NSF program staff gauge the size and range of the competition, enabling earlier selection and better management of reviewers and panelists. In addition, the information contained in an LOI is used to help avoid potential conflicts of interest in the review process.
+
+An LOI normally contains the PI’s names, a proposed title, a list of possible participating organizations (if applicable), and a synopsis of one page that describes the work in sufficient detail to permit an appropriate selection of reviewers.
+
+Proposers that plan to submit a collaborative proposal from multiple organizations must submit a single LOI for the entire project, given that NSF considers a collaborative proposal to be a unified research project. An LOI is not externally evaluated or used to decide on funding. The requirement to submit an LOI will be identified in the program solicitation, and such letters are submitted electronically to NSF. Failure to submit a required LOI identified in a program solicitation will result in a full proposal not being accepted or returned without review.
+
+#### 3. Preliminary Proposals
+
+Some NSF program solicitations require or request submission of a preliminary proposal in advance of submission of a full proposal. The three predominant reasons for requiring submission of a preliminary proposal are to:
+
+- reduce the proposers' unnecessary effort in proposal preparation when the chance of success is very small. This is particularly true of exploratory initiatives when the community senses that a major new direction is being identified, or competitions that will result in a small number of awards;
+- increase the overall quality of the full submission; and
+- assist NSF program staff in managing the review process and in the selection of reviewers.
+
+The NSF program solicitation will specify content and submission requirements when preliminary proposals are to be submitted. Preliminary proposals are prepared by the PI using the Prepare New Preliminary Proposal module in Research.gov. The PI completes only the sections appropriate to the solicitation specific preliminary proposal requirements. The PI then forwards the proposal to the appropriate office at the proposing organization, and the Authorized Organizational Representative (AOR) signs and submits the preliminary proposal via use of NSF's electronic systems.
+
+One of the following two types of decisions may be received from NSF upon submission of a preliminary proposal. The program solicitation will specify the type of decision to be rendered for a particular program.
+
+a. Invite/Not Invite Decisions
+
+This type of mechanism is used when the NSF decision made on the preliminary proposal is final, affecting the organization’s eligibility to submit a full proposal. Only submitters of favorably reviewed preliminary proposals are invited and eligible to submit full proposals. The PI and the organization's Sponsored Projects Office (SPO) (or equivalent) will be electronically notified of NSF's decision to either invite submission of a full proposal or decline NSF support.
+
+b. Encourage/Discourage Decisions
+
+This type of mechanism is used when the NSF decision made on the preliminary proposal is advisory only. This means that submitters of both favorably and unfavorably reviewed preliminary proposals are eligible to submit full proposals. The PI and the organization's SPO will be notified of NSF's decision to either encourage or discourage submission of a full proposal.
+
+#### 4. Full Proposals
+
+The full proposal should present the: (1) objectives and scientific, engineering, or educational significance of the proposed work; (2) suitability of the methods to be employed; (3) qualifications of the investigator and the recipient organization; (4) effect of the activity on the infrastructure of science, engineering, and education, if applicable; and (5) amount of funding requested. It should present the intellectual merit and broader impacts of the proposed project clearly and should be prepared with the care and thoroughness of a paper submitted for publication. The requisite proposal preparation instructions are contained in Chapter II. Sufficient information should be provided to enable reviewers to evaluate the proposal in accordance with the two merit review criteria established by the NSB. (See Chapter III for additional information on NSF processing and review of proposals.)
+
+NSF expects strict adherence to the rules of proper scholarship and attribution. The responsibility for proper scholarship and attribution rests with the authors of a proposal; all parts of the proposal should be prepared with equal care for this concern. Authors other than the PI (or any co-PI) must be named and acknowledged. Serious failure to adhere to such standards can result in findings of research misconduct. Research misconduct refers to fabrication, falsification, or plagiarism in proposing or performing research funded by NSF, reviewing research proposals submitted to NSF, or in reporting research results funded by NSF. Reporting results include but is not limited to annual/final annual project reports and Project Outcomes Reports submitted to NSF, as well as the publication of results from the NSF-funded projects. NSF policies and procedures on research misconduct are discussed in Chapter XII.C, as well as 45 CFR Part 689.
+
+NSF will not tolerate research misconduct. Allegations of research misconduct are taken seriously and are investigated by NSF’s Office of Inspector General (OIG). OIG refers completed investigations of research misconduct to NSF for action. Upon findings of research misconduct, NSF will take appropriate action against individuals or organizations.
+
+The Metric Conversion Act of 1975, as amended, and E.O. 12770 encourage Federal agencies to use the Metric System (SI) in procurement, award and other business-related activities. Proposers are encouraged to use the Metric System of weights and measures in proposals submitted to the Foundation. Recipients also are encouraged to use metric units in reports, publications and correspondence relating to proposals and awards.
+
+### E. Who May Submit Proposals
+
+NSF welcomes proposals on behalf of all qualified scientists, engineers, and educators. The Foundation strongly encourages women, minorities, and persons with disabilities to participate fully in its programs. In accordance with Federal statutes, regulations and NSF policies, no person on grounds of race, color, age, sex, national origin, or disability shall be excluded from participation in, be denied the benefits of, or be subjected to discrimination under, any program or activity receiving financial assistance from NSF, although some programs may have special requirements that limit eligibility.
+
+Scientists, engineers, and educators usually initiate proposals that are officially submitted by their employing organization. Before formal submission, the proposal may be discussed with appropriate NSF program staff. Graduate students are not encouraged to submit research proposals but should arrange to serve as research assistants to faculty members. Some NSF divisions accept proposals for Doctoral Dissertation Research Grants when submitted by a faculty member on behalf of the graduate student.
+
+Categories of Proposers — The following describes the eligibility of specific categories of proposers. A program solicitation, however, may apply more restrictive eligibility criteria.
+
+#### 1. The following organizations are eligible to submit proposals to NSF:
+
+(a) Institutions of Higher Education (IHEs) — Two- and four-year IHEs (including community colleges) accredited in, and having a campus located in the U.S., acting on behalf of their faculty members. IHEs located outside the U.S. fall under paragraph 2(c). below.
+
+Special Instructions for International Branch Campuses of U.S. IHEs
+
+If the proposal includes funding to be provided to an international branch campus of a U.S. IHE (including through use of subawards and consultant arrangements), the proposer must explain the benefit(s) to the project of performance at the international branch campus and justify why the project activities cannot be performed at the U.S. campus. Such information must be included in the project description. The box for “Funding of an International Branch Campus of a U.S. IHE” must be checked on the Cover Sheet if the proposal includes funding for an international branch campus of a U.S. IHE.
+
+(b) Non-profit, Non-academic Organizations — Independent museums, observatories, research laboratories, professional societies, and similar organizations located in the U.S. that are directly associated with educational or research activities.
+
+(c) Tribal Nations — The term "Tribal nation" means an American Indian or Alaska Native tribe, band, nation, pueblo, village, or community that the Secretary of the Interior acknowledges as a federally recognized tribe pursuant to the Federally Recognized Indian Tribe List Act of 1994, 25 U.S.C. §§ 5130-5131.
+
+#### 2. The following organizations may be eligible to submit proposals to NSF:
+
+(a) For-profit Organizations — U.S.-based commercial organizations, including small businesses, with strong capabilities in scientific or engineering research or education and a passion for innovation. An unsolicited proposal from a for-profit organization may be funded when the project is of special concern from a national point of view, special resources are available for the work, or the proposed project is especially meritorious. NSF is interested in supporting projects that couple industrial use-inspired challenges and research resources with those of IHEs; therefore, the Foundation especially welcomes proposals for cooperative projects involving both IHEs and industry. Specific NSF funding opportunities also may make for-profit organizations eligible for submission of proposals to the Foundation. US-based affiliates or subsidiaries of foreign organizations must contact the cognizant NSF program officer prior to preparing and submitting a proposal to NSF.
+
+(b) State and Local Governments — As programmatically necessary and as provided for in a solicitation, State and local governments may be eligible to submit proposals.
+
+(c) Foreign Organizations — NSF rarely provides direct funding support to foreign organizations. NSF will consider proposals for cooperative projects involving U.S. and foreign organizations, provided support is requested only for the U.S. portion of the collaborative effort.
+
+In cases however, where the proposer considers the foreign organization or foreign individual’s involvement to be essential to the project and proposes to provide funding through the NSF budget (via a subaward or consultant arrangement), the proposer must justify the benefit to U.S. research and education. The justification must include, at minimum:
+
+- why support from the foreign counterpart’s in-country resources is not feasible;
+- why the foreign organization or foreign individual can carry out the activity more effectively than a U.S. organization or U.S. individual
+- what unique expertise, organizational capability, facilities, data resources, and/or access to a geographic location not generally available to U.S. investigators the foreign organization or foreign individual brings to the project; and
+- what significant science and engineering education, training, or research opportunities the foreign organization or foreign individual offers to the U.S.
+
+Such information must be included in any proposal to NSF, including new and renewal proposals. The information must be included in the project description section of the proposal. The box for "Funding of a Foreign Organization or Foreign Individual" must be checked on the Cover Sheet if the proposal includes funding for a foreign organization or foreign individual.
+
+(d) Other Federal Agencies — NSF does not normally support research or education activities by scientists, engineers or educators employed by Federal agencies or FFRDCs. Under unusual circumstances, other Federal agencies and FFRDCs may submit proposals directly to NSF. A proposed project is only eligible for support if it meets one or more of the following exceptions, as determined by a cognizant NSF Program Officer in advance of proposal submission:
+
+- Special Projects. Under exceptional circumstances, research or education projects at other Federal agencies or FFRDCs that can make unique contributions to the needs of researchers elsewhere or to other specific NSF objectives may receive NSF support.
+- National and International Programs. The Foundation may fund research and logistical support activities of other Government agencies or FFRDCs directed at meeting the goals of special national and international research programs for which the Foundation bears special responsibility, such as the U.S. Antarctic Research Program.
+- International Travel Awards. To help ensure appropriate representation or availability of a particular expertise at an international conference, staff researchers of other Federal agencies may receive NSF international travel awards.
+
+Proposers who think their project may meet one of the exceptions listed above must contact a cognizant NSF Program Officer before preparing a proposal for submission. In addition, a scientist, engineer, or educator who has a joint appointment with an IHE and a Federal agency (such as a Veterans Administration Hospital, or with an IHE and a FFRDC) may submit proposals through the IHE and may receive support if the individual is a faculty member (or equivalent) of the IHE, although part of the individual’s salary may be provided by the Federal agency. Preliminary inquiry must be made to the appropriate program before preparing a proposal for submission.
+
+#### 3. The following are not eligible to submit proposals to NSF:
+
+(a) Unaffiliated Individuals — Unaffiliated individuals in the U.S. and unaffiliated U.S. citizens are not eligible to receive direct funding support from NSF. Recipients of Federal funds must be able to demonstrate their ability to fully comply with the requirements specified in 2 CFR § 200, Uniform Administrative Requirements, Cost Principles, and Audit Requirements for Federal Awards. As such, unaffiliated individuals are strongly encouraged to affiliate with an organization that is able to meet the requirements specified in 2 CFR § 200.
+
+An individual submitting a proposal to an NSF Postdoctoral Fellowship solicitation is not considered an unaffiliated individual.
+
+(b) Parties to Malign Foreign Talent Recruitment Programs — Individuals who are a current party to a Malign Foreign Talent Recruitment Program are not eligible to serve as a senior/key person on an NSF proposal or on any NSF award made after May 20, 2024. See PAPPG Chapter II.D.1.e for additional information on required certifications associated with Malign Foreign Talent Recruitment Programs.
+
+### F. When to Submit Proposals
+
+Proposers should allow adequate time for processing of proposals (see Chapter I.H for further information). Many NSF programs accept proposals at any time. Other programs, however, establish due dates for submission of proposals. Below are the types of due dates utilized by NSF:
+
+- Target Dates — dates after which proposals will still be accepted, although they may miss a particular panel or committee meeting.
+-
+Deadline Date — dates after which proposals will not be accepted or will be returned without review by NSF. The deadline date will be waived only in extenuating circumstances. Such a deviation may be authorized only in accordance with Chapter II.A.
+
+Special Exceptions to NSF’s Deadline Date Policy
+
+In the occurrence of a natural or anthropogenic event, or when NSF is closed due to inclement weather or other reason that interferes with an organization’s ability to meet a proposal submission deadline, NSF has developed the following guidelines for use by impacted organizations.
+
+Natural or Anthropogenic Event - Flexibility in meeting announced deadline dates because of a natural or anthropogenic event that impacts a proposer’s ability to submit a proposal to NSF may be granted with the approval of the cognizant NSF Program Officer. Where possible, such requests should be submitted in advance of the proposal deadline. Proposers should contact the cognizant NSF Program Officer in the Division/Office to which they intend to submit their proposal and request authorization to submit a proposal after the deadline date. Proposers must then follow the written or verbal guidance provided by the cognizant NSF Program Officer. The Foundation will work with each impacted organization on a case-by-case basis to address its specific issue(s). Generally, NSF permits extension of the deadline by up to five business days.
+
+To submit the proposal after the deadline date, proposers must check the “Special Exception to the Deadline Date Policy” box on the NSF Cover Sheet, indicating NSF approval has been obtained. A statement identifying the nature of the event that impacted the ability to submit the proposal on time must be uploaded under Nature of Natural or Anthropogenic Event in the Single Copy Document section in Research.gov. If available, written approval from the cognizant NSF Program Officer also should be uploaded under the Additional Single Copy Documents in the Single Copy Document section in Research.gov.
+
+Closure of NSF – When NSF is closed due to inclement weather or other reason[5], deadline(s) that occurred during the closure automatically will be extended to the following business day after the closure ends.
+
+- Submission Windows— designated periods of time during which proposals will be accepted for review by NSF. It is NSF’s policy that the end date of a submission window converts to, and is subject to, the same policies as a deadline date.
+
+These target dates, deadlines, and submission windows are published in specific program descriptions, program announcements and solicitations that can be obtained through the NSF website.[6] Unless otherwise stated, proposals must be received by the specified date. If the deadline date falls on a weekend, it will be extended to the following Monday; if the date falls on a Federal holiday, it will be extended to the following business day. Proposals must be received by 5 p.m. submitting organization’s local time on the established deadline date. Failure to submit by 5.p.m. submitting organization's local time will result in the proposal not being accepted. See Chapter IV.B for additional information. Letters of intent or preliminary proposals also follow the 5 p.m. submitting organization's local time standard.
+
+### G. How to Submit Proposals
+
+#### 1. Submission Instructions
+
+The same work/proposal cannot be funded twice. If the proposer envisions review by multiple programs, more than one program may be designated. The submission of duplicate or substantially similar proposals concurrently for review by more than one program will result in the return of the redundant proposals. (See Chapter IV.B.)
+
+In submission of a proposal for funding, the AOR is required to provide certain NSF-specific proposal certifications. (See Chapter II.C.1.d for a listing.) This certification process will occur concurrently with submission of the proposal. Submission of government-wide representations and certifications is addressed in Chapter I.G.2 below.
+
+#### 2. Requirements Relating to Unique Entity Identifier (UEI) and Registration in the System for Award Management (SAM)
+
+All proposers must provide a UEI when submitting a new or renewal proposal or transfer of an award. NSF requires that organizations registering to use NSF's electronic systems have a valid and active SAM registration. NSF will validate that each proposer’s UEI and SAM registration are valid and active prior to allowing submission of a proposal to NSF. If a registration is not active, an organization will not be able to submit a proposal. Additionally, if the SAM registration is not renewed annually and is not valid, NSF will block any award approval actions. Organizations are responsible for maintaining their SAM registration and UEI information.
+
+Any subrecipients named in the proposal also are required to obtain a UEI and register in Research.gov. Subrecipients named in the proposal, however, do not need to be registered in SAM. GSA has implemented a process by which an organization that will only be a subrecipient may receive a UEI without undergoing a complete SAM registration. See the SAM.gov website for additional information about registration and UEI assignment.
+
+SAM is the primary registrant database for the U.S. Government. This SAM registration must be maintained with current information at all times during which an organization has an active award or a proposal under consideration by NSF. Failure to comply with the SAM registration requirement prior to proposal submission may impact the processing of the proposal. Proposers are advised that entity registration will become active after SAM completes entity validation followed by Internal Revenue Service (IRS) validation. Proposers can check status of their registration online on SAM.gov.
+
+Organizations are responsible for utilizing SAM to submit government-wide representations and certifications. Prior to proposal submission, all proposing organizations are required to have reviewed and certified compliance with the government-wide financial assistance representations and certifications maintained in SAM. Failure to comply with SAM certification and registration requirements will impact the submission and processing of the proposal. If a registration is not active, an organization will not be able to submit a proposal, nor will NSF be able to take approval actions on any submitted proposals or recommended awards. Additionally, payments will not be able to be processed and approved. An expired registration will impact an organization’s ability to submit proposals and/or receive award payments. Note that if an organization’s registration lapses, it will take longer to reactivate the registration than if the registration is still active when doing the revalidation and recertification.
+
+SAM is the NSF system of record for organizational information, including financial and address information. The Legal Business Name and Physical Address information are automatically pulled from SAM and used by NSF to validate organizational information. All name and address changes must be handled via SAM. NSF has no control over SAM and cannot override SAM data or statuses.
+
+#### 3. NSF ID
+
+The NSF ID is a unique alpha-numeric identifier assigned to users by NSF. The NSF ID is used throughout NSF's electronic systems as a login ID and identification verification. Each individual user of NSF systems, (e.g., Research.gov) should not have more than one NSF ID. Users with more than one NSF ID should contact the Help Desk at 1-800-381-1532 or by e-mail to rgov@nsf.gov for assistance.
+
+Submission of Social Security Numbers (SSNs) only will be requested where it is necessary for business purposes, e.g., financial reimbursement. An SSN is solicited under the NSF Act of 1950, as amended.
+
+#### 4. Proposal Receipt
+
+Once the proposal is submitted, PIs can check the status of the proposal via use of NSF's electronic systems. If a proposal number is not reflected in the electronic systems, contact the Help Desk at 1-800-381-1532 or by e-mail to rgov@nsf.gov.
+
+Communications about the proposal should be addressed to the cognizant NSF Program Officer with reference to the proposal number. Proposers are strongly encouraged to use NSF's electronic systems to verify the status of their submission to NSF.
+
+### H. Proposal Processing
+
+Proposers should allow up to six months for programmatic review and processing (see Chapter III for additional information on the NSF merit review process). In addition, proposers should be aware that the NSF Division of Grants and Agreements generally makes awards within 30 calendar days after the program division/office makes its recommendation. Grants and cooperative agreements that are being made to organizations that have not received an NSF award within the preceding five years or involving special situations (such as coordination with another Federal agency or a private funding source), cooperative agreements, and other unusual arrangements may require additional review and processing time. Proposals that are time-sensitive (e.g., conference and group travel) will be accepted for review only if, in the opinion of the cognizant Program Officer, they are received in sufficient time to permit appropriate NSF review and processing to support an award in advance of the activity to be supported. Every effort is made to reach a decision and inform the proposer promptly. Until an award is made, NSF is not responsible for any costs incurred by the proposing organization.
+
+#### Footnotes to Chapter I
+
+[3] Unless otherwise specified, the term "organization" refers to all categories of proposers.
+
+[4] Concept outlines are generally limited to two pages for a document attached to an email or 6000 characters of narrative text inserted in an email body or the ProSPCT webform.
+
+[5] This policy is not intended to cover NSF closures due to lapses in appropriation. In such cases, specific guidance will be issued, as appropriate.
+
+[6] A listing of upcoming target dates and deadlines, sorted by date and by program area is available on the NSF website.

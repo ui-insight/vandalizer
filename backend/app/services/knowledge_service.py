@@ -7,7 +7,7 @@ import datetime
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 import pymongo
@@ -29,8 +29,9 @@ from app.models.knowledge import (
     KnowledgeBaseUsage,
 )
 from app.models.user import User
+from app.models.team import Team
 from app.services import access_control, audit_service, kb_source_versions, name_conflicts
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import get_document_manager
 from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_fetch_error
 from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
@@ -42,14 +43,9 @@ logger = logging.getLogger(__name__)
 # error. Mirrors the stage list in tasks.document_tasks.
 IN_FLIGHT_TASK_STATUSES = ("layout", "extracting", "ocr", "security", "readying")
 
-_dm: DocumentManager | None = None
 
-
-def _get_dm() -> DocumentManager:
-    global _dm
-    if _dm is None:
-        _dm = DocumentManager()
-    return _dm
+def _get_dm():
+    return get_document_manager()
 
 
 def build_kb_list_query(
@@ -129,11 +125,12 @@ async def list_knowledge_bases(
     total = await KnowledgeBase.find(query).count()
     kbs = await (
         KnowledgeBase.find(query)
-        .sort(-KnowledgeBase.created_at)
+        .sort([("created_at", -1), ("uuid", 1)])
         .skip(skip)
         .limit(limit)
         .to_list()
     )
+
     return kbs, total
 
 
@@ -180,25 +177,42 @@ async def get_kb_usage_map(
     return {r.kb_uuid: r.last_used_at for r in records}
 
 
-async def admin_list_all_knowledge_bases(
+async def admin_search_knowledge_bases(
     search: str | None = None,
+    status: str | None = None,
+    sort: Literal["title", "updated", "created"] = "created",
     limit: int = 1000,
-) -> list[KnowledgeBase]:
-    """List EVERY knowledge base across all users/teams (admin-only).
+    offset: int = 0,
+) -> tuple[list[KnowledgeBase], int]:
+    """Unscoped admin inventory: filter and sort before paging, with one count.
 
-    Unscoped — bypasses the per-user/team/org visibility filtering of
-    ``list_knowledge_bases``. Intended for admin review (e.g. auditing names
-    for versioning). Newest first; optional case-insensitive title search.
+    Owner/team joins are needed only for searches. Keeping the search in MongoDB
+    avoids loading the entire inventory or materializing an unbounded ID list.
+    The facet uses the same filtered records for the page and its total.
     """
-    query: dict = {}
+    pipeline: list[dict] = []
+    if status:
+        pipeline.append({"$match": {"status": status}})
     if search and search.strip():
-        query["title"] = {"$regex": re.escape(search.strip()), "$options": "i"}
-    return await (
-        KnowledgeBase.find(query)
-        .sort("-created_at")
-        .limit(max(1, min(limit, 5000)))
-        .to_list()
-    )
+        regex = {"$regex": re.escape(search.strip()), "$options": "i"}
+        pipeline.extend([
+            {"$lookup": {"from": User.get_collection_name(), "localField": "user_id", "foreignField": "user_id", "as": "inventory_owner"}},
+            {"$lookup": {"from": Team.get_collection_name(), "localField": "team_id", "foreignField": "uuid", "as": "inventory_team"}},
+            {"$match": {"$or": [
+                {"title": regex}, {"tags": regex},
+                {"inventory_owner.email": regex}, {"inventory_team.name": regex},
+            ]}},
+            {"$project": {"inventory_owner": 0, "inventory_team": 0}},
+        ])
+    order = {"title": {"title": 1, "_id": 1}, "updated": {"updated_at": -1, "_id": 1}, "created": {"created_at": -1, "_id": 1}}[sort]
+    pipeline.append({"$facet": {
+        "records": [{"$sort": order}, {"$skip": max(0, offset)}, {"$limit": max(1, min(limit, 5000))}],
+        "count": [{"$count": "total"}],
+    }})
+    result = await KnowledgeBase.aggregate(pipeline, collation={"locale": "en", "strength": 2}).to_list()
+    page = result[0] if result else {}
+    counts = page.get("count", [])
+    return [KnowledgeBase.model_validate(record) for record in page.get("records", [])], counts[0]["total"] if counts else 0
 
 
 async def create_knowledge_base(
@@ -579,6 +593,7 @@ async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
             # index and answers from them, so chat must not call it
             # "still indexing" (which tells the model it can't be searched).
             "status": "ready" if s.status in ("pending", "processing") and s.chunk_count else s.status,
+            "error": (s.error_message or "") if s.status in ("error", "skipped", "held") else "",
         })
     return manifest
 
@@ -665,11 +680,11 @@ async def share_with_team(
     *,
     user_org_ancestry: list[str] | None = None,
     comment: str | None = None,
+    shared_with_team: bool | None = None,
 ) -> KnowledgeBase | None:
-    """Toggle shared_with_team for an authorized knowledge base.
+    """Set sharing explicitly; retain toggle behavior for legacy callers.
 
-    When toggling from unshared → shared, notifies the user's current team
-    (bell + email). Untoggling is silent.
+    Repeating the same desired state is a no-op, including notifications.
     """
     kb = await get_knowledge_base(
         uuid,
@@ -681,7 +696,16 @@ async def share_with_team(
     if not kb:
         return None
     was_shared = bool(kb.shared_with_team)
-    kb.shared_with_team = not kb.shared_with_team
+    desired = not was_shared if shared_with_team is None else shared_with_team
+    if kb.team_owned and not desired:
+        raise ValueError("Team-owned knowledge bases must remain shared with their team.")
+    if desired and not kb.team_id:
+        if not user.current_team:
+            raise ValueError("Join or select a team before sharing this knowledge base.")
+        kb.team_id = str(user.current_team)
+    elif desired == was_shared:
+        return kb
+    kb.shared_with_team = desired
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
 
@@ -884,7 +908,10 @@ async def register_documents(
     """
     team_access = await access_control.get_team_access_context(user)
     source_uuids: list[str] = []
-    for doc_uuid in document_uuids:
+    documents = []
+    # Check the whole selection before writing. A missing/inaccessible later
+    # document must not strand earlier inserts that were never dispatched.
+    for doc_uuid in dict.fromkeys(document_uuids):
         doc = await access_control.get_authorized_document(
             doc_uuid,
             user,
@@ -893,9 +920,11 @@ async def register_documents(
         )
         if not doc:
             raise ValueError(f"Document not found: {doc_uuid}")
+        documents.append(doc)
+    for doc in documents:
         existing = await KnowledgeBaseSource.find_one(
             KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
-            KnowledgeBaseSource.document_uuid == doc_uuid,
+            KnowledgeBaseSource.document_uuid == doc.uuid,
         )
         if existing:
             continue
@@ -936,20 +965,15 @@ async def partition_new_urls(
     router uses this to tell the user which URLs were skipped and to point
     them at the per-source refresh instead.
     """
-    new: list[str] = []
-    present: list[str] = []
-    seen: set[str] = set()
-    for raw in urls:
-        url = _normalize_url(raw or "")
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        existing = await KnowledgeBaseSource.find_one(
-            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
-            KnowledgeBaseSource.url == url,
-        )
-        (present if existing else new).append(url)
-    return new, present
+    ordered = list(dict.fromkeys(u for u in (_normalize_url(raw or "") for raw in urls) if u))
+    if not ordered:
+        return [], []
+    # One query, not one per URL: a sitemap or a file of links is hundreds.
+    rows = await KnowledgeBaseSource.find(
+        {"knowledge_base_uuid": kb.uuid, "url": {"$in": ordered}},
+    ).to_list()
+    held = {row.url for row in rows}
+    return [u for u in ordered if u not in held], [u for u in ordered if u in held]
 
 
 async def add_urls(
@@ -995,6 +1019,80 @@ async def add_urls(
     # Unconditional: the router set status="building" before dispatching this
     # run, and a run that added nothing (every URL already present) must still
     # restore the real status or the KB shows "building" forever.
+    await recalculate_stats(kb)
+    return added
+
+
+async def register_url_sources(
+    kb: KnowledgeBase, urls: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+) -> list[str]:
+    """Create a pending source row for each URL the KB doesn't hold; returns their uuids.
+
+    Rows go in before any fetch so a bulk add (a sitemap's pages, a file of
+    links) can be split across several worker tasks: every page shows as
+    queued at once, and the KB stays "building" until the last batch is done
+    rather than reading "ready" between batches. ``ingest_url_sources`` does
+    the fetching.
+    """
+    source_uuids: list[str] = []
+    new_urls, _ = await partition_new_urls(kb, urls)
+    for url in new_urls:
+        source = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type="url",
+            url=url[:2000],
+            crawl_enabled=crawl_enabled,
+            max_crawl_pages=max_crawl_pages,
+        )
+        if await _insert_source_unless_duplicate(source):
+            source_uuids.append(source.uuid)
+    return source_uuids
+
+
+async def ingest_url_sources(
+    kb: KnowledgeBase, source_uuids: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+) -> int:
+    """Fetch and index sources made by ``register_url_sources``. Returns pages added
+    (crawled children included).
+
+    A source deleted while queued is skipped. So is one already finished, which
+    a retried task meets again; one still "processing" is picked up, since the
+    attempt that started it is gone.
+
+    A big add can sit in the queue past the stalled-source sweep's window, and
+    the sweep settles a queued row it can't tell from an abandoned one as a
+    failed fetch. This batch arriving shows the add is alive, so such a row is
+    fetched after all. A row someone has since queued again (Try again,
+    Refresh) belongs to that task and is left to it.
+    """
+    from app.services.kb_url_refresh import STALLED_ADD_MESSAGE
+
+    added = 0
+    for source_uuid in source_uuids:
+        source = await KnowledgeBaseSource.find_one(
+            KnowledgeBaseSource.uuid == source_uuid,
+            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+        )
+        if not source:
+            continue
+        settled_while_queued = (
+            source.status == "error"
+            and source.error_message == STALLED_ADD_MESSAGE
+            and not getattr(source, "chunk_count", 0)
+        )
+        if settled_while_queued:
+            source.error_message = None
+        elif source.status not in ("pending", "processing") or getattr(source, "refresh_queued_at", None):
+            continue
+        added += 1
+        fetched = await _ingest_url_source(source, kb)
+        if crawl_enabled and fetched:
+            added += await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, fetched)
     await recalculate_stats(kb)
     return added
 
@@ -1332,7 +1430,7 @@ async def list_suggestions(
     query: dict = {"knowledge_base_uuid": kb_uuid}
     if status:
         query["status"] = status
-    return await KBSuggestion.find(query).sort("-created_at").to_list()
+    return await KBSuggestion.find(query).sort([("created_at", -1), ("uuid", 1)]).to_list()
 
 
 async def review_suggestion(

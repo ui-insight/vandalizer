@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { CredentialTestPanel, summarizeTest } from './CredentialTestPanel'
 import type { CredentialTestResult } from '../../types/credential'
 
@@ -61,4 +61,23 @@ describe('CredentialTestPanel', () => {
     rerender(<CredentialTestPanel run={vi.fn()} testUrl="" onTestUrlChange={onUrl} hideUrlField />)
     expect(screen.queryByLabelText('Test URL')).toBeNull()
   })
+  it('clears a previous result when connection settings change', async () => {
+    const run = vi.fn().mockResolvedValue(OK)
+    const { rerender } = render(<CredentialTestPanel run={run} testUrl="" onTestUrlChange={vi.fn()} revision={1} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Test' }))
+    await screen.findByRole('status')
+    rerender(<CredentialTestPanel run={run} testUrl="" onTestUrlChange={vi.fn()} revision={2} />)
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+  it('does not apply an in-flight result to changed settings', async () => {
+    let resolve!: (value: CredentialTestResult) => void
+    const run = vi.fn(() => new Promise<CredentialTestResult>(r => { resolve = r }))
+    const { rerender } = render(<CredentialTestPanel run={run} testUrl="" onTestUrlChange={vi.fn()} revision={1} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Test' }))
+    rerender(<CredentialTestPanel run={run} testUrl="" onTestUrlChange={vi.fn()} revision={2} />)
+    await act(async () => resolve(OK))
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Test' })).toBeEnabled()
+  })
+
 })

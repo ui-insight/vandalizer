@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck, Cpu } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -24,8 +25,9 @@ export interface HistoryRun {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
-  /** Models the run's calls used, most tokens first; empty for runs recorded
-   * before models were. */
+  /** Models the run used, most tokens first. Runs recorded before calls were
+   * metered carry the models their steps were configured with; empty when
+   * neither is known. */
   models?: string[]
   /** Workflow runs: each step's models, in step order. */
   step_models?: { index: number; name: string | null; models: string[] }[]
@@ -62,7 +64,7 @@ function StatusIcon({ status }: { status: string }) {
   if (status === 'completed') return <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />
   if (status === 'failed' || status === 'error') return <XCircle style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />
   if (status === 'running' || status === 'queued') return <Loader2 style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
-  return <Clock style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
+  return <Clock style={{ width: 14, height: 14, color: 'var(--ui-text-muted, #59616b)', flexShrink: 0 }} />
 }
 
 function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; type: 'workflow' | 'extraction' }) {
@@ -73,13 +75,13 @@ function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; 
     if (!normalized || Object.keys(normalized).length === 0) return null
     const entries = Object.entries(normalized)
     return (
-      <div style={{ marginTop: 8, fontSize: 12, color: '#374151' }}>
+      <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#374151' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             {entries.map(([key, val]) => (
               <tr key={key}>
-                <td style={{ padding: '3px 8px 3px 0', color: '#6b7280', fontWeight: 500, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{key}</td>
-                <td style={{ padding: '3px 0', wordBreak: 'break-word' }}>{val != null ? String(val) : <span style={{ color: '#d1d5db' }}>--</span>}</td>
+                <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-8) var(--workspace-space-4) 0", color: '#6b7280', fontWeight: 500, verticalAlign: 'top', wordBreak: 'break-word' }}>{key}</td>
+                <td style={{ padding: "var(--workspace-space-4) 0", wordBreak: 'break-word' }}>{val != null ? String(val) : <span style={{ color: '#6b7280' }}>No value</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -92,7 +94,7 @@ function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; 
   const keys = Object.keys(snapshot)
   if (keys.length === 0) return null
   return (
-    <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+    <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
       {keys.length} result field{keys.length !== 1 ? 's' : ''}
     </div>
   )
@@ -125,70 +127,59 @@ const DOWNLOAD_FORMATS = [
 // (it can be arbitrarily large) — fetch it from the persisted WorkflowResult
 // by session_id when the row is first expanded.
 function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
-  const [loading, setLoading] = useState(true)
-  const [unavailable, setUnavailable] = useState(false)
-  const [output, setOutput] = useState<unknown>(null)
+  const request = useCallback(() => getWorkflowStatus(sessionId), [sessionId])
+  const { data: status, loading, error, load } = useAdminQuery(request)
   const [showDownload, setShowDownload] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    getWorkflowStatus(sessionId)
-      .then(status => {
-        if (cancelled) return
-        const fo = status?.final_output as Record<string, unknown> | null
-        setOutput(fo && typeof fo === 'object' && 'output' in fo ? fo.output : fo)
-        setLoading(false)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setUnavailable(true)
-        setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [sessionId])
+  const downloadButton = useRef<HTMLButtonElement>(null)
+  const finalOutput = status?.final_output as Record<string, unknown> | null
+  const output = finalOutput && typeof finalOutput === 'object' && 'output' in finalOutput ? finalOutput.output : finalOutput
 
   if (loading) {
     return (
-      <div role="status" aria-label="Loading run output" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+      <div role="status" aria-label="Loading run output" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
         Loading output...
       </div>
     )
   }
 
-  if (unavailable || output == null) {
+  if (error) return <div role="alert" className="mt-2 text-sm text-red-800">{error} <button type="button" onClick={load} className="underline">Retry run output</button></div>
+
+  if (output == null) {
     return (
-      <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
-        Output is no longer available for this run.
+      <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--ui-text-muted, #59616b)' }}>
+        No final output was saved for this run.
       </div>
     )
   }
 
   const file = summarizeFilePayload(output)
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 'var(--workspace-space-8)' }}>
       {file ? (
         <FileOutputCard summary={file} downloadHref={downloadResults(sessionId, 'text')} maxHeight="50vh" />
       ) : (
         <div
+          role="region" aria-label="Saved workflow output" tabIndex={0}
           className="chat-markdown"
           style={{
-            backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-            padding: 12, fontSize: 13, lineHeight: 1.6,
+            backgroundColor: '#f9fafb', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
+            padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
             maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
             color: '#374151', wordBreak: 'break-word',
           }}
           dangerouslySetInnerHTML={{ __html: renderMarkdownOutput(output) }}
         />
       )}
-      <div style={{ position: 'relative', display: 'inline-block', marginTop: 8 }}>
+      <div onKeyDown={event => { if (event.key === 'Escape') { setShowDownload(false); downloadButton.current?.focus() } }} style={{ marginTop: 'var(--workspace-space-8)' }}>
         <button
+          ref={downloadButton}
           onClick={() => setShowDownload(s => !s)}
           aria-expanded={showDownload}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-            fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            border: '1px solid #d1d5db', borderRadius: 6,
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-12)",
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
             backgroundColor: '#fff', cursor: 'pointer', color: '#374151',
           }}
         >
@@ -197,10 +188,10 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
         </button>
         {showDownload && (
           <div style={{
-            position: 'absolute', bottom: '100%', left: 0, marginBottom: 4,
-            backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, minWidth: 200,
-            padding: '4px 0',
+            marginTop: 'var(--workspace-space-4)', maxHeight: '45vh', overflowY: 'auto',
+            backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 0, width: '100%', maxWidth: 320,
+            padding: "var(--workspace-space-4) 0",
           }}>
             {DOWNLOAD_FORMATS.map(({ fmt, label, desc, parseStructured }) => (
               <a
@@ -209,7 +200,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
                 onClick={() => setShowDownload(false)}
                 style={{
                   display: 'flex', flexDirection: 'column', gap: 1,
-                  padding: '8px 14px', fontSize: 13, fontWeight: 500,
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                   color: '#374151', textDecoration: 'none',
                   transition: 'background-color 0.1s',
                 }}
@@ -217,7 +208,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
                 onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff' }}
               >
                 <span>{label}</span>
-                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{desc}</span>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>{desc}</span>
               </a>
             ))}
           </div>
@@ -263,8 +254,8 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '12px 24px',
+          gap: 'var(--workspace-space-12)',
+          padding: "var(--workspace-space-12) var(--workspace-space-24)",
           background: 'none',
           border: 'none',
           cursor: hasResults ? 'pointer' : 'default',
@@ -275,15 +266,15 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
         <StatusIcon status={displayStatus} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124' }}>
               {run.started_at ? relativeTime(run.started_at) : 'Unknown'}
             </span>
             <span style={{
-              fontSize: 11,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 500,
-              padding: '1px 6px',
-              borderRadius: 4,
+              padding: "1px var(--workspace-space-6)",
+              borderRadius: 'var(--workspace-radius-small)',
               backgroundColor: reviewUuid ? '#fef3c7' : run.status === 'completed' ? '#dcfce7' : run.status === 'failed' || run.status === 'error' ? '#fef2f2' : '#f3f4f6',
               color: reviewUuid ? '#92400e' : run.status === 'completed' ? '#166534' : run.status === 'failed' || run.status === 'error' ? '#991b1b' : '#6b7280',
             }}>
@@ -291,15 +282,15 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 11, color: '#6b7280' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
             {run.duration_ms != null && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <Clock style={{ width: 11, height: 11 }} />
                 {formatDuration(run.duration_ms)}
               </span>
             )}
             {run.documents_touched > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <FileText style={{ width: 11, height: 11 }} />
                 {run.documents_touched} doc{run.documents_touched !== 1 ? 's' : ''}
               </span>
@@ -310,7 +301,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
               </span>
             )}
             {(run.tokens_input > 0 || run.tokens_output > 0) && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <Zap style={{ width: 11, height: 11 }} />
                 {(run.tokens_input + run.tokens_output).toLocaleString()} tokens
               </span>
@@ -324,16 +315,16 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           </div>
 
           {run.error && (
-            <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>
-              {run.error.length > 120 ? run.error.slice(0, 120) + '...' : run.error}
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginTop: 'var(--workspace-space-4)' }}>
+              {run.error}
             </div>
           )}
         </div>
 
         {hasResults && (
           expanded
-            ? <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
-            : <ChevronRight style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
+            ? <ChevronDown style={{ width: 14, height: 14, color: 'var(--ui-text-muted, #59616b)', flexShrink: 0 }} />
+            : <ChevronRight style={{ width: 14, height: 14, color: 'var(--ui-text-muted, #59616b)', flexShrink: 0 }} />
         )}
       </button>
 
@@ -345,7 +336,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           params={{ uuid: reviewUuid } as never}
           style={{
             display: 'inline-block', margin: '-6px 0 12px 48px',
-            fontSize: 12, fontWeight: 600, color: '#0ea5e9', textDecoration: 'none',
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#0369a1', textDecoration: 'underline',
           }}
         >
           Open review →
@@ -353,14 +344,14 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
       )}
 
       {expanded && hasResults && (
-        <div style={{ padding: '0 24px 12px 48px' }}>
+        <div style={{ padding: "0 var(--workspace-space-24) var(--workspace-space-12) 48px" }}>
           {showStepModels && (
-            <table aria-label="Models by step" style={{ marginTop: 4, fontSize: 12, color: '#374151', borderCollapse: 'collapse' }}>
+            <table aria-label="Models by step" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#374151', borderCollapse: 'collapse' }}>
               <tbody>
                 {stepModels.map(s => (
                   <tr key={s.index}>
-                    <td style={{ padding: '2px 12px 2px 0', color: '#6b7280', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{s.name ?? `Step ${s.index + 1}`}</td>
-                    <td style={{ padding: '2px 0', wordBreak: 'break-word' }}>{s.models.join(', ')}</td>
+                    <td style={{ padding: 'var(--workspace-space-2) var(--workspace-space-12) var(--workspace-space-2) 0', color: '#6b7280', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{s.name ?? `Step ${s.index + 1}`}</td>
+                    <td style={{ padding: 'var(--workspace-space-2) 0', wordBreak: 'break-word' }}>{s.models.join(', ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -382,22 +373,8 @@ export function RunHistoryTab({
   fetchHistory: () => Promise<{ runs: HistoryRun[] }>
   type: 'workflow' | 'extraction'
 }) {
-  const [runs, setRuns] = useState<HistoryRun[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await fetchHistory()
-      setRuns(data.runs)
-    } catch {
-      // silent
-    } finally {
-      setLoading(false)
-    }
-  }, [fetchHistory])
-
-  useEffect(() => { load() }, [load])
+  const { data, loading, error, load } = useAdminQuery(fetchHistory)
+  const runs = data?.runs ?? []
 
   if (loading) {
     return (
@@ -407,9 +384,11 @@ export function RunHistoryTab({
     )
   }
 
+  if (error) return <div role="alert" className="p-6 text-sm text-red-800">{error} <button type="button" onClick={load} className="underline">Retry run history</button></div>
+
   if (runs.length === 0) {
     return (
-      <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+      <div style={{ padding: "48px var(--workspace-space-24)", textAlign: 'center', color: 'var(--ui-text-muted, #59616b)', fontSize: 'var(--workspace-font-control)' }}>
         No runs yet. Results will appear here after you run this {type}.
       </div>
     )
@@ -417,8 +396,8 @@ export function RunHistoryTab({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px 8px' }}>
-        <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--workspace-space-12) var(--workspace-space-24) var(--workspace-space-8)' }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
           {runs.length} run{runs.length !== 1 ? 's' : ''}
         </div>
         <button
@@ -432,8 +411,8 @@ export function RunHistoryTab({
             URL.revokeObjectURL(url)
           }}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 12, fontWeight: 500,
-            fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+            fontFamily: 'inherit', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', backgroundColor: 'var(--workspace-surface)',
             color: '#374151', cursor: 'pointer',
           }}
         >

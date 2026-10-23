@@ -122,6 +122,10 @@ class WorkflowStatusResponse(BaseModel):
     # "completed" that the stream (which sends the service dict) did not.
     delivery_failures: list[str] = []
     retrieved_sources: list[dict] = []
+    # The run's model, and the models its steps actually ran on (see
+    # WorkflowResult.models_used). Shown on every run view.
+    model: Optional[str] = None
+    models_used: list[str] = []
     workflow_name: Optional[str] = None
     document_title: Optional[str] = None
     start_time: Optional[datetime.datetime] = None

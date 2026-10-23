@@ -4,7 +4,7 @@ import {
   listKBOptimizationHistory,
   type KBOptimizationRunSummary,
 } from '../../api/knowledge'
-import { StatusDot } from '../shared/StatusDot'
+import { StatusBadge } from '../shared/StatusBadge'
 import { scoreColor } from '../shared/TrialsTable'
 import { CompareRunsView } from './CompareRunsView'
 
@@ -45,46 +45,47 @@ export function OptimizationHistoryPanel({
 
   return (
     <div style={{
-      backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       overflow: 'hidden',
     }}>
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '10px 14px', background: 'transparent', border: 'none',
-          fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
+          padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'transparent', border: 'none',
+          fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#888' }} /> : <ChevronRight size={14} style={{ color: '#888' }} />}
-        <History size={14} style={{ color: '#888' }} />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
+        {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
+        <History size={14} style={{ color: 'var(--workspace-muted)' }} />
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
       </button>
 
       {open && (
-        <div style={{ padding: '0 12px 12px 12px' }}>
+        <div style={{ padding: "0 var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-12)" }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: '#888' }}>
+            <div style={{ textAlign: 'center', padding: 'var(--workspace-space-16)', color: 'var(--workspace-muted)' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: '#fca5a5', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 'var(--workspace-space-8)' }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ fontSize: 12, color: '#888', padding: '12px 8px' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-12) var(--workspace-space-8)" }}>
               No prior optimization runs for this KB.
             </div>
           )}
           {items != null && filtered.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               {filtered.map(run => (
                 <HistoryRow
                   key={run.uuid}
@@ -123,35 +124,35 @@ function HistoryRow({
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '7px 10px',
-        background: '#1a1a1a', border: '1px solid #2a2a2a',
-        borderRadius: 5,
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)',
+        padding: "7px var(--workspace-space-12)",
+        background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
+        borderRadius: 'var(--workspace-radius-small)',
       }}
     >
       <button
         onClick={() => onSelect?.(run.uuid)}
         disabled={!onSelect}
         style={{
-          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+          flex: '1 1 220px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', minHeight: 'var(--workspace-control-height)',
           background: 'transparent', border: 'none', padding: 0,
           cursor: onSelect ? 'pointer' : 'default',
-          fontFamily: 'inherit', color: '#e5e5e5', textAlign: 'left',
+          fontFamily: 'inherit', color: 'var(--workspace-text)', textAlign: 'left',
         }}
       >
-        <StatusDot status={run.status} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <StatusBadge status={run.status} />
+        <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{
-            fontSize: 12, color: '#ddd',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+            overflowWrap: 'anywhere',
           }}>
             {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
-            <span style={{ color: '#666' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
-            {run.options?.apply_on_finish ? <span style={{ color: '#a78bfa' }}> · auto-applied</span> : null}
+            <span style={{ color: 'var(--workspace-muted)' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
+            {run.options?.apply_on_finish ? <span style={{ color: 'var(--workspace-info)' }}> · auto-applied</span> : null}
           </div>
           <div style={{
-            fontSize: 10, color: '#666',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+            overflowWrap: 'anywhere', marginTop: 1,
           }}>
             {run.judge_model && <>judge: {run.judge_model}</>}
             {run.judge_model && run.eval_set_size != null && ' · '}
@@ -161,22 +162,22 @@ function HistoryRow({
           </div>
           {run.error_message && run.status === 'failed' && (
             <div style={{
-              fontSize: 10, color: '#fca5a5',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
+              overflowWrap: 'anywhere', marginTop: 1,
             }}>
               {run.error_message}
             </div>
           )}
         </div>
         {score != null && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
             {(score * 100).toFixed(0)}%
           </span>
         )}
         {lift != null && (
           <span style={{
-            fontSize: 10,
-            color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#666',
+            fontSize: 'var(--workspace-font-meta)',
+            color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
             minWidth: 50, textAlign: 'right',
           }}>
             {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts
@@ -188,10 +189,10 @@ function HistoryRow({
           onClick={onCompare}
           title="Compare this run with the current one"
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'inherit',
-            color: '#a78bfa', background: 'transparent',
-            border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 4,
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+            minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            color: 'var(--workspace-info)', background: 'transparent',
+            border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-small)',
             cursor: 'pointer',
           }}
         >

@@ -1,0 +1,163 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 19: Research Patient Care Costs
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+19 RESEARCH PATIENT CARE COSTS
+19.1 GENERAL
+This chapter provides NIH policy on the determination and reimbursement of research patient care costs
+under grants. This general policy is intended to be applied in conjunction with the requirements of 2
+CFR Part 200, Appendix IX, Hospital Cost Principles. In addition, specific NIH programs may have additional or alternative requirements with which an applicant or recipient must comply.
+19.2 DEFINITIONS
+Research Patient Care Costs. The costs of routine and ancillary services provided by hospitals to individuals participating in research programs. The costs of these services normally are assigned to specific
+research projects through the development and application of research patient care rates or amounts (hereafter “rates”). Research patient care costs do not include: (1) the otherwise allowable items of personal
+expense reimbursement, such as patient travel or subsistence, consulting physician fees, or any other direct payments related to all classes of individuals, including inpatients, outpatients, subjects, volunteers,
+and donors, (2) costs of ancillary tests performed in facilities outside the hospital on a fee-for-service
+basis (e.g., in an independent, privately owned laboratory) or laboratory tests performed at a medical
+school/university not associated with a hospital routine or ancillary service , (3) recruitment or retention
+fees or (4) the data management or statistical analysis of clinical research results.
+Hospital. Includes all types of medical, psychiatric, and dental facilities, such as clinics, infirmaries, and
+sanatoria.
+Research Patients. Inpatient and outpatient subjects, volunteers, or donors participating in a research protocol.
+Routine Services. Regular room services, minor medical and surgical supplies, and the use of equipment
+and facilities, for which a separate charge is not customarily made.
+Ancillary Services. Those special services for which charges are customarily made in addition to routine
+services, e.g., x-ray, operating room, laboratory, pharmacy, blood bank, and pathology.
+Outpatient Services. Services rendered to subjects/volunteers/donors who are not hospitalized.
+Usual Patient Care. Items and services (routine and ancillary) ordinarily furnished in the treatment of
+patients by providers of patient care under the supervision of the physician or other responsible health
+professional. Such items or services may be diagnostic, therapeutic, rehabilitative, medical, psychiatric,
+or any other related professional health services. These expenses are for care that would have been
+incurred even if the research study did not exist. The patient and/or third-party insurance generally will
+provide for reimbursement of charges for “usual patient care” as opposed to not reimbursing those
+charges generated solely because of participation in a research protocol.
+Discrete Centers. Groups of beds that have been set aside for occupancy by research patients and are
+physically separated from other hospital beds in an environment that normally permits an ascertainable
+allocation of costs associated with the space they occupy and the service needs they generate.
+Scatter Beds. Beds assigned to research patients based on availability. These beds are not physically separate from nonresearch beds. Scatter beds are geographically dispersed among all the beds available for
+use in the hospital and are not usually distinguishable in terms of services or costs from other general service beds within the hospital.
+(GPS page IIB-149)
+
+Cost-Finding Process. The technique of apportioning or allocating the costs of the non-revenue-producing cost centers to each other and to the revenue-producing centers on the basis of the statistical data
+that measure the amount of service rendered by each center to other centers.
+19.3 POLICY
+NIH provides funds for research patient care costs under grants and cooperative agreements. Research
+patients may receive routine services as inpatients or ancillary services as either inpatient or outpatient
+subjects/volunteers/donors. In order to receive reimbursement for research patient care costs, any hospital that, as a direct recipient of NIH funds, expects to incur more than $100,000 in patient care costs in
+any single budget period on a single NIH grant must either have in place or take steps to negotiate a
+research patient care rate agreement with the cognizant CAS office. These rates must be shown in all
+requests and/or claims for reimbursement of research patient care costs. Hospital recipients that expect to
+incur $100,000 or less in research patient care costs per budget period on a single NIH grant and patient
+care for all consortium participants/contractors under grants no matter the dollar figure are subject to the
+requirements specified in the subsection on Special Procedures for Certain Hospitals below. Failure to
+negotiate a research patient care rate with CAS when required may result in the disallowance of all
+research patient care costs charged to a grant.
+19.4 ALLOWABLE COSTS
+The type of patient and services received are the determining factors for allowing research patient care
+costs as charges to NIH grants. If the patient is receiving service or care that neither differs from usual
+patient care nor results in expenses greater than those that would have been incurred if the study had not
+existed, then the patient is considered to be hospitalized for usual care purposes and the grant will generally not support the costs. When the research extends the period of hospitalization beyond that ordinarily required for usual care, or imposes procedures, tests or services beyond usual care, whether in an
+inpatient or outpatient setting, the grant may pay the additional costs. The recipient must decide whether,
+in fact, the hospitalization period, the tests, or the services have been extended beyond or added to what
+would ordinarily have been expected, and to what extent. Patient care costs for individuals who are
+receiving accepted treatment according to standard regimens would not ordinarily be acceptable charges
+to an NIH grant. Similarly, in certain kinds of clinical trials where accepted treatments are compared
+against new therapies, research patient care costs generally may be charged to a grant only insofar as
+they are measurements or services above and beyond those that constitute usual patient care and are specified by the study protocol. Acceptable exceptions are listed below.
+NIH funds may be used to pay all costs (whether usual care costs or research care costs) for the entire
+period of hospitalization or research tests or services for individuals who would not have been hospitalized or received such tests or services except for their participation in the research study. Any such
+exceptions should be documented in the recipient’s records. These individuals may include the following:
+ l Volunteers to whom no health advantages may be expected to accrue as a result of the hospitalization. Examples would be normal controls for metabolic or other studies; people with
+genetic or certain abnormalities of interest to the investigator; healthy individuals participating in
+a clinical trial, for example a vaccine trial; and sick people brought to the hospital solely for studies when they otherwise would not require hospitalization.
+(GPS page IIB-150)
+
+l Volunteers who are sick and of research importance to the protocol but economically unable or
+without funds available to them through a responsible third party to pay hospitalization expenses.
+This includes patients for whom some third-party payer, such as a city, county, or State government, might pay hospitalization expenses in some other hospital but has no responsibility to
+pay in the hospital in which the approved clinical research is being conducted.
+ l Volunteers of research importance who are unwilling to spend their own money or use their hospital plan coverage at that particular time. (Fear of more urgent need in the future for both personal funds and health insurance might be one reason for the patient’s reluctance to participate in
+the study.) The investigator has a special responsibility in making the decision to include patients
+in this group with full charges to the grant, since NIH expects the patient and/or third party to
+pay the total costs of usual care. However, in exceptional circumstances, the investigator may
+decide to pay the total expenses for hospitalization, research services, or tests from the grant if
+this is required to secure timely cooperation of a valuable study patient not otherwise available.
+19.4.1 Computing Research Patient Care Costs
+Research patient care costs, whether expressed as a rate or an amount, shall be computed in an amount
+consistent with the principles and procedures used by the Medicare program for determining the portion
+of Medicare reimbursement based on reasonable costs. Separate cost centers must be established for each
+discrete bed unit for purposes of allocating or distributing allowable routine costs to the discrete unit.
+When provisional rates are used as the basis for award of research patient care costs, the amount awarded shall constitute the maximum amount that the NIH awarding IC is obligated to reimburse the recipient for such costs. Provisional rates must be adjusted if a lower final rate is negotiated.
+19.4.2 Indirect Costs
+Indirect costs should not be paid on any cost component representing the cost of research patient care
+activities. Research patient care rates (routine and ancillary) include indirect costs related to “hospitaltype” employees (nurses, medical technicians, and similar personnel) supported as a direct cost under a
+grant. Therefore, to preclude over-recoveries of costs similar to these indirect costs, salaries and wages
+of all “hospital-type” employees working on the grant must be excluded from the salary and wage
+(S&W) base used to claim indirect costs. Related fringe benefits also should be excluded if such costs
+are part of the S&W base. If a “total-direct-costs” base is used to compute and claim indirect costs, the
+above-mentioned “hospital-type” salaries also must be excluded from the base as well as any other base
+costs chargeable to the grant through the application of a research patient care rate.
+If the grant or a consortium agreement/contract under a grant provides funding exclusively for research
+patient care activities, no indirect costs normally will be allowed as a separate cost element since all
+allocable indirect costs will be accounted for in the routine or ancillary activity costs contained in
+research patient care rates.
+Although foreign organizations are not prohibited from requesting research patient care costs, all indirect
+expenses must be excluded from the charges to the grant.
+19.4.3 Special Procedures for Certain Hospitals
+19.4.3.1 Recipients
+If a recipient does not meet the threshold for negotiation of a research patient care rate agreement with
+CAS in a given budget period, as specified under Policy in this chapter, but has a currently negotiated
+(GPS page IIB-151)
+
+research patient care rate, that rate will be used in awarding and reimbursing research patient care costs,
+regardless of the amount that the recipient expects to incur. In all other cases, the recipient will be reimbursed at a rate not to exceed the lesser of actual research patient care costs or the rate included in its
+Medicare cost report.
+19.4.3.2 Consortium Participants/Contractors under Grants
+If a hospital incurring research patient care costs is not the recipient, the recipient will be responsible for
+establishing the rate or amount that will be reimbursed for such costs unless the hospital also is a direct
+recipient of other HHS awards and in that capacity has established a research patient care rate with CAS.
+If a participating hospital expects to incur more than $100,000 in research patient care costs as specified
+under Policy in this chapter, the recipient must negotiate a rate for that hospital unless the relationship
+between the recipient and the hospital is considered “less-than-arms-length.” In this case, the recipient
+should contact the GMO to determine whether CAS should negotiate the rate.
+If a participating hospital expects to incur $100,000 or less in research patient care costs (as provided
+under Policy in this chapter), the recipient will use the lesser of actual costs or the rate in the hospital’s
+Medicare cost report as the basis for determining reimbursement. For purposes of this paragraph, the
+recipient will apply the thresholds to each hospital individually.
+19.4.4 Financial Responsibilities
+If the costs of patient care are funded by the grant, and whether those costs are classified as usual patient
+care or research patient care, the amount recovered from third parties must be credited to the grant.
+However, patient charges must be adjusted for both routine services and ancillaries prior to applying the
+third-party recoveries. The recipient is obligated to pursue recovery to the fullest extent possible and
+should be able to document those efforts. An example of such an adjustment follows:
+If the standard fee schedule charge for a CT scan is $500, the negotiated research patient care agreement
+rate is 75 percent, and third-party insurance pays $300, the maximum amount that may be charged to the
+NIH grant is $75, based on the following calculation.
+Standard Fee Schedule X (multiplied by) Negotiated Rate = Cost—(minus) Insurance = Maximum
+Charge to NIH Grant
+$500 x .75 = $375 - $300 = $75
+In those instances when the recipient determines that the balance of the patient’s bill may be charged to
+the grant (see Allowable Costs in this chapter), the total bill must be adjusted to cost before applying any
+third-party recoveries. The remaining balance of allowable costs may then be charged to the grant.
+In certain circumstances, funds may be awarded that support tests specifically developed for research purposes that are subsequently billed to third parties. In such cases, funds recovered from third parties must
+be credited to the grant account.
+19.5 PROGRAM REQUIREMENTS
+An individual NIH IC/program may adopt special implementing procedures consistent with this section
+to meet its own specific needs.
+(GPS page IIB-152)
+
+19.6 POST-AWARD REQUIREMENTS
+Post-award rebudgeting into or out of the patient care costs category is likely to be considered a change
+in scope and require prior approval of the NIH awarding IC (see Administrative Requirements — Prior
+Approval Requirements — Change in Scope in IIA).
+(GPS page IIB-153)
+
+PART III: POINTS OF CONTACT
+Various offices and officials are mentioned throughout the preceding parts of the NIHGPS as sources of
+information or as responsible for certain activities in the NIH grants process. Contact information for
+these and other offices and officials is provided in this part. These addresses should not be used for
+express mail or other types of hand-deliveries. The IC should be contacted to obtain the address to use
+for express mail.
+For each IC that awards grants, a listing is provided for the CGMO as well as an extramural program
+official that may be contacted for general information. The web address for the IC’s home page also is
+included. Requests related to particular applications submitted or grants awarded should be directed to
+the individual(s) specified in formal communications from NIH, e.g., in the NoA.
+(GPS page IIB-154)

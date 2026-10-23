@@ -21,6 +21,7 @@ from app.dependencies import get_api_key_user, get_current_user
 from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, activity_service, audit_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
@@ -43,6 +44,7 @@ from app.schemas.extractions import (
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
 from app.services.name_conflicts import DuplicateNameError
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +257,7 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_name}.vandalizer.json")},
     )
 
 
@@ -383,7 +385,7 @@ async def download_validation_zip(uuid: str, user: User = Depends(get_current_us
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_validation.zip")},
     )
 
 
@@ -587,7 +589,7 @@ async def download_validation_results(
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation-results.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_validation-results.zip")},
     )
 
 
@@ -789,7 +791,7 @@ async def generate_pdf_template(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}_template.pdf"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}_template.pdf")},
     )
 
 
@@ -850,7 +852,7 @@ async def export_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_title}.pdf")},
     )
 
 
@@ -939,7 +941,7 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     await _get_search_set_or_404(uuid, user)
     document_uuids = await _authorize_documents(req.document_uuids, user)
     try:
-        entities = await svc.build_from_documents(
+        entities, _ = await svc.build_from_documents(
             search_set_uuid=uuid,
             document_uuids=document_uuids,
             user_id=user.user_id,
@@ -960,7 +962,7 @@ async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User
     """
     document_uuids = await _authorize_documents(req.document_uuids, user)
     try:
-        entities = await svc.suggest_fields_from_documents(
+        entities, _ = await svc.suggest_fields_from_documents(
             document_uuids=document_uuids,
             user_id=user.user_id,
             model=req.model,
@@ -1027,31 +1029,39 @@ def _evaluate_cross_field_rules(search_set, values: dict) -> Optional[dict]:
         return None
 
 
-@router.post("/run-sync")
-@limiter.limit("30/minute")
-async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
-    # Look up the search set for the activity title
-    ss = await _get_search_set_or_404(req.search_set_uuid, user)
-    document_uuids = await _authorize_documents(req.document_uuids, user)
-    title = ss.title
+async def run_recorded_extraction(
+    ss,
+    document_uuids: list[str],
+    *,
+    user_id: str,
+    team_id: Optional[str],
+    model: Optional[str] = None,
+    extraction_config_override: Optional[dict] = None,
+    combined_context: bool = False,
+    tags: Optional[list[str]] = None,
+    source_conversation_id: Optional[str] = None,
+) -> dict:
+    """Run an extraction set and record it as a run in History.
 
-    # Nothing to extract with: refuse before a run exists. The service
-    # returns [] for a fieldless set, so this used to record a "completed"
-    # run in a few milliseconds — green tick in History, nothing to open —
-    # once per click (support ticket).
-    if not await svc.get_extraction_keys(req.search_set_uuid):
-        raise HTTPException(
-            status_code=400,
-            detail="This extraction has no fields yet — add at least one field before running it",
-        )
+    The one implementation behind the editor's Run and chat's run_extraction,
+    so the same set on the same document gives the same values and sources
+    either way, and both runs open from History with their real duration.
+    Chat once ran its own copy of the engine call, with the set's raw config
+    instead of the optimizer's, domain prompt hints the editor never used, and
+    no model, and logged a zero-length run with nothing to open.
 
-    # Create activity event
+    Callers authorize *ss* and *document_uuids* and check the set has fields.
+    Returns the run-sync response plus ``activity_id``.
+    """
     activity = await activity_service.activity_start(
         type=ActivityType.SEARCH_SET_RUN,
-        title=title,
-        user_id=user.user_id,
-        team_id=str(user.current_team) if user.current_team else None,
-        search_set_uuid=req.search_set_uuid,
+        title=ss.title,
+        user_id=user_id,
+        team_id=team_id,
+        search_set_uuid=ss.uuid,
+        tags=tags,
+        document_uuids=document_uuids,
+        source_conversation_id=source_conversation_id,
     )
     assert activity.id is not None
 
@@ -1059,8 +1069,8 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         from app.services.metering import metered_async, model_usage_rows, summarize_model_usage
         async with metered_async(
             "extraction",
-            user_id=user.user_id,
-            team_id=str(user.current_team) if user.current_team else None,
+            user_id=user_id,
+            team_id=team_id,
             activity_id=str(activity.id),
         ) as meter:
             # Degraded inputs the run should disclose: text that is garbled,
@@ -1069,12 +1079,12 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             # expensive place to stay quiet.
             document_warnings: list[dict] = []
             results = await svc.run_extraction_sync(
-                search_set_uuid=req.search_set_uuid,
+                search_set_uuid=ss.uuid,
                 document_uuids=document_uuids,
-                user_id=user.user_id,
-                model=req.model,
-                extraction_config_override=req.extraction_config_override,
-                combined_context=req.combined_context,
+                user_id=user_id,
+                model=model,
+                extraction_config_override=extraction_config_override,
+                combined_context=combined_context,
                 capture_sources=True,
                 document_warnings=document_warnings,
             )
@@ -1166,7 +1176,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 # looks exactly like a run over documents read whole.
                 "document_warnings": document_warnings,
                 "document_uuids": document_uuids,
-                "search_set_uuid": req.search_set_uuid,
+                "search_set_uuid": ss.uuid,
             },
         )
 
@@ -1182,12 +1192,13 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 "cross_field_sets": [],
                 "document_warnings": document_warnings,
                 "error": EXTRACTION_NO_VALUES_ERROR,
+                "activity_id": str(activity.id),
                 "models": summarize_model_usage(model_usage_rows(meter))["models"],
             }
 
         # Fire-and-forget auto-validation if test cases exist
         from app.tasks.quality_tasks import auto_validate_extraction
-        auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
+        auto_validate_extraction.delay(ss.uuid, user_id, model)
 
         return {
             "results": results,
@@ -1195,9 +1206,17 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             "cross_field": cross_field,
             "cross_field_sets": cross_field_sets,
             "document_warnings": document_warnings,
+            "activity_id": str(activity.id),
             # The models the run's calls used, for the results export.
             "models": summarize_model_usage(model_usage_rows(meter))["models"],
         }
+    except asyncio.CancelledError:
+        # The caller gave up (chat's tool timeout). Without this the run
+        # would show as running in History forever.
+        await asyncio.shield(activity_service.activity_finish(
+            activity.id, ActivityStatus.FAILED, error="Extraction was cancelled before it finished",
+        ))
+        raise
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
@@ -1215,8 +1234,35 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
 
         status_code, message = describe_extraction_failure(e)
         if status_code == 500:
-            logger.exception("Extraction run failed for search set %s", req.search_set_uuid)
+            logger.exception("Extraction run failed for search set %s", ss.uuid)
         raise HTTPException(status_code=status_code, detail=message) from e
+
+
+@router.post("/run-sync")
+@limiter.limit("30/minute")
+async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
+    ss = await _get_search_set_or_404(req.search_set_uuid, user)
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+
+    # Nothing to extract with: refuse before a run exists. The service
+    # returns [] for a fieldless set, so this used to record a "completed"
+    # run in a few milliseconds — green tick in History, nothing to open —
+    # once per click (support ticket).
+    if not await svc.get_extraction_keys(req.search_set_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="This extraction has no fields yet — add at least one field before running it",
+        )
+
+    return await run_recorded_extraction(
+        ss,
+        document_uuids,
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+        model=req.model,
+        extraction_config_override=req.extraction_config_override,
+        combined_context=req.combined_context,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1309,6 +1355,7 @@ async def run_extraction_integrated(
         doc = SmartDocument(
             title=upload.filename,
             processing=True,
+            validating=True,
             valid=True,
             raw_text="",
             downloadpath=str(relative_path),
@@ -1324,8 +1371,7 @@ async def run_extraction_integrated(
             document_uuid=uid, extension=ext, document_path=str(file_path),
             user_id=user.user_id,
         )
-        doc.task_id = task_id
-        await doc.save()
+        await record_extraction_dispatch(doc, task_id)
         all_doc_uuids.append(uid)
         created_doc_uuids.append(uid)
 
@@ -1347,6 +1393,7 @@ async def run_extraction_integrated(
         title=ss.title,
         user_id=user.user_id,
         search_set_uuid=search_set_uuid,
+        document_uuids=all_doc_uuids,
     )
     assert activity.id is not None
 
@@ -1742,6 +1789,38 @@ async def get_extraction_quality_history(
     return {"runs": await get_quality_history("search_set", uuid, limit)}
 
 
+@router.get("/search-sets/{uuid}/quality-history/{run_uuid}/results")
+async def get_extraction_quality_run_results(
+    uuid: str, run_uuid: str, user: User = Depends(get_current_user),
+) -> dict:
+    """One validation run's per-document, per-field results, for the Quality
+    History row that expands to show which fields matched or missed.
+
+    The same shape the results download carries (``documents``), as JSON.
+    """
+    import datetime
+
+    from app.models.validation_run import ValidationRun
+
+    ss = await _get_search_set_or_404(uuid, user)
+    vr = await ValidationRun.find_one(
+        ValidationRun.uuid == run_uuid,
+        ValidationRun.item_id == ss.uuid,
+        ValidationRun.item_kind == "search_set",
+    )
+    if not vr:
+        raise HTTPException(status_code=404, detail="Validation run not found")
+    payload, _ = _build_validation_results_export(
+        ss_uuid=ss.uuid,
+        ss_title=ss.title,
+        vr=vr,
+        doc_by_case={},
+        exported_by_user_id=user.user_id,
+        exported_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    )
+    return {"run": payload["validation_run"], "documents": payload["documents"]}
+
+
 @router.get("/search-sets/{uuid}/quality-sparkline")
 async def get_extraction_quality_sparkline(
     uuid: str, limit: int = 10, user: User = Depends(get_current_user),
@@ -1777,6 +1856,17 @@ async def get_extraction_quality_status(
             "status": "unvalidated", "score": None, "tier": None,
             "config_changed": False, "stale": False,
             "regression_pending_review": False,
+        }
+
+    # A catalog tier with no score and no run behind it is the author's claim,
+    # not a measurement (#1013 §5): report the item as unvalidated and pass
+    # the claim separately so the card can say whose rating it is.
+    if not latest and meta and meta.quality_score is None:
+        return {
+            "status": "unvalidated", "score": None, "tier": None,
+            "tier_asserted": meta.quality_tier,
+            "config_changed": False, "stale": False, "last_validated_at": None,
+            "regression_pending_review": bool(meta.regression_pending_review),
         }
 
     score = meta.quality_score if meta else latest.get("score") if latest else None
@@ -2002,6 +2092,8 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "excluded_models": getattr(run, "excluded_models", []) or [],
         "judge_model": run.judge_model,
         "best_config": run.best_config,
+        "best_trial_id": getattr(run, "best_trial_id", None),
+        "baseline_model": getattr(run, "baseline_model", None),
         "trials": run.trials,
         "field_breakdown": run.field_breakdown,
         "winner_cross_field_summary": getattr(run, "winner_cross_field_summary", None),
@@ -2172,27 +2264,12 @@ async def start_extraction_optimization(
     Returns ``{run_uuid, status: "queued"}``. The UI polls
     ``GET /search-sets/{uuid}/optimize/{run_uuid}`` for progress.
     """
-    import uuid as _uuid
-
-    from app.models.extraction_optimization_run import ExtractionOptimizationRun
-    from app.services.extraction_optimizer import reap_stale_runs
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_extraction_optimization as _start,
+    )
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
-
-    # Recover any orphaned run first so a dead worker's "running" doc can't
-    # permanently block new runs via the 409 below.
-    await reap_stale_runs(ss.uuid)
-
-    # Reject if a non-terminal run already exists.
-    active = await ExtractionOptimizationRun.find_one(
-        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
-        {"status": {"$in": ["queued", "running"]}},
-    )
-    if active:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Optimization already in progress (run {active.uuid})",
-        )
 
     # Cross-resource cost governance: per-user concurrency cap + audit trail.
     from app.services import optimization_governance
@@ -2205,41 +2282,20 @@ async def start_extraction_optimization(
         token_budget=int(req.token_budget),
     )
 
-    # Drop blanks/dupes; None means "use every test case" downstream.
-    selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None
-
-    # Generate the Celery task id up front so it's persisted before dispatch —
-    # no race where the task finishes before we record the id. It's the handle
-    # the cancel endpoint + stale-run watchdog use to hard-revoke a wedged run.
-    celery_task_id = _uuid.uuid4().hex
-
-    run = ExtractionOptimizationRun(
-        search_set_uuid=ss.uuid,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=max(0, int(req.token_budget)),
-        celery_task_id=celery_task_id,
-        options={
-            "apply_on_finish": req.apply_on_finish,
-            "max_candidates": req.max_candidates,
-            "include_judge": req.include_judge,
-            "test_case_uuids": selected_case_uuids,
-        },
-    )
-    await run.insert()
-
-    from app.tasks.extraction_tasks import optimize_extraction_task
-    optimize_extraction_task.apply_async(
-        args=[
-            ss.uuid, user.user_id, run.uuid,
-            max(0, int(req.token_budget)),
-            bool(req.apply_on_finish),
-            max(1, int(req.max_candidates)),
-            bool(req.include_judge),
-            selected_case_uuids,
-        ],
-        task_id=celery_task_id,
-    )
+    try:
+        run = await _start(
+            ss, user.user_id,
+            token_budget=int(req.token_budget),
+            apply_on_finish=bool(req.apply_on_finish),
+            max_candidates=int(req.max_candidates),
+            include_judge=bool(req.include_judge),
+            test_case_uuids=req.test_case_uuids,
+        )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -2408,135 +2464,27 @@ async def apply_extraction_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
 
     # Normalize missing body to a defaults instance — UI callers don't send one.
     body = req or ApplyExtractionOptimizationRequest()
 
-    # The same condition the optimizer refuses to auto-apply on. A judge
-    # outage during the baseline-default trial withholds the baseline, and
-    # `tied_with_baseline` is False both when the winner genuinely beat the
-    # baseline and when there was no baseline to beat — so without this the
-    # significance gate silently becomes no gate, by hand, with no 409.
-    if run.baseline_default_score is None and not body.force:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "no_baseline",
-                "message": (
-                    "This run has no baseline score to measure the winner "
-                    "against — the judge was unavailable when the baseline was "
-                    "measured, so there is no evidence the winning "
-                    "configuration is an improvement. Re-run the optimization, "
-                    "or re-submit with force=true to apply anyway."
-                ),
-            },
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_extraction_optimization as _apply,
+    )
+    try:
+        return await _apply(
+            ss, run, user.user_id,
+            min_cf_pass_rate=body.min_cf_pass_rate,
+            force=body.force,
         )
-
-    if run.tied_with_baseline and not body.force:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "tied_with_baseline",
-                "message": (
-                    "The winning configuration is statistically tied with the "
-                    "search set's current settings (within judge noise), so the "
-                    "data doesn't justify a config change. Re-submit with "
-                    "force=true to apply anyway."
-                ),
-            },
-        )
-
-    # Cross-field apply-gate. Only meaningful when the run actually evaluated
-    # rules (winner_cross_field_summary populated and has a decisive pass_rate).
-    if (
-        body.min_cf_pass_rate is not None
-        and not body.force
-        and run.winner_cross_field_summary
-    ):
-        cf_pass_rate = run.winner_cross_field_summary.get("pass_rate")
-        if cf_pass_rate is not None and cf_pass_rate < float(body.min_cf_pass_rate):
-            failing = [
-                {
-                    "rule_id": r.get("rule_id"),
-                    "type": r.get("type"),
-                    "label": r.get("label"),
-                    "pass": r.get("pass"),
-                    "fail": r.get("fail"),
-                    "pass_rate": r.get("pass_rate"),
-                }
-                for r in (run.winner_cross_field_rule_breakdown or [])
-                if (r.get("fail") or 0) > 0
-            ]
+    except OptimizationActionError as e:
+        if e.code in ("cross_field_below_threshold", "tied_with_baseline", "no_baseline"):
             raise HTTPException(
                 status_code=409,
-                detail={
-                    "code": "cross_field_below_threshold",
-                    "message": (
-                        f"Winning config's cross-field pass rate is "
-                        f"{cf_pass_rate:.0%}, below the requested minimum of "
-                        f"{float(req.min_cf_pass_rate):.0%}. Re-submit with "
-                        "force=true to apply anyway."
-                    ),
-                    "pass_rate": cf_pass_rate,
-                    "min_required": float(req.min_cf_pass_rate),
-                    "failing_rules": failing,
-                },
+                detail={"code": e.code, "message": e.message, **e.detail},
             )
-
-    # Persist previous override on the run so revert can restore it.
-    run.previous_override = ss.extraction_config_override
-    ss.extraction_config_override = dict(run.best_config)
-    ss.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await ss.save()
-    await run.save()
-
-    # Close the loop: re-validate the test set with the applied config so the
-    # completed-state panel can show "optimizer score → real post-apply score."
-    # Synchronous so the UI's refetch sees post_apply_validation populated.
-    from app.services.extraction_optimizer import run_post_apply_validation
-    await run_post_apply_validation(
-        run_doc=run,
-        search_set_uuid=ss.uuid,
-        user_id=user.user_id,
-        source="explicit_apply",
-    )
-
-    # Phase 4: record this apply on the unified quality timeline. Prefer the
-    # authoritative post-apply score (0..1 unit, just stamped onto the run by
-    # run_post_apply_validation) so the timeline marker agrees with the certified
-    # quality tile; fall back to the optimizer's in-run headline only if the
-    # post-apply validation didn't run.
-    try:
-        from app.services import quality_service as _qs
-        _post = run.post_apply_validation or {}
-        _post_unit = _post.get("score")
-        score_pct = (
-            float(_post_unit * 100.0) if _post_unit is not None
-            else float((run.optimized_score or 0.0) * 100.0)
-        )
-        await _qs.record_optimizer_apply(
-            item_kind="search_set",
-            item_id=ss.uuid,
-            item_name=getattr(ss, "title", "") or "",
-            run_type="extraction",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=ss.extraction_config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
-        )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for SearchSet %s", ss.uuid)
-
-    return {"ok": True, "applied_config": ss.extraction_config_override}
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 # ---------------------------------------------------------------------------

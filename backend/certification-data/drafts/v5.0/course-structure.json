@@ -1,0 +1,77 @@
+{
+  "levels": [
+    {
+      "name": "novice",
+      "xp": 0
+    },
+    {
+      "name": "apprentice",
+      "xp": 100
+    },
+    {
+      "name": "builder",
+      "xp": 250
+    },
+    {
+      "name": "designer",
+      "xp": 400
+    },
+    {
+      "name": "engineer",
+      "xp": 600
+    },
+    {
+      "name": "specialist",
+      "xp": 800
+    },
+    {
+      "name": "expert",
+      "xp": 1050
+    },
+    {
+      "name": "master",
+      "xp": 1300
+    },
+    {
+      "name": "architect",
+      "xp": 1600
+    }
+  ],
+  "tiers": [
+    {
+      "name": "Foundation",
+      "theme": "Review scope and decisions",
+      "narrative": "Learn to check source support, correct scope and plan a bounded task. You may study modules in any order; each required outcome needs its own assessed evidence.",
+      "moduleIds": [
+        "ai_literacy",
+        "foundations",
+        "process_mapping",
+        "workflow_design"
+      ],
+      "celebration": "The required modules in this group are complete. Continue with the remaining course outcomes."
+    },
+    {
+      "name": "Builder",
+      "theme": "Run and verify bounded work",
+      "narrative": "Practice linked execution, calculations and delivery. A successful run still needs the required learner checks and automatic assessment.",
+      "moduleIds": [
+        "extraction_engine",
+        "multi_step",
+        "advanced_nodes",
+        "output_delivery"
+      ],
+      "celebration": "The required modules in this group are complete. Your full-course certificate still depends on all required modules."
+    },
+    {
+      "name": "Architect",
+      "theme": "Validate and explain the handoff",
+      "narrative": "Use tests, targeted recovery and an accountable capstone handoff. This group does not substitute for outcomes in the other modules.",
+      "moduleIds": [
+        "validation_qa",
+        "batch_processing",
+        "governance"
+      ],
+      "celebration": "The required modules in this group are complete. Check overall course completion for your certificate status."
+    }
+  ]
+}

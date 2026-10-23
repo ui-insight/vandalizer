@@ -16,7 +16,7 @@ from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -231,10 +231,15 @@ app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(feedback_admin.router, prefix="/api/feedback/admin", tags=["feedback-admin"])
 app.include_router(verification.router, prefix="/api/verification", tags=["verification"])
+app.include_router(verification_sessions.router, prefix="/api/verification-sessions", tags=["verification-sessions"])
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
+# Landing-page demo-request form is always-on (not gated by trial system).
+# Mounted under /api/demo so the route `/api/demo/request-contact` works
+# regardless of whether the trial waitlist is enabled for this install.
+app.include_router(contact.router, prefix="/api/demo", tags=["contact"])
 if _boot_settings.enable_trial_system:
     app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])
@@ -247,6 +252,7 @@ app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(obligations.router, prefix="/api/obligations", tags=["obligations"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:
@@ -329,9 +335,9 @@ async def health() -> JSONResponse:
 
     # ChromaDB
     try:
-        from app.services.document_manager import get_chroma_client
+        from app.services.document_manager import get_document_manager
 
-        chroma = get_chroma_client(settings.chromadb_persist_dir)
+        chroma = get_document_manager().client
         chroma.heartbeat()
         checks["chromadb"] = "ok"
     except Exception as e:
