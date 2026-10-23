@@ -1800,3 +1800,20 @@ def test_verify_reports_why_a_link_was_refused():
     st = Statement(0, 0, "1240.00", label="amount")
     assert verify(st, corpus, 0, "Amount: $1,240.00").link is not None
     assert verify(st, corpus, 0, "Amount: $1,240.00 extra").reason == "quote_not_in_passage"
+
+
+@pytest.mark.parametrize("statement,quote,differs", [
+    # Seen on the NSF NHERI solicitation: a deliverable wrote every section's
+    # "up to N pages" as "≥N pages", and the links stood.
+    ("Summarize cybersecurity plan (≥1 page).", "Section 14. Cybersecurity Plan-Summary (all proposals, up to one page)", True),
+    ("Optional additional information (at least 2 pages)", "(optional for all proposals, up to two pages)", True),
+    ("Maximum 55 pages", "Project Description must not exceed 55 pages", False),
+    ("Up to $10,000 per year", "Up to $10,000 should be budgeted annually", False),
+    ("Minimum award of $50,000", "awards may be up to $50,000", True),
+    ("Budget no more than $500,000", "budgets of at least $100,000 and up to $500,000", False),
+    ("Font 11pt", "font size of at least 11 points", False),
+])
+def test_a_limit_turned_around_is_not_linked(statement, quote, differs):
+    from app.services.output_sourcing import limit_direction_differs
+
+    assert limit_direction_differs(statement, quote) is differs

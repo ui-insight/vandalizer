@@ -1276,6 +1276,33 @@ def obligation_differs(statement: str, quote: str) -> bool:
     return False
 
 
+# Which way a limit points: a floor ("at least 2 pages") or a ceiling ("up to
+# two pages").
+_FLOOR_RE = re.compile(
+    r"≥|>=|\bat\s+least\b|\bminimum\b|\bmin\.|\bno\s+(?:less|fewer)\s+than\b|\bnot\s+(?:less|fewer)\s+than\b"
+    r"|\bor\s+(?:more|greater|longer)\b",
+    re.I,
+)
+_CEILING_RE = re.compile(
+    r"≤|<=|\bup\s+to\b|\bmaximum\b|\bmax\.|\bat\s+most\b|\bno\s+(?:more|greater|longer)\s+than\b"
+    r"|\bnot\s+(?:to\s+)?exceed(?:ing)?\b|\bmust\s+not\s+exceed\b|\bor\s+(?:less|fewer|shorter)\b",
+    re.I,
+)
+
+
+def limit_direction_differs(statement: str, quote: str) -> bool:
+    """Whether the statement turns the excerpt's limit around: "(≥1 page)"
+    sourced to "(all proposals, up to one page)", or a cap read as a floor.
+    A model rewriting "≤" in a deliverable wrote "≥" for every section page
+    limit of an NSF solicitation, and the words and figures still matched.
+    Only a statement and an excerpt that each point one way are compared."""
+    s_floor, s_ceiling = bool(_FLOOR_RE.search(statement)), bool(_CEILING_RE.search(statement))
+    q_floor, q_ceiling = bool(_FLOOR_RE.search(quote)), bool(_CEILING_RE.search(quote))
+    return (s_floor and not s_ceiling and q_ceiling and not q_floor) or (
+        s_ceiling and not s_floor and q_floor and not q_ceiling
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sources and their candidate windows
 # ---------------------------------------------------------------------------
@@ -1821,6 +1848,8 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         or (pieces and obligation_differs(st.text, exact))
     ):
         return Verdict(None, "obligation_differs", where)
+    if limit_direction_differs(st.text, cited) or limit_direction_differs(st.text, sentence):
+        return Verdict(None, "limit_differs", where)
     # Advice for this case ("Obtain vendor quotations…") sourced to a rule
     # that applies only in some cases ("If simplified acquisition procedures
     # are used, price or rate quotations must be obtained…") says the case
