@@ -583,7 +583,8 @@ def test_a_short_statement_needs_a_passage_about_what_its_label_names(value, jud
                "raw_text": "NOTICE OF AWARD\nTotal Federal Share\nALL AMOUNTS ARE SHOWN IN USD\n"}
     expense = {**EXPENSE, "raw_text": EXPENSE["raw_text"] + "Charged to: Supplies\nApproved by: PI, 2025-03-16\n"}
     result = _trace({"final": value}, Judge(judge_rule), docs=[noa_usd, expense], passages=passages)
-    assert _links(result, "final") == []
+    # The record's own name may be found under its heading ("EXPENSE RECORD").
+    assert [row for row, _ in _links(result, "final") if row.get("p") != ["source_document"]] == []
     assert result["reasons"].get("label_not_in_passage") == 1
 
 
@@ -1781,7 +1782,9 @@ def test_sourcing_never_changes_the_outputs_it_reads():
                   ("Forestry", "Vendor:", "Vendor: Forestry Suppliers Inc."))
     result = _trace(targets, judge)
     assert targets == snapshot and json.dumps(targets, sort_keys=True) == before
-    assert len(_links(result, "step:Check")) == 1 and len(_links(result, "step:Normalize")) == 1
+    # The amount and the rate are found without the judge, on the record's
+    # "Amount: $1,240.00" and the award's "Indirect Cost Rate: 17.5%" lines.
+    assert len(_links(result, "step:Check")) == 2 and len(_links(result, "step:Normalize")) == 2
 
 
 def test_candidates_need_every_value_and_a_shared_word():
@@ -1817,3 +1820,95 @@ def test_a_limit_turned_around_is_not_linked(statement, quote, differs):
     from app.services.output_sourcing import limit_direction_differs
 
     assert limit_direction_differs(statement, quote) is differs
+
+
+@pytest.mark.parametrize("statement,text", [
+    # Seen on the NSF NHERI solicitation: both lost their right link.
+    ("Letters of Intent must be submitted by the Sponsored Projects Office via FastLane (required).",
+     "When submitting a Letter of Intent through FastLane in response to this Program Solicitation please note the "
+     "conditions outlined below: Sponsored Projects Office (SPO) Submission is required"),
+    ("Submission must include all required sections and comply with FastLane automated checks.",
+     "FastLane will check for required sections of the proposal. If a required section is missing, FastLane will "
+     "not accept the proposal."),
+])
+def test_a_case_named_in_common_words_or_a_broken_rule_is_not_dropped(statement, text):
+    from app.services.output_sourcing import common_words, condition_dropped
+    from app.services.output_statements import Statement
+
+    common = common_words(" ".join(["Letter Intent submit FastLane section required proposal"] * 10))
+    assert not condition_dropped(Statement(0, 0, statement), text, common)
+
+
+NHERI = {"uuid": "nheri", "title": "nsf15598.pdf", "text_markers": [], "raw_text": (
+    "Program Solicitation NSF 15-598\n"
+    "Replaces: NSF 14-605\n"
+    "Letter of Intent Due Date(s) (required) (due by 5 p.m. proposer's local time): October 16, 2015\n"
+    "https://www.nsf.gov/funding/opportunities/nheri/nsf15-598/solicitation\n"
+    "The GPG requires submission of: Project Summary; Project Description; References Cited; Budget; "
+    "Budget Justification; Data Management Plan.\n"
+    "Inclusion of voluntary committed cost sharing is prohibited.\n"
+    "Up to $10,000 should be budgeted annually to provide local staff support for the REU students at the "
+    "project location. Up to $10,000 should be budgeted for local staff support to participate in the NHERI "
+    "Summer Institute.\n"
+)}
+
+
+def test_what_the_judge_left_plain_is_found_without_it():
+    """Seen in the NSF NHERI run: the URL, the solicitation number, a due
+    date and a listed component stayed plain though the document states
+    each. A second look finds them, held to the same checks."""
+    value = {
+        "announcement_url": "https://www.nsf.gov/funding/opportunities/nheri/nsf15-598/solicitation",
+        "rfa_number": "NSF 15-598",
+        "letter_of_intent_due": "2015-10-16 5:00 PM",
+        "required_components": [{"name": "Budget"}, {"name": "Data Management Plan"}],
+    }
+    result = _trace({"final": value}, Judge(), docs=[NHERI])
+    linked = {tuple(row["p"]): link["quote"] for row, link in _links(result, "final")}
+    assert linked[("announcement_url",)].startswith("https://www.nsf.gov/")
+    assert "NSF 15-598" in linked[("rfa_number",)]
+    assert "October 16, 2015" in linked[("letter_of_intent_due",)]
+    assert "Budget;" in linked[("required_components", 0, "name")]
+    assert "Data Management Plan" in linked[("required_components", 1, "name")]
+    assert result["anchored"] == 5
+
+
+def test_a_kb_link_gives_way_to_the_documents_own_sentence():
+    judge = Judge(("Voluntary committed", "generally prohibited", "Voluntary committed cost share is generally prohibited"))
+    kb = [{"chunk_id": "apm_1", "label": "UI OSP — APM 45.08 · part 2", "kb_title": "UI OSP", "document_title": "APM 45.08",
+           "content": "Voluntary committed cost share is generally prohibited at the University."}]
+    result = _trace({"final": "- Voluntary committed cost sharing prohibited"}, judge, docs=[NHERI], passages=kb)
+    (_, link), = _links(result, "final")
+    assert link["kind"] == "document" and "Inclusion of voluntary committed cost sharing is prohibited" in link["quote"]
+    assert result["document_preferred"] == 1
+
+
+def test_two_limits_of_one_amount_are_not_one_limit():
+    from app.services.output_sourcing import values_merged
+
+    quote = NHERI["raw_text"].split("prohibited.\n")[1]
+    assert values_merged("up to $10,000 per year may be budgeted for local staff support of REU students and the "
+                         "Summer Institute", quote)
+    assert not values_merged("up to $10,000 each for REU students and the Summer Institute", quote)
+    assert not values_merged("up to $10,000 per year for local staff support of REU students", quote)
+
+
+def test_the_second_look_leaves_what_it_cannot_tell_apart():
+    """Seen replaying the NHERI and BLM runs: a bare small number matched
+    "References 1-6"; an inverted rule was linked by its "14-605"; "$0.00"
+    under Subcontracts matched another row's "$ 0.00"; "Budget" matched a
+    "Budgetary Limitations" heading."""
+    doc = {"uuid": "d", "title": "d.pdf", "text_markers": [], "raw_text": (
+        "Critical lifelines (References 1-6, Section IX).\n"
+        "A PI named on an award made under NSF 14-605 may not serve as a PI on an award made under this solicitation.\n"
+        "Less Cumulative Prior Award(s) This Budget Period $ 0.00\n"
+        "Other Budgetary Limitations: Proposers should prepare annual budgets.\n"
+    )}
+    value = {
+        "mandated_sections": ["Section 1."],
+        "conditions": "cannot serve as PI on an award made under NSF 14-605",
+        "budget_categories": [{"category": "Subcontracts", "approved_amount": "$0.00"}],
+        "required_components": [{"name": "Budget"}],
+    }
+    result = _trace({"final": value}, Judge(), docs=[doc])
+    assert _links(result, "final") == [] and result["anchored"] == 0

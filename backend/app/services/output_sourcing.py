@@ -543,6 +543,10 @@ _LABEL_ALIASES: tuple[tuple[frozenset, tuple[str, ...]], ...] = (
     (frozenset({stem("instrument")}), ("award",)),
     (frozenset({stem("mechanism")}), ("award",)),
     (frozenset({stem("cfda")}), ("catalog of federal domestic assistance", "assistance listing")),
+    # An announcement's own number: "RFA ID / Number" is the "Program
+    # Solicitation NSF 15-598".
+    *((frozenset({stem(k)}), ("solicitation", "funding opportunity", "announcement", "notice of funding"))
+      for k in ("rfa", "foa", "nofo", "rfp")),
 )
 
 
@@ -646,6 +650,12 @@ _WRAPPED_LINE_RE = re.compile(r"[ \t]*\n[ \t]*(?=[a-z])")
 # A word this common in the source does not name a case: on a BLM award
 # "Federal" and "system" are everywhere.
 CASE_COMMON_MIN = 10
+CASE_KEPT_WORDS = 3
+_BROKEN_RULE_RE = re.compile(
+    r"\b(?:missing|fails?|failed|failure|late|absent|incomplete"
+    r"|(?:is|are|was|were)\s+not|not\s+(?:met|included|submitted|received|provided|followed))\b",
+    re.I,
+)
 # Labels and headings a statement of a rule sits under: "prior approval
 # requirements", "special conditions", "unallowable costs".
 _RULE_CONTEXT_RE = re.compile(
@@ -693,10 +703,19 @@ def dropped_condition(st: Statement, text: str, common: frozenset = frozenset())
     "Federal" and "system" are everywhere."""
     have = stems(st.text) | stems(st.label) | stems(" ".join(st.context))
     for clause in _cases(text):
+        # "If a required section is missing, FastLane will not accept the
+        # proposal": what happens when the rule is broken, not a case it is
+        # limited to.
+        if _BROKEN_RULE_RE.search(clause):
+            continue
         words = stems(clause) - _GENERIC_LABEL_WORDS
         if not words:
             continue
-        if not (words & have) - common:
+        shared = words & have
+        # Three shared words name the case even when each is common: "when
+        # submitting a Letter of Intent through FastLane" for "Letters of
+        # Intent must be submitted … via FastLane".
+        if len(shared) < CASE_KEPT_WORDS and not shared - common:
             return clause
     return None
 
@@ -1303,6 +1322,42 @@ def limit_direction_differs(statement: str, quote: str) -> bool:
     )
 
 
+_EACH_RE = re.compile(r"\b(?:each|apiece|respectively|both|per\s+(?:activity|program|item|category))\b", re.I)
+_LIMIT_FRAME_WORDS = frozenset(stem(w) for w in (
+    "annual", "annually", "year", "yearly", "years", "month", "monthly", "budget", "budgeted", "cost", "costs",
+    "fund", "funds", "total", "provide",
+))
+# Sentence ends and line breaks; a list's ";" items stay one sentence.
+_SENTENCE_CUT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z*_(\[\"'])|\n+")
+
+
+def values_merged(statement: str, quote: str) -> bool:
+    """Whether the statement folds two limits of the same amount into one:
+    "up to $10,000 per year may be budgeted for local staff support of REU
+    students and the Summer Institute" from "Up to $10,000 should be
+    budgeted … for the REU students … Up to $10,000 should be budgeted for
+    local staff support to participate in the NHERI Summer Institute" —
+    $20,000 in all, read as $10,000. The statement gives the amount once,
+    without "each", and names what only one of the limits covers and what
+    only the other does."""
+    if _EACH_RE.search(statement):
+        return False
+    # How often and from what a limit is paid says nothing about what it covers.
+    own = stems(statement) - _LIMIT_FRAME_WORDS
+    sentences = [s for s in _SENTENCE_CUT_RE.split(quote or "") if s.strip()]
+    for v in values_in(statement):
+        if v.kind != "num" or sum(1 for w in values_in(statement) if w.key == v.key) != 1:
+            continue
+        limits = [s for s in sentences
+                  if any(w.key == v.key for w in values_in(s)) and (_CEILING_RE.search(s) or _FLOOR_RE.search(s))]
+        for i, first in enumerate(limits):
+            for second in limits[i + 1:]:
+                a, b = stems(first), stems(second)
+                if (a - b) & own and (b - a) & own:
+                    return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Sources and their candidate windows
 # ---------------------------------------------------------------------------
@@ -1850,6 +1905,8 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
         return Verdict(None, "obligation_differs", where)
     if limit_direction_differs(st.text, cited) or limit_direction_differs(st.text, sentence):
         return Verdict(None, "limit_differs", where)
+    if values_merged(st.text, cited):
+        return Verdict(None, "values_merged", where)
     # Advice for this case ("Obtain vendor quotations…") sourced to a rule
     # that applies only in some cases ("If simplified acquisition procedures
     # are used, price or rate quotations must be obtained…") says the case
@@ -1962,6 +2019,172 @@ def widen_to_statement(
     while start < end and text[start] in " \t\r\n":
         start += 1
     return start, end
+
+
+# ---------------------------------------------------------------------------
+# A second, deterministic look at what the judge left plain
+# ---------------------------------------------------------------------------
+
+# Only what the judge found no passage for: a statement a check refused
+# stays refused.
+ANCHOR_REASONS = frozenset({"judge_unsupported", "judge_named_no_passage", "quote_too_short", "unchecked"})
+ANCHOR_MAX_WORDS = 2           # words besides its values of a statement looked up by them; a longer one needs the judge
+ANCHOR_TRIES = 6               # sentences verified per statement, best first
+PREFER_DOCUMENT_SHARE = 0.8    # of a statement's words an input-document sentence must hold to replace a KB link
+PREFER_DOCUMENT_MIN_WORDS = 4  # a shorter statement names a thing, not what a passage says of it
+_URL_ONLY_RE = re.compile(r"<?(https?://[^\s<>\"')\]]+?)>?[.,;]?")
+
+
+def _anchor_sentences(corpus: Corpus) -> list[tuple[int, int, int, frozenset, list]]:
+    """Every sentence (or list line) of the input documents: source index,
+    offsets, its words and its values. Read once per run."""
+    cached = getattr(corpus, "_anchor_cache", None)
+    if cached is not None:
+        return cached
+    out = []
+    for si, src in enumerate(corpus.sources):
+        if src.kind != "document":
+            continue
+        pos = 0
+        for piece in _SENTENCE_CUT_RE.split(src.text):
+            a = src.text.find(piece, pos)
+            if a < 0:
+                continue
+            b = a + len(piece)
+            pos = b
+            if not piece.strip() or len(piece) > MAX_QUOTE_CHARS:
+                continue
+            vals = values_in(piece) if any(c.isdigit() for c in piece) else []
+            out.append((si, a, b, frozenset(stems(piece)), vals))
+    corpus._anchor_cache = out
+    return out
+
+
+def _window_of(corpus: Corpus, si: int, a: int, b: int) -> int | None:
+    best, overlap = None, 0
+    for wi, w in enumerate(corpus.windows):
+        if w.src == si:
+            o = min(b, w.end) - max(a, w.start)
+            if o > overlap:
+                best, overlap = wi, o
+    return best
+
+
+def _verify_spans(st: Statement, corpus: Corpus, spans: list[tuple[int, int, int, frozenset, list]]) -> Verdict | None:
+    want = stems(st.text) | stems(st.label)
+    ranked = sorted(spans, key=lambda s: (-len(s[3] & want), s[2] - s[1]))
+    for si, a, b, _, _ in ranked[:ANCHOR_TRIES]:
+        wi = _window_of(corpus, si, a, b)
+        if wi is None:
+            continue
+        v = verify(st, corpus, wi, corpus.sources[si].text[a:b])
+        if v.link is not None:
+            return v
+    return None
+
+
+def _small(v: Value) -> bool:
+    try:
+        return abs(float(v.key.split(":", 1)[1])) < 1000
+    except ValueError:
+        return False
+
+
+def _row_words(st: Statement) -> set[str]:
+    """The words of what a value is a value of: the row a field sits in
+    ("Subcontracts" in "budget categories — Subcontracts — approved
+    amount"), else the field ("total direct costs")."""
+    parts = [p for p in (st.label or "").split(" — ") if p.strip()]
+    if not parts:
+        return set()
+    core = parts[-2] if len(parts) >= 2 else parts[0]
+    return stems(core) - _GENERIC_LABEL_WORDS
+
+
+def _window_text(corpus: Corpus, s: tuple) -> str:
+    wi = _window_of(corpus, s[0], s[1], s[2])
+    return corpus.window_text(wi) if wi is not None else ""
+
+
+def _listed_item_re(text: str) -> re.Pattern | None:
+    """The name as one item of a list: between ":", ";" or "," and the
+    next separator or the end ("…; Budget; Budget Justification; …")."""
+    name = re.sub(r"\([^)]*\)", " ", text or "").strip(" .;:")
+    words = re.findall(r"[A-Za-z0-9&]+", name)
+    if not words:
+        return None
+    body = r"\W+".join(re.escape(w) for w in words)
+    return re.compile(rf"(?:^|[:;,]\s*(?:and\s+|or\s+)?)\**{body}\**\s*(?:\([^)]*\))?\s*(?:[;,.]|$)", re.I)
+
+
+def anchor(st: Statement, corpus: Corpus) -> Verdict | None:
+    """A link for a statement the judge found no passage for, found without
+    it: a URL where the document gives it; a short value statement (a
+    date, an identifier, an amount) where a sentence holds all its values;
+    a part of a submission where the document lists it; a sponsor where a
+    sentence names it and ties it to this opportunity. Every candidate goes
+    through ``verify``, so a figure still needs its label beside it. Seen in
+    the NSF NHERI run: the announcement URL ("quote too short"), the
+    solicitation number, the Letter of Intent due date and "Budget" among
+    the required components stayed plain while the document states each."""
+    text = (st.text or "").strip()
+    url = _URL_ONLY_RE.fullmatch(text)
+    if url:
+        target = url.group(1).rstrip("/").lower()
+        for si, src in enumerate(corpus.sources):
+            if src.kind != "document":
+                continue
+            a = src.text.lower().find(target)
+            if a < 0:
+                continue
+            b = a + len(target)
+            marker = page_marker_for_offset(a, src.markers or [])
+            link = _document_link(
+                src, a, b, marker.get("value") if marker else None, bool(marker and marker.get("approximate")),
+            )
+            link["judge_quote"] = src.text[a:b]
+            return Verdict(link, "ok", (si, a, b))
+        return None
+    words = stems(text)
+    if not words and not values_in(text):
+        return None
+    sentences = _anchor_sentences(corpus)
+    values = values_in(text)
+    name = item_name(st)
+    if values and len(words) <= ANCHOR_MAX_WORDS:
+        # A bare small number ("Section 1.", "6 lines") is in too many places.
+        if len(values) == 1 and values[0].kind == "num" and not re.search(r"[$€£%]", values[0].raw) and _small(values[0]):
+            return None
+        row = _row_words(st)
+        spans = [s for s in sentences
+                 if s[4] and _values_supported(values, corpus.sources[s[0]].text[s[1]:s[2]], s[4])
+                 and (not row or row & s[3] or _named_otherwise(row, _window_text(corpus, s)))]
+    elif name:
+        listed = _listed_item_re(st.text)
+        spans = [s for s in sentences
+                 if listed and listed.search(corpus.sources[s[0]].text[s[1]:s[2]])
+                 and presented_as_item(name, corpus.sources[s[0]].text, s[1], s[2])]
+    elif _PARTY_LABEL_RE.search(field_label(st)) and len(words) <= ANCHOR_MAX_WORDS:
+        spans = [s for s in sentences
+                 if words <= s[3] and _BOUND_TO_THIS_RE.search(corpus.sources[s[0]].text[s[1]:s[2]])]
+    else:
+        return None
+    return _verify_spans(st, corpus, spans)
+
+
+def document_statement(st: Statement, corpus: Corpus) -> Verdict | None:
+    """The input document's own sentence for a statement linked to a
+    knowledge-base passage, when the document says the same thing: the
+    report is about the document. Seen in the NSF NHERI run: "Voluntary
+    committed cost sharing prohibited" was linked to a policy passage
+    ("Voluntary committed cost share is generally prohibited") although the
+    solicitation says "Inclusion of voluntary committed cost sharing is
+    prohibited"."""
+    words = stems(st.text)
+    if len(words) < PREFER_DOCUMENT_MIN_WORDS:
+        return None
+    spans = [s for s in _anchor_sentences(corpus) if len(s[3] & words) >= PREFER_DOCUMENT_SHARE * len(words)]
+    return _verify_spans(st, corpus, spans)
 
 
 def verify_offered(st: Statement, corpus: Corpus, wi: int, offered: list[int], quote: str) -> Verdict:
@@ -2660,6 +2883,8 @@ def trace_sources(
             "retried": stats["retried"],
             "rescued": stats["rescued"],
             "unchecked": stats["unchecked"],
+            "anchored": stats["anchored"],
+            "document_preferred": stats["document_preferred"],
             "errors": sched.errors,
             "reasons": dict(Counter(v.reason for v in settled.values())),
         }
@@ -2688,4 +2913,20 @@ def trace_sources(
         elif skey not in settled:
             settled[skey] = Verdict(None, "unchecked")
     open_keys.clear()
+    # A second, deterministic look (``anchor``) at what the judge found no
+    # passage for, and the input document's own sentence in place of a
+    # knowledge-base passage that says the same (``document_statement``).
+    for skey, st in unique.items():
+        v = settled.get(skey)
+        found = None
+        if v is None or (v.link is None and v.reason in ANCHOR_REASONS):
+            found = anchor(st, corpus)
+            if found is not None:
+                stats["anchored"] += 1
+        elif v.link is not None and v.link.get("kind") == "kb":
+            found = document_statement(st, corpus)
+            if found is not None:
+                stats["document_preferred"] += 1
+        if found is not None:
+            settled[skey] = found
     return build("done")
