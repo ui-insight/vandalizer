@@ -33,7 +33,7 @@ from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
     ProvisionResult, ReflectionResult, certification_result,
 )
-from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range
+from app.services.page_locator import annotate_chunk_pages
 
 logger = logging.getLogger(__name__)
 
@@ -685,16 +685,31 @@ async def search_knowledge_base(
     # Autovalidate-tuned knobs (k, min_similarity floor, query rewriting,
     # rerank) apply on the agentic path too. A raw top-k vector query here
     # would silently skip the relevance floor the platform advertises.
+    from app.services import kb_grounding, kb_retrieval
+    from app.services.document_manager import get_document_manager
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
+        resolve_kb_rag_config,
         retrieve_kb_chunks,
     )
 
     try:
         await _ensure_system_config_loaded()
-        results, rag_cfg, _ = await retrieve_kb_chunks(
-            uuid, query, context.deps.model_name, per_step_timeout=6.0,
-        )
+        # Precise retrieval first, as in classic chat and workflow grounding:
+        # cross-encoder-ranked and cut, so a query the base cannot answer
+        # returns nothing rather than the nearest text. None when it cannot
+        # run here; then the tuned vector pipeline answers.
+        rag_cfg = await resolve_kb_rag_config(uuid)
+        results = None
+        if kb_retrieval.enabled():
+            results = await asyncio.to_thread(
+                kb_grounding._precise_pool, get_document_manager(), uuid, query,
+                k=rag_cfg.k, floor=rag_cfg.min_similarity,
+            )
+        if results is None:
+            results, rag_cfg, _ = await retrieve_kb_chunks(
+                uuid, query, context.deps.model_name, per_step_timeout=6.0,
+            )
         results = results[: rag_cfg.k]
     except Exception as e:
         # Distinguish infrastructure failure from an empty corpus: a Chroma /
@@ -770,9 +785,14 @@ async def search_knowledge_base(
         #    an unbounded amount;
         #  * a chunk that crosses a page break cited by the page it *starts*
         #    on rather than the page the answering passage is actually on.
-        cited = cited_pages(meta, content, query)
-        page, page_end = cited["page"], cited["page_end"]
-        approximate = bool(cited["page_approximate"])
+        #
+        # The label is the source line workflow grounding cites, so a passage
+        # reads the same in chat and in a run; for a source with no pages (an
+        # eCFR subpart, a policy web page) it says where the passage sits —
+        # "§ 200.307 · part 2" — which a bare source name could not.
+        label, located = kb_grounding._passage_label(r, kb_title=None, query=query)
+        page, page_end = located["page"], located["page_end"]
+        approximate = bool(located["page_approximate"])
         any_approximate = any_approximate or (page is not None and approximate)
 
         # `[p. N]` markers at each internal page break, so the model can see
@@ -784,6 +804,8 @@ async def search_knowledge_base(
             # Annotated for the model, so it can see where the page turns.
             "content": annotated,
             "source_name": meta.get("source_name", "unknown"),
+            # What to cite: [Source: <label>].
+            "label": label,
         }
         if annotated != content:
             # Unannotated, for anything that has to match this text against the
@@ -817,13 +839,11 @@ async def search_knowledge_base(
         # cites these by name; the number stays out of its context.
         context.deps.kb_snippet_ref += 1
         source_name = meta.get("source_name", "Unknown")
-        locator = (
-            format_page_range(page, page_end, approximate) if isinstance(page, int)
-            else (sheet if isinstance(sheet, str) and sheet else None)
-        )
         citations.append({
             "ref": context.deps.kb_snippet_ref,
-            "cite_label": f"{source_name}, {locator}" if locator else source_name,
+            "cite_label": label,
+            "label": label,
+            "content": content[:kb_grounding.CITATION_CONTENT_CHARS],
             "document_id": sid or None,
             "document_title": source_name,
             "page": page if isinstance(page, int) else None,

@@ -193,6 +193,15 @@ function kbPassages(content: unknown): Array<Record<string, unknown>> {
   )
 }
 
+/** What a retrieved passage is cited as: its source line when the result
+ *  carries one ("PAPPG.pdf · p. 54"; for a source without pages, where the
+ *  passage sits — "Subpart E · § 200.423"), else, on results saved before
+ *  the line was sent, the source's name. */
+function kbPassageLabel(passage: Record<string, unknown>): string {
+  const label = typeof passage.label === 'string' ? passage.label.trim() : ''
+  return label || String(passage.source_name || 'Source')
+}
+
 /** The approve button for a tool with no label of its own: "Approve run
  * report", never "Approve approve …" for a tool whose name starts with the verb. */
 export function approveLabel(toolName: string): string {
@@ -590,10 +599,10 @@ export function toolResultToText(toolName: string, content: unknown): string {
     return [header, ...rows].join('\n')
   }
 
-  // KB passages: source + content
+  // KB passages: source line + content
   if (toolName === 'search_knowledge_base' && Array.isArray(content)) {
     return (content as Array<Record<string, unknown>>)
-      .map(c => `[${c.source_name || 'Source'}]\n${c.content || ''}`)
+      .map(c => `[${kbPassageLabel(c)}]\n${c.content || ''}`)
       .join('\n\n')
   }
 
@@ -991,6 +1000,9 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
         const docUuid = chunk.document_uuid as string | undefined
         const url = chunk.url as string | undefined
         const sourceName = String(chunk.source_name || 'Source')
+        // Named as the answer cites it, so two passages of one source without
+        // pages (an eCFR subpart, a policy web page) read differently.
+        const sourceLabel = kbPassageLabel(chunk)
         const chunkContent = String(chunk.content || '')
         // The passage the model reads carries injected "[p. N]" markers at its
         // page breaks. Those appear nowhere in the document, so anything that
@@ -1034,7 +1046,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
             >
               {isDoc && <FileText size={10} style={{ flexShrink: 0 }} />}
               {isUrl && <ExternalLink size={9} style={{ flexShrink: 0 }} />}
-              {sourceName}
+              {sourceLabel}
             </span>
             <span style={{ margin: "0 var(--workspace-space-6)", color: '#d1d5db' }}>&middot;</span>
             <span>{chunkContent.slice(0, 200)}{chunkContent.length > 200 ? '...' : ''}</span>

@@ -41,8 +41,14 @@ export function conversationEvidence(message: ChatMessage, names: Record<string,
   if (message.citations?.length) {
     lines.push('Source references (inspect the originals before relying on the answer):')
     message.citations.forEach((source, index) => {
+      // The source line chat shows, when the answer carries one: it already
+      // names the page or sheet, or where a passage of a source without
+      // pages sits ("Subpart E · § 200.423").
+      const label = source.label?.trim()
       const locator = formatPageLocator(source.page, source.page_approximate, source.page_end)
-      lines.push(`[${index + 1}] ${source.document_title || 'Untitled source'}${locator ? ` · ${locator}` : ''}${source.sheet ? ` · Sheet: ${source.sheet}` : ''}`)
+      lines.push(label
+        ? `[${index + 1}] ${label}${source.sheet && !label.endsWith(source.sheet) ? ` · Sheet: ${source.sheet}` : ''}`
+        : `[${index + 1}] ${source.document_title || 'Untitled source'}${locator ? ` · ${locator}` : ''}${source.sheet ? ` · Sheet: ${source.sheet}` : ''}`)
       if (source.kb_title || source.kb_uuid) lines.push(`Knowledge base: ${source.kb_title || source.kb_uuid}`)
       if (!source.document_title && (source.document_uuid || source.document_id)) lines.push(`Document ID: ${source.document_uuid || source.document_id}`)
       if (source.url) lines.push(`URL: ${source.url}`)

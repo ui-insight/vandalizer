@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { ChatMessage } from './ChatMessage'
 import type { ChatMessage as ChatMessageType, Citation } from '../../types/chat'
 
@@ -82,5 +82,74 @@ describe('ChatMessage source citations', () => {
     ])} />)
 
     expect(screen.getByText('Policy Memo')).toBeInTheDocument()
+  })
+})
+
+// Answers now carry the source line a workflow run cites (`label`) and the
+// whole passage (`content`). Every passage of an eCFR subpart or a policy web
+// page used to read as the bare source name; where the passage sits is what
+// tells them apart. Answers saved before keep the lines above.
+describe('ChatMessage source lines', () => {
+  const SECTION_LINE = 'OMB Uniform Guidance — Subpart D · § 200.308 · part 2'
+  const section: Citation = {
+    document_title: 'OMB Uniform Guidance — Subpart D',
+    label: SECTION_LINE,
+    chunk_id: 'c5',
+  }
+
+  it('names a passage of a source without pages by where it sits', () => {
+    render(<ChatMessage message={messageWith([section])} />)
+
+    expect(screen.getByRole('button', { name: SECTION_LINE })).toBeInTheDocument()
+  })
+
+  it('tells two passages of one source apart', () => {
+    render(<ChatMessage message={messageWith([
+      { document_title: 'Subpart E', label: 'Subpart E · § 200.423', chunk_id: 'c6' },
+      { document_title: 'Subpart E', label: 'Subpart E · Appendix III · part 4', chunk_id: 'c7' },
+    ])} />)
+
+    expect(screen.getByRole('button', { name: 'Subpart E · § 200.423' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Subpart E · Appendix III · part 4' })).toBeInTheDocument()
+  })
+
+  it('never offers "part 2" as a page to open at', () => {
+    render(<ChatMessage message={messageWith([{ ...section, document_uuid: 'doc-ug' }])} />)
+
+    fireEvent.click(screen.getByRole('button', { name: SECTION_LINE }))
+
+    expect(screen.getByRole('menuitem', { name: 'Open document' })).toBeInTheDocument()
+    expect(screen.queryByText(/p\. ~?2/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the knowledge base after the line on a multi-KB turn', () => {
+    render(<ChatMessage message={messageWith([
+      { document_title: 'PAPPG.pdf', page: 54, label: 'PAPPG.pdf · p. 54', kb_title: 'NSF Policies', chunk_id: 'c8' },
+    ])} />)
+
+    expect(screen.getByRole('button', { name: 'PAPPG.pdf · p. 54 · NSF Policies' })).toBeInTheDocument()
+  })
+
+  it('previews the whole passage under its line, scrolling inside a bounded box', () => {
+    const passage = `${'Costs must be necessary and reasonable for the award. '.repeat(8)}Advertising costs are allowable only for recruitment.`
+    render(<ChatMessage message={messageWith([{ ...section, content: passage, content_preview: passage.slice(0, 240) }])} />)
+
+    fireEvent.click(screen.getByRole('button', { name: SECTION_LINE }))
+
+    const box = screen.getByRole('region', { name: 'Source passage' })
+    // Past the 240-character preview: the claim may rest on the end of it.
+    expect(box).toHaveTextContent(/Advertising costs are allowable only for recruitment\.$/)
+    expect(box).toHaveStyle({ maxHeight: '260px', overflowY: 'auto' })
+    // The chip and the preview's heading.
+    expect(screen.getAllByText(SECTION_LINE)).toHaveLength(2)
+  })
+
+  it('previews the saved opening of an answer from before the whole passage was sent', () => {
+    render(<ChatMessage message={messageWith([{ ...measured, content_preview: 'Indirect costs are charged at 58% of MTDC.' }])} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Budget Justification · p. 12' }))
+
+    expect(screen.getByRole('region', { name: 'Source passage' })).toHaveTextContent('Indirect costs are charged at 58% of MTDC.')
+    expect(screen.getAllByText('Budget Justification · p. 12')).toHaveLength(2)
   })
 })

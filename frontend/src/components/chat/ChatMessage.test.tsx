@@ -92,6 +92,23 @@ describe('ChatMessage source citations', () => {
     expect(highlight.terms[0].endsWith('otherw')).toBe(false)
   })
 
+  it('keeps anchoring on the preview when the answer carries the whole passage', () => {
+    // A passage whose opening differs from the preview's, only so the test can
+    // tell which one the anchor came from; the server sends one text for both.
+    render(<ChatMessage message={messageWith({
+      document_uuid: 'doc-1',
+      label: 'Uniform Guidance · p. 12',
+      content: `§ 200.334 Record retention requirements. ${CHUNK}ise.`,
+    })} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Uniform Guidance · p. 12' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open at p. 12' }))
+
+    const [, , highlight] = workspace.viewDocument.mock.calls[0]
+    expect(highlight.page).toBe(12)
+    expect(CHUNK.startsWith(highlight.terms[0])).toBe(true)
+  })
+
   it('goes straight to Preview once that document is already open', () => {
     workspace.openDocumentUuid = 'doc-1'
     render(<ChatMessage message={messageWith({ document_uuid: 'doc-1' })} />)

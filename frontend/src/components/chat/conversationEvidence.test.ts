@@ -8,6 +8,18 @@ describe('conversation export evidence', () => {
     expect(text).not.toContain('doc-1')
     expect(text).not.toContain('kb-1')
   })
+  it('names each source by the line chat showed when the answer carries one', () => {
+    const text = conversationEvidence({ role: 'assistant', content: 'Advertising is allowable for recruitment.', citations: [
+      { document_title: 'Subpart E', label: 'Subpart E · § 200.421', kb_title: 'OMB UG', content_preview: 'Advertising costs…' },
+      { document_title: 'Subpart E', label: 'Subpart E · Appendix III · part 4', content_preview: 'Rate agreements…' },
+      { document_title: 'budget.xlsx', label: 'budget.xlsx · Sheet1', sheet: 'Sheet1', content_preview: 'Travel 4,000' },
+    ] })
+    expect(text).toContain('[1] Subpart E · § 200.421\nKnowledge base: OMB UG')
+    expect(text).toContain('[2] Subpart E · Appendix III · part 4\n')
+    // The line already names the sheet.
+    expect(text).toContain('[3] budget.xlsx · Sheet1\n')
+    expect(text).not.toContain('Sheet: Sheet1')
+  })
   it('falls back to the ID only for a source that has no name', () => {
     const text = conversationEvidence({ role: 'assistant', content: 'x', citations: [{ document_title: '', document_uuid: 'doc-9', content_preview: 'p' }] })
     expect(text).toContain('Document ID: doc-9')

@@ -115,4 +115,4 @@ class TestRenderedSnippetsAreNumbered:
         assert [s["ref"] for s in sources] == [1, 2]
         assert "[S1] Source: PAPPG.pdf" in segment.text
         assert "[S2] Source: PAPPG.pdf" in segment.text
-        assert sources[1]["cite_label"].startswith("PAPPG.pdf, p.")
+        assert sources[1]["cite_label"].startswith("PAPPG.pdf · p.")

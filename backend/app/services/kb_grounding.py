@@ -756,6 +756,23 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
     return pool
 
 
+def precise_cut(dm, kb_uuid: str, query: str, results: list[dict]) -> Optional[list[dict]]:
+    """Chunks another lane found — a source the message names, a passage
+    that amends one retrieved — scored by the cross-encoder against
+    ``query`` and kept only above the relevance cut precise retrieval
+    applies to its own, best first; None when precise retrieval cannot run
+    here. A vector hit is the nearest text, relevant or not."""
+    from app.services import kb_retrieval as kr
+
+    if not results:
+        return []
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or not kr.ready():
+        return None
+    scored = kr.rerank(index, kr.expand(index, query), results)
+    return [r for r in scored if r["rerank_score"] >= kr.MIN_SCORE]
+
+
 def _retrieve_pool(
     dm, kb_uuid: str, query: str, *, k: int, floor: float,
 ) -> list[dict]:

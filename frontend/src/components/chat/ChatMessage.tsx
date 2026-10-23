@@ -128,6 +128,24 @@ export function menuAlignmentFor(
   return fitsRightAligned ? 'right' : 'left'
 }
 
+/** A source's line: the one the server sent, which a workflow run cites the
+ *  same way and which, for a source without pages, says where the passage
+ *  sits ("Subpart E · § 200.423", "… · part 3") so two passages of one eCFR
+ *  subpart or web page read differently. Answers saved before it was sent
+ *  rebuild it from the title and page or sheet. */
+function sourceLine(c: Citation): string {
+  const label = c.label?.trim()
+  if (label) return label
+  const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
+  return locator ? `${c.document_title} · ${locator}` : c.document_title
+}
+
+// The whole passage can run to 5,000 characters: it scrolls inside the
+// preview rather than stretching the chat.
+const PASSAGE_SCROLL_STYLE = {
+  maxHeight: 260, overflowY: 'auto', overscrollBehavior: 'contain', overflowWrap: 'anywhere',
+} as const
+
 export function ChatMessage({
   message, messageIndex, conversationUuid, streamingThinking,
   thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
@@ -295,6 +313,9 @@ export function ChatMessage({
     // The file panel is collapsed to nothing while chat has the workspace;
     // switch modes first or the document opens where nobody can see it.
     setWorkspaceMode('files')
+    // From the preview even when the whole passage (`content`) is here: the
+    // anchor is the passage's opening words either way, and older answers
+    // carry only the preview.
     const anchor = citationAnchor(citation.content_preview)
     viewDocument(citation.document_uuid, citation.document_title, {
       terms: anchor ? [anchor] : [],
@@ -606,7 +627,8 @@ export function ChatMessage({
           {message.citations && message.citations.length > 0 && (() => {
             const citations = message.citations
             const open = openCitation !== null ? citations[openCitation] : null
-            const openPreview = open?.content_preview?.trim() || ''
+            // The passage itself when the answer carries it, else its opening.
+            const openPassage = open?.content?.trim() || open?.content_preview?.trim() || ''
             // Only the snippets the answer cited are its sources. The rest
             // were retrieved and searched but not used — listing them as
             // sources made "the KB doesn't cover this" look sourced (support
@@ -615,8 +637,7 @@ export function ChatMessage({
             const used = indexed.filter(({ c }) => isUsedCitation(c))
             const unused = indexed.filter(({ c }) => !isUsedCitation(c))
             const renderChip = (c: Citation, i: number, muted: boolean) => {
-                    const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
-                    const base = locator ? `${c.document_title} · ${locator}` : c.document_title
+                    const base = sourceLine(c)
                     // With several knowledge bases attached, the filename
                     // alone doesn't say which one a claim came from.
                     const labelled = c.kb_title ? `${base} · ${c.kb_title}` : base
@@ -764,11 +785,7 @@ export function ChatMessage({
                     whiteSpace: 'pre-wrap' as const,
                   }}>
                     <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 'var(--workspace-space-4)' }}>
-                      {open.document_title}
-                      {(() => {
-                        const loc = formatPageLocator(open.page, open.page_approximate, open.page_end) ?? open.sheet
-                        return loc ? ` · ${loc}` : ''
-                      })()}
+                      {sourceLine(open)}
                     </div>
                     {(open.grounding === 'not_found' || open.grounding === 'unchecked') && (
                       <p role="note" style={{ margin: '0 0 var(--workspace-space-6)', color: '#92400e', fontWeight: 500 }}>
@@ -777,7 +794,9 @@ export function ChatMessage({
                           : 'The assistant cited this page without a figure, date, quote or wording that could be checked against it. Shown below is the top of the page, not a supporting passage.'}
                       </p>
                     )}
-                    {openPreview || 'No preview was saved for this source.'}
+                    {openPassage
+                      ? <div role="region" aria-label="Source passage" tabIndex={0} style={PASSAGE_SCROLL_STYLE}>{openPassage}</div>
+                      : 'No preview was saved for this source.'}
                     {!open.document_uuid && !open.url && <p style={{ marginTop: 'var(--workspace-space-8)' }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
                       <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>

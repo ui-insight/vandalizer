@@ -200,8 +200,19 @@ export interface Citation {
   url?: string | null
   /** The snippet's number in its turn's prompt; the answer cites it as [S#]. */
   ref?: number
-  /** What [S#] reads as, e.g. "PAPPG.pdf, p. ~54". */
+  /** What [S#] reads as: the same text as `label` on answers that carry one;
+   *  "PAPPG.pdf, p. ~54" or the bare source name on older ones. */
   cite_label?: string
+  /** The passage's source line, built the way a workflow run's is:
+   *  "PAPPG.pdf · p. 54", "budget.xlsx · Sheet1", or — for a source without
+   *  pages, such as an eCFR subpart or a policy web page — where the passage
+   *  sits: "Subpart E · § 200.423", "APM 45.13 Program Income · part 3".
+   *  Never names the knowledge base (`kb_title` does). Absent on answers
+   *  saved before chat sent it; those rebuild the line from title and page. */
+  label?: string | null
+  /** The passage itself (up to 5,000 characters), for the source preview.
+   *  Older answers carry only `content_preview`. */
+  content?: string | null
   /** Whether the answer cited this snippet. false = retrieved and searched
    *  but not used. Absent on answers saved before the distinction, which
    *  show every snippet as a source. */

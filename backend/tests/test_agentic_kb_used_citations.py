@@ -30,7 +30,7 @@ async def test_search_citations_are_numbered_after_the_prefetched_snippets():
 
     citations = ctx.deps.citation_annotations["call-1"]
     assert [c["ref"] for c in citations] == [4, 5]
-    assert citations[0]["cite_label"] == "Award Terms.pdf, p. 137"
+    assert citations[0]["cite_label"] == "Award Terms.pdf · p. 137"
     assert ctx.deps.kb_snippet_ref == 5
 
 

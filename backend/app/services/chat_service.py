@@ -63,9 +63,6 @@ from app.services.model_routing import (
 from app.services.native_token_count import count_natively, native_count_for
 from app.services.page_locator import (
     annotate_chunk_pages,
-    cited_pages,
-    format_page_range,
-    locator_for_meta,
     with_marker_provenance,
 )
 from app.services.llm_service import (
@@ -3722,6 +3719,7 @@ async def _retrieve_kb_results(
         annotate_amendments,
         condense_retrieval_query,
         load_amendment_links,
+        resolve_kb_rag_config,
         retrieve_amendment_chunks,
         retrieve_kb_chunks,
     )
@@ -3756,7 +3754,33 @@ async def _retrieve_kb_results(
     # fairly represented before the top-k trim. Skipped for anaphoric turns
     # (single condensed intent) and single-question turns (unchanged path).
     sub_questions = _split_questions(message) if retrieval_query is None else []
-    if sub_questions:
+
+    # Precise retrieval, the pipeline workflow grounding uses: the sections a
+    # question names, literal identifiers, and hybrid candidates reranked by a
+    # cross-encoder and kept only above its relevance cut, so a question the
+    # base cannot answer hands over nothing rather than the nearest text. It
+    # has its own section and identifier lanes, so chat's pins are not added
+    # on top. None when it cannot run here (store, reranker or setting): the
+    # tuned vector pipeline below stands.
+    from app.services import kb_grounding, kb_retrieval
+    from app.services.document_manager import get_document_manager
+
+    rag_cfg = await resolve_kb_rag_config(kb_uuid)
+    precise_pools: list = []
+    if kb_retrieval.enabled():
+        dm = get_document_manager()
+        precise_pools = await asyncio.gather(*[
+            asyncio.to_thread(
+                kb_grounding._precise_pool, dm, kb_uuid, q, k=rag_cfg.k, floor=rag_cfg.min_similarity,
+            )
+            for q in (sub_questions or [retrieval_query or message])
+        ])
+    precise = bool(precise_pools) and all(pool is not None for pool in precise_pools)
+
+    pinned_results: list[dict] = []
+    if precise:
+        kb_results = kb_grounding.merge_pools([precise_pools], rag_cfg.k)
+    elif sub_questions:
         pools = await asyncio.gather(*[
             retrieve_kb_chunks(
                 kb_uuid, q, model_name, per_step_timeout=6.0,
@@ -3779,8 +3803,7 @@ async def _retrieve_kb_results(
     # them — and near-identical documents that differ only by an identifier are
     # not separable at all. Fetch those chunks lexically and pin them into the
     # final slots.
-    pinned_results: list[dict] = []
-    pin_terms = _extract_pin_terms(message)
+    pin_terms = _extract_pin_terms(message) if not precise else []
     if pin_terms:
         pinned_results = await _retrieve_pinned_chunks(kb_uuid, pin_terms)
 
@@ -3798,6 +3821,11 @@ async def _retrieve_kb_results(
             per_step_timeout=6.0,
             retrieval_query=retrieval_query,
         )
+        if precise:
+            # The named file's nearest text, held to the same relevance cut.
+            named_results = await asyncio.to_thread(
+                kb_grounding.precise_cut, dm, kb_uuid, retrieval_query or message, named_results,
+            ) or []
 
     general_results = kb_results
     kb_results = _compose_kb_results(
@@ -3813,6 +3841,12 @@ async def _retrieve_kb_results(
         kb_uuid, kb_results, retrieval_query or message, links,
         min_similarity=rag_cfg.min_similarity,
     )
+    if amendment_results and precise:
+        # An amended passage keeps its "amended by" mark either way; the
+        # amendment's own text is shown only where it is about the question.
+        amendment_results = await asyncio.to_thread(
+            kb_grounding.precise_cut, dm, kb_uuid, retrieval_query or message, amendment_results,
+        ) or []
     if amendment_results:
         kb_results = _compose_kb_results(
             general_results, named_results + amendment_results, rag_cfg.k,
@@ -3838,6 +3872,7 @@ async def _render_kb_segment(
     if not kb_results:
         return None, []
 
+    from app.services.kb_grounding import CITATION_CONTENT_CHARS, _passage_label
     from app.services.kb_validation_service import AMENDMENT_INSTRUCTION, amendment_label
 
     kb_sources: list[dict] = []
@@ -3850,14 +3885,16 @@ async def _render_kb_segment(
         content = r.get("content") or ""
         src = meta.get("source_name", "Unknown")
         sheet = meta.get("sheet")
-        # A chunk that crosses a page break is cited by the page of the
+        # The source line workflow grounding cites, so a passage reads the
+        # same in chat and in a run: "PAPPG.pdf · p. 54", or for a source with
+        # no pages (an eCFR subpart, a policy web page) where it sits —
+        # "§ 200.307 · part 2" — which a bare source name could not tell
+        # apart. A chunk that crosses a page break is cited by the page of the
         # passage that matches the question, or as a range when that is
         # ambiguous — never by the page it merely starts on.
-        cited = cited_pages(meta, content, message)
-        page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
-        locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
-        label = f"{src} ({locator})" if locator else src
-        label = f"{label}{amendment_label(r)}"
+        cite_label, located = _passage_label(r, kb_title=None, query=message)
+        page, page_end, approximate = located["page"], located["page_end"], located["page_approximate"]
+        label = f"{cite_label}{amendment_label(r)}"
         any_amendment = any_amendment or bool(r.get("amends") or r.get("amended_by"))
         kb_title = r.get("kb_title")
         if kb_title:
@@ -3872,7 +3909,12 @@ async def _render_kb_segment(
             "ref": ref,
             # What [S{ref}] reads as in the answer the user sees and the one
             # stored.
-            "cite_label": f"{src}, {locator}" if locator else src,
+            "cite_label": cite_label,
+            # The source line and the passage itself, as a workflow run's
+            # sources carry them: the chip names the section, and its popover
+            # shows the text the claim rests on.
+            "label": cite_label,
+            "content": content[:CITATION_CONTENT_CHARS],
             "document_id": meta.get("source_id"),
             "document_title": src,
             "page": page,

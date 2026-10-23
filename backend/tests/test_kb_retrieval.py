@@ -162,8 +162,8 @@ async def test_build_kb_segment_trims_to_cfg_k_and_builds_sources():
     assert segment is not None
     # Over-fetched pool trimmed back to the tuned k.
     assert len(sources) == 2
-    assert "budget.xlsx (Year 1)" in segment.text
-    assert "proposal.pdf (p. 12)" in segment.text
+    assert "budget.xlsx · Year 1" in segment.text
+    assert "proposal.pdf · p. 12" in segment.text
     assert "chunk 2 content" not in segment.text
     assert sources[0]["document_title"] == "budget.xlsx"
     assert sources[0]["sheet"] == "Year 1"
@@ -1371,7 +1371,7 @@ async def test_kb_segment_explains_the_tilde_when_a_page_is_estimated():
         )
 
     assert segment is not None
-    assert "scanned.pdf (p. ~234)" in segment.text
+    assert "scanned.pdf · p. ~234" in segment.text
     assert "estimate" in segment.text, (
         "the model was shown a tilde with nothing explaining it"
     )
@@ -1400,5 +1400,5 @@ async def test_kb_segment_stays_quiet_when_every_page_is_measured():
         )
 
     assert segment is not None
-    assert "digital.pdf (p. 12)" in segment.text
+    assert "digital.pdf · p. 12" in segment.text
     assert "estimate" not in segment.text

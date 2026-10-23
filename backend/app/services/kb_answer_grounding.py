@@ -373,17 +373,28 @@ def used_snippet_refs(answer: str, sources: list[dict]) -> list[int]:
     used the file. An answer that cites nothing used nothing — which is what
     "the sources don't cover this" should look like.
     """
+    from app.services.kb_grounding import _locator, _norm_citation
+
     by_ref = _by_ref(sources)
     used: set[int] = set()
     for m in _SNIPPET_REF_RE.finditer(answer):
         used.update(n for n in map(int, _DIGITS_RE.findall(m.group(0))) if n in by_ref)
     for m in _FILENAME_CITATION_RE.finditer(answer):
-        cited = m.group(1).lower()
-        pages = {int(p) for p in _CITED_PAGE_RE.findall(cited)}
-        for ref, s in by_ref.items():
-            title = (s.get("document_title") or "").lower()
-            if title and title in cited and (not pages or _covers_page(s, pages)):
-                used.add(ref)
+        for one in m.group(1).split(";"):
+            cited = one.lower()
+            pages = {int(p) for p in _CITED_PAGE_RE.findall(cited)}
+            # A page-less source's passages are told apart by where they sit
+            # ("§ 200.307 · part 2"): such a citation used that passage only.
+            where = _locator(_norm_citation(one))
+            for ref, s in by_ref.items():
+                title = (s.get("document_title") or "").lower()
+                if not title or title not in cited:
+                    continue
+                if where is not None:
+                    if _locator(_norm_citation(s.get("label") or "")) == where:
+                        used.add(ref)
+                elif not pages or _covers_page(s, pages):
+                    used.add(ref)
     return sorted(used)
 
 

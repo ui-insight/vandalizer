@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ToolStatusLine, listErrorEntry } from './ToolCallDisplay'
+import { ToolStatusLine, listErrorEntry, toolResultToText } from './ToolCallDisplay'
 
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({}) }))
 vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn(), CertCheckCard: () => null }))
@@ -38,6 +38,31 @@ describe('knowledge base search results', () => {
       { content: 'MTDC excludes equipment…', source_name: '2 CFR 200.1', page: 4 },
     ])} />)
     expect(screen.getByText('Found 2 relevant passages')).toBeInTheDocument()
+  })
+
+  it('names each passage by the line it is cited by, and copies that line', () => {
+    // A source without pages: both passages used to read "Subpart E".
+    const passages = [
+      { content: 'Advertising costs are allowable only for recruitment…', source_name: 'Subpart E', label: 'Subpart E · § 200.421' },
+      { content: 'Rate agreements negotiated with the cognizant agency…', source_name: 'Subpart E', label: 'Subpart E · Appendix III · part 4' },
+    ]
+    render(<ToolStatusLine call={call} result={searched(passages)} />)
+
+    expect(screen.getByText('Subpart E · § 200.421')).toBeInTheDocument()
+    expect(screen.getByText('Subpart E · Appendix III · part 4')).toBeInTheDocument()
+    expect(screen.queryByText('Subpart E')).toBeNull()
+    expect(toolResultToText('search_knowledge_base', passages)).toBe(
+      '[Subpart E · § 200.421]\nAdvertising costs are allowable only for recruitment…\n\n'
+      + '[Subpart E · Appendix III · part 4]\nRate agreements negotiated with the cognizant agency…',
+    )
+  })
+
+  it('keeps the source name for results saved before the line was sent', () => {
+    const passages = [{ content: 'Equipment means tangible personal property…', source_name: '2 CFR 200.1', page: 3 }]
+    render(<ToolStatusLine call={call} result={searched(passages)} />)
+
+    expect(screen.getByText('2 CFR 200.1')).toBeInTheDocument()
+    expect(toolResultToText('search_knowledge_base', passages)).toBe('[2 CFR 200.1]\nEquipment means tangible personal property…')
   })
 
   it('unwraps only a lone error entry', () => {

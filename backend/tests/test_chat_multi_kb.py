@@ -6,6 +6,7 @@ retrieved at its own tuned settings, the pools merged so every attached KB is
 represented, and each snippet labelled with the KB it came from.
 """
 
+import re
 import secrets
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -61,8 +62,8 @@ class TestMultiKBSegment:
         assert [s["kb_title"] for s in sources] == ["Policies", "Awards", "Policies"]
         assert [s["kb_uuid"] for s in sources] == ["kb-a", "kb-b", "kb-a"]
         # …and the prompt text says which KB each snippet came from.
-        assert "policy.pdf — Policies" in segment.text
-        assert "award.pdf — Awards" in segment.text
+        assert re.search(r"Source: policy\.pdf[^*\n]* — Policies\*\*", segment.text)
+        assert re.search(r"Source: award\.pdf[^*\n]* — Awards\*\*", segment.text)
 
     @pytest.mark.asyncio
     async def test_caps_the_total_number_of_snippets(self):
