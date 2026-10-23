@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **A written reference for running workflows through the API.** The only guidance for `POST /api/workflows/run-integrated` and `GET /api/workflows/status` was the editor's **Run this workflow via API** panel, which showed only the `queued` reply. API users logging runs for evaluation had no description of the status fields or of the `run_metadata` block added in v4.15.0, and nothing saying how far that record can be relied on (#1039). `docs/api.md` now covers key expiry, multi-file runs, every status value, each response and `run_metadata` field, what the record does not capture (provider-side model updates, sampling variation above temperature 0), and a Python script that writes one evaluation-log row per run. The editor panel links to it.
+
+### Fixed
+- **Polling a workflow run reports outputs that failed to deliver.** `GET /api/workflows/status` dropped `delivery_failures`, so a run whose library write, notification or webhook failed after it completed polled as a clean `completed`. The service returned the field since #810, but the response model had no slot for it. The stream showed it; the poll didn't. The poll now also returns `workflow_name`, `document_title` and `start_time`, which the stream already sent.
+- **The workflow status stream closes when a run is canceled.** `GET /api/workflows/status/stream` ended on `completed`, `error` and `failed` but not `canceled`, so a canceled run's stream kept polling until the client gave up.
+
 ### Security
 - **certifi 2026.10.19 and Pillow 13.0.0 patch four critical advisories.** certifi bundled emSign root CAs with compromised keys (GHSA-6q48-6c7w-9gw2), and Pillow before 13.0.0 had three critical CVEs (CVE-2026-112393, CVE-2026-112403, CVE-2026-112900). The CI vulnerability scan failed on every pull request until both were upgraded in `backend/uv.lock`. Vandalizer doesn't import Pillow itself; it comes in through fpdf2, reportlab and python-pptx.
 
