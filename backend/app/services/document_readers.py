@@ -8,6 +8,7 @@ import io
 import logging
 import os
 import re
+from collections import Counter
 from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import NoReturn
@@ -173,6 +174,241 @@ def _is_numeric_cell(text: str) -> bool:
     return bool(_NUMERIC_CELL.fullmatch(text.strip()))
 
 
+# A value a form fills in: an amount, a date, or an identifier with digits in
+# it (L24AC00293-00, 0051049525-00010, C8WLYVK4EYL1).
+_FORM_DATE = re.compile(r"\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")
+_FORM_ID = re.compile(r"(?=(?:\D*\d){2})[A-Za-z0-9][A-Za-z0-9\-.]{2,30}")
+# What sits between a form label and its value: leader dots, a currency sign.
+_FORM_CONNECTOR = re.compile(r"[\s.…·•:$€£_*\-–—]*")
+_FORM_LABEL = re.compile(r"[^\W\d_]{2}")
+# A label this many lines or more from its value in the content stream was
+# written in another pass over the page, not beside it.
+_STRANDED_DISTANCE = 5
+
+
+def _is_form_value(text: str) -> bool:
+    text = text.strip()
+    return bool(
+        _NUMERIC_CELL.fullmatch(text) or _FORM_DATE.fullmatch(text) or _FORM_ID.fullmatch(text)
+    )
+
+
+def _page_lines(page) -> list[dict]:
+    """The page's text lines in content-stream order, with their boxes."""
+    import pymupdf
+
+    lines: list[dict] = []
+    for block in page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT).get("blocks", []):
+        for line in block.get("lines", []):
+            text = "".join(span.get("text", "") for span in line.get("spans", []))
+            if not text.strip():
+                continue
+            x0, y0, x1, y1 = line["bbox"]
+            lines.append({
+                "text": text, "x0": x0, "x1": x1, "y0": y0, "y1": y1,
+                "yc": (y0 + y1) / 2, "h": max(y1 - y0, 1.0),
+            })
+    return lines
+
+
+def _bands(lines: list[dict], ids=None) -> list[list[int]]:
+    """Indices of ``lines`` (or of the subset ``ids``) grouped into visual
+    rows by vertical centre, top to bottom."""
+    bands: list[list[int]] = []
+    order = range(len(lines)) if ids is None else ids
+    for idx in sorted(order, key=lambda i: lines[i]["yc"]):
+        ln = lines[idx]
+        if bands:
+            ref = lines[bands[-1][0]]
+            if abs(ln["yc"] - ref["yc"]) <= 0.5 * min(ln["h"], ref["h"]):
+                bands[-1].append(idx)
+                continue
+        bands.append([idx])
+    return bands
+
+
+def _same_row(a: dict, b: dict) -> bool:
+    overlap = min(a["y1"], b["y1"]) - max(a["y0"], b["y0"])
+    return overlap >= 0.5 * min(a["h"], b["h"])
+
+
+def _value_links(lines: list[dict]) -> list[tuple[int, int, bool]]:
+    """(left, value, left is a label) line indices: each value with the
+    nearest text to its left on its row, past leader dots and currency
+    signs — its label, the row's item letter, or the number before it."""
+    links: list[tuple[int, int, bool]] = []
+    for idx, ln in enumerate(lines):
+        if not _is_form_value(ln["text"]):
+            continue
+        left = [
+            i for i, other in enumerate(lines)
+            if i != idx and other["x1"] <= ln["x0"] + 1 and _same_row(other, ln)
+        ]
+        for i in sorted(left, key=lambda i: -lines[i]["x1"]):
+            text = lines[i]["text"]
+            if _FORM_CONNECTOR.fullmatch(text):
+                continue
+            links.append((i, idx, bool(_FORM_LABEL.search(text)) and not _is_form_value(text)))
+            break
+    return links
+
+
+def _drawn_rules(page) -> tuple[dict[float, list[list[float]]], dict[float, list[list[float]]]]:
+    """The page's drawn vertical and horizontal rules — form cell borders —
+    as {x: [[y0, y1], …]} and {y: [[x0, x1], …]}, collinear pieces merged."""
+    vertical: list[tuple[float, float, float]] = []
+    horizontal: list[tuple[float, float, float]] = []
+
+    def add_rect(r) -> None:
+        # Rules are often drawn as runs of thin filled slivers.
+        if r.width <= 2 and r.height > r.width:
+            vertical.append(((r.x0 + r.x1) / 2, r.y0, r.y1))
+        elif r.height <= 2 and r.width > r.height:
+            horizontal.append(((r.y0 + r.y1) / 2, r.x0, r.x1))
+        elif r.width > 2 and r.height > 2:
+            vertical.extend([(r.x0, r.y0, r.y1), (r.x1, r.y0, r.y1)])
+            horizontal.extend([(r.y0, r.x0, r.x1), (r.y1, r.x0, r.x1)])
+
+    for path in page.get_drawings():
+        for item in path.get("items", []):
+            if item[0] == "l":
+                p, q = item[1], item[2]
+                if abs(p.x - q.x) <= 1 and abs(p.y - q.y) >= 3:
+                    vertical.append(((p.x + q.x) / 2, min(p.y, q.y), max(p.y, q.y)))
+                elif abs(p.y - q.y) <= 1 and abs(p.x - q.x) >= 3:
+                    horizontal.append(((p.y + q.y) / 2, min(p.x, q.x), max(p.x, q.x)))
+            elif item[0] == "re":
+                add_rect(item[1])
+            elif item[0] == "qu":
+                add_rect(item[1].rect)
+
+    def merge(segments: list[tuple[float, float, float]]) -> dict[float, list[list[float]]]:
+        groups: dict[float, list[tuple[float, float]]] = {}
+        for at, lo, hi in sorted(segments):
+            key = next((k for k in groups if abs(k - at) <= 1), at)
+            groups.setdefault(key, []).append((lo, hi))
+        merged: dict[float, list[list[float]]] = {}
+        for key, pieces in groups.items():
+            spans: list[list[float]] = []
+            for lo, hi in sorted(pieces):
+                if spans and lo <= spans[-1][1] + 2:
+                    spans[-1][1] = max(spans[-1][1], hi)
+                else:
+                    spans.append([lo, hi])
+            merged[key] = spans
+        return merged
+
+    return merge(vertical), merge(horizontal)
+
+
+def _rule_spans(spans: list[list[float]], lo: float, hi: float) -> bool:
+    return any(a <= lo + 2 and b >= hi - 2 for a, b in spans)
+
+
+def _visual_reading(
+    lines: list[dict], links: list[tuple[int, int, bool]], rules, ids: list[int], out: list[str],
+    depth: int = 0,
+) -> None:
+    """Append the lines ``ids`` to ``out`` in visual order: split at drawn
+    rules that run the full width (sections, table rows) or height (columns)
+    of the region, then at blank rows; a row's cells go left to right,
+    tab-separated. A rule between a value and what stands to its left — its
+    label, its row's item letter, the figure before it — is not a column
+    boundary: the label box and the value box of one form row are one row."""
+    vertical, horizontal = rules
+    if len(ids) > 1 and depth < 50 and len(_bands(lines, ids)) > 1:
+        x0 = min(lines[i]["x0"] for i in ids)
+        x1 = max(lines[i]["x1"] for i in ids)
+        y0 = min(lines[i]["y0"] for i in ids)
+        y1 = max(lines[i]["y1"] for i in ids)
+        inside = set(ids)
+
+        def column_cut(x: float) -> bool:
+            return (
+                x0 < x < x1
+                and _rule_spans(vertical[x], y0, y1)
+                and not any(lines[i]["x0"] < x - 1 and lines[i]["x1"] > x + 1 for i in ids)
+                and not any(
+                    left in inside and val in inside
+                    and lines[left]["x1"] <= x + 1 and lines[val]["x0"] >= x - 1
+                    for left, val, _ in links
+                )
+            )
+
+        def section_cut(y: float) -> bool:
+            return (
+                y0 < y < y1
+                and _rule_spans(horizontal[y], x0, x1)
+                and not any(lines[i]["y0"] < y - 1 and lines[i]["y1"] > y + 1 for i in ids)
+            )
+
+        for cuts, centre in (
+            (sorted(y for y in horizontal if section_cut(y)), lambda i: lines[i]["yc"]),
+            (sorted(x for x in vertical if column_cut(x)), lambda i: (lines[i]["x0"] + lines[i]["x1"]) / 2),
+        ):
+            if not cuts:
+                continue
+            groups: list[list[int]] = [[] for _ in range(len(cuts) + 1)]
+            for i in ids:
+                groups[sum(centre(i) > c for c in cuts)].append(i)
+            groups = [g for g in groups if g]
+            if len(groups) > 1:
+                for g in groups:
+                    _visual_reading(lines, links, rules, g, out, depth + 1)
+                return
+
+        # Blank rows between lines.
+        rows: list[list[int]] = []
+        bottom = None
+        for i in sorted(ids, key=lambda i: lines[i]["y0"]):
+            if bottom is None or lines[i]["y0"] > bottom - 0.5:
+                rows.append([])
+                bottom = lines[i]["y1"]
+            rows[-1].append(i)
+            bottom = max(bottom, lines[i]["y1"])
+        if len(rows) > 1:
+            for r in rows:
+                _visual_reading(lines, links, rules, r, out, depth + 1)
+            return
+
+    for band in _bands(lines, ids):
+        cells = sorted(band, key=lambda i: lines[i]["x0"])
+        out.append("\t".join(lines[i]["text"].strip() for i in cells))
+
+
+def _form_page_reading(page, lines=None) -> tuple[str, list[tuple[str, str]]] | None:
+    """A form page's text in visual order, with its (label, value) texts.
+
+    Forms such as a federal Notice of Award are often written in passes —
+    every label, then every figure — so the text layer, PyMuPDF's and
+    pdf-inspector's alike, lists "Supplies" and "Travel" in one block and
+    "1,000.00" and "3,566.00" in another, out of order: extraction swapped
+    Travel and Supplies on every run, and read Total Direct Costs from the
+    award total. On such a page the reading is rebuilt from where the text
+    sits instead, so each label and its value share a line. None — the page
+    is left as read — unless at least three values, and at least half of
+    those beside a label, are that far from their label in the stream.
+    """
+    if lines is None:
+        lines = _page_lines(page)
+    if not lines:
+        return None
+    links = _value_links(lines)
+    pairs = [(lab, val) for lab, val, is_label in links if is_label]
+    stranded = sum(1 for lab, val in pairs if abs(lab - val) >= _STRANDED_DISTANCE)
+    if stranded < 3 or stranded * 2 < len(pairs):
+        return None
+    try:
+        rules = _drawn_rules(page)
+    except Exception as e:  # noqa: BLE001 — without rules the rows still hold
+        logger.warning("Could not read the drawings of page %s: %s", getattr(page, "number", "?"), e)
+        rules = ({}, {})
+    out: list[str] = []
+    _visual_reading(lines, links, rules, list(range(len(lines))), out)
+    texts = [(lines[lab]["text"].strip(), lines[val]["text"].strip()) for lab, val in pairs]
+    return "\n".join(out) + "\n", texts
+
+
 def _page_text_with_table_rows(page) -> str:
     """PyMuPDF's page text, with each table row kept on one line.
 
@@ -193,32 +429,18 @@ def _page_text_with_table_rows(page) -> str:
     collapse whitespace: a quote copied from the old one-cell-per-line text
     still matches. A page with fewer than two such rows is returned exactly as
     ``get_text("text")`` gives it, so prose and multi-column articles are
-    untouched.
+    untouched — unless it is a form whose labels and values the stream keeps
+    apart, which is read in visual order instead (``_form_page_reading``).
     """
-    import pymupdf
-
     plain = page.get_text("text")
-    lines: list[dict] = []
-    for block in page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT).get("blocks", []):
-        for line in block.get("lines", []):
-            text = "".join(span.get("text", "") for span in line.get("spans", []))
-            if not text.strip():
-                continue
-            x0, y0, x1, y1 = line["bbox"]
-            lines.append({"text": text, "x0": x0, "yc": (y0 + y1) / 2, "h": max(y1 - y0, 1.0)})
+    lines = _page_lines(page)
     if not lines:
         return plain
+    form = _form_page_reading(page, lines)
+    if form is not None:
+        return form[0]
 
-    # Group lines into visual rows by vertical centre.
-    bands: list[list[int]] = []
-    for idx in sorted(range(len(lines)), key=lambda i: lines[i]["yc"]):
-        ln = lines[idx]
-        if bands:
-            ref = lines[bands[-1][0]]
-            if abs(ln["yc"] - ref["yc"]) <= 0.5 * min(ln["h"], ref["h"]):
-                bands[-1].append(idx)
-                continue
-        bands.append([idx])
+    bands = _bands(lines)
 
     def cells(band: list[int]) -> list[dict]:
         return sorted((lines[i] for i in band), key=lambda ln: ln["x0"])
@@ -1371,7 +1593,7 @@ def _local_markdown_extract_from_pdf(
         )
         return None
 
-    joined = _join_pages({p.page + 1: p.markdown or "" for p in result.pages})
+    joined = _join_pages({n + 1: t for n, t in _fast_path_page_texts(pdf_path, result).items()})
     if joined is None:
         return None
     text, markers = joined
@@ -1433,6 +1655,101 @@ def _fast_path_parse(pdf_path: str, classification):
     return result, problem
 
 
+def _pairs_kept(text: str, pairs: list[tuple[str, str]]) -> float:
+    """Share of (label, value) pairs whose value follows its label on one
+    line of ``text``, Markdown emphasis and table pipes aside."""
+    if not pairs:
+        return 1.0
+
+    def norm(s: str) -> str:
+        return " ".join(re.sub(r"[*_|`]+", " ", s).split()).lower()
+
+    lines = [norm(line) for line in text.splitlines()]
+    kept = 0
+    for label, value in pairs:
+        lab, val = norm(label), norm(value)
+        if any(lab in line and val in line[line.find(lab) + len(lab):] for line in lines):
+            kept += 1
+    return kept / len(pairs)
+
+
+# A fast-path line that suggests a form's labels and values were parted: a
+# label ending in a currency sign or leader dots with no figure after it.
+_LABEL_AWAITING_RE = re.compile(r"(?:[$€£]|\.{4,}|…{2,})\s*$")
+
+
+def _may_be_scattered(markdown: str) -> bool:
+    """Whether a fast-path page's Markdown has three or more lines that are
+    a label waiting for its figure, or nothing but figures — or a table cell
+    holding a whole column of figures ("4 4 4 4 1 1", a quote's quantities).
+    Only such a page is checked against its layout: opening a page in
+    PyMuPDF can cost a third of a second, and the fast path reads most
+    documents in milliseconds."""
+    hits = 0
+    for line in markdown.splitlines():
+        if "|" in line and any(
+            len(cell.split()) >= 3 and all(_is_form_value(t) for t in cell.split())
+            for cell in line.split("|")
+        ):
+            return True
+        line = re.sub(r"[*_|`#>]+", " ", line).strip()
+        if line and (
+            _LABEL_AWAITING_RE.search(line)
+            or all(_is_form_value(t) or _FORM_CONNECTOR.fullmatch(t) for t in line.split())
+        ):
+            hits += 1
+            if hits >= 3:
+                return True
+    return False
+
+
+_LETTER_WORD_RE = re.compile(r"[^\W\d_]{3,}")
+
+
+def _reads_the_same_words(markdown: str, reading: str) -> bool:
+    """Whether PyMuPDF's reading of a page has nine in ten of the words
+    pdf-inspector's Markdown has. A font PyMuPDF decodes to glyph IDs — a
+    subaward's ")'3&RVW5HLPEXUVHPHQW" for "FDP Cost Reimbursement" — reads
+    as gibberish there, and the Markdown must stand."""
+    md = Counter(w.lower() for w in _LETTER_WORD_RE.findall(markdown))
+    rd = Counter(w.lower() for w in _LETTER_WORD_RE.findall(reading))
+    total = sum(md.values())
+    return total > 0 and sum((md & rd).values()) >= 0.9 * total
+
+
+def _fast_path_page_texts(pdf_path: str, result, skip=()) -> dict[int, str]:
+    """0-indexed page -> pdf-inspector's Markdown for it, but a form page
+    whose Markdown parts most of its labels from their values (see
+    ``_form_page_reading``) is read in visual order instead: on the BLM
+    Notice of Award the Markdown listed budget lines a–n with no figures.
+    Pages in ``skip`` are left out. Never raises; on any error the Markdown
+    stands."""
+    texts = {p.page: p.markdown or "" for p in result.pages if p.page not in skip}
+    suspects = [n for n, markdown in texts.items() if _may_be_scattered(markdown)]
+    if not suspects:
+        return texts
+    try:
+        import pymupdf
+
+        with pymupdf.open(pdf_path) as doc:
+            for n in suspects:
+                markdown = texts[n]
+                form = _form_page_reading(doc[n])
+                if (
+                    form is not None
+                    and _pairs_kept(markdown, form[1]) < 0.5
+                    and _reads_the_same_words(markdown, form[0])
+                ):
+                    logger.info(
+                        "Page %d of %s is a form whose Markdown separates labels from "
+                        "values; reading it in visual order", n + 1, pdf_path,
+                    )
+                    texts[n] = _pymupdf_page_text(doc[n])
+    except Exception as e:  # noqa: BLE001 — the fast path's own reading stands
+        logger.warning("Could not check %s for scattered form pages: %s", pdf_path, e)
+    return texts
+
+
 def _join_pages(page_texts: dict[int, str]) -> tuple[str, list[dict]] | None:
     """Join 1-indexed page texts in page order, with a marker per page that
     has text. None when the whole is too short to count as a reading."""
@@ -1491,9 +1808,7 @@ def _fast_path_with_page_ocr(
     if parsed is None:
         return None
     result, problem = parsed
-    read_pages = {
-        p.page: p.markdown or "" for p in result.pages if p.page not in problem
-    }
+    read_pages = _fast_path_page_texts(pdf_path, result, skip=problem)
     if (
         not problem
         or len(problem) > _MAX_PAGES_OCR_ONE_BY_ONE
