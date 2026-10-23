@@ -623,6 +623,54 @@ class TestCitationPayload:
             "OMB UG — Subpart E—Cost Principles · part 9",
         ]
 
+    @staticmethod
+    def _sectioned(cid, source, key, part, parts):
+        """A chunk cut by its section, as kb_chunking records it."""
+        c = _chunk(cid, f"text of {cid}", source=source)
+        c["metadata"].update(section_key=key, section_part=part, section_parts=parts, chunker_version=2)
+        return c
+
+    def test_a_pageless_passage_cut_by_section_is_named_by_its_section_and_part(self):
+        """Chunks cut by section say which section and which part of it they
+        are, so the source line is unique per passage and tells a reader where
+        to look; a section held in one chunk needs no part."""
+        subpart_d, apps = "Subpart D—Post Federal Award Requirements", "2 CFR Part 200 — Appendices I–XII"
+        dm = FakeDM(vector={("ug", "cost"): [
+            self._sectioned("d_chunk_40", subpart_d, "200.307", 2, 5),
+            self._sectioned("d_chunk_41", subpart_d, "200.307", 3, 5),
+            self._sectioned("e_chunk_88", "Subpart E—Cost Principles", "200.423", 1, 1),
+            self._sectioned("a_chunk_70", apps, "Appendix III", 4, 77),
+            # A policy page named after its own section, and front matter
+            # under no heading: their position in the source names them.
+            self._sectioned("p_chunk_2", "APM 45.13 - Program Income", "45.13", 3, 6),
+            self._sectioned("y_chunk_0", "Your session will expire", "source:Your session will expire", 1, 1),
+        ]})
+        meta = {"ug": {"title": "OMB UG", "exists": True}}
+        cfg = GroundingConfig(targets=_targets(ug=["cost"]), k=6, max_passages=8)
+        labels = [s["label"] for s in retrieve_grounding(cfg, {}, kb_meta=meta, dm=dm).sources]
+        assert labels == [
+            f"OMB UG — {subpart_d} · § 200.307 · part 2",
+            f"OMB UG — {subpart_d} · § 200.307 · part 3",
+            "OMB UG — Subpart E—Cost Principles · § 200.423",
+            f"OMB UG — {apps} · Appendix III · part 4",
+            "OMB UG — APM 45.13 - Program Income · part 3",
+            "OMB UG — Your session will expire · part 1",
+        ]
+        sources = [{"document_title": label.split(" — ", 1)[1].split(" · ")[0], "label": label} for label in labels]
+        # Each passage answers to its own line, copied with or without the
+        # knowledge base's name; a bare part or the whole section is none of
+        # the parts.
+        assert kg.match_source_index(labels[1], sources) == 1
+        assert kg.match_source_index(f"{subpart_d} · §200.307 · part 3", sources) == 1
+        assert kg.match_source_index(f"{subpart_d} · § 200.307 · part 4", sources) is None
+        assert kg.match_source_index(f"{subpart_d} · part 2", sources) is None
+        assert kg.match_source_index(f"{subpart_d} · § 200.307", sources) is None
+        assert kg.match_source_index(f"{apps} · Appendix III · part 4", sources) == 3
+        assert kg.match_source_index("Subpart E—Cost Principles · § 200.423", sources) == 2
+        text = f"Program income is deducted [{labels[0]}] and beer is unallowable [Subpart E—Cost Principles · § 200.423]."
+        assert unmatched_citations(text, sources) == []
+        assert cites_any(text, sources)
+
     def test_a_source_line_is_safe_inside_brackets_and_json(self):
         dm = FakeDM(vector={("ug", "cost"): [
             _chunk("c1", "x", source='APM 45.05 [Cost "Share"]; notes\\draft', page=3),

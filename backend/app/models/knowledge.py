@@ -37,6 +37,11 @@ class KnowledgeBaseSource(Document):
     status: str = "pending"  # pending | processing | ready | error | skipped | held
     error_message: Optional[str] = None
     chunk_count: int = 0
+    # The chunker that cut the indexed chunks (kb_chunking.CHUNKER_VERSION),
+    # written with the ingestion stamp. None: indexed before it was recorded,
+    # by the fixed 1,000/200 window. scripts/rechunk_knowledge_bases.py
+    # rebuilds sources below the current version.
+    chunker_version: Optional[int] = None
     # True when the fetched web page's extracted text was cut off at the fetcher
     # size cap — the source is "ready" but incomplete, so the UI shows a warning
     # rather than a clean check. Only set for URL sources.
@@ -311,6 +316,10 @@ class KnowledgeBase(Document):
     rag_config_override: Optional[dict] = None
     rag_config_override_set_at: Optional[datetime.datetime] = None
     rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
+    # When scripts/rechunk_knowledge_bases.py last re-cut this KB's sources
+    # with a new chunker. Settings tuned before it were tuned on other
+    # chunks and other similarities, so the Optimized badge reads stale.
+    rechunked_at: Optional[datetime.datetime] = None
     # Re-fetch web sources automatically: None (off) | daily | weekly | monthly.
     # See services/kb_url_refresh.py.
     url_refresh_interval: Optional[str] = None

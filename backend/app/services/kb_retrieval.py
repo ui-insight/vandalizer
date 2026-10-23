@@ -19,23 +19,26 @@ answered here:
   local cross-encoder (:mod:`app.services.cross_encoder`) then reads each
   query-passage pair, and appendices written for other kinds of recipient
   are left out for an institution of higher education.
-* **Headings cut away from their rules.** Chunks are cut every 1,000
-  characters, so three in four carry no heading. The index rebuilds each
-  source in order, finds its section headings, and gives every chunk the
-  heading path it sits under — for BM25, for the cross-encoder, and for a
-  title index that routes "program income" to § 200.307 when the match is
-  unambiguous.
+* **Headings cut away from their rules.** Every chunk is read under the
+  heading path it sits under — by BM25, by the cross-encoder, and by a title
+  index that routes "program income" to § 200.307 when the match is
+  unambiguous. A source chunked by its structure
+  (:mod:`app.services.kb_chunking`) stores that path on each chunk; one cut
+  every 1,000 characters, where three chunks in four carry no heading, is
+  rebuilt in order and its headings found again.
 * **Every slot filled.** A passage is kept only if the cross-encoder scores it
   above an absolute cut and close to the best one; a passage from a different
   section than the best must be closer still. A query the base cannot answer
   gets no passage at all, which is what grounding wants: a wrong citation is
   worse than none.
 
-The index is built from the chunks already stored — no re-ingest, nothing
-written — and cached per process. The cuts and the route thresholds below
-were set on the development queries and checked on the held-out ones; they
-are tied to the default embedder (all-MiniLM-L6-v2) and to the cross-encoder
-revision pinned in :mod:`app.services.cross_encoder`.
+The index is built from the chunks already stored — nothing written — and
+cached per process. The cuts and the route thresholds below were set on the
+development queries and checked on the held-out ones, for both kinds of
+chunk (a lower cut gained on chunks cut by section but let a held-out
+question the base cannot answer through); they are tied to the default
+embedder (all-MiniLM-L6-v2) and to the cross-encoder revision pinned in
+:mod:`app.services.cross_encoder`.
 
 Everything here is optional: without a full-collection read on the store, or
 without the cross-encoder, :func:`index_for` / :func:`ready` say so and the
@@ -54,6 +57,17 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+
+from app.services.kb_chunking import (
+    DEFINITION_RE,
+    HEADING_PATH_MAX_CHARS,
+    Bound,
+    heading_path,
+    is_definitions,
+    section_bounds,
+    sub_headings,
+    title_words,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,29 +94,8 @@ INDEX_TTL_S = 600
 RESULT_CACHE_SIZE = 512
 
 # ---------------------------------------------------------------------------
-# Headings
+# Sections
 # ---------------------------------------------------------------------------
-
-_MD = r"[ \t]*(?:#{1,6}[ \t]+)?"
-# "§ 200.414 Indirect costs.", FAR's "31.205-6 Compensation…".
-_SECTION_RE = re.compile(
-    rf"^{_MD}(?:§[ \t]*)?(?P<num>\d{{1,4}}\.\d{{1,4}}(?:-\d{{1,3}})?[a-z]?)(?![\d(\-–—]|\.\d)[ \t]+(?P<title>[A-Z\[][^\n]{{0,200}})$",
-    re.MULTILINE,
-)
-# A numbered policy page: "45.10 - Facilities and Administrative (Indirect) Rate".
-_POLICY_RE = re.compile(
-    rf"^{_MD}(?P<num>\d{{1,3}}\.\d{{1,3}})[ \t]+[-–—][ \t]+(?P<title>[A-Z][^\n]{{0,200}})$",
-    re.MULTILINE,
-)
-# "Appendix III to Part 200—Indirect (F&A) Costs Identification and …".
-_APPENDIX_RE = re.compile(rf"^{_MD}(?P<num>Appendix [IVXLC]+)\b(?P<title>[^\n]{{0,240}})$", re.MULTILINE)
-# "Subpart E—Cost Principles": a group boundary, not a section of its own.
-_GROUP_RE = re.compile(rf"^{_MD}(?:Subpart|SUBPART|Part|PART)[ \t]+[\w.]+[ \t]*(?:[-—–:][^\n]*)?$", re.MULTILINE)
-# Sub-headings inside a section: "C-1. Indirect rate.", "D. Policy.", "A. General".
-_SUB_RE = re.compile(r"^(?P<label>[A-Z](?:-\d+)?(?:\.[a-z])?)\.[ \t]+(?P<text>[^\n]{2,160})", re.MULTILINE)
-# A defined term: "Program income means …".
-_DEFINITION_RE = re.compile(r"^(?P<term>[A-Z][^\n]{1,90}?) (?:means|is defined)\b", re.MULTILINE)
-_NUMBER_IN_NAME_RE = re.compile(r"(?<![\d.])(\d{1,4}\.\d{1,4}(?:-\d{1,3})?)(?![\d])")
 
 # Cost-principle appendices of 2 CFR 200 written for recipients other than
 # institutions of higher education (nonprofits, state and local governments,
@@ -110,20 +103,6 @@ _NUMBER_IN_NAME_RE = re.compile(r"(?<![\d.])(\d{1,4}\.\d{1,4}(?:-\d{1,3})?)(?![\
 # Appendix III, and were the commonest wrong passage for an IHE's
 # indirect-cost questions.
 _NOT_FOR_IHE_RE = re.compile(r"^Appendix (?:IV|V|VI|VII|VIII|IX) to Part 200\b")
-
-
-def _short_title(text: str) -> str:
-    """'C-2. Residual funds. Residual funds are …' -> 'Residual funds'."""
-    m = re.match(r"([^.:\n]{2,90})[.:]", text)
-    return (m.group(1) if m else text[:90]).strip()
-
-
-def _title_words(heading: str) -> str:
-    """The words of a heading without its number or trailing period."""
-    text = re.sub(r"^\s*#{1,6}\s*", "", heading)
-    text = re.sub(r"^§\s*", "", text)
-    text = re.sub(r"^(?:\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?|Appendix [IVXLC]+(?: to Part \d+)?)\s*[-–—:]?\s*", "", text)
-    return text.strip().rstrip(".").strip()
 
 
 def _join(text: str, nxt: str) -> tuple[str, int]:
@@ -249,6 +228,91 @@ def _is_default_embedder(ef) -> bool:
     return type(ef).__name__ in ("ONNXMiniLM_L6_V2", "DefaultEmbeddingFunction")
 
 
+Titles = list[tuple[str, str, Optional[str]]]
+
+
+def _has_stored_section(c: dict) -> bool:
+    key = (c.get("metadata") or {}).get("section_key")
+    return isinstance(key, str) and bool(key)
+
+
+def _stored_sections(group: list[dict], section_titles: dict[str, str], titles: Titles) -> list[tuple[str, str]]:
+    """(section key, heading path) per chunk of a source chunked by its
+    structure, read from the chunks (:mod:`app.services.kb_chunking`)."""
+    out: list[tuple[str, str]] = []
+    for c in group:
+        meta = c.get("metadata") or {}
+        key = str(meta["section_key"])
+        title = str(meta.get("section_title") or "")
+        content = c.get("content") or ""
+        if not key.startswith("group:"):
+            if title and key not in section_titles:
+                section_titles[key] = title
+                titles.append((key, title, None))
+            if is_definitions(title):
+                titles.extend((key, m.group("term"), m.group("term")) for m in DEFINITION_RE.finditer(content))
+            titles.extend((key, sub, None) for _, sub in sub_headings(content))
+        out.append((key, str(meta.get("heading_path") or "")))
+    return out
+
+
+def _rebuilt_sections(group: list[dict], name: str, section_titles: dict[str, str],
+                      titles: Titles) -> list[tuple[str, str]]:
+    """(section key, heading path) per chunk of a source cut by length: its
+    text rebuilt in chunk order, the overlap removed, and its headings found
+    again."""
+    text, starts = "", []
+    for c in group:
+        content = c.get("content") or ""
+        if not text:
+            text, at = content, 0
+        else:
+            text, at = _join(text, content)
+        starts.append(at)
+
+    bounds = section_bounds(text, name)
+    subs = sub_headings(text)
+
+    def section_at(pos: int) -> Bound:
+        return next((b for b in bounds if b.start <= pos < b.end), bounds[-1])
+
+    for b in bounds:
+        if b.group:
+            continue
+        words = title_words(b.heading)
+        if not words:
+            continue
+        # The first heading of a key names it (a later contents line or
+        # cross-reference cannot rename it).
+        if b.key not in section_titles:
+            section_titles[b.key] = words
+            titles.append((b.key, words, None))
+        if is_definitions(words):
+            for m in DEFINITION_RE.finditer(text, b.start, b.end):
+                titles.append((b.key, m.group("term"), m.group("term")))
+    for at, sub in subs:
+        b = section_at(at)
+        if not b.group:
+            titles.append((b.key, sub, None))
+
+    out: list[tuple[str, str]] = []
+    for c, start in zip(group, starts):
+        end = start + len(c.get("content") or "")
+        # A chunk belongs to the section holding most of its text, not the
+        # one it starts in: chunks are cut by length, so one that opens on
+        # the last lines of § 200.431 can be mostly § 200.432, and a
+        # heading naming the wrong section misleads the reranker.
+        spans = [(min(b.end, end) - max(b.start, start), b) for b in bounds
+                 if min(b.end, end) > max(b.start, start) and not b.group]
+        b = max(spans, key=lambda x: x[0])[1] if spans else section_at(start)
+        sub = next((s for at, s in reversed(subs) if b.start <= at <= max(start, b.start) + 40), None)
+        prefix = heading_path(b, sub=sub, content=c.get("content") or "")
+        if b.key.startswith("source:") and name:
+            prefix = name
+        out.append((b.key, prefix))
+    return out
+
+
 def build_index(kb_uuid: str, chunks: list[dict], *, embedding_function=None, institution_type: str = "ihe",
                 route_titles: Optional[bool] = None) -> Optional[KbIndex]:
     """The index over a base's stored chunks. None for an empty base.
@@ -269,94 +333,25 @@ def build_index(kb_uuid: str, chunks: list[dict], *, embedding_function=None, in
     excluded: set[int] = set()
     texts: list[str] = []
     section_titles: dict[str, str] = {}
-    titles: list[tuple[str, str, Optional[str]]] = []
+    titles: Titles = []
 
     for group in by_source.values():
         group.sort(key=_chunk_order)
         name = str((group[0].get("metadata") or {}).get("source_name") or "")
-        text, starts = "", []
-        for c in group:
-            content = c.get("content") or ""
-            if not text:
-                text, at = content, 0
-            else:
-                text, at = _join(text, content)
-            starts.append(at)
-
-        # Section marks: (offset, key, heading line). The source's own name
-        # stands for whatever precedes its first heading.
-        marks: list[tuple[int, str, str]] = []
-        for rx in (_SECTION_RE, _POLICY_RE, _APPENDIX_RE):
-            for m in rx.finditer(text):
-                marks.append((m.start(), m.group("num"), m.group(0).strip()))
-        for m in _GROUP_RE.finditer(text):
-            if not any(abs(m.start() - at) < 3 for at, _, _ in marks):
-                marks.append((m.start(), f"group:{m.group(0).strip()[:60]}", m.group(0).strip()))
-        marks.sort()
-        # A contents list names each section on a line of its own: a heading
-        # with nothing but the next heading after it is a contents line, not
-        # the section (a one-sentence section such as "See § 200.425." stays).
-        marks = [mk for i, mk in enumerate(marks)
-                 if i + 1 >= len(marks) or mk[1].startswith("group:")
-                 or len(text[mk[0]:marks[i + 1][0]].strip()) > len(mk[2]) + 2]
-        if not marks or marks[0][0] > 0:
-            m = _NUMBER_IN_NAME_RE.search(name)
-            marks.insert(0, (0, m.group(1) if m else f"source:{name[:60]}", name))
-        bounds = [(at, marks[i + 1][0] if i + 1 < len(marks) else len(text), key, head)
-                  for i, (at, key, head) in enumerate(marks)]
-        subs = [(m.start(), _short_title(m.group("text"))) for m in _SUB_RE.finditer(text)]
-
-        def section_at(pos: int):
-            for b in bounds:
-                if b[0] <= pos < b[1]:
-                    return b
-            return bounds[-1]
-
-        for at, end, key, head in bounds:
-            if key.startswith("group:"):
-                continue
-            words = _title_words(head)
-            if not words:
-                continue
-            # The first heading of a key names it (a later contents line or
-            # cross-reference cannot rename it).
-            if key not in section_titles:
-                section_titles[key] = words
-                titles.append((key, words, None))
-            if re.search(r"\bdefinitions\b", words, re.IGNORECASE):
-                for m in _DEFINITION_RE.finditer(text, at, end):
-                    titles.append((key, m.group("term"), m.group("term")))
-        for at, sub in subs:
-            key = section_at(at)[2]
-            if not key.startswith("group:"):
-                titles.append((key, sub, None))
-
-        for c, start in zip(group, starts):
-            end = start + len(c.get("content") or "")
-            # A chunk belongs to the section holding most of its text, not the
-            # one it starts in: chunks are cut by length, so one that opens on
-            # the last lines of § 200.431 can be mostly § 200.432, and a
-            # heading naming the wrong section misleads the reranker.
-            spans = [(min(e, end) - max(s, start), (s, e, k, h)) for s, e, k, h in bounds
-                     if min(e, end) > max(s, start) and not k.startswith("group:")]
-            b = max(spans, key=lambda x: x[0])[1] if spans else section_at(start)
-            key, head = b[2], b[3]
-            sub = next((s for at, s in reversed(subs) if b[0] <= at <= max(start, b[0]) + 40), None)
-            prefix = re.sub(r"\s+", " ", head).strip()
-            if sub:
-                prefix += f" — {sub}"
-            if re.search(r"\bdefinitions\b", head, re.IGNORECASE):
-                terms = [m.group("term") for m in _DEFINITION_RE.finditer(c.get("content") or "")][:6]
-                if terms:
-                    prefix += " — " + "; ".join(terms)
-            if key.startswith("source:") and name:
-                prefix = name
+        # A source whose chunks all say where they sit is read as stored; one
+        # chunked before that (or only partly rewritten) is rebuilt.
+        if all(_has_stored_section(c) for c in group):
+            labelled = _stored_sections(group, section_titles, titles)
+        else:
+            labelled = _rebuilt_sections(group, name, section_titles, titles)
+        for c, (key, prefix) in zip(group, labelled):
             i = len(ordered)
             ordered.append(c)
             keys.append(key)
-            prefixes.append(prefix[:300])
+            prefixes.append(prefix[:HEADING_PATH_MAX_CHARS])
             texts.append(f"{prefix}\n{c.get('content') or ''}")
-            if institution_type == "ihe" and _NOT_FOR_IHE_RE.match(re.sub(r"^\s*#{1,6}\s*", "", head)):
+            # The heading path opens with the section's heading line.
+            if institution_type == "ihe" and _NOT_FOR_IHE_RE.match(re.sub(r"^\s*#{1,6}\s*", "", prefix)):
                 excluded.add(i)
 
     from app.services.ra_glossary import corpus_abbreviations

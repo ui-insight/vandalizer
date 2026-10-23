@@ -19,6 +19,8 @@ import datetime
 import hashlib
 from typing import Any, Optional
 
+from app.services.kb_chunking import CHUNKER_VERSION
+
 HASH_ALGORITHM = "sha256"
 
 # ``last_refresh_outcome`` values written by refresh_url_source.
@@ -69,6 +71,9 @@ def ingestion_stamp(
         "last_ingested_at": now,
         # Kept for every reader that predates the split.
         "processed_at": now,
+        # Chunks are written by DocumentManager.add_to_kb, which cuts them
+        # with the current chunker.
+        "chunker_version": CHUNKER_VERSION,
     }
     if retrieved:
         out["last_retrieved_at"] = now

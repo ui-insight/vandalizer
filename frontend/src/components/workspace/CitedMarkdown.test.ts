@@ -90,6 +90,27 @@ describe('matchCitation', () => {
     const far: WorkflowCitation = { document_title: 'Part 31', chunk_id: 'f', label: 'FAR — Part 31 · § 31.205-6' }
     expect(matchCitation('Part 31 · § 31.205-6', [far])).toBe(0)
   })
+
+  it('tells the parts of a section apart, and a part from the whole section', () => {
+    const part = (section: string, n: number): WorkflowCitation => ({
+      document_title: 'Subpart D—Post Federal Award Requirements', kb_title: 'OMB UG', chunk_id: `d${section}-${n}`,
+      label: `OMB UG — Subpart D—Post Federal Award Requirements · § ${section} · part ${n}`, content: `passage ${n}`,
+    })
+    const appendix: WorkflowCitation = {
+      document_title: '2 CFR Part 200 — Appendices I–XII', chunk_id: 'a4',
+      label: '2 CFR Part 200 — Appendices I–XII · Appendix III · part 4', content: 'C. Determination…',
+    }
+    const sources = [part('200.306', 2), part('200.307', 2), part('200.307', 3), appendix]
+    expect(matchCitation('OMB UG — Subpart D—Post Federal Award Requirements · § 200.307 · part 2', sources)).toBe(1)
+    expect(matchCitation('Subpart D—Post Federal Award Requirements · §200.307 · part 3', sources)).toBe(2)
+    // A bare part, or the whole section, is none of them.
+    expect(matchCitation('Subpart D—Post Federal Award Requirements · part 2', sources)).toBeNull()
+    expect(matchCitation('Subpart D—Post Federal Award Requirements · § 200.307', sources)).toBeNull()
+    expect(matchCitation('2 CFR Part 200 — Appendices I–XII · Appendix III · part 4', sources)).toBe(3)
+    expect(matchCitation('2 CFR Part 200 — Appendices I–XII · Appendix III · part 5', sources)).toBeNull()
+    expect(citationLocator(sources[1])).toBe('§ 200.307 · part 2')
+    expect(citationLocator(appendix)).toBe('Appendix III · part 4')
+  })
 })
 
 describe('injectCitationChips', () => {

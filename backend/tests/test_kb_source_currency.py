@@ -132,6 +132,7 @@ class TestIngestionStamp:
             "content_hash": cur.content_fingerprint(NEW_TEXT),
             "last_ingested_at": T_ATTEMPT,
             "processed_at": T_ATTEMPT,
+            "chunker_version": cur.CHUNKER_VERSION,
             "last_retrieved_at": T_ATTEMPT,
             "content_retrieved_at": T_ATTEMPT,
         }

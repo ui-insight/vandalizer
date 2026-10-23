@@ -115,6 +115,7 @@ def compute_optimization_status(
     latest_completed_run,
     sources: list[SourceStamp],
     queries: list[QueryStamp],
+    rechunked_at: Optional[datetime.datetime] = None,
 ) -> Optional[OptimizationStatus]:
     """Decide the KB's optimization state. Returns None when there is nothing
     to say — no applied override and no completed run with settings to apply.
@@ -124,6 +125,8 @@ def compute_optimization_status(
     recorded); ``latest_completed_run`` the newest completed run for the KB.
     Both are read for ``uuid``, ``started_at``, ``completed_at``,
     ``best_config``, ``tied_with_baseline`` and ``test_query_snapshot`` only.
+    ``rechunked_at`` is when the KB's sources were last re-cut by a new
+    chunker (``KnowledgeBase.rechunked_at``).
     """
     has_override = isinstance(rag_config_override, dict) and bool(rag_config_override)
     latest = latest_completed_run
@@ -226,6 +229,14 @@ def compute_optimization_status(
             f"Test questions changed since the settings were tuned: {', '.join(bits)} "
             f"(had {_plural(status.queries_at_run, 'question')})."
         )
+    # Re-cut chunks are re-embedded, so every similarity the settings were
+    # tuned on moved (the relevance floor most of all), even though no
+    # source or question did.
+    if ref_time is not None and rechunked_at is not None and _utc(rechunked_at) > ref_time:
+        status.stale_reasons.append(
+            "The knowledge base was re-chunked by section since the settings were tuned, "
+            "so its retrieval scores have shifted."
+        )
     if status.stale_reasons:
         status.stale = True
         status.state = "stale"
@@ -313,6 +324,7 @@ async def optimization_status_by_kb(kbs: list) -> dict[str, OptimizationStatus]:
             latest_completed_run=latest.get(kb.uuid),
             sources=sources.get(kb.uuid, []),
             queries=queries.get(kb.uuid, []),
+            rechunked_at=getattr(kb, "rechunked_at", None),
         )
         if status is not None:
             out[kb.uuid] = status

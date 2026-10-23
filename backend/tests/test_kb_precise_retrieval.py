@@ -57,12 +57,34 @@ POLICY = (
 
 
 def _chunks(source_id: str, name: str, text: str) -> list[dict]:
+    """A source as it was chunked before sections were recorded: 1,000
+    characters with a 200-character overlap, no section metadata."""
     from app.services.document_manager import CHUNK_OVERLAP, CHUNK_SIZE, _split_text_with_offsets
 
     return [
         {"content": chunk, "metadata": {"source_id": source_id, "source_name": name, "chunk_index": i},
          "chunk_id": f"{source_id}_chunk_{i}", "score": None, "similarity": None}
         for i, (chunk, _) in enumerate(_split_text_with_offsets(text, CHUNK_SIZE, CHUNK_OVERLAP))
+    ]
+
+
+def _sectioned(source_id: str, name: str, text: str) -> list[dict]:
+    """A source as DocumentManager.add_to_kb stores it now: cut by section,
+    each chunk carrying its section key, title and heading path."""
+    from unittest.mock import patch
+
+    from app.services.document_manager import DocumentManager
+
+    dm = object.__new__(DocumentManager)
+    dm.chunk_size = 1000
+    dm.client = MagicMock(get_max_batch_size=MagicMock(return_value=5000))
+    collection = MagicMock()
+    with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+        dm.add_to_kb(KB, source_id, name, text)
+    kw = collection.add.call_args.kwargs
+    return [
+        {"content": doc, "metadata": meta, "chunk_id": cid, "score": None, "similarity": None}
+        for cid, doc, meta in zip(kw["ids"], kw["documents"], kw["metadatas"])
     ]
 
 
@@ -149,6 +171,14 @@ def _store():
         _chunks("subD", "Subpart D—Post Federal Award Requirements", SUBPART_D),
         _chunks("apps", "2 CFR Part 200 — Appendices", APPENDICES),
         _chunks("apm1313", "APM 45.13 - Program Income on Sponsored Projects | University of Idaho", POLICY),
+    )
+
+
+def _sectioned_store():
+    return Store(
+        _sectioned("subD", "Subpart D—Post Federal Award Requirements", SUBPART_D),
+        _sectioned("apps", "2 CFR Part 200 — Appendices", APPENDICES),
+        _sectioned("apm1313", "APM 45.13 - Program Income on Sponsored Projects | University of Idaho", POLICY),
     )
 
 
@@ -344,6 +374,70 @@ class TestPrecisePool:
         result = kg.retrieve_grounding(cfg, {}, dm=_store())
         assert result.empty
         assert "no matching passages" in result.warnings[0]
+
+
+# ---------------------------------------------------------------------------
+# Sources chunked by section
+# ---------------------------------------------------------------------------
+
+class TestStoredSections:
+    """A source cut by its sections (kb_chunking) says on every chunk where
+    it sits; the index reads that instead of rebuilding it from chunk order."""
+
+    def test_the_index_reads_each_chunks_section_and_heading_path(self):
+        store = _sectioned_store()
+        index = _index(store)
+        for i, c in enumerate(index.chunks):
+            assert index.keys[i] == c["metadata"]["section_key"]
+            assert index.prefixes[i] == c["metadata"]["heading_path"]
+        assert index.section_titles["200.307"] == "Program income"
+        assert index.section_titles["45.13"] == "Program Income on Sponsored Projects"
+        assert any(t[0] == "Appendix III" and t[1] == "General" for t in index.titles)
+
+    def test_stored_and_rebuilt_sections_agree_on_where_a_section_is(self):
+        stored, rebuilt = _index(_sectioned_store()), _index()
+        assert set(stored.section_titles) == set(rebuilt.section_titles)
+        # Cut by length, the one-line § 200.309 never held most of a chunk,
+        # so no chunk was its; cut by section, it is a chunk of its own.
+        assert set(stored.keys) - set(rebuilt.keys) == {"200.309"}
+
+    def test_a_base_mixing_old_and_new_sources_indexes_both(self):
+        store = Store(
+            _sectioned("subD", "Subpart D—Post Federal Award Requirements", SUBPART_D),
+            _chunks("apps", "2 CFR Part 200 — Appendices", APPENDICES),
+        )
+        index = _index(store)
+        assert {index.keys[i] for i, c in enumerate(index.chunks) if c["chunk_id"].startswith("apps")} \
+            == {"Appendix III", "Appendix VII"}
+        assert index.section_titles["200.308"] == "Revision of budget and program plans"
+
+    def test_a_source_only_partly_rewritten_is_rebuilt_from_order(self):
+        """A chunk without its section (a half-finished write) means the
+        stored sections cannot be trusted for that source."""
+        chunks = _sectioned("subD", "Subpart D—Post Federal Award Requirements", SUBPART_D)
+        for key in ("section_key", "heading_path"):
+            chunks[1]["metadata"].pop(key)
+        index = kr.build_index(KB, chunks)
+        assert index.keys[1] in {"200.306", "200.307"}
+        assert index.prefixes[1].startswith("§ 200.30")
+
+    def test_appendices_for_other_recipients_are_still_left_out(self):
+        index = _index(_sectioned_store())
+        vii = {i for i, k in enumerate(index.keys) if k == "Appendix VII"}
+        assert vii and vii <= index.excluded
+        assert not any(index.keys[i] == "Appendix III" for i in index.excluded)
+
+    def test_plain_words_still_reach_the_section(self, precise):
+        pool = _pool(_sectioned_store(), "program income")
+        assert pool and pool[0].get("_section") == "200.307"
+        assert _pool(_sectioned_store(), "parking permits for visitors") == []
+
+    def test_a_one_line_section_is_a_passage_of_its_own(self, precise):
+        store = _sectioned_store()
+        [one_liner] = [c for c in store.chunks if c["metadata"]["section_key"] == "200.309"]
+        assert one_liner["content"] == "§ 200.309 Modifications to period of performance.\n\nSee § 200.308."
+        pool = _pool(store, "modifications to period of performance")
+        assert any(p["chunk_id"] == one_liner["chunk_id"] or p.get("_section") == "200.309" for p in pool)
 
 
 # ---------------------------------------------------------------------------

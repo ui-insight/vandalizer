@@ -12,6 +12,7 @@ from typing import Any, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
+from app.services import kb_chunking
 from app.services.page_locator import span_meta, with_marker_provenance
 
 logger = logging.getLogger(__name__)
@@ -93,9 +94,9 @@ CHUNK_OVERLAP = 200
 
 
 def count_chunks(text: str) -> int:
-    """How many chunks ``text`` would be indexed as — the same split
-    ``DocumentManager.add_to_kb`` makes, without a Chroma client."""
-    return len(_split_text_with_offsets(text, CHUNK_SIZE, CHUNK_OVERLAP))
+    """How many chunks ``text`` would be indexed as in a knowledge base — the
+    same split ``DocumentManager.add_to_kb`` makes, without a Chroma client."""
+    return len(kb_chunking.chunk_source(text, max_chars=CHUNK_SIZE))
 
 
 def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
@@ -377,15 +378,22 @@ class DocumentManager:
             return self._FALLBACK_MAX_ADD_BATCH
         return reported if reported >= 1 else self._FALLBACK_MAX_ADD_BATCH
 
-    def _add_in_batches(self, collection, ids, documents, metadatas) -> None:
-        """``collection.add`` split to respect ChromaDB's per-call maximum."""
+    def _add_in_batches(self, collection, ids, documents, metadatas, embed_texts=None) -> None:
+        """``collection.add`` split to respect ChromaDB's per-call maximum.
+
+        ``embed_texts`` (one per document) are embedded in place of the
+        documents themselves; without them, or without an embedding function
+        to embed them with, the collection embeds the documents."""
         size = self._max_add_batch()
+        embed = getattr(self, "embedding_function", None) if embed_texts is not None else None
         for start in range(0, len(ids), size):
             stop = start + size
+            extra = {"embeddings": embed(embed_texts[start:stop])} if embed is not None else {}
             collection.add(
                 ids=ids[start:stop],
                 documents=documents[start:stop],
                 metadatas=metadatas[start:stop],
+                **extra,
             )
 
     def query_documents(
@@ -480,7 +488,15 @@ class DocumentManager:
         text_markers: Optional[list[dict]] = None,
         id_prefix: Optional[str] = None,
     ) -> int:
-        """Chunk text, embed, and add to a KB collection. Returns chunk count.
+        """Chunk text by its sections, embed, and add to a KB collection.
+        Returns chunk count.
+
+        Chunks follow the source's structure (:mod:`app.services.kb_chunking`)
+        and carry where they sit: ``section_key``, ``section_title``,
+        ``heading_path``, ``section_part`` of ``section_parts``, and the
+        ``chunker_version`` that cut them. The stored document is the chunk's
+        text; its vector is of the heading path and the text together, so a
+        rule is found by the heading it sits under.
 
         ``text_markers`` lets KB ingestion preserve page/sheet citations the
         same way per-user ingestion does. Sources without markers (web URLs,
@@ -490,8 +506,8 @@ class DocumentManager:
         carries ``source_id``), so :meth:`replace_kb_source` can write a new
         set of chunks beside the old one instead of colliding with it.
         """
-        text_splits = _split_text_with_offsets(raw_text, self.chunk_size, self.chunk_overlap)
-        if not text_splits:
+        chunks = kb_chunking.chunk_source(raw_text, source_name, max_chars=self.chunk_size)
+        if not chunks:
             return 0
 
         collection = self.get_kb_collection(kb_uuid)
@@ -504,21 +520,32 @@ class DocumentManager:
         ids = []
         documents = []
         metadatas = []
-        for i, (chunk, offset) in enumerate(text_splits):
+        embed_texts = []
+        for i, chunk in enumerate(chunks):
             ids.append(f"{id_prefix or source_id}_chunk_{i}")
-            documents.append(chunk)
+            documents.append(chunk.text)
             meta: dict = {
                 "source_id": source_id,
                 "source_name": source_name,
                 "chunk_index": i,
-                "total_chunks": len(text_splits),
+                "total_chunks": len(chunks),
                 "timestamp": datetime.now().isoformat(),
+                "chunker_version": kb_chunking.CHUNKER_VERSION,
+                "section_key": chunk.section_key,
+                "section_part": chunk.section_part,
+                "section_parts": chunk.section_parts,
             }
-            meta.update(span_meta(offset, len(chunk), markers))
+            # Empty values are left out.
+            if chunk.section_title:
+                meta["section_title"] = chunk.section_title
+            if chunk.heading_path:
+                meta["heading_path"] = chunk.heading_path
+            meta.update(span_meta(chunk.offset, len(chunk.text), markers))
             metadatas.append(meta)
+            embed_texts.append(f"{chunk.heading_path}\n{chunk.text}" if chunk.heading_path else chunk.text)
 
-        self._add_in_batches(collection, ids, documents, metadatas)
-        return len(text_splits)
+        self._add_in_batches(collection, ids, documents, metadatas, embed_texts=embed_texts)
+        return len(chunks)
 
     def query_kb(
         self,

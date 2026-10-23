@@ -409,9 +409,11 @@ def _pinned_hits(dm, kb_uuid: str, query: str, *, skip: frozenset = frozenset())
 #
 # A query that names a section ("200.405 allocable costs") wants the section.
 # Its number is literally in two kinds of chunk: the ones that cross-reference
-# it ("see § 200.405(c)") and the one holding its heading — and chunks are cut
-# every 1,000 characters regardless of structure, so that heading often closes
-# its chunk while the rule sits in the next one. Pinning hits by how often they
+# it ("see § 200.405(c)") and the one holding its heading — and a source chunked
+# before chunks followed sections was cut every 1,000 characters, so that
+# heading often closes its chunk while the rule sits in the next one (a section
+# chunked by its structure starts its own chunk, but a long one still runs on
+# into the chunks after it). Pinning hits by how often they
 # name the number handed the model cross-references and a bare heading, and the
 # citation check rightly refused every citation to them.
 #
@@ -819,6 +821,28 @@ def _citation_safe(label: str) -> str:
     return re.sub(r"\s+", " ", label).strip()
 
 
+_SECTION_NUMBER_RE = re.compile(r"\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?")
+
+
+def _chunk_locator(meta: dict, source_name: str, chunk_id) -> Optional[str]:
+    """Where a pageless chunk sits: "§ 200.307 · part 2" — the second chunk
+    of § 200.307 — or "§ 200.423" for a section held in one chunk, from the
+    section a structure-aware chunk records; "part N" (its position in the
+    source) for a chunk with no section, one whose source is named after
+    its section ("APM 45.13 …"), or one chunked before sections were
+    recorded."""
+    key = meta.get("section_key")
+    if (isinstance(key, str) and key and not key.startswith(("source:", "group:"))
+            and not re.search(rf"(?<![\w.]){re.escape(key)}(?!\w)", source_name)):
+        locator = f"§ {key}" if _SECTION_NUMBER_RE.fullmatch(key) else key
+        part, parts = meta.get("section_part"), meta.get("section_parts")
+        if isinstance(part, int) and isinstance(parts, int) and parts > 1:
+            locator += f" · part {part}"
+        return locator
+    m = re.search(r"_chunk_(\d+)$", str(chunk_id or ""))
+    return f"part {int(m.group(1)) + 1}" if m else None
+
+
 def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str, dict]:
     meta = r.get("metadata") or {}
     content = r.get("content") or ""
@@ -839,10 +863,9 @@ def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str
     if not locator:
         # A web page or eCFR subpart has no pages, so every passage from it
         # would share one source line and a citation could not say which it
-        # means. Its position in the source tells them apart, the same in
-        # every task that retrieves it.
-        m = re.search(r"_chunk_(\d+)$", str(r.get("chunk_id") or ""))
-        locator = f"part {int(m.group(1)) + 1}" if m else None
+        # means. Where it sits tells them apart, the same in every task that
+        # retrieves it: its section and part of it, or its position.
+        locator = _chunk_locator(meta, source_name, r.get("chunk_id"))
     label = f"{source_name} · {locator}" if locator else source_name
     if kb_title:
         label = f"{kb_title} — {label}"
@@ -1031,9 +1054,9 @@ def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
         if isinstance(s, dict) and s.get("label") and _norm_citation(str(s["label"])) == n:
             return i
     page = re.search(r"\bp\. (\d+)", n)
-    # "part 12" or "§ 200.405" ends a pageless source line; only the passage
-    # that is that part or that section answers to it.
-    tail = re.search(r"(?:\bpart \d+|§ ?" + _NORM_SECTION + r")\s*$", n)
+    # "part 12", "§ 200.405" or "§ 200.405 · part 2" ends a pageless source
+    # line; only the passage that is that part or that section answers to it.
+    tail = _locator(n)
     title_only = _strip_locator(n)
     for i, s in enumerate(sources):
         if not isinstance(s, dict):
@@ -1047,7 +1070,7 @@ def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
                 continue
         elif page:
             continue
-        if tail and not _norm_citation(str(s.get("label") or "")).endswith(re.sub(r"§\s*", "§ ", tail.group(0).strip())):
+        if tail and _locator(_norm_citation(str(s.get("label") or ""))) != tail:
             continue
         return i
     return None
@@ -1055,13 +1078,21 @@ def match_source_index(citation: str, sources: list[dict]) -> Optional[int]:
 
 # A section number as _norm_citation leaves it ("31.205-6" → "31.205 - 6").
 _NORM_SECTION = r"\d{1,4}\.\d{1,4}(?: - \d{1,3})?[a-z]?"
+# Where a pageless passage sits, at the end of a normalized source line: its
+# section ("§ 200.405", "appendix iii"), part of a section ("§ 200.405 ·
+# part 2"), or position in the source ("part 12").
+_LOCATOR = r"(?:(?:§ ?" + _NORM_SECTION + r"|(?<=· )appendix [ivxlc]+)(?: · part \d+)?|\bpart \d+)"
+_LOCATOR_RE = re.compile(_LOCATOR + r"\s*$")
+
+
+def _locator(normalized: str) -> Optional[str]:
+    m = _LOCATOR_RE.search(normalized)
+    return re.sub(r"§\s*", "§ ", m.group(0).strip()) if m else None
 
 
 def _strip_locator(normalized: str) -> str:
     """A normalized source line without its trailing page, part or section."""
-    return re.sub(
-        r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|part \d+|§ ?" + _NORM_SECTION + r")\s*$", "", normalized,
-    ).strip()
+    return re.sub(r"\s*·?\s*(?:p\. \d+(\s*-\s*\d+)?|" + _LOCATOR + r")\s*$", "", normalized).strip()
 
 
 _CITATION_RE = re.compile(r"\[([^\[\]\n]{3,300})\]")

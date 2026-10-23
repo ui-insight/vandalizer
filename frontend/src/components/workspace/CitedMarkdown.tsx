@@ -14,7 +14,8 @@ import { applySourcingSpans, stripMarks, withSentinels } from './sourcingSpans'
  * tag for the passage's source line, e.g. `[OMB Uniform Guidance — Subpart F
  * · p. 12]`, and the run keeps every passage it retrieved (`retrieved_sources`,
  * each with that `label` and its `content`). A source without pages is told
- * apart by its position, `· part 12`. Here each bracketed citation that matches a retrieved passage
+ * apart by the part of a section a passage is, `· § 200.307 · part 2`, or by
+ * its position, `· part 12`. Here each bracketed citation that matches a retrieved passage
  * becomes a chip beside the claim; clicking it opens a popover with the
  * passage text, so a reader can check the claim against what it rests on.
  * A section the task's query named is retrieved whole and cited as such,
@@ -55,6 +56,16 @@ export function normalizeCitation(text: string): string {
 
 // A section number as normalizeCitation leaves it ("31.205-6" → "31.205 - 6").
 const NORM_SECTION = '\\d{1,4}\\.\\d{1,4}(?: - \\d{1,3})?[a-z]?'
+// Where a pageless passage sits, at the end of a normalized source line: its
+// section ("§ 200.405", "appendix iii"), part of a section ("§ 200.405 ·
+// part 2"), or position in the source ("part 12").
+const LOCATOR = `(?:(?:§ ?${NORM_SECTION}|(?<=· )appendix [ivxlc]+)(?: · part \\d+)?|\\bpart \\d+)`
+const LOCATOR_RE = new RegExp(`${LOCATOR}\\s*$`)
+const TRAILING_LOCATOR_RE = new RegExp(`\\s*·?\\s*(?:p\\. \\d+(\\s*-\\s*\\d+)?|${LOCATOR})\\s*$`)
+
+function locatorOf(normalized: string): string | null {
+  return LOCATOR_RE.exec(normalized)?.[0].trim().replace(/^§\s*/, '§ ') ?? null
+}
 
 function citedPage(normalized: string): number | null {
   const m = /p\. (\d+)/.exec(normalized)
@@ -76,11 +87,11 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
     if (normalizeCitation(citationLabel(sources[i])) === t) return i
   }
   // 2. The document named (title contained either way) and, when the citation
-  //    names a page — or its "part N", or the section it is ("§ 200.405") —
-  //    the passage that is there.
+  //    names a page — or its "part N", the section it is ("§ 200.405"), or
+  //    the part of a section ("§ 200.405 · part 2") — the passage that is there.
   const page = citedPage(t)
-  const tail = new RegExp(`(?:\\bpart \\d+|§ ?${NORM_SECTION})\\s*$`).exec(t)?.[0].trim().replace(/^§\s*/, '§ ') ?? null
-  const titleOnly = t.replace(new RegExp(`\\s*·?\\s*(?:p\\. \\d+(\\s*-\\s*\\d+)?|part \\d+|§ ?${NORM_SECTION})\\s*$`), '').trim()
+  const tail = locatorOf(t)
+  const titleOnly = t.replace(TRAILING_LOCATOR_RE, '').trim()
   let candidates: number[] = []
   for (let i = 0; i < sources.length; i++) {
     const title = normalizeCitation(sources[i].document_title || '')
@@ -92,7 +103,7 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
   }
   if (page != null) candidates = candidates.filter(i => coversPage(sources[i], page))
   if (tail != null) {
-    candidates = candidates.filter(i => normalizeCitation(citationLabel(sources[i])).endsWith(tail))
+    candidates = candidates.filter(i => locatorOf(normalizeCitation(citationLabel(sources[i]))) === tail)
   }
   if (candidates.length === 0) return null
   // Several tasks can retrieve the same passage; any of them is the same text.
@@ -142,10 +153,12 @@ const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'BUTTON', 'SCRIPT', 'STYLE'])
 
 /** Where in its source a passage sits: the section it is ("§ 200.405", for a
  *  passage retrieved as a whole section), its page(s) or sheet, or — for a
- *  source without pages (a web page, an eCFR subpart) — its "part N". */
+ *  source without pages (a web page, an eCFR subpart) — the part of a
+ *  section it is ("§ 200.405 · part 2", "Appendix III · part 4") or its
+ *  "part N". */
 export function citationLocator(c: WorkflowCitation): string | null {
   const page = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
-  const section = /·\s*(§\s*\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?)\s*$/.exec(c.label || '')?.[1] ?? null
+  const section = /·\s*((?:§\s*\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?|Appendix [IVXLC]+)(?:\s*·\s*part \d+)?)\s*$/.exec(c.label || '')?.[1] ?? null
   if (section) return page ? `${section} · ${page}` : section
   if (page) return page
   return /·\s*(part \d+)\s*$/.exec(c.label || '')?.[1] ?? null
