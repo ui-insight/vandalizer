@@ -81,6 +81,14 @@
           "category": "content",
           "description": "Every favourable conclusion (exempt, expedited, minimal risk, complete) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
+      ],
+      "validation_inputs": [
+        {
+          "id": "0e3fab53-c38f-5697-9855-ddf1d535773e",
+          "type": "text",
+          "label": "Fictional protocol. Answer key: the requested Exempt Category 2 does NOT apply. All 120 participants are minors aged 15–17, so the research is subject to subpart D. Under 45 CFR 46.104(b)(3), exemption (d)(2) can be used with children only for educational tests or for observing public behavior without the investigator taking part, and (d)(2)(iii) never applies, yet this study uses interviews and surveys and records names. It needs expedited or full-board review. Parental permission and child assent (45 CFR 46.408) are not described, so consent Needs Revision. The data security plan is \"To be determined\", so it is Incomplete. Do not call the study exempt or minimal-risk on the protocol's say-so.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL PROTOCOL\nHuman Subjects Protocol — Example University IRB\nProtocol title: Teen Social Media Use and Sleep Quality\nPrincipal Investigator: Casey Example, Department of Psychology\nFunding source: Example Foundation\nReview type requested: Exempt, Category 2 (survey and interview procedures)\nStudy duration: 12 months, beginning September 1, 2027\n\nStudy population: 120 high school students aged 15–17 at two public high schools in Idaho. All participants are minors under Idaho law.\nInclusion criteria: enrolled in grades 10–12; owns a smartphone.\nExclusion criteria: diagnosed sleep disorder.\n\nRecruitment: announcements in homeroom classes and flyers posted in school hallways.\n\nProcedures: participants complete a 20-minute online survey about social media habits and sleep, and a 30-minute recorded interview with a member of the research team. Participants' names are recorded with their responses so that a follow-up survey can be matched six months later.\n\nInformed consent: students will read and sign a consent form before the survey.\n\nRisks: minimal; some questions about mood may cause mild discomfort.\n\nData security plan: To be determined.\n\nDeception: none."
+        }
       ]
     }
   ]
