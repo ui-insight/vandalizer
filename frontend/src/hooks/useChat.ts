@@ -273,6 +273,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
                 tool_call_id: chunk.tool_call_id!,
                 content: chunk.content,
                 quality: chunk.quality || null,
+                ...(chunk.sources?.length ? { sources: chunk.sources } : {}),
               }
               // Dispatch before rendering: React may batch the call, result and
               // end-of-stream into one mount. Transcript replay never enters here.

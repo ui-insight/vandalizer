@@ -20,7 +20,8 @@ import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
 import { announceWorkflowEdited } from '../../lib/workflowEdits'
-import type { WorkflowStatus } from '../../types/workflow'
+import type { WorkflowCitation, WorkflowStatus } from '../../types/workflow'
+import { CitedHtml } from '../workspace/CitedMarkdown'
 
 // ---------------------------------------------------------------------------
 // Tool metadata
@@ -1061,7 +1062,12 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
 }
 
 /** Render completed workflow output as structured content. */
-function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
+function WorkflowOutput({ content, sources = [] }: {
+  content: Record<string, unknown>
+  /** The passages the output cites, so its "[KB — source · § 200.308]"
+   *  citations show as chips with the passage, as in the run view. */
+  sources?: WorkflowCitation[]
+}) {
   const status = content.status as string | undefined
   if (status !== 'completed') return null
 
@@ -1077,7 +1083,9 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
     if (output.trim().length === 0) return null
     return (
       <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)' }}>
-        <div
+        <CitedHtml
+          html={renderMarkdown(output)}
+          sources={sources}
           className="chat-markdown select-text"
           style={{
             fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
@@ -1085,7 +1093,6 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
             maxHeight: 480, overflow: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-12)",
             background: '#fafafa', borderRadius: 'var(--workspace-radius-small)', border: '1px solid #f3f4f6',
           }}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(output) }}
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--workspace-space-2)' }}>
           <CopyButton text={copyText} label="Copy workflow output" />
@@ -1161,7 +1168,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
       {(fetchFailed || effective === 'paused') && <button type="button" className="chat-action-btn" disabled={checking} onClick={() => { setChecking(true); setAttempt(value => value + 1) }}>{checking ? 'Checking workflow status…' : 'Check workflow status'}</button>}
       {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
       {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
-      {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
+      {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} sources={status?.retrieved_sources} />}
       {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
     </section>
   )
@@ -1482,7 +1489,7 @@ export function ToolStatusLine({
         <KBPassages content={result.content} actions={kbActions} />
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
-        <WorkflowOutput content={obj} />
+        <WorkflowOutput content={obj} sources={result.sources} />
       )}
       {result && name === 'run_workflow' && typeof obj?.session_id === 'string' && (
         <WorkflowProgress key={obj.session_id} sessionId={obj.session_id as string} initialStatus={obj?.status as string | undefined} workflowId={typeof args.workflow_id === 'string' ? args.workflow_id : undefined} />

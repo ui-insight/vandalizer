@@ -2530,10 +2530,8 @@ async def chat_stream(
                                 # Tools embed a "quality" key in their return dict;
                                 # we strip it here so it goes to the frontend but
                                 # NOT back into the LLM context.
-                                quality = None
                                 result_content = event.result.content
-                                if isinstance(result_content, dict) and "quality" in result_content:
-                                    quality = result_content.pop("quality")
+                                quality, cited_sources = _pop_ui_sidecars(result_content)
                                 # Also check the deps annotations dict (future-proof)
                                 if quality is None and deps and event.tool_call_id in deps.quality_annotations:
                                     quality = deps.quality_annotations.pop(event.tool_call_id)
@@ -2545,6 +2543,8 @@ async def chat_stream(
                                     "content": result_content,
                                     "quality": quality,
                                 }
+                                if cited_sources:
+                                    result_data["sources"] = cited_sources
                                 streamed_tool_results.append(result_data)
                                 streamed_segments.append({"kind": "tool_result", "result": result_data})
                                 yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
@@ -3992,6 +3992,16 @@ async def _render_kb_segment(
 # The optional "[S3] " prefix is the snippet number a numbered rendering puts
 # before "Source:" (#993); without it every heading would go unmatched and
 # every citation would read as naming a source that was never retrieved.
+def _pop_ui_sidecars(result_content) -> tuple[Optional[dict], Optional[list]]:
+    """The keys a tool's result carries for the UI alone — ``quality`` and a
+    workflow output's ``cited_sources`` — popped off it in place. The result
+    is the same object the next model request sends, so the model never reads
+    them (the passages a workflow cites can run to 60,000 characters)."""
+    if not isinstance(result_content, dict):
+        return None, None
+    return result_content.pop("quality", None), result_content.pop("cited_sources", None)
+
+
 _KB_SOURCE_HEADING_RE = re.compile(
     r"^\*\*(?:\[S\d+\]\s*)?Source: (.+?)\*\*$", re.MULTILINE,
 )

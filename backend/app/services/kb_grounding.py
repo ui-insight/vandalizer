@@ -1118,8 +1118,9 @@ _PAGE_WORD_RE = re.compile(r"\bpage\s+\d")
 
 
 def _norm_citation(text: str) -> str:
-    """Loose form of a citation for comparison; mirrors the run UI's matcher."""
-    t = (text or "").lower()
+    """Loose form of a citation for comparison; mirrors the run UI's matcher.
+    Chat's "Source: " prefix is not part of the label."""
+    t = re.sub(r"^\s*source\s*:\s*", "", text or "", flags=re.IGNORECASE).lower()
     t = re.sub(r"[‐‑‒–—―]", "-", t)
     t = re.sub(r"\s*--+\s*", " - ", t)
     t = re.sub(r"[·•|,]", "·", t)

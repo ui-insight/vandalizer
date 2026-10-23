@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ToolStatusLine, listErrorEntry, toolResultToText } from './ToolCallDisplay'
+import type { Citation } from '../../types/chat'
 
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({}) }))
 vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn(), CertCheckCard: () => null }))
@@ -11,6 +12,34 @@ vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPan
 // passage", and the failure showed as a success (#997).
 const call = { tool_name: 'search_knowledge_base', tool_call_id: 'kb-1', args: { query: 'equipment threshold' } }
 const searched = (content: unknown) => ({ tool_name: 'search_knowledge_base', tool_call_id: 'kb-1', content, quality: null })
+
+describe('a workflow output shown in chat', () => {
+  const LABEL = 'OMB Uniform Guidance — Subpart D · § 200.308 · part 2'
+  const wfCall = { tool_name: 'get_workflow_status', tool_call_id: 'wf-1', args: { session_id: 's-1' } }
+  const finished = (sources?: Citation[]) => ({
+    tool_name: 'get_workflow_status', tool_call_id: 'wf-1', quality: null,
+    content: { status: 'completed', output: `Rebudgeting participant support costs needs prior approval [${LABEL}].` },
+    ...(sources ? { sources } : {}),
+  })
+  const passage: Citation = {
+    document_title: 'Subpart D', kb_title: 'OMB Uniform Guidance', label: LABEL, chunk_id: 'ug-d_chunk_41',
+    content: '(5) The transfer of funds budgeted for participant support costs to other budget categories.',
+  }
+
+  it('shows the passages the output cites as chips that open them', () => {
+    const { container } = render(<ToolStatusLine call={wfCall} result={finished([passage])} />)
+    const chip = container.querySelector('.chat-markdown .kb-cite') as HTMLElement
+    expect(chip).toHaveAttribute('aria-label', `Citation: ${LABEL}`)
+    fireEvent.click(chip)
+    expect(screen.getByRole('dialog')).toHaveTextContent('participant support costs to other budget categories')
+  })
+
+  it('leaves the citation as written when the run sent no passages', () => {
+    const { container } = render(<ToolStatusLine call={wfCall} result={finished()} />)
+    expect(container.querySelector('.kb-cite')).toBeNull()
+    expect(container.querySelector('.chat-markdown')).toHaveTextContent(`[${LABEL}]`)
+  })
+})
 
 describe('knowledge base search results', () => {
   it.each([

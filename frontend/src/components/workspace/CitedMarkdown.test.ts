@@ -37,6 +37,27 @@ describe('citationLabel / normalizeCitation', () => {
   })
 })
 
+describe('chat\'s "Source:" citations', () => {
+  const short = (title: string, label: string): WorkflowCitation => ({ document_title: title, label, chunk_id: label })
+
+  it('drops the prefix when normalizing', () => {
+    expect(normalizeCitation('Source: UG · part 3')).toBe('ug · part 3')
+    expect(normalizeCitation('source:Subpart E · § 200.423')).toBe(normalizeCitation('Subpart E · § 200.423'))
+  })
+
+  it('matches a label whose title is too short for the title fallback', () => {
+    const sources = [short('UG', 'UG · part 2'), short('UG', 'UG · part 3'), short('FAR', 'FAR · § 31.205-6')]
+    expect(matchCitation('Source: UG · part 3', sources)).toBe(1)
+    expect(matchCitation('Source: FAR · § 31.205-6', sources)).toBe(2)
+  })
+
+  it('chips every passage of a "[Source: a; b]" bracket', () => {
+    const sources = [short('UG', 'UG · part 2'), short('UG', 'UG · part 3')]
+    const html = injectCitationChips('<p>Both [Source: UG · part 2; UG · part 3].</p>', sources)
+    expect(html.match(/class="kb-cite"/g)).toHaveLength(2)
+  })
+})
+
 describe('matchCitation', () => {
   it('matches the label exactly as the model was shown it', () => {
     expect(matchCitation(UG.label!, SOURCES)).toBe(0)

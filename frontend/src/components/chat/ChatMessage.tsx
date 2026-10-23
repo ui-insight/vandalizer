@@ -10,6 +10,8 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, toolResultToText } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
+import { CitedHtml } from '../workspace/CitedMarkdown'
+import type { WorkflowCitation } from '../../types/workflow'
 import { routeActionClick } from './actionRoute'
 import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 import type { ReactNode } from 'react'
@@ -180,6 +182,14 @@ export function ChatMessage({
 
   // Determine which segments to use: streaming > persisted > none
   const segments = streamSegments || message.segments || null
+
+  // What an answer's bracketed citations can point at: the passages this turn
+  // retrieved, each with its source line and text. A citation that matches
+  // none of them stays as written.
+  const chipSources = useMemo(
+    () => (message.citations ?? []) as WorkflowCitation[],
+    [message.citations],
+  )
 
   // For non-segment fallback: full rendered HTML
   const renderedHtml = useMemo(() => {
@@ -492,13 +502,13 @@ export function ChatMessage({
                 if (seg.kind === 'text') {
                   const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
                   if (!cleaned.trim()) return null
-                  const html = renderMarkdown(cleaned)
                   return (
-                    <div
+                    <CitedHtml
                       key={i}
+                      html={renderMarkdown(cleaned)}
+                      sources={chipSources}
                       className="select-text chat-markdown"
                       style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
-                      dangerouslySetInnerHTML={{ __html: html }}
                     />
                   )
                 }
@@ -543,13 +553,14 @@ export function ChatMessage({
             /* Fallback: no segments (e.g. history loaded from backend) */
             <>
               {message.content && (
-                <div
-                  ref={contentRef}
-                  onClick={handleActionClick}
-                  className="select-text chat-markdown"
-                  style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
-                  dangerouslySetInnerHTML={{ __html: renderedHtml! }}
-                />
+                <div ref={contentRef} onClick={handleActionClick}>
+                  <CitedHtml
+                    html={renderedHtml!}
+                    sources={chipSources}
+                    className="select-text chat-markdown"
+                    style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
+                  />
+                </div>
               )}
 
               {(() => {

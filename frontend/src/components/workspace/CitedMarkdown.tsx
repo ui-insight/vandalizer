@@ -36,9 +36,12 @@ export function citationLabel(c: WorkflowCitation): string {
 }
 
 /** Normalize a citation string so small variations in how the model copies
- *  a label (dash style, "p." vs "page", spacing, a dropped tilde) still match. */
+ *  a label (dash style, "p." vs "page", spacing, a dropped tilde) still match.
+ *  Chat writes a citation as "[Source: <label>]"; the prefix is not part of
+ *  the label. */
 export function normalizeCitation(text: string): string {
   return text
+    .replace(/^\s*source\s*:\s*/i, '')
     .toLowerCase()
     .replace(/[‒–—―]/g, '-')
     .replace(/\s*--+\s*/g, ' - ')
@@ -335,6 +338,20 @@ export function renderCitedText(
   const holder = document.createElement('div')
   holder.textContent = sourcing ? withSentinels(text, sourcing.rows) : text
   return withChips(holder.innerHTML, sources, sourcing)
+}
+
+/** HTML another renderer already sanitized — a chat answer, a workflow output
+ *  shown in chat — with its citations as chips, sanitized again after the
+ *  round trip (chat's action and document buttons kept). Unchanged on error. */
+export function withCitationChips(html: string, sources: WorkflowCitation[]): string {
+  if (!sources.length) return html
+  try {
+    return DOMPurify.sanitize(injectCitationChips(html, sources), {
+      ADD_TAGS: ['button'], ADD_ATTR: ['data-action', 'data-doc-uuid'],
+    })
+  } catch {
+    return html
+  }
 }
 
 function withChips(
@@ -692,6 +709,41 @@ export function CitedMarkdown({ markdown, sources, format = 'markdown', classNam
     <>
       <style>{CITATION_CHIP_CSS}</style>
       <div className={classes} style={style} onClick={onClick} onKeyDown={onKeyDown} dangerouslySetInnerHTML={{ __html: html }} />
+      {popover}
+    </>
+  )
+}
+
+/**
+ * Already-sanitized HTML — a chat answer, a workflow output shown in chat —
+ * with its bracketed citations ("[Source: Subpart D · § 200.308 · part 2]",
+ * "[OMB Uniform Guidance — Subpart D · § 200.308]") as the same chips a
+ * workflow run shows, and the passage popover. A click anywhere else bubbles
+ * on to the caller's own handler (chat's action and document buttons).
+ */
+export function CitedHtml({ html, sources, className, style }: {
+  html: string
+  sources: WorkflowCitation[]
+  className?: string
+  style?: CSSProperties
+}) {
+  const chipped = useMemo(() => withCitationChips(html, sources), [html, sources])
+  const { openAt, popover } = useCitationPopover(sources)
+
+  const onClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const chip = (e.target as Element | null)?.closest?.('.kb-cite') as HTMLElement | null
+    if (!chip) return
+    const idx = parseInt(chip.getAttribute('data-cite') || '', 10)
+    if (!Number.isFinite(idx) || !sources[idx]) return
+    e.preventDefault()
+    e.stopPropagation()
+    openAt(idx, chip)
+  }
+
+  return (
+    <>
+      {sources.length > 0 && <style>{CITATION_CHIP_CSS}</style>}
+      <div className={className} style={style} onClick={onClick} dangerouslySetInnerHTML={{ __html: chipped }} />
       {popover}
     </>
   )

@@ -48,7 +48,9 @@ describe('ChatMessage used vs searched sources', () => {
     )} />)
 
     expect(screen.getByText('Sources:')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /PAPPG\.pdf · p\. 139/ })).toBeInTheDocument()
+    // The citation is a chip beside the claim, and the Sources row lists it.
+    expect(screen.getByRole('button', { name: /^Citation: PAPPG\.pdf · p\. 139/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /PAPPG\.pdf · p\. 139/ })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: /PAPPG\.pdf · p\. 212/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Searched but not used \(2\)/ })).toBeInTheDocument()
   })

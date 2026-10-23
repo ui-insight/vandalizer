@@ -2906,6 +2906,29 @@ async def _execute_workflow(
     }
 
 
+CITED_PASSAGES_LIMIT = 12
+
+
+def _cited_passages(output: str, sources: list[dict]) -> list[dict]:
+    """The passages a workflow output cites by their source line
+    ("[OMB Uniform Guidance — Subpart D · § 200.308 · part 2]"), from the
+    run's retrieved sources, in order of first citation."""
+    from app.services import kb_grounding
+
+    picked: list[dict] = []
+    seen: set[int] = set()
+    for m in kb_grounding._CITATION_RE.finditer(output):
+        for part in m.group(1).split(";"):
+            i = kb_grounding.match_source_index(part, sources)
+            if i is None or i in seen:
+                continue
+            seen.add(i)
+            picked.append(sources[i])
+            if len(picked) >= CITED_PASSAGES_LIMIT:
+                return picked
+    return picked
+
+
 async def _workflow_quality_sidecar(workflow_id: str, user) -> Optional[dict]:
     """Quality sidecar for a completed workflow run, from the workflow's own
     latest ValidationRun — QUALITY_SIGNALS_EXPLAINED.md promises signals on
@@ -3048,6 +3071,12 @@ async def get_workflow_status(
             if isinstance(output, str) and len(output) > 5000:
                 output = output[:5000] + "\n\n[Output truncated...]"
             result["output"] = output
+            cited = _cited_passages(output, status.get("retrieved_sources") or []) if isinstance(output, str) else []
+            if cited:
+                # For the chat UI's citation chips, not for the model: the
+                # streaming layer moves this key off the result before the
+                # model reads it, as it does "quality".
+                result["cited_sources"] = cited
         else:
             result["output"] = final
     elif is_failed_status(status["status"]):

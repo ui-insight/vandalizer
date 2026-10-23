@@ -71,6 +71,9 @@ export interface ToolResultInfo {
   tool_call_id: string
   content: unknown
   quality: QualityMeta | null
+  /** The passages a workflow output shown in chat cites (get_workflow_status),
+   *  for its citation chips; kept out of the model's context. */
+  sources?: Citation[]
 }
 
 export interface FileAttachment {

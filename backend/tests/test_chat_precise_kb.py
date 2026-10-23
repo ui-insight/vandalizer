@@ -147,3 +147,12 @@ async def test_the_agent_search_returns_labels_to_cite(precise_on, monkeypatch):
     assert [c["cite_label"] for c in citations] == [e["label"] for e in out]
     assert citations[0]["content"].startswith("§ 200.308")
 
+
+def test_ui_sidecars_leave_the_result_the_model_reads():
+    content = {"status": "completed", "output": "x", "quality": {"score": 90}, "cited_sources": [{"label": "L"}]}
+    same = content
+    quality, cited = chat_service._pop_ui_sidecars(content)
+    assert quality == {"score": 90} and cited == [{"label": "L"}]
+    # Popped in place: the next model request sends this very object.
+    assert same is content and content == {"status": "completed", "output": "x"}
+    assert chat_service._pop_ui_sidecars(["not", "a", "dict"]) == (None, None)
