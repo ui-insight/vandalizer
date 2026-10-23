@@ -560,14 +560,20 @@ def _named_otherwise(label_words: set[str], passage: str) -> bool:
 # ---------------------------------------------------------------------------
 
 # "Need not" and "not required" first: they say a thing is optional.
-_NOT_REQUIRED_RE = re.compile(r"\bnot\s+(?:be\s+)?(?:required|mandatory|necessary)\b|\bneed\s+not\b", re.I)
+_NOT_REQUIRED_RE = re.compile(
+    r"\bnot\s+(?:be\s+)?(?:required|mandatory|necessary)\b|\bneed\s+not\b|\bno\s+requirements?\b", re.I,
+)
 _FORBIDDEN_RE = re.compile(
     r"\b(?:must|shall|may|can|will|should)\s+not\b|\bcannot\b|\bcan[’']t\b|\bprohibit(?:s|ed|ing)?\b"
     r"|\bnot\s+(?:be\s+)?(?:permitted|allowed|authorized)\b",
     re.I,
 )
-# Not "obligated": funds are obligated, which is not a duty.
-_REQUIRED_RE = re.compile(r"\b(?:must|shall|required|requires?|mandatory)\b", re.I)
+# Not "obligated": funds are obligated, which is not a duty. A duty is also
+# stated as a noun: "Requirement to complete DOI … Security Awareness
+# training".
+_REQUIRED_RE = re.compile(
+    r"\b(?:must|shall|required|requires?|mandatory)\b|\brequirements?\s+(?:to|that)\b", re.I,
+)
 # "May" before a day or after a preposition is the month.
 _PERMITTED_RE = re.compile(
     r"(?<!\bin )(?<!\bof )(?<!\bby )(?<!\bon )(?<!\bto )\bmay\b(?!\s*\d)|\bcan\b|\boptional(?:ly)?\b|\b(?:is|are) free to\b",
@@ -605,6 +611,7 @@ _CONDITION_RE = re.compile(
     r"|\bwhen\b(?!\s+(?:applicable|appropriate|possible|practicable|necessary|available|requested))"
     r"|\b(?:above|below|over|under|exceed(?:s|ing)?|in excess of|less than|more than|greater than)\s+"
     r"(?:the\s+)?(?:\$|micro-?purchase|simplified acquisition|threshold)"
+    r"|[<>≤≥]\s*\$?\d"
     r"|\bthreshold\b",
     re.I,
 )
@@ -622,7 +629,23 @@ _IF_CLAUSE_RE = re.compile(
     r"|allowed|permitted)\b)",
     re.I,
 )
-_CLAUSE_END_RE = re.compile(r"[,;:.()\n]|\s[-–—]\s")
+# Not the comma or point inside a figure: "a budget exceeding $600,000".
+_CLAUSE_END_RE = re.compile(r"[,.](?!\d)|(?<!\d)[,.]|[;:()\n]|\s[-–—]\s")
+# A precondition is a case too — "Before the recipient … are granted access
+# to the BLM Federal computer system, they must first … complete …" — but
+# only a clause with a verb: "before December 31" is a date.
+_BEFORE_RE = re.compile(r"\b(?:before|prior\s+to)\b", re.I)
+_VERB_RE = re.compile(
+    r"\b(?:is|are|was|were|be|been|being|has|have|had|can|could|will|would|shall|should|may|might|must"
+    r"|(?!(?:during|including|regarding|concerning|following|pending|according|excluding|nothing|something"
+    r"|anything|everything|thing|hundred|need|bed|red|shed)\b)[a-z]+(?:ing|ed))\b",
+    re.I,
+)
+# A line a PDF wrapped mid-sentence: "…granted access to the BLM Federal \ncomputer system".
+_WRAPPED_LINE_RE = re.compile(r"[ \t]*\n[ \t]*(?=[a-z])")
+# A word this common in the source does not name a case: on a BLM award
+# "Federal" and "system" are everywhere.
+CASE_COMMON_MIN = 10
 # Labels and headings a statement of a rule sits under: "prior approval
 # requirements", "special conditions", "unallowable costs".
 _RULE_CONTEXT_RE = re.compile(
@@ -634,31 +657,72 @@ NARROWING_MIN_WORDS = 2    # words an excerpt adds inside what a statement says 
 NARROWING_VOTES = 3        # confirmations asked of a link whose excerpt may say less; a majority decides
 
 
-def dropped_condition(st: Statement, text: str) -> str | None:
-    """A clause in ``text`` saying when what it states applies, none of
-    whose words the statement, its label or its headings have: the case
-    the statement leaves out. None when there is no such clause."""
+def _case_clause(text: str, start: int) -> str:
+    """The clause that opens at ``start``, read past commas until it has a
+    verb: "the recipient, or any of its employees or subrecipients, are
+    granted access to the BLM Federal computer system"."""
+    rest = text[start:start + 240]
+    end = 0
+    while True:
+        stop = _CLAUSE_END_RE.search(rest, end)
+        if stop is None:
+            return rest[:160].strip()
+        end = stop.start()
+        if rest[end] != "," or end > 160 or _VERB_RE.search(rest[:end]):
+            return rest[:end].strip()
+        end += 1
+
+
+def _cases(text: str):
+    """Each clause in ``text`` that says when what it states applies."""
+    text = _WRAPPED_LINE_RE.sub(" ", text or "")
+    found = [(m.end(), False) for m in _IF_CLAUSE_RE.finditer(text)]
+    found += [(m.end(), True) for m in _BEFORE_RE.finditer(text)]
+    for at, needs_verb in sorted(found):
+        clause = _case_clause(text, at)
+        if needs_verb and not _VERB_RE.search(clause):
+            continue
+        yield clause
+
+
+def dropped_condition(st: Statement, text: str, common: frozenset = frozenset()) -> str | None:
+    """A clause in ``text`` saying when what it states applies that the
+    statement, its label and its headings do not name: the case the
+    statement leaves out. None when there is no such clause. A word common
+    in the source (``common``) does not name a case: on a BLM award
+    "Federal" and "system" are everywhere."""
     have = stems(st.text) | stems(st.label) | stems(" ".join(st.context))
-    for m in _IF_CLAUSE_RE.finditer(text or ""):
-        rest = text[m.end():m.end() + 160]
-        stop = _CLAUSE_END_RE.search(rest)
-        clause = rest[:stop.start() if stop else len(rest)]
+    for clause in _cases(text):
         words = stems(clause) - _GENERIC_LABEL_WORDS
-        if words and not words & have:
-            return clause.strip()
+        if not words:
+            continue
+        if not (words & have) - common:
+            return clause
     return None
 
 
-def condition_dropped(st: Statement, text: str) -> bool:
+def condition_dropped(st: Statement, text: str, common: frozenset = frozenset()) -> bool:
     """Whether a statement says outright that something must (or must not)
     be done, sourced to text that says so only in some case it leaves out:
     "Mandatory BLM‑approved safety and training courses" from "required to
     complete a BLM-approved … safety and training program if using
     Government-furnished ATVs". Only the statement's own words count: under
     "required components", "Maximum 2 pages" is the plan's page limit, not
-    a claim that the plan is always required."""
+    a claim that the plan is always required. A statement with a case of
+    its own is left to the confirmation (``narrows``)."""
     required, forbidden, _ = obligation(st.text)
-    return (required or forbidden) and not _CONDITION_RE.search(st.text) and dropped_condition(st, text) is not None
+    if not (required or forbidden) or _CONDITION_RE.search(st.text) or next(_cases(st.text), None) is not None:
+        return False
+    return dropped_condition(st, text, common) is not None
+
+
+@functools.lru_cache(maxsize=16)
+def common_words(text: str) -> frozenset:
+    """Content words that occur at least ``CASE_COMMON_MIN`` times in ``text``."""
+    counts: dict[str, int] = {}
+    for s, _, _ in word_positions(text):
+        counts[s] = counts.get(s, 0) + 1
+    return frozenset(s for s, n in counts.items() if n >= CASE_COMMON_MIN)
 
 
 def _added_inside(st: Statement, quote: str) -> str | None:
@@ -1772,8 +1836,11 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     # a case elsewhere in its sentence may belong to another clause ("…will
     # not accept the proposal if a required section is missing"), so it is
     # left to the separate confirmation (``narrows``). Another passage may
-    # state the requirement without the case.
-    if condition_dropped(st, cited):
+    # state the requirement without the case. "Requirement to complete DOI
+    # Federal Information Systems Security Awareness training" shares only
+    # "Federal" and "system" with "Before the recipient … are granted access
+    # to the BLM Federal computer system": words a BLM award uses throughout.
+    if condition_dropped(st, cited, common_words(src.text)):
         return Verdict(None, "condition_dropped", where)
     if st_values and not _bound(st_values, shared, exact, values_in(exact)):
         return Verdict(None, "value_not_bound_to_label", where)

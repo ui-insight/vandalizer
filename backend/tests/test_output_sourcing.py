@@ -1414,6 +1414,62 @@ def test_what_counts_as_a_requirement_stated_without_its_case(statement, label, 
     assert condition_dropped(Statement(0, 0, statement, label=label), text) is dropped
 
 
+SECURITY_TRAINING = (
+    "C. \nFederal Information Systems Security Awareness Training.  Before the recipient,  \nor any of its "
+    "employees or subrecipients, are granted access to the BLM Federal  \ncomputer system, they must first "
+    "successfully complete the U.S. Department of  \nthe Interior's (DOI) Federal Information Systems Security "
+    "Awareness Online  \nCourse."
+)
+
+
+def test_a_requirement_is_not_sourced_to_a_precondition_it_leaves_out():
+    """Seen on the BLM award: "Requirement to complete DOI Federal
+    Information Systems Security Awareness training" was linked to the
+    training required before access to the BLM computer system. The case
+    shares "Federal" and "system" with the statement — words the award uses
+    throughout — and a duty stated as a noun is a duty."""
+    from app.services.output_sourcing import common_words, condition_dropped, dropped_condition
+    from app.services.output_statements import Statement
+
+    common = common_words(" ".join(["Federal system"] * 10))
+    st = Statement(0, 0, "Requirement to complete DOI Federal Information Systems Security Awareness training.")
+    assert condition_dropped(st, SECURITY_TRAINING, common)
+    assert "granted access to the BLM Federal computer system" in dropped_condition(st, SECURITY_TRAINING, common)
+    # Without knowing those words are everywhere, the shared words keep the case.
+    assert not condition_dropped(st, SECURITY_TRAINING)
+    kept = Statement(0, 0, "DOI security awareness training is required before access to BLM computer systems")
+    assert not condition_dropped(kept, SECURITY_TRAINING, common)
+
+
+@pytest.mark.parametrize("statement,text,dropped", [
+    # A threshold in the statement is its own case; "$600,000" is one figure.
+    ("Required for proposals > $600,000 with multiple PIs",
+     "If a proposal with a budget exceeding $600,000 and more than one investigator does not include a "
+     "Collaboration Plan, that proposal will be returned without review.", False),
+    # A date is not a case.
+    ("Annual reports must be submitted", "Annual reports must be submitted before December 31, 2025.", False),
+    ("Recipients must complete the training", "Before travelling abroad, recipients must complete the training.",
+     True),
+])
+def test_cases_with_figures_dates_and_preconditions(statement, text, dropped):
+    from app.services.output_sourcing import condition_dropped
+    from app.services.output_statements import Statement
+
+    assert condition_dropped(Statement(0, 0, statement), text) is dropped
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Requirement to complete DOI training", (True, False, False)),
+    ("Requirements that apply to subawards", (True, False, False)),
+    ("No requirement for cost sharing", (False, False, True)),
+    ("Program requirements", (False, False, False)),
+])
+def test_a_duty_stated_as_a_noun(text, expected):
+    from app.services.output_sourcing import obligation
+
+    assert obligation(text) == expected
+
+
 @pytest.mark.parametrize("text", [
     # "Even if" says the rule holds regardless.
     "a collaboration plan must be provided for all projects, even if all investigators are affiliated "
