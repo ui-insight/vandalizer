@@ -35,7 +35,10 @@ run. A statement is linked only when all of these hold:
    Date(s): …") and a list of the statement's own figures are not "other
    figures". An excerpt that only says a thing may or should be done, in
    itself or in its sentence, does not source a statement that it must
-   (nor "must" an "optional"; see ``obligation_differs``). A part of a
+   (nor "must" an "optional"; see ``obligation_differs``), and one that
+   requires it only in a case ("if using Government-furnished ATVs") does
+   not source a statement that it is required outright
+   (``condition_dropped``). A part of a
    submission named in the report's list of parts ("Data Management Plan")
    links only where the passage lists it, heads a section with it or asks
    for it (``presented_as_item``); a statement about one stage (the letter
@@ -55,7 +58,13 @@ run. A statement is linked only when all of these hold:
    said so; the university is the recipient, which no word count can see.
    And "Sponsor: National Science Foundation" was linked to the NSF's
    hearing-impaired relay service, because the text around it says the
-   NSF awards grants.
+   NSF awards grants;
+7. for a statement whose excerpt may say less than it does — a case in the
+   excerpt's sentence the statement leaves out, or for a statement of a
+   rule, words the excerpt adds inside what it says ("funds budgeted for
+   participant support costs" for "Transfer of funds between budget
+   categories") — separate calls confirm the excerpt states all of it, a
+   majority of three deciding (``narrows``).
 
 A Markdown statement is judged with the headings and list items above it
 (``Statement.context``), and a statement with no label of its own is
@@ -223,6 +232,16 @@ CONFIRM_INSTRUCTIONS = (
     "narrower, broader or conditional that the statement does not; needs a fact from outside the excerpt; "
     "is about a different item, person or program than the label and context name; or does not let you "
     "tell.\n\n"
+    "Narrower or conditional includes an excerpt that limits what it says to a kind of cost, item, party, "
+    "amount or case the statement leaves out: \"The transfer of funds budgeted for participant support "
+    "costs to other budget categories\" does not state \"Transfer of funds between budget categories\", "
+    "and \"required to complete a safety and training program if using Government-furnished ATVs\" does "
+    "not state \"Mandatory safety and training courses\". A statement that keeps the limit, in its own "
+    "words or its label, is stated. Leaving out what only explains or illustrates — an aside in "
+    "parentheses, an example, a reason, who may do it, a definition's wording — does not make the excerpt "
+    "narrower: \"funding for one or more project representatives (PI/co-PI/senior researcher) to attend the "
+    "PI meeting\" states \"travel funding for at least one representative to attend the PI meeting\". Only "
+    "a limit on what the rule covers does.\n\n"
     "Reply with JSON only: "
     '{"items": [{"id": 1, "stated": true}, {"id": 2, "stated": false}]}'
 )
@@ -589,6 +608,99 @@ _CONDITION_RE = re.compile(
     r"|\bthreshold\b",
     re.I,
 )
+
+
+# A clause that says when what a sentence states applies: "if using
+# Government-furnished ATVs", "provided that …", "only when …". Not "even
+# if" (the rule holds regardless), not "unless" (the exception is usually
+# the rule itself: "no funds may be obligated unless all iron … is produced
+# in the United States"), and not one that only hedges ("if applicable",
+# "when allowed").
+_IF_CLAUSE_RE = re.compile(
+    r"(?<!\beven )\b(?:only\s+)?(?:if|whenever|when|provided\s+that|in\s+(?:the\s+)?cases?\s+(?:of|where))\b"
+    r"(?!\s+(?:applicable|appropriate|possible|practicable|necessary|needed|available|any|requested|required"
+    r"|allowed|permitted)\b)",
+    re.I,
+)
+_CLAUSE_END_RE = re.compile(r"[,;:.()\n]|\s[-–—]\s")
+# Labels and headings a statement of a rule sits under: "prior approval
+# requirements", "special conditions", "unallowable costs".
+_RULE_CONTEXT_RE = re.compile(
+    r"\b(?:requir|condition|approv|restrict|allow|unallow|prohibit|rules?\b|regulat|polic|complian|obligat"
+    r"|mandat|eligib|terms?\b|limit)",
+    re.I,
+)
+NARROWING_MIN_WORDS = 2    # words an excerpt adds inside what a statement says that make it narrower
+NARROWING_VOTES = 3        # confirmations asked of a link whose excerpt may say less; a majority decides
+
+
+def dropped_condition(st: Statement, text: str) -> str | None:
+    """A clause in ``text`` saying when what it states applies, none of
+    whose words the statement, its label or its headings have: the case
+    the statement leaves out. None when there is no such clause."""
+    have = stems(st.text) | stems(st.label) | stems(" ".join(st.context))
+    for m in _IF_CLAUSE_RE.finditer(text or ""):
+        rest = text[m.end():m.end() + 160]
+        stop = _CLAUSE_END_RE.search(rest)
+        clause = rest[:stop.start() if stop else len(rest)]
+        words = stems(clause) - _GENERIC_LABEL_WORDS
+        if words and not words & have:
+            return clause.strip()
+    return None
+
+
+def condition_dropped(st: Statement, text: str) -> bool:
+    """Whether a statement says outright that something must (or must not)
+    be done, sourced to text that says so only in some case it leaves out:
+    "Mandatory BLM‑approved safety and training courses" from "required to
+    complete a BLM-approved … safety and training program if using
+    Government-furnished ATVs". Only the statement's own words count: under
+    "required components", "Maximum 2 pages" is the plan's page limit, not
+    a claim that the plan is always required."""
+    required, forbidden, _ = obligation(st.text)
+    return (required or forbidden) and not _CONDITION_RE.search(st.text) and dropped_condition(st, text) is not None
+
+
+def _added_inside(st: Statement, quote: str) -> str | None:
+    """The longest run of words the excerpt has, between the first and the
+    last word it shares with the statement, that the statement (and its
+    label and headings) does not: "participant support costs" in "The
+    transfer of funds budgeted for participant support costs to other budget
+    categories" for "Transfer of funds between budget categories". Only the
+    statement's own words bound the stretch read: "2 CFR 200.403(b)" under
+    "regulation anchor" says nothing an excerpt could narrow."""
+    own = stems(st.text)
+    have = own | stems(st.label) | stems(" ".join(st.context))
+    pos = word_positions(quote)
+    shared = [i for i, (s, _, _) in enumerate(pos) if s in own]
+    if len(shared) < 2:
+        return None
+    best: list = []
+    run: list = []
+    for s, a, b in pos[shared[0]:shared[-1] + 1] + [("", 0, 0)]:
+        if s in have or not s:
+            best, run = (run if len(run) > len(best) else best), []
+        else:
+            run.append((a, b))
+    return quote[best[0][0]:best[-1][1]] if len(best) >= NARROWING_MIN_WORDS else None
+
+
+def narrows(st: Statement, link: dict | None) -> bool:
+    """Whether an excerpt may say less than its statement, in a way no word
+    count can settle: it attaches a case the statement leaves out, or — for
+    a statement of a rule, by its own words or the label and headings it sits
+    under — adds words inside what the statement says ("funds budgeted for
+    participant support costs" for "funds"). Then a separate call must
+    confirm the excerpt states all of it."""
+    if not link:
+        return False
+    quote = link.get("judge_quote") or link.get("quote") or ""
+    excerpt, qs, qe = link.get("excerpt") or "", link.get("quote_start"), link.get("quote_end")
+    sentence = sentence_around(excerpt, qs, qe) if isinstance(qs, int) and isinstance(qe, int) else ""
+    if dropped_condition(st, quote) or dropped_condition(st, sentence):
+        return True
+    rule = any(obligation(st.text)) or bool(_RULE_CONTEXT_RE.search(" ".join([st.label or "", *st.context])))
+    return rule and _added_inside(st, quote) is not None
 
 
 def is_action(st: Statement) -> bool:
@@ -1653,6 +1765,16 @@ def verify(st: Statement, corpus: Corpus, wi: int, quote: str) -> Verdict:
     # judge quotes the main clause, so the whole sentence is read.
     if is_action(st) and not _CONDITION_RE.search(st.text) and _CONDITION_RE.search(sentence):
         return Verdict(None, "rule_applies_only_if", where)
+    # Likewise a requirement the statement states outright: "Mandatory
+    # BLM‑approved safety and training courses" was linked to "Recipient
+    # staff will be required to complete a BLM-approved … safety and training
+    # program if using Government-furnished ATVs". Only the excerpt is read:
+    # a case elsewhere in its sentence may belong to another clause ("…will
+    # not accept the proposal if a required section is missing"), so it is
+    # left to the separate confirmation (``narrows``). Another passage may
+    # state the requirement without the case.
+    if condition_dropped(st, cited):
+        return Verdict(None, "condition_dropped", where)
     if st_values and not _bound(st_values, shared, exact, values_in(exact)):
         return Verdict(None, "value_not_bound_to_label", where)
     if subject_differs(st, sentence) or negation_differs(st, sentence):
@@ -2003,6 +2125,15 @@ def _role_vote(
     return {(key, vote): (answers.get(n) or {}).get("shown") is True for n, (key, _, _) in enumerate(items, 1)}
 
 
+def _reordered(batch: list, vote: int) -> list:
+    """The batch as reading ``vote`` sees it: reversed, then turned halfway,
+    so no two readings put a link beside the same ones in the same place."""
+    if vote % 2:
+        return batch[::-1]
+    half = len(batch) // 2
+    return batch[half:] + batch[:half]
+
+
 def _confirm_vote(
     batch: list[tuple[str, Statement, Verdict]], ask: Callable[[str, str], str],
 ) -> dict[str, bool]:
@@ -2130,7 +2261,7 @@ RETRY_REASONS = frozenset({
 # second look is offered other passages, never the one refused.
 RETRY_ELSEWHERE_REASONS = frozenset({
     "not_an_item", "label_not_in_passage", "party_not_bound", "subject_differs", "role_not_shown",
-    "statement_is_elsewhere", "stage_differs", "scope_missing",
+    "statement_is_elsewhere", "stage_differs", "scope_missing", "condition_dropped",
 })
 # What a second look that finds nothing ends in: then the first look's
 # reason stands.
@@ -2216,13 +2347,25 @@ def trace_sources(
 
     def checks(items: list[tuple[str, Statement, Verdict]], *, retry: bool) -> None:
         """Queue the separate calls a link still needs — a confirmation for
-        one a second look found or whose statement says more than its
-        excerpt's words, role checks for a short statement — and settle each
-        when they are back."""
-        needs: dict[str, tuple[bool, bool]] = {}
+        one a second look found, whose statement says more than its
+        excerpt's words or whose excerpt may say less (``narrows``), role
+        checks for a short statement — and settle each when they are back.
+
+        A link confirmed only because its excerpt may say less is asked
+        ``NARROWING_VOTES`` times, in different orders, and refused on a
+        majority: that check reaches about a third of all links, and one
+        reading of a borderline link flips with the links it is batched with
+        (of 740 stored links, one reading refused 20, three readings 48
+        between them, a majority 18 — 13 of them wrong links, 3 right ones).
+        A confirmation for any other reason stays a single reading that must
+        say yes."""
+        needs: dict[str, tuple[int, bool]] = {}   # confirmations to read, role check
         waiting = []
         for skey, st, v in items:
-            confirm = retry or says_more(st, v.link) or bool((v.link or {}).get("pieced"))
+            if retry or says_more(st, v.link) or (v.link or {}).get("pieced"):
+                confirm = 1
+            else:
+                confirm = NARROWING_VOTES if narrows(st, v.link) else 0
             role = label_names_role(st)
             if confirm or role:
                 needs[skey] = (confirm, role)
@@ -2232,11 +2375,17 @@ def trace_sources(
         for i in range(0, len(waiting), ROLE_BATCH):
             chunk = waiting[i:i + ROLE_BATCH]
             to_confirm = [it for it in chunk if needs[it[0]][0]]
+            again = [it for it in to_confirm if needs[it[0]][0] > 1]
             roles = [it for it in chunk if needs[it[0]][1]]
-            answers: dict = {"confirm": None, "roles": [None] * ROLE_VOTES}
+            answers: dict = {"confirm": [None] * NARROWING_VOTES, "roles": [None] * ROLE_VOTES}
             jobs: list[tuple] = []
             if to_confirm:
                 jobs.append(("confirm", 0, lambda c=to_confirm: _confirm_vote(c, ask)))
+            if again:
+                jobs.extend(
+                    ("confirm", n, (lambda c=again, n=n: _confirm_vote(_reordered(c, n), ask)))
+                    for n in range(1, NARROWING_VOTES)
+                )
             if roles:
                 jobs.extend(("role", n, (lambda r=roles, n=n: _role_vote(r, n, ask))) for n in range(ROLE_VOTES))
             for skey, _, _ in chunk:
@@ -2247,13 +2396,13 @@ def trace_sources(
                 for skey, _, v in chunk:
                     confirm, role = needs[skey]
                     if confirm:
-                        said = (answers["confirm"] or {}).get(skey)
-                        if said is None:
+                        said = [(answers["confirm"][n] or {}).get(skey) for n in range(confirm)]
+                        if said.count(False) * 2 > confirm:
+                            settle(skey, Verdict(None, "not_confirmed"), may_retry=False)
+                            continue
+                        if said.count(True) * 2 <= confirm:
                             stats["unchecked"] += 1
                             settle(skey, Verdict(None, "confirm_unchecked"), may_retry=False)
-                            continue
-                        if said is False:
-                            settle(skey, Verdict(None, "not_confirmed"), may_retry=False)
                             continue
                     if role:
                         votes = [(r or {}).get((skey, n)) for n, r in enumerate(answers["roles"])]
@@ -2271,7 +2420,7 @@ def trace_sources(
             for kind, n, call in jobs:
                 def done(result, kind=kind, n=n, answers=answers, left=left, decide=decide) -> None:
                     if kind == "confirm":
-                        answers["confirm"] = result
+                        answers["confirm"][n] = result
                     else:
                         answers["roles"][n] = result
                     left["n"] -= 1

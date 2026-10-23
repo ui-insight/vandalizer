@@ -1373,6 +1373,121 @@ def test_a_transaction_date_is_not_an_action():
     assert is_action(Statement(0, 0, "Obtain itemized invoices.", label=""))
 
 
+TRAINING = {"uuid": "noa2", "title": "NoA.pdf", "text_markers": [], "raw_text": (
+    "Special Conditions\n"
+    "D. Recipient staff will be required to complete a BLM-approved Defensive Driving Course if driving a "
+    "Government-owned vehicle (GOV).\n"
+    "E. Recipient staff will be required to complete a BLM-approved Four-wheel ATV safety and training "
+    "program if using Government-furnished ATVs.\n"
+)}
+
+
+def test_a_requirement_is_not_sourced_to_one_that_applies_only_in_a_case():
+    """Seen on the BLM award: "Mandatory BLM‑approved safety and training
+    courses" was linked to training the award requires only if staff drive a
+    Government vehicle or use its ATVs. A statement that keeps the case is
+    stated."""
+    quote = ("Recipient staff will be required to complete a BLM-approved Four-wheel ATV safety and training "
+             "program if using Government-furnished ATVs.")
+    judge = Judge(("training", "Four-wheel", quote))
+    result = _trace({"final": {"special_conditions": ["Mandatory BLM‑approved safety and training courses"]}},
+                    judge, docs=[TRAINING])
+    assert _links(result, "final") == []
+    assert result["reasons"] == {"condition_dropped": 1}
+    kept = {"special_conditions": ["BLM-approved ATV safety and training required when using Government-furnished ATVs"]}
+    assert len(_links(_trace({"final": kept}, judge, docs=[TRAINING]), "final")) == 1
+
+
+@pytest.mark.parametrize("statement,label,text,dropped", [
+    # A label's "required" does not make a page limit a requirement.
+    ("Maximum 2 pages", "required components — Collaboration Plan",
+     "If more than one PI is involved, a collaboration plan (up to 2 pages) must be provided.", False),
+    ("A collaboration plan must be provided", "", "If more than one PI is involved, a collaboration plan "
+     "(up to 2 pages) must be provided.", True),
+    ("A collaboration plan must be provided when more than one PI is involved", "",
+     "If more than one PI is involved, a collaboration plan (up to 2 pages) must be provided.", False),
+])
+def test_what_counts_as_a_requirement_stated_without_its_case(statement, label, text, dropped):
+    from app.services.output_sourcing import condition_dropped
+    from app.services.output_statements import Statement
+
+    assert condition_dropped(Statement(0, 0, statement, label=label), text) is dropped
+
+
+@pytest.mark.parametrize("text", [
+    # "Even if" says the rule holds regardless.
+    "a collaboration plan must be provided for all projects, even if all investigators are affiliated "
+    "with the same organization.",
+    # "Unless" is usually the rule itself.
+    "No funds may be obligated for infrastructure unless all of the iron and steel is produced in the "
+    "United States.",
+    # A hedge is not a case.
+    "Include a collaboration plan, if applicable.",
+])
+def test_what_is_not_a_case_a_rule_applies_in(text):
+    from app.services.output_sourcing import dropped_condition
+    from app.services.output_statements import Statement
+
+    assert dropped_condition(Statement(0, 0, "A collaboration plan is required"), text) is None
+
+
+PRIOR_APPROVAL = {
+    "chunk_id": "ug_d_308", "kb_title": "OMB Uniform Guidance", "document_title": "Subpart D",
+    "label": "OMB Uniform Guidance — Subpart D · § 200.308", "page": None,
+    "content": ("§ 200.308 Revision of budget and program plans.\n(c)(1) The recipient must request prior "
+                "approval from the Federal agency for the following program or budget-related reasons:\n"
+                "(1) Change in the scope or the objective of the project or program.\n"
+                "(5) The transfer of funds budgeted for participant support costs to other budget categories.\n"),
+}
+
+
+def _readings(*answers):
+    """A confirmation that answers each reading in turn."""
+    said = list(answers)
+    return lambda item: said.pop(0)
+
+
+def test_a_rule_whose_excerpt_adds_a_limit_is_confirmed_by_a_majority_of_three_readings():
+    """Seen on the BLM award: "Transfer of funds between budget categories"
+    under "prior approval requirements" was linked to § 200.308(c)(1)(5),
+    which is about funds budgeted for participant support costs only. Every
+    word of the statement is in the excerpt, so no word count could see it;
+    one reading of a borderline link flips with what it is batched with, so
+    three are asked and a majority decides."""
+    quote = "The transfer of funds budgeted for participant support costs to other budget categories."
+    value = {"prior_approval_requirements": ["Transfer of funds between budget categories"]}
+    refused = Judge(("Transfer of funds", "participant support", quote), confirm=_readings(True, False, False))
+    result = _trace({"final": value}, refused, docs=[], passages=[PRIOR_APPROVAL])
+    assert _links(result, "final") == [] and result["reasons"] == {"not_confirmed": 1}
+    assert len(refused.confirm_asked) == 3
+    kept = Judge(("Transfer of funds", "participant support", quote), confirm=_readings(False, True, True))
+    assert len(_links(_trace({"final": value}, kept, docs=[], passages=[PRIOR_APPROVAL]), "final")) == 1
+
+
+def test_an_excerpt_that_adds_nothing_the_statement_lacks_is_not_confirmed_again():
+    quote = "The transfer of funds budgeted for participant support costs to other budget categories."
+    judge = Judge(("participant support", "participant support", quote))
+    value = {"prior_approval_requirements": ["Transfer of funds budgeted for participant support costs to other budget categories"]}
+    assert len(_links(_trace({"final": value}, judge, docs=[], passages=[PRIOR_APPROVAL]), "final")) == 1
+    assert judge.confirm_asked == []
+
+
+def test_what_may_say_less_than_its_statement():
+    from app.services.output_sourcing import narrows
+    from app.services.output_statements import Statement
+
+    excerpt = "The transfer of funds budgeted for participant support costs to other budget categories."
+    link = {"quote": excerpt, "excerpt": excerpt, "quote_start": 0, "quote_end": len(excerpt)}
+    rule = Statement(0, 0, "Transfer of funds between budget categories", label="prior approval requirements")
+    assert narrows(rule, link)
+    # Only a statement of a rule is read for words added inside it.
+    assert not narrows(Statement(0, 0, "Transfer of funds between budget categories", label="topics"), link)
+    # A case in the excerpt's sentence that the statement leaves out, whatever it is.
+    sentence = "Staff must complete the course if using Government-furnished ATVs."
+    near = {"quote": "Staff must complete the course", "excerpt": sentence, "quote_start": 0, "quote_end": 30}
+    assert narrows(Statement(0, 0, "Course completion", label="topics"), near)
+
+
 def test_absences_and_verdicts_are_never_judged():
     judge = Judge()
     result = _trace({"final": "**Funding Instrument:** Not specified in the document\n**Decision:** Allowable\n"}, judge)
