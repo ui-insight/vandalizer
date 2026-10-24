@@ -33,7 +33,8 @@ answered here:
   worse than none.
 
 The index is built from the chunks already stored — nothing written — and
-cached per process. The cuts and the route thresholds below were set on the
+cached per process until the base's chunks are written again (see
+``INDEX_CHECK_S``). The cuts and the route thresholds below were set on the
 development queries and checked on the held-out ones, for both kinds of
 chunk (a lower cut gained on chunks cut by section but let a held-out
 question the base cannot answer through); they are tied to the default
@@ -88,9 +89,15 @@ ROUTE_MIN_SIMILARITY = 0.75
 ROUTE_MIN_LEAD = 0.03
 # A routed section is handed over through its best chunks, at most this many.
 ROUTED_CHUNKS = 2
-# Index lifetime: rebuilt after this when the base's chunk count changed, and
-# after twice this regardless (a refreshed source can keep its count).
-INDEX_TTL_S = 600
+# Index lifetime. A cached index is used for INDEX_CHECK_S without asking the
+# store; then it is kept while the base's revision — stamped on its collection
+# by every chunk write (DocumentManager.KB_REVISION_KEY) — and its chunk count
+# are the ones it was built from, and rebuilt when either changed. A re-chunk
+# or refresh can keep the count; it cannot keep the revision. A base not
+# written since revisions were stamped has only its count to go by, so its
+# index is also rebuilt UNSTAMPED_MAX_AGE_S after it was built.
+INDEX_CHECK_S = 30
+UNSTAMPED_MAX_AGE_S = 1200
 RESULT_CACHE_SIZE = 512
 
 # ---------------------------------------------------------------------------
@@ -217,6 +224,8 @@ class KbIndex:
     count: int = 0
     built_at: float = 0.0
     position: dict[str, int] = field(default_factory=dict)
+    revision: Optional[str] = None     # the base's revision when it was read
+    checked_at: float = 0.0            # last found current against the store
 
     def section_of(self, chunk_id) -> Optional[str]:
         i = self.position.get(str(chunk_id))
@@ -394,25 +403,28 @@ def enabled() -> bool:
 
 
 def index_for(dm, kb_uuid: str) -> Optional[KbIndex]:
-    """The cached index for a base, rebuilt when it may be stale. None when
-    precise retrieval is off or the store cannot list a base's chunks."""
+    """The cached index for a base, rebuilt when the base changed (see
+    INDEX_CHECK_S). None when precise retrieval is off or the store cannot
+    list a base's chunks."""
     if not enabled() or not hasattr(dm, "get_kb_all_chunks"):
         return None
-    now = time.time()
     current = _INDEXES.get(kb_uuid)
-    if current is not None and now - current.built_at < INDEX_TTL_S:
+    if current is not None and time.time() - current.checked_at < INDEX_CHECK_S:
         return current
     with _INDEX_GUARD:
         lock = _INDEX_LOCKS.setdefault(kb_uuid, threading.Lock())
     with lock:
+        now = time.time()
         current = _INDEXES.get(kb_uuid)
-        if current is not None and now - current.built_at < INDEX_TTL_S:
+        if current is not None and now - current.checked_at < INDEX_CHECK_S:
             return current
-        if current is not None and now - current.built_at < 2 * INDEX_TTL_S:
-            count = _count(dm, kb_uuid)
-            if count is not None and count == current.count:
-                current.built_at = now
-                return current
+        # Read before the chunks: a write landing between the two leaves an
+        # index of new chunks under the old revision (rebuilt once more at
+        # the next check), never one of old chunks under the new revision.
+        signature = _signature(dm, kb_uuid)
+        if current is not None and signature is not None and _still_current(current, signature, now):
+            current.checked_at = now
+            return current
         try:
             chunks = dm.get_kb_all_chunks(kb_uuid)
             if not isinstance(chunks, list):
@@ -427,16 +439,35 @@ def index_for(dm, kb_uuid: str) -> Optional[KbIndex]:
         if index is None:
             _INDEXES.pop(kb_uuid, None)
             return None
+        index.revision = signature[0] if signature is not None else None
+        index.checked_at = now
         _INDEXES[kb_uuid] = index
         return index
 
 
-def _count(dm, kb_uuid: str) -> Optional[int]:
+def _signature(dm, kb_uuid: str) -> Optional[tuple[Optional[str], int]]:
+    """A base's revision (None when it has none) and chunk count — the
+    collection's metadata and its count, no chunk read; None when the store
+    cannot say."""
+    from app.services.document_manager import KB_REVISION_KEY
+
     try:
         collection = dm.get_kb_collection_readonly(kb_uuid)
-        return collection.count() if collection is not None else 0
+        if collection is None:
+            return None, 0
+        meta = collection.metadata
+        revision = meta.get(KB_REVISION_KEY) if isinstance(meta, dict) else None
+        return (revision if isinstance(revision, str) else None), collection.count()
     except Exception:  # noqa: BLE001
         return None
+
+
+def _still_current(index: KbIndex, signature: tuple[Optional[str], int], now: float) -> bool:
+    revision, count = signature
+    if revision != index.revision or count != index.count:
+        return False
+    # Without a revision only the count speaks, and a rewrite can keep it.
+    return revision is not None or now - index.built_at < UNSTAMPED_MAX_AGE_S
 
 
 def ready() -> bool:

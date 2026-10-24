@@ -8,6 +8,7 @@ are fakes: nothing here touches Chroma, the network or a model file.
 
 import hashlib
 import re
+import uuid
 from unittest.mock import MagicMock
 
 import httpx
@@ -17,6 +18,7 @@ import pytest
 from app.services import cross_encoder as ce
 from app.services import kb_grounding as kg
 from app.services import kb_retrieval as kr
+from app.services.document_manager import KB_REVISION_KEY
 from app.services.ra_glossary import corpus_abbreviations, expand_query
 
 KB = "kb-ug"
@@ -112,6 +114,17 @@ class Store:
         self.chunks = [c for s in sources for c in s]
         self.embedding_function = FakeEmbedder()
         self.vector_calls = 0
+        self.full_reads = 0
+        self.collection_reads = 0
+        self.revision = None
+
+    def rewrite(self, chunks, *, stamp=True):
+        """The base's chunks written again; DocumentManager stamps a new
+        revision on every write (``stamp=False``: one whose stamp failed, or
+        a base written before revisions were stamped)."""
+        self.chunks = chunks
+        if stamp:
+            self.revision = uuid.uuid4().hex
 
     def query_kb(self, kb_uuid, query, k=8, min_similarity=0.0, **kw):
         self.vector_calls += 1
@@ -127,10 +140,13 @@ class Store:
         return [dict(by[i]) for i in ids if i in by]
 
     def get_kb_all_chunks(self, kb_uuid, limit=50_000):
+        self.full_reads += 1
         return [dict(c) for c in self.chunks]
 
     def get_kb_collection_readonly(self, kb_uuid):
-        return MagicMock(count=MagicMock(return_value=len(self.chunks)))
+        self.collection_reads += 1
+        return MagicMock(count=MagicMock(return_value=len(self.chunks)),
+                         metadata={KB_REVISION_KEY: self.revision} if self.revision else None)
 
 
 class FakeScorer:
@@ -242,6 +258,153 @@ class TestIndex:
     def test_a_store_that_cannot_list_its_chunks_has_no_index(self, precise):
         assert kr.index_for(MagicMock(), KB) is None
         assert kr.index_for(object(), KB) is None
+
+
+# ---------------------------------------------------------------------------
+# Freshness
+# ---------------------------------------------------------------------------
+
+class Clock:
+    def __init__(self):
+        self.now = 1_000_000.0
+
+    def time(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """The time kb_retrieval reads, moved by hand."""
+    c = Clock()
+    monkeypatch.setattr(kr, "time", c)
+    return c
+
+
+def _rechunked(chunks, tag="ab12cd34"):
+    """``chunks`` under the fresh ids replace_kb_source writes them with."""
+    return [dict(c, chunk_id=c["chunk_id"].replace("_chunk_", f"_{tag}_chunk_")) for c in chunks]
+
+
+def _relabelled(chunks):
+    """A re-chunk that reads § 200.307's heading differently, under new ids."""
+    out = []
+    for c in _rechunked(chunks):
+        meta = dict(c["metadata"])
+        if meta.get("section_key") == "200.307":
+            meta["section_title"] = "Program income (relabelled)"
+            meta["heading_path"] = "§ 200.307 Program income (relabelled)."
+        out.append(dict(c, metadata=meta))
+    return out
+
+
+def _refreshed(chunks):
+    """A refresh written by delete_kb_source then add_to_kb: the same
+    deterministic ids, new text."""
+    return [dict(c, content=c["content"].replace("program income", "program revenue")) for c in chunks]
+
+
+class TestIndexFreshness:
+    """A process keeps its index of a base until the base's chunks are
+    written again. A re-chunk or refresh that kept the chunk count (the
+    EXPORT re-chunk of 2026-10-24 kept 150 → 150) went unseen for as long as
+    the base kept being asked, serving old chunk ids and section labels."""
+
+    def test_within_the_check_interval_the_store_is_not_asked(self, precise, clock):
+        store = _store()
+        store.revision = "r1"
+        index = kr.index_for(store, KB)
+        reads = store.collection_reads
+        clock.advance(kr.INDEX_CHECK_S - 1)
+        assert kr.index_for(store, KB) is index
+        assert store.collection_reads == reads
+
+    def test_an_unchanged_base_keeps_its_index_without_a_full_read(self, precise, clock):
+        store = _store()
+        store.revision = "r1"
+        index = kr.index_for(store, KB)
+        built = index.built_at
+        for _ in range(4):
+            clock.advance(kr.UNSTAMPED_MAX_AGE_S)
+            assert kr.index_for(store, KB) is index
+        # One collection read per check, and the chunks read once.
+        assert store.full_reads == 1
+        assert store.collection_reads == 5
+        assert index.built_at == built
+
+    @pytest.mark.parametrize("before", [None, "r1"], ids=["first-stamp", "stamped"])
+    @pytest.mark.parametrize("rewrite", ["re-chunk", "refresh"])
+    def test_a_rewrite_that_keeps_the_count_rebuilds_the_index(self, precise, clock, rewrite, before):
+        store = _sectioned_store()
+        store.revision = before
+        old = kr.index_for(store, KB)
+        assert old.section_titles["200.307"] == "Program income"
+        store.rewrite(_relabelled(store.chunks) if rewrite == "re-chunk" else _refreshed(store.chunks))
+        assert len(store.chunks) == old.count
+
+        clock.advance(kr.INDEX_CHECK_S)
+        new = kr.index_for(store, KB)
+        assert new is not old and store.full_reads == 2
+        assert new.revision == store.revision
+        assert set(new.position) == {c["chunk_id"] for c in store.chunks}
+        if rewrite == "re-chunk":
+            assert not set(new.position) & set(old.position)
+            assert new.section_titles["200.307"] == "Program income (relabelled)"
+        else:
+            assert any("program revenue" in c["content"] for c in new.chunks)
+        # Then it is the one kept.
+        clock.advance(kr.INDEX_CHECK_S)
+        assert kr.index_for(store, KB) is new
+
+    def test_a_rebuilt_index_does_not_serve_the_pool_cached_before(self, precise, clock):
+        store = _store()
+        store.revision = "r1"
+        # A section passage is built under an id of its own; the rest are chunks.
+        def chunk_ids(pool):
+            return {p["chunk_id"] for p in pool if "_chunk_" in str(p.get("chunk_id"))}
+
+        first = chunk_ids(_pool(store, "program income"))
+        assert first and first <= {c["chunk_id"] for c in store.chunks}
+
+        store.rewrite(_rechunked(store.chunks))
+        clock.advance(kr.INDEX_CHECK_S)
+        second = chunk_ids(_pool(store, "program income"))
+        assert second and second <= {c["chunk_id"] for c in store.chunks}
+
+    def test_a_changed_count_rebuilds_under_the_same_revision(self, precise, clock):
+        """A write whose stamp failed still shows in the count."""
+        store = _store()
+        store.revision = "r1"
+        index = kr.index_for(store, KB)
+        store.rewrite(store.chunks[:-1], stamp=False)
+        clock.advance(kr.INDEX_CHECK_S)
+        assert kr.index_for(store, KB).count == index.count - 1
+
+    def test_a_base_without_a_revision_is_also_rebuilt_by_age(self, precise, clock):
+        """A base not written since revisions were stamped has only its count
+        to go by, so its index is not kept past UNSTAMPED_MAX_AGE_S."""
+        store = _store()
+        index = kr.index_for(store, KB)
+        assert index.revision is None
+        store.rewrite(_rechunked(store.chunks), stamp=False)
+        clock.advance(kr.INDEX_CHECK_S)
+        assert kr.index_for(store, KB) is index
+        clock.advance(kr.UNSTAMPED_MAX_AGE_S)
+        rebuilt = kr.index_for(store, KB)
+        assert rebuilt is not index
+        assert set(rebuilt.position) == {c["chunk_id"] for c in store.chunks}
+
+    def test_a_base_whose_collection_is_gone_has_no_index(self, precise, clock):
+        store = _store()
+        store.revision = "r1"
+        assert kr.index_for(store, KB) is not None
+        store.rewrite([])
+        store.get_kb_collection_readonly = lambda kb_uuid: None
+        clock.advance(kr.INDEX_CHECK_S)
+        assert kr.index_for(store, KB) is None
+        assert KB not in kr._INDEXES
 
 
 # ---------------------------------------------------------------------------

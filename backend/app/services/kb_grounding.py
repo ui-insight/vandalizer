@@ -702,7 +702,7 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
     index = kr.index_for(dm, kb_uuid)
     if index is None or not kr.ready():
         return None
-    cache_key = (kb_uuid, index.count, index.built_at, query, k, floor)
+    cache_key = (kb_uuid, index.revision, index.count, index.built_at, query, k, floor)
     hit = kr.cached(cache_key)
     if hit is not None:
         return hit

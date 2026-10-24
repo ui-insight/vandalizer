@@ -92,6 +92,13 @@ def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAP
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
+#: Collection metadata naming the last write to a knowledge base's chunks.
+#: Every KB write below stamps a new one, so a process holding an index over
+#: the chunks (``kb_retrieval.index_for``) can tell any rewrite from none —
+#: one that keeps the chunk count, and a delete-then-add that writes the
+#: same ids, included.
+KB_REVISION_KEY = "kb_revision"
+
 
 def count_chunks(text: str) -> int:
     """How many chunks ``text`` would be indexed as in a knowledge base — the
@@ -479,6 +486,19 @@ class DocumentManager:
         except Exception:
             return None
 
+    def _stamp_kb_revision(self, collection) -> None:
+        """Give a KB collection a new :data:`KB_REVISION_KEY` after its chunks
+        were written. Chroma's ``modify`` replaces a collection's metadata, so
+        the rest is carried over. A failed stamp is logged, not raised: the
+        chunks are written, and a reader still sees a changed count."""
+        try:
+            meta = collection.metadata
+            meta = dict(meta) if isinstance(meta, dict) else {}
+            meta[KB_REVISION_KEY] = uuid.uuid4().hex
+            collection.modify(metadata=meta)
+        except Exception as e:
+            logger.warning(f"Error stamping a revision on KB collection {getattr(collection, 'name', '?')}: {e}")
+
     def add_to_kb(
         self,
         kb_uuid: str,
@@ -544,7 +564,11 @@ class DocumentManager:
             metadatas.append(meta)
             embed_texts.append(f"{chunk.heading_path}\n{chunk.text}" if chunk.heading_path else chunk.text)
 
-        self._add_in_batches(collection, ids, documents, metadatas, embed_texts=embed_texts)
+        try:
+            self._add_in_batches(collection, ids, documents, metadatas, embed_texts=embed_texts)
+        finally:
+            # Also when a batch failed: the ones before it are in.
+            self._stamp_kb_revision(collection)
         return len(chunks)
 
     def query_kb(
@@ -727,10 +751,11 @@ class DocumentManager:
         try:
             collection = self.get_kb_collection(kb_uuid)
             collection.delete(where={"source_id": source_id})
-            return True
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
             return False
+        self._stamp_kb_revision(collection)
+        return True
 
     def replace_kb_source(
         self,
@@ -770,6 +795,9 @@ class DocumentManager:
             except Exception as cleanup_error:
                 logger.error(f"Error cleaning up partial chunks for KB source {source_id}: {cleanup_error}")
             raise
+        finally:
+            # After the old chunks (or the partial new ones) are gone.
+            self._stamp_kb_revision(collection)
         return count
 
     def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
@@ -796,3 +824,5 @@ class DocumentManager:
             collection.update(ids=ids, metadatas=updated)
         except Exception as e:
             logger.error(f"Error updating KB source {source_id} metadata: {e}")
+            return
+        self._stamp_kb_revision(collection)

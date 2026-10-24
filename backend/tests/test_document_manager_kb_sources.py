@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import KB_REVISION_KEY, DocumentManager
 
 
 def _manager() -> DocumentManager:
@@ -119,6 +119,16 @@ class TestChromaAddBatching:
         assert mgr._max_add_batch() == DocumentManager._FALLBACK_MAX_ADD_BATCH
 
 
+def _writer() -> DocumentManager:
+    """A DocumentManager that chunks and writes, into a patched collection."""
+    mgr = _manager()
+    mgr.chunk_size = 1000
+    mgr.chunk_overlap = 200
+    mgr.client = MagicMock()
+    mgr.client.get_max_batch_size.return_value = 1000
+    return mgr
+
+
 class _FakeCollection:
     """Just enough of a Chroma collection to watch chunks come and go."""
 
@@ -126,6 +136,8 @@ class _FakeCollection:
         self.rows: dict[str, dict] = {}
         self.fail_add_after: int | None = None
         self.fail_delete = False
+        self.metadata: dict | None = None
+        self.fail_modify = False
 
     def add(self, ids, documents, metadatas):
         for i, doc, meta in zip(ids, documents, metadatas):
@@ -134,13 +146,30 @@ class _FakeCollection:
             self.rows.setdefault(i, {"document": doc, "metadata": meta})
 
     def get(self, where, include=None):
-        return {"ids": [i for i, r in self.rows.items() if r["metadata"]["source_id"] == where["source_id"]]}
+        ids = [i for i, r in self.rows.items() if r["metadata"]["source_id"] == where["source_id"]]
+        return {"ids": ids, "metadatas": [self.rows[i]["metadata"] for i in ids]}
+
+    def update(self, ids, metadatas):
+        for i, meta in zip(ids, metadatas):
+            self.rows[i]["metadata"] = meta
 
     def delete(self, ids=None, where=None):
         if self.fail_delete:
             raise RuntimeError("chroma compaction in progress")
+        if where is not None:
+            ids = [i for i, r in self.rows.items() if r["metadata"]["source_id"] == where["source_id"]]
         for i in list(ids or []):
             self.rows.pop(i, None)
+
+    def modify(self, metadata):
+        if self.fail_modify:
+            raise RuntimeError("chroma went away")
+        # Chroma replaces a collection's metadata; it does not merge.
+        self.metadata = dict(metadata)
+
+    @property
+    def revision(self):
+        return (self.metadata or {}).get(KB_REVISION_KEY)
 
     def text_of(self, source_id):
         return [r["document"] for r in self.rows.values() if r["metadata"]["source_id"] == source_id]
@@ -156,12 +185,7 @@ class TestReplaceKbSource:
     """
 
     def _manager(self) -> DocumentManager:
-        mgr = _manager()
-        mgr.chunk_size = 1000
-        mgr.chunk_overlap = 200
-        mgr.client = MagicMock()
-        mgr.client.get_max_batch_size.return_value = 1000
-        return mgr
+        return _writer()
 
     def _seeded(self, mgr):
         collection = _FakeCollection()
@@ -213,6 +237,65 @@ class TestReplaceKbSource:
             mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "third version. " * 300)
 
         assert all("third version" in t for t in collection.text_of("src-1"))
+
+
+class TestKbRevision:
+    """Every write to a KB's chunks stamps a new revision on its collection.
+    A process's cached index over the chunks (kb_retrieval.index_for) checks
+    it, so a rewrite is noticed even when it keeps the chunk count — a
+    re-chunk — or the chunk ids too — a refresh by delete then add."""
+
+    def _write(self, mgr, collection, *calls):
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            for name, *args in calls:
+                getattr(mgr, name)("kb1", *args)
+
+    def test_a_refresh_under_the_same_ids_gets_a_new_revision(self):
+        mgr, collection = _writer(), _FakeCollection()
+        self._write(mgr, collection, ("add_to_kb", "src-1", "APM 45.14", "policy text. " * 200))
+        first, ids = collection.revision, set(collection.rows)
+        assert first
+
+        self._write(mgr, collection, ("delete_kb_source", "src-1"),
+                    ("add_to_kb", "src-1", "APM 45.14", "policy tent. " * 200))
+        assert set(collection.rows) == ids
+        assert collection.revision not in (None, first)
+
+    @pytest.mark.parametrize("call", [
+        ("replace_kb_source", "src-1", "APM 45.14", "new policy text. " * 200),
+        ("rename_kb_source", "src-1", "APM 45.14 (renamed)"),
+        ("delete_kb_source", "src-1"),
+    ], ids=lambda c: c[0])
+    def test_each_write_gets_a_new_revision(self, call):
+        mgr, collection = _writer(), _FakeCollection()
+        self._write(mgr, collection, ("add_to_kb", "src-1", "APM 45.14", "old policy text. " * 200))
+        before = collection.revision
+        self._write(mgr, collection, call)
+        assert collection.revision not in (None, before)
+
+    def test_the_rest_of_the_collection_metadata_is_kept(self):
+        mgr, collection = _writer(), _FakeCollection()
+        collection.metadata = {"owner": "ops"}
+        self._write(mgr, collection, ("add_to_kb", "src-1", "Name", "text. " * 100))
+        assert collection.metadata["owner"] == "ops" and collection.revision
+
+    def test_a_write_that_failed_part_way_still_gets_one(self):
+        """The chunks it wrote before failing are in the store."""
+        mgr, collection = _writer(), _FakeCollection()
+        self._write(mgr, collection, ("add_to_kb", "src-1", "APM 45.14", "old policy text. " * 200))
+        before = collection.revision
+        collection.fail_add_after = len(collection.rows) + 1
+        with pytest.raises(RuntimeError):
+            self._write(mgr, collection, ("replace_kb_source", "src-1", "APM 45.14", "new policy text. " * 300))
+        assert collection.revision not in (None, before)
+
+    def test_a_stamp_that_fails_does_not_fail_the_write(self):
+        mgr, collection = _writer(), _FakeCollection()
+        collection.fail_modify = True
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            count = mgr.add_to_kb("kb1", "src-1", "Name", "text. " * 100)
+            assert mgr.delete_kb_source("kb1", "src-1") is True
+        assert count > 0 and collection.revision is None
 
 
 class TestGetKbAllChunks:

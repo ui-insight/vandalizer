@@ -207,6 +207,67 @@ class TestKBCollectionRoundTrip:
 
 
 # ---------------------------------------------------------------------------
+# KB revision — what a process's cached index checks for a rewrite
+# ---------------------------------------------------------------------------
+
+def _hash_embedder():
+    """Word-hash vectors, so these tests need no model download."""
+    from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+
+    class HashEmbedder(EmbeddingFunction[Documents]):
+        def __call__(self, input: Documents) -> Embeddings:
+            out = []
+            for text in input:
+                v = [0.0] * 64
+                for w in text.lower().split():
+                    v[sum(map(ord, w)) % 64] += 1.0
+                n = sum(x * x for x in v) ** 0.5 or 1.0
+                out.append([x / n for x in v])
+            return out
+
+    return HashEmbedder()
+
+
+class TestKBRevision:
+    def test_every_write_stamps_a_revision_another_client_reads(self, chroma_dir):
+        from app.services import kb_retrieval as kr
+        from app.services.document_manager import DocumentManager
+
+        dm = DocumentManager(persist_directory=chroma_dir, embedding_function=_hash_embedder())
+        dm.delete_kb_collection("kb-rev")
+        text = "Funding eligibility rules for sponsored projects. " * 60
+        n = dm.add_to_kb("kb-rev", "src", "rules.md", text)
+        first = kr._signature(dm, "kb-rev")
+        assert first[0] and first[1] == n
+
+        # Opened again for a write, the collection keeps its revision.
+        dm.get_kb_collection("kb-rev")
+        assert kr._signature(dm, "kb-rev") == first
+
+        # A refresh by delete then add: the same ids and count, a new revision.
+        ids = set(dm.get_kb_collection("kb-rev").get(include=[])["ids"])
+        dm.delete_kb_source("kb-rev", "src")
+        dm.add_to_kb("kb-rev", "src", "rules.md", text.replace("rules", "rulez"))
+        second = kr._signature(dm, "kb-rev")
+        assert set(dm.get_kb_collection("kb-rev").get(include=[])["ids"]) == ids
+        assert second[1] == n and second[0] != first[0]
+
+        # A re-chunk under fresh ids, then a rename.
+        dm.replace_kb_source("kb-rev", "src", "rules.md", text)
+        third = kr._signature(dm, "kb-rev")
+        assert third[1] == n and third[0] not in (first[0], second[0])
+        dm.rename_kb_source("kb-rev", "src", "Rules")
+        last = kr._signature(dm, "kb-rev")
+        assert last[0] not in (first[0], second[0], third[0])
+
+        # What another process's client reads.
+        other = DocumentManager(persist_directory=chroma_dir, embedding_function=_hash_embedder())
+        assert kr._signature(other, "kb-rev") == last
+        dm.delete_kb_collection("kb-rev")
+        assert kr._signature(other, "kb-rev") == (None, 0)
+
+
+# ---------------------------------------------------------------------------
 # Amending sources — the PAPPG supplement ticket, against the real embedder
 # ---------------------------------------------------------------------------
 
