@@ -97,6 +97,42 @@ class TestSections:
         assert costs.text == "§ 200.506 Audit costs.\n\nSee § 200.425."
         assert _by_key(chunks, "200.501")[0].text.startswith("Contents\n§ 200.501")
 
+    def test_a_title_opening_on_a_quoted_term_is_a_section(self):
+        """15 CFR's § 734.8 opens on “Technology”. Unread as a heading, its
+        fundamental-research rule was stored, and cited, as § 734.7."""
+        text = (
+            "§ 734.7 Published.\n\n" + "\n".join(_para(c, 400, "published information") for c in "abc")
+            + "\n\n§ 734.8 “Technology” or “software” that arises during, or results from, fundamental research.\n\n"
+            + "\n".join(_para(c, 400, "fundamental research") for c in "abc")
+            + "\n\n§ 734.9 Foreign-Direct Product (FDP) Rules.\n\n" + _para("a", 300, "foreign-produced items") + "\n"
+        )
+        chunks = _chunks(text, "PART 734—SCOPE OF THE EXPORT ADMINISTRATION REGULATIONS")
+        assert list(dict.fromkeys(c.section_key for c in chunks)) == ["734.7", "734.8", "734.9"]
+        assert not any("fundamental research" in c.text for c in _by_key(chunks, "734.7"))
+        first = _by_key(chunks, "734.8")[0]
+        assert first.text.startswith("§ 734.8 “Technology” or “software”")
+        assert first.section_title == (
+            "“Technology” or “software” that arises during, or results from, fundamental research"
+        )
+
+    def test_a_title_opens_on_a_capital_or_a_quoted_term(self):
+        for heading in ("§ 734.8 “Technology” or “software” that arises …", '§ 734.8 "Technology" or "software" …',
+                        "734.8 ‘Technology’ …", "§ 200.2 [Reserved]", "§ 200.414 Indirect (F&A) costs."):
+            assert kc.SECTION_RE.fullmatch(heading), heading
+        # A sentence opening on a section number, and a cross-reference.
+        for line in ("§ 734.8 of this part sets out …", "734.8 “fundamental research” is defined …",
+                     "See § 734.8 “Technology” or “software” …"):
+            assert not kc.SECTION_RE.search(line), line
+
+    def test_a_line_opening_on_a_section_number_and_a_lower_case_word_stays_in_its_section(self):
+        text = (
+            "§ 734.3 Items subject to the EAR.\n\n" + _para("a", 300, "items subject")
+            + "\n§ 734.8 of this part sets out when research results are not subject to the EAR.\n"
+            "734.8 “fundamental research” is defined in paragraph (c) of that section.\n"
+            + _para("b", 300, "items subject") + "\n"
+        )
+        assert {c.section_key for c in _chunks(text, "PART 734")} == {"734.3"}
+
     def test_text_under_no_heading_is_named_by_its_source(self):
         [c] = _chunks("A short page about parking permits for visitors.", "Parking.html")
         assert (c.section_key, c.section_title, c.heading_path) == ("source:Parking.html", "Parking.html", "Parking.html")

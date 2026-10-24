@@ -56,14 +56,20 @@ HEADING_PATH_MAX_CHARS = 300
 # ---------------------------------------------------------------------------
 
 _MD = r"[ \t]*(?:#{1,6}[ \t]+)?"
+# A title opens on a capital, "[Reserved]", or a quoted defined term: 15 CFR's
+# "§ 734.8 “Technology” or “software” that arises during, or results from,
+# fundamental research." A line opening on a number and a lower-case word
+# ("§ 734.8 of this part …") is a sentence, not a heading.
+_OPEN_QUOTE = "[\"'“‘]?"
+SECTION_TITLE_START = rf"{_OPEN_QUOTE}[A-Z\[]"
 # "§ 200.414 Indirect costs.", FAR's "31.205-6 Compensation…".
 SECTION_RE = re.compile(
-    rf"^{_MD}(?:§[ \t]*)?(?P<num>\d{{1,4}}\.\d{{1,4}}(?:-\d{{1,3}})?[a-z]?)(?![\d(\-–—]|\.\d)[ \t]+(?P<title>[A-Z\[][^\n]{{0,200}})$",
+    rf"^{_MD}(?:§[ \t]*)?(?P<num>\d{{1,4}}\.\d{{1,4}}(?:-\d{{1,3}})?[a-z]?)(?![\d(\-–—]|\.\d)[ \t]+(?P<title>{SECTION_TITLE_START}[^\n]{{0,200}})$",
     re.MULTILINE,
 )
 # A numbered policy page: "45.10 - Facilities and Administrative (Indirect) Rate".
 POLICY_RE = re.compile(
-    rf"^{_MD}(?P<num>\d{{1,3}}\.\d{{1,3}})[ \t]+[-–—][ \t]+(?P<title>[A-Z][^\n]{{0,200}})$",
+    rf"^{_MD}(?P<num>\d{{1,3}}\.\d{{1,3}})[ \t]+[-–—][ \t]+(?P<title>{_OPEN_QUOTE}[A-Z][^\n]{{0,200}})$",
     re.MULTILINE,
 )
 # "Appendix III to Part 200—Indirect (F&A) Costs Identification and …".

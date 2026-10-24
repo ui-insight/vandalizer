@@ -63,6 +63,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from app.services.kb_chunking import SECTION_TITLE_START
 from app.services.kb_lead_in import attach_lead_ins, with_lead_in
 from app.services.page_locator import (
     annotate_chunk_pages,
@@ -428,10 +429,11 @@ def _pinned_hits(dm, kb_uuid: str, query: str, *, skip: frozenset = frozenset())
 # A section number in a query: "200.405", "§ 200.403(h)", FAR's "31.205-6".
 _QUERY_SECTION_RE = re.compile(r"(?<![\d.])(\d{1,4}\.\d{1,4}(?:-\d{1,3}(?!\d|\.\d))?)(?!\d|\.\d)")
 # A heading line: "§ 200.405 Allocable costs.", "31.205-6 Compensation for
-# personal services.", "## 9904.401 …", a Subpart or Part title.
+# personal services.", "## 9904.401 …", "§ 734.8 “Technology” or …", a
+# Subpart or Part title. Titles open as the chunker's do.
 _ANY_HEADING_RE = re.compile(
     r"^[ \t]*(?:#{1,6}[ \t]+)?(?:"
-    r"(?:§[ \t]*)?\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?(?![\d(\-–—]|\.\d)[ \t]+[A-Z\[]"
+    r"(?:§[ \t]*)?\d{1,4}\.\d{1,4}(?:-\d{1,3})?[a-z]?(?![\d(\-–—]|\.\d)[ \t]+" + SECTION_TITLE_START +
     r"|(?:Subpart|SUBPART|Part|PART)[ \t]+[\w.]+[ \t]*(?:[-—–:]|$)"
     r")[^\n]{0,200}$",
     re.MULTILINE,
@@ -450,7 +452,7 @@ def section_terms(query: str) -> list[str]:
 def _section_heading_re(section: str) -> re.Pattern:
     return re.compile(
         rf"^[ \t]*(?:#{{1,6}}[ \t]+)?(?:§[ \t]*)?{re.escape(section)}"
-        r"(?![\d(\-–—]|\.\d)[ \t]+[A-Z\[][^\n]{0,200}$",
+        rf"(?![\d(\-–—]|\.\d)[ \t]+{SECTION_TITLE_START}[^\n]{{0,200}}$",
         re.MULTILINE,
     )
 

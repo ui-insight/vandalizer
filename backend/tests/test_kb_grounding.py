@@ -449,6 +449,17 @@ SUBPART_E = (
     + "\n\nGeneral Provisions for Selected Items of Cost\n\n§ 200.406 Applicable credits.\n\n"
     + "\n".join(_para(c, 300) for c in "ab")
 )
+# 15 CFR 734, contents first: § 734.8's title opens on a quoted term.
+SECTION_734_7 = "§ 734.7 Published.\n\n" + "\n".join(_para(c, 400) for c in "pqr")
+SECTION_734_8 = (
+    "§ 734.8 “Technology” or “software” that arises during, or results from, fundamental research.\n\n"
+    + "\n".join(_para(c, 400) for c in "fgh")
+)
+PART_734 = (
+    "§ 734.7 Published.\n"
+    "§ 734.8 “Technology” or “software” that arises during, or results from, fundamental research.\n\n"
+    + SECTION_734_7 + "\n\n" + SECTION_734_8 + "\n\n§ 734.9 Foreign-Direct Product (FDP) Rules.\n\n" + _para("z", 300)
+)
 
 
 class TestSectionPassages:
@@ -527,6 +538,30 @@ class TestSectionPassages:
         result = self._run(store, "31.205-6 compensation")
         assert result.sources[0]["label"] == "OMB UG — Part 31 - Contract Cost Principles · § 31.205-6"
         assert result.passages[0]["content"].endswith(_para("c", 500))
+
+    def test_a_heading_whose_title_opens_on_a_quoted_term(self):
+        """15 CFR's § 734.8 opens on “Technology”. Unread as a heading, a
+        query naming it got no passage and § 734.7's ran on through it."""
+        store = SectionStore()
+        store.add("p734", "PART 734—SCOPE OF THE EXPORT ADMINISTRATION REGULATIONS", PART_734)
+        result = self._run(store, "734.8 fundamental research")
+        assert result.passages[0]["content"] == SECTION_734_8
+        assert result.sources[0]["label"] == (
+            "OMB UG — PART 734—SCOPE OF THE EXPORT ADMINISTRATION REGULATIONS · § 734.8"
+        )
+        assert self._run(store, "734.7 published").passages[0]["content"] == SECTION_734_7
+
+    def test_a_line_opening_on_the_number_and_a_lower_case_word_is_not_a_heading(self):
+        section = (
+            "§ 734.3 Items subject to the EAR.\n\n" + _para("a", 300)
+            + "\n§ 734.8 of this part sets out when research results are not subject to the EAR.\n"
+            "734.8 “fundamental research” is defined in paragraph (c) of that section.\n" + _para("b", 300)
+        )
+        store = SectionStore()
+        store.add("p734", "PART 734—SCOPE OF THE EXPORT ADMINISTRATION REGULATIONS", section)
+        assert not any(p["chunk_id"].endswith("_section_734.8") for p in self._run(store, "734.8").passages)
+        # Nor does either line end § 734.3.
+        assert self._run(store, "734.3").passages[0]["content"] == section
 
     def test_a_paged_section_keeps_its_own_pages(self):
         text = SUBPART_E
