@@ -181,6 +181,20 @@ export interface CertificationProgress extends CourseIdentity {
   unlocked?: boolean
   learning_position?: LearningPosition | null
   position_revision?: number
+  /** Lesson ids read per module: opened (no check) or check passed. */
+  lessons_read?: Record<string, string[]>
+  /** Per module, whether lessons must be passed in order before the exercise. */
+  lesson_checks_required?: Record<string, boolean>
+}
+
+export interface LessonCheckResult {
+  module_id: string
+  lesson_id: string
+  correct: boolean
+  explanation: string
+  lesson_ids_read: string[]
+  lessons_read: number[]
+  unread_lessons: number[]
 }
 
 export interface ValidationCheck {

@@ -6260,10 +6260,14 @@ async def get_certification_lesson(
     The lesson content renders as a card the user reads directly. Add one
     framing sentence; don't summarize or restate the lesson in your own words,
     because a paraphrase can reverse what it says. When the learner asks about
-    it, quote the lesson's own words. Knowledge checks render as interactive practice in the
-    card; invite the learner to try them and ask for help if needed. Do not
-    duplicate the question or claim to have seen their local answer. Practice
-    checks do not award module credit.
+    it, quote the lesson's own words. When check_required is true, the lesson
+    counts as read only after the learner answers its knowledge check
+    correctly in the card; that opens the next lesson. Ask them to answer it
+    there. You cannot answer it or record an answer for them, and you must
+    not say or hint which option is correct; if they're stuck, point to the
+    part of the lesson that covers it. Don't call a lesson read, or send the
+    next one, until unread_lessons shows it passed. The check itself awards no
+    module credit.
     Apply editorial_notices when explaining outdated historical statements;
     those corrections preserve assessment requirements and earned credit.
     The result's unread_lessons lists lessons the learner has not opened yet,
@@ -6306,7 +6310,7 @@ async def get_certification_lesson(
             ),
         }
     lesson = lessons[lesson_number - 1]
-    read_ids = await cert_svc.mark_lessons_read(context.deps.user_id, module_id, [lesson.get("id")])
+    read_ids = await cert_svc.record_lessons_opened(context.deps.user_id, module_id, [lesson.get("id")])
     return {
         **cert_svc.course_identity(),
         **cert_svc.lesson_reading(module_id, read_ids),
@@ -6321,7 +6325,9 @@ async def get_certification_lesson(
         "objective": lesson.get("objective", ""),
         "variant": lesson.get("variant", "concept"),
         "content": lesson["content"],
-        "knowledge_check": lesson.get("knowledge_check"),
+        # Without the answer key: the learner answers in the card.
+        "lesson_check": cert_svc.lesson_check_for_learner(lesson),
+        "check_required": cert_svc.lesson_check(lesson) is not None,
         "diagram": lesson.get("diagram"),
         "is_last": lesson_number == len(lessons),
     }

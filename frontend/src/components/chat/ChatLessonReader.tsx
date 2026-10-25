@@ -7,7 +7,7 @@ import { LessonExtras } from '../certification/LessonContent'
 import { EditorialCorrection } from '../certification/EditorialCorrection'
 import type { KnowledgeCheckData } from '../../types/certification'
 import { renderMarkdown } from './markdown'
-import { markLessonRead } from '../../api/certification'
+import { useLessonGate } from '../../hooks/useLessonGate'
 import { wrapCertificationTables } from '../../lib/certificationMarkdown'
 
 const button = 'min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50'
@@ -31,6 +31,7 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
   const available = !readOnly && !!original && original.revision === content.lesson_revision && original.content === content.content
     && lessons.every(item => typeof item.id === 'string' && item.id.length > 0)
     && new Set(lessons.map(item => item.id)).size === lessons.length
+  const gate = useLessonGate(moduleId, available ? lessons : [], enrollmentId)
   const [selectedId, setSelectedId] = useState(String(content.lesson_id ?? ''))
   const selected = available ? lessons.find(item => item.id === selectedId) : undefined
   const index = selected ? lessons.indexOf(selected) : Number(content.lesson_number) - 1
@@ -53,11 +54,13 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
   }, [selectedId])
   function navigate(id: string) {
     if (!available || !lessons.some(item => item.id === id) || savePending.current) return
+    if (!gate.canOpen(lessons.findIndex(item => item.id === id))) return
     focusHeading.current = true
     setSelectedId(id)
     setStatus('idle')
-    // Recorded so chat knows this lesson was read and doesn't send it again.
-    markLessonRead(moduleId, id, enrollmentId).catch(() => {})
+    // Recorded so chat knows this lesson was opened and doesn't send it again;
+    // a lesson with a knowledge check counts as read once its check is passed.
+    gate.opened(id)
     // A return to the already displayed lesson still gives keyboard focus.
     if (id === selectedId) { focusHeading.current = false; heading.current?.focus() }
   }
@@ -88,20 +91,25 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
     <LessonExtras practiceDisabled={readOnly} key={`${selected?.id ?? content.lesson_id}:${selected?.revision ?? content.lesson_revision}`}
       practiceScope={selected?.id && selected.revision ? { userId: auth?.user?.user_id || '', enrollmentId, moduleId, lessonId: selected.id, revision: selected.revision } : undefined}
       diagram={selected ? selected.diagram : typeof content.diagram === 'string' ? content.diagram : undefined}
-      knowledgeCheck={selected ? selected.knowledgeCheck : content.knowledge_check as KnowledgeCheckData | undefined} />
+      knowledgeCheck={selected ? selected.knowledgeCheck : content.knowledge_check as KnowledgeCheckData | undefined}
+      checkPrompt={content.lesson_check as { question: string; options: string[] } | undefined}
+      requiredCheck={!readOnly && (selected ? gate.required && !!selected.knowledgeCheck : content.check_required === true)
+        ? { passed: selected ? gate.isRead(index) : false, onAnswer: choice => gate.answer(String(selected?.id ?? content.lesson_id), choice) }
+        : undefined} />
     {available && selected ? <nav aria-label="Chat lesson navigation" className="mt-4 min-w-0 space-y-3">
       <label className="block text-sm font-medium text-gray-900">Lessons in this module
         <select className="mt-1 block min-h-11 w-full min-w-0 max-w-full rounded-lg border border-gray-300 bg-white p-2" value={selectedId} disabled={status === 'saving'} onChange={event => navigate(event.target.value)}>
-          {lessons.map((item, i) => <option key={item.id} value={item.id}>{i + 1}. {item.title}</option>)}
+          {lessons.map((item, i) => <option key={item.id} value={item.id} disabled={!gate.canOpen(i)}>{i + 1}. {item.title}{gate.required && gate.isRead(i) ? ' (passed)' : ''}</option>)}
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={index === 0 || status === 'saving'} onClick={() => navigate(lessons[index - 1].id!)}>Previous lesson</button>
-        <button type="button" className={button} disabled={index === lessons.length - 1 || status === 'saving'} onClick={() => navigate(lessons[index + 1].id!)}>Next lesson</button>
+        <button type="button" className={button} disabled={index === lessons.length - 1 || status === 'saving' || !gate.canOpen(index + 1)}
+          title={gate.canOpen(index + 1) ? undefined : 'Pass this lesson’s knowledge check first'} onClick={() => navigate(lessons[index + 1].id!)}>Next lesson</button>
         {savedId && lessons.some(item => item.id === savedId) && <button type="button" className={button} disabled={status === 'saving'} onClick={() => navigate(savedId)}>Return to saved lesson</button>}
         <button type="button" className={button} disabled={status === 'saving'} onClick={() => void save()}>Save my place</button>
       </div>
-      <p role="status" className="text-sm text-gray-700">{status === 'saving' ? 'Saving your place…' : status === 'saved' ? enrollmentId ? 'Place saved across devices.' : 'Place saved on this browser.' : status === 'error' ? 'Your place could not be saved. Refresh progress before trying again.' : 'Browse lessons here. Use Save my place to update where you resume. Reading and practice do not award credit.'}</p>
+      <p role="status" className="text-sm text-gray-700">{status === 'saving' ? 'Saving your place…' : status === 'saved' ? enrollmentId ? 'Place saved across devices.' : 'Place saved on this browser.' : status === 'error' ? 'Your place could not be saved. Refresh progress before trying again.' : gate.required ? 'Pass each lesson’s knowledge check to open the next. Use Save my place to update where you resume.' : 'Browse lessons here. Use Save my place to update where you resume. Reading and practice do not award credit.'}</p>
       {status === 'error' && <button type="button" className={button} onClick={() => void certification?.refresh()}>Refresh progress</button>}
       {index === lessons.length - 1 && <p className="text-sm text-gray-700">You have reached the last lesson. Open the learning panel to review the module challenge.</p>}
     </nav> : <p className="mt-4 text-sm text-gray-700">This saved card is available to read. Open the learning panel for the current course lessons.</p>}

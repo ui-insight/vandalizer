@@ -50,6 +50,19 @@ class LessonReadPayload(BaseModel):
     lesson_id: str
 
 
+class LessonCheckPayload(BaseModel):
+    module_id: str
+    lesson_id: str
+    choice: int
+
+
+async def _require_lessons_read(user_id: str, module_id: str, action: str) -> None:
+    """The panel's exercise steps open after the module's lessons, as in chat."""
+    gate = await svc.lesson_gate(user_id, module_id)
+    if gate is not None:
+        raise HTTPException(status_code=409, detail=svc.lesson_gate_error(module_id, gate, action)["error"])
+
+
 class ScenarioSubmissionPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
@@ -161,9 +174,20 @@ async def save_lesson_position(payload: LessonPositionPayload, user: User = Depe
 @router.post('/lessons/read')
 @course_operation(http=True)
 async def mark_lesson_read(payload: LessonReadPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
-    """A lesson opened with the chat lesson card's Next lesson, so chat knows."""
-    read = await svc.mark_lessons_read(user.user_id, payload.module_id, [payload.lesson_id])
-    return {"module_id": payload.module_id, **svc.lesson_reading(payload.module_id, read)}
+    """A lesson opened in the panel or the chat lesson card, so chat knows.
+    It counts as read only when the lesson has no knowledge check."""
+    read = await svc.record_lessons_opened(user.user_id, payload.module_id, [payload.lesson_id])
+    return {"module_id": payload.module_id, "lesson_ids_read": read, **svc.lesson_reading(payload.module_id, read)}
+
+
+@router.post('/lessons/check')
+@course_operation(http=True)
+async def answer_lesson_check(payload: LessonCheckPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+    """Grade a lesson's knowledge check; a correct answer records the lesson as read."""
+    result = await svc.answer_lesson_check(user.user_id, payload.module_id, payload.lesson_id, payload.choice)
+    if "error" in result:
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
 
 
 @router.get("/progress")
@@ -208,6 +232,7 @@ async def download_certificate(user: User = Depends(get_current_user), enrollmen
 @router.post("/modules/{module_id}/validate")
 @course_operation(http=True)
 async def validate_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+    await _require_lessons_read(user.user_id, module_id, "Checking the module")
     result = await svc.validate_module(user.user_id, module_id)
     return result
 
@@ -215,6 +240,7 @@ async def validate_module(module_id: str, user: User = Depends(get_current_user)
 @router.post("/modules/{module_id}/complete")
 @course_operation(write=True, http=True)
 async def complete_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None, request_id: str | None = None, payload: OutcomeCompletionPayload | None = None, expected_attempts: Annotated[int | None, Query(ge=0)] = None):
+    await _require_lessons_read(user.user_id, module_id, "Completing the module")
     selected = {'require_attempt_counter': True}
     if expected_attempts is not None:
         selected['expected_attempts'] = expected_attempts
@@ -259,6 +285,7 @@ async def provision_module(
     enrollment_id: str | None = None,
 ):
     """Provision sample documents for a certification module into the user's workspace."""
+    await _require_lessons_read(user.user_id, module_id, "Setting up the lab")
     result = await svc.provision_module_documents(user, module_id, settings)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

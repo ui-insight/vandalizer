@@ -246,6 +246,8 @@ async def get_progress_dict(user_id: str) -> dict:
         "certified_at": prog.certified_at.isoformat() if prog.certified_at else None,
         "last_activity_date": prog.last_activity_date,
         "unlocked": prog.unlocked,
+        "lessons_read": dict(getattr(prog, "lessons_read", None) or {}),
+        "lesson_checks_required": lesson_checks_required(prog),
         **({'learning_position': prog.learning_position, 'position_revision': prog.position_revision,
             'pending_completions': pending} if operation else {}),
     }
@@ -297,6 +299,88 @@ async def lessons_read_for(user_id: str, module_id: str) -> list[str]:
     return await mark_lessons_read(user_id, module_id, [])
 
 
+# Mandatory lesson checks. Support ticket: opening a lesson counted as reading
+# it, so clicking Next lesson through a module in seconds "read" all of it.
+# A lesson with a knowledge check now counts as read only once its check is
+# answered correctly, in chat or the panel; a lesson without one still counts
+# when opened. Lessons already recorded as read stay read.
+
+def lesson_check(lesson: dict | None) -> dict | None:
+    """The lesson's knowledge check, when it is one a learner can pass."""
+    check = (lesson or {}).get("knowledge_check")
+    if not isinstance(check, dict):
+        return None
+    options = check.get("options")
+    if not isinstance(options, list) or sum(1 for o in options if isinstance(o, dict) and o.get("correct") is True) != 1:
+        return None
+    return check
+
+
+def lesson_check_for_learner(lesson: dict | None) -> dict | None:
+    """The lesson's check without its answer key, for the model: the learner
+    answers in the card, and the model must not be able to give it away."""
+    check = (lesson or {}).get("knowledge_check")
+    if not isinstance(check, dict):
+        return None
+    options = check.get("options") if isinstance(check.get("options"), list) else []
+    return {"question": check.get("question", ""),
+            "options": [o.get("text", "") if isinstance(o, dict) else "" for o in options]}
+
+
+async def record_lessons_opened(user_id: str, module_id: str, lesson_ids: list[str]) -> list[str]:
+    """Record lessons opened in chat or the panel. Opening counts as reading
+    only for a lesson without a knowledge check; returns every lesson id read."""
+    by_id = {row.get("id"): row for row in (get_lessons(module_id) or {}).get("lessons", [])}
+    return await mark_lessons_read(
+        user_id, module_id, [i for i in lesson_ids if lesson_check(by_id.get(i)) is None],
+    )
+
+
+async def answer_lesson_check(user_id: str, module_id: str, lesson_id: str, choice: int) -> dict:
+    """Grade the learner's answer to a lesson's knowledge check.
+
+    A correct answer records the lesson as read, which opens the next lesson
+    and, after the last, the module's exercise. A wrong answer records
+    nothing and returns that option's explanation, so the learner can try
+    again. Lessons are answered in order where the module's lessons are gated.
+    """
+    lessons = (get_lessons(module_id) or {}).get("lessons", [])
+    number = next((n for n, row in enumerate(lessons, 1) if row.get("id") == lesson_id), None)
+    if module_id not in course_module_xp() or number is None:
+        return {"error": "This lesson isn't part of the course."}
+    gate = await lesson_gate(user_id, module_id)
+    if gate is not None and number > gate["next_lesson"]:
+        return {"error": f"Lessons are taken in order: pass lesson {gate['next_lesson']} first."}
+    check = lesson_check(lessons[number - 1])
+    if check is None:
+        read = await mark_lessons_read(user_id, module_id, [lesson_id])
+        return {"module_id": module_id, "lesson_id": lesson_id, "correct": True, "explanation": "",
+                "lesson_ids_read": read, **lesson_reading(module_id, read)}
+    options = check["options"]
+    if not isinstance(choice, int) or not 0 <= choice < len(options):
+        return {"error": f"Choose one of the {len(options)} answers."}
+    option = options[choice]
+    correct = option.get("correct") is True
+    read = await (mark_lessons_read(user_id, module_id, [lesson_id]) if correct else lessons_read_for(user_id, module_id))
+    return {
+        "module_id": module_id,
+        "lesson_id": lesson_id,
+        "correct": correct,
+        "explanation": option.get("explanation", ""),
+        "lesson_ids_read": read,
+        **lesson_reading(module_id, read),
+    }
+
+
+def lesson_checks_required(prog) -> dict[str, bool]:
+    """Per module, whether its lessons must be passed in order before the
+    exercise: not for admin-unlocked learners or modules already under way."""
+    if getattr(prog, "unlocked", False):
+        return {module_id: False for module_id in course_module_xp()}
+    modules = getattr(prog, "modules", None) or {}
+    return {module_id: not _module_started(modules.get(module_id) or {}) for module_id in course_module_xp()}
+
+
 # Guided course in chat: a module's lessons come before its exercise, answers,
 # check and completion. Support ticket: the course was only rules for the
 # model, so learners' paths depended on the model that day (lessons skipped,
@@ -334,12 +418,14 @@ async def lesson_gate(user_id: str, module_id: str) -> dict | None:
         return None
     read = list((getattr(prog, "lessons_read", None) or {}).get(module_id, []))
     # The saved place counts as reached, with every lesson before it: a
-    # learner who stopped at lesson 5 resumes there, not at lesson 1.
+    # learner who stopped at lesson 5 resumes there, not at lesson 1. Not for
+    # a lesson with a knowledge check: only passing the check reads it.
     position = getattr(prog, "learning_position", None)
     if isinstance(position, dict) and position.get("module_id") == module_id:
         ids = [row.get("id") for row in lessons]
         if position.get("lesson_id") in ids:
-            read += ids[: ids.index(position["lesson_id"]) + 1]
+            reached = lessons[: ids.index(position["lesson_id"]) + 1]
+            read += [row.get("id") for row in reached if lesson_check(row) is None]
     reading = lesson_reading(module_id, read)
     if not reading["unread_lessons"]:
         return None

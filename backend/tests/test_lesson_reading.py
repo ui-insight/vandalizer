@@ -92,7 +92,7 @@ def test_sent_back_once_per_turn():
 
 
 @pytest.mark.asyncio
-async def test_the_lesson_tool_records_the_lesson_and_reports_what_is_unread():
+async def test_the_lesson_tool_reports_what_is_unread_and_opening_does_not_read_a_checked_lesson():
     from app.services.chat_tools import get_certification_lesson
 
     real = svc.get_lessons("foundations")["lessons"]
@@ -101,6 +101,86 @@ async def test_the_lesson_tool_records_the_lesson_and_reports_what_is_unread():
     marked = AsyncMock(return_value=[real[0]["id"], real[1]["id"]])
     with patch.object(svc, "mark_lessons_read", marked):
         result = await get_certification_lesson(ctx, "foundations", 2)
-    marked.assert_awaited_once_with("user1", "foundations", [real[1]["id"]])
+    # Lesson 2 has a knowledge check: opening it records nothing new.
+    marked.assert_awaited_once_with("user1", "foundations", [])
+    assert result["check_required"] is True
     assert result["lessons_read"] == [1, 2]
     assert result["unread_lessons"] == list(range(3, len(real) + 1))
+
+
+# Mandatory lesson checks. Support ticket: clicking Next lesson through a
+# module "read" all six lessons in seconds; opening a lesson counted as reading.
+CHECKED = {"lessons": [
+    {"id": f"m.l{n}", "title": f"L{n}", "content": "c", "knowledge_check": {"question": "Q?", "options": [
+        {"text": "right", "correct": True, "explanation": "Because the lesson says so."},
+        {"text": "wrong", "correct": False, "explanation": "The lesson says otherwise."},
+    ]}} for n in range(1, 4)
+]}
+
+
+@pytest.fixture
+def checked_course():
+    with patch.object(svc, "get_lessons", return_value=CHECKED), \
+         patch.object(svc, "course_module_xp", return_value={"foundations": 50}):
+        yield
+
+
+@pytest.mark.asyncio
+async def test_opening_a_checked_lesson_does_not_read_it(checked_course):
+    marked = AsyncMock(return_value=[])
+    with patch.object(svc, "mark_lessons_read", marked):
+        await svc.record_lessons_opened("user1", "foundations", ["m.l1"])
+    marked.assert_awaited_once_with("user1", "foundations", [])
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_answer_explains_and_reads_nothing(checked_course):
+    marked = AsyncMock(return_value=[])
+    with patch.object(svc, "lesson_gate", AsyncMock(return_value={"next_lesson": 1, "lesson_count": 3})), \
+         patch.object(svc, "mark_lessons_read", marked):
+        result = await svc.answer_lesson_check("user1", "foundations", "m.l1", 1)
+    assert result["correct"] is False
+    assert result["explanation"] == "The lesson says otherwise."
+    marked.assert_awaited_once_with("user1", "foundations", [])  # only the read-back
+
+
+@pytest.mark.asyncio
+async def test_a_correct_answer_reads_the_lesson(checked_course):
+    marked = AsyncMock(return_value=["m.l1"])
+    with patch.object(svc, "lesson_gate", AsyncMock(return_value={"next_lesson": 1, "lesson_count": 3})), \
+         patch.object(svc, "mark_lessons_read", marked):
+        result = await svc.answer_lesson_check("user1", "foundations", "m.l1", 0)
+    assert result["correct"] is True
+    marked.assert_awaited_once_with("user1", "foundations", ["m.l1"])
+    assert result["unread_lessons"] == [2, 3]
+
+
+@pytest.mark.asyncio
+async def test_checks_are_answered_in_order(checked_course):
+    with patch.object(svc, "lesson_gate", AsyncMock(return_value={"next_lesson": 1, "lesson_count": 3})):
+        result = await svc.answer_lesson_check("user1", "foundations", "m.l3", 0)
+    assert "pass lesson 1 first" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_an_answer_outside_the_options_is_refused(checked_course):
+    with patch.object(svc, "lesson_gate", AsyncMock(return_value=None)):
+        result = await svc.answer_lesson_check("user1", "foundations", "m.l1", 5)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_a_saved_place_does_not_read_checked_lessons(checked_course):
+    prog = SimpleNamespace(modules={}, unlocked=False, lessons_read={},
+                           learning_position={"module_id": "foundations", "lesson_id": "m.l3"})
+    with patch.object(svc, "get_progress", AsyncMock(return_value=prog)):
+        gate = await svc.lesson_gate("user1", "foundations")
+    assert gate["next_lesson"] == 1
+
+
+def test_checks_are_required_except_for_unlocked_or_started_modules(checked_course):
+    fresh = SimpleNamespace(modules={}, unlocked=False)
+    started = SimpleNamespace(modules={"foundations": {"attempts": 1}}, unlocked=False)
+    assert svc.lesson_checks_required(fresh) == {"foundations": True}
+    assert svc.lesson_checks_required(started) == {"foundations": False}
+    assert svc.lesson_checks_required(SimpleNamespace(modules={}, unlocked=True)) == {"foundations": False}

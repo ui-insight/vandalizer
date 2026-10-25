@@ -1,5 +1,5 @@
 import { apiFetch, ApiError, rawFetch } from './client'
-import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PositionSaved, ScenarioSubmission, SavedScenarioSubmission, ChatPracticeJudgment, ChatPracticeResult } from '../types/certification'
+import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PositionSaved, ScenarioSubmission, SavedScenarioSubmission, ChatPracticeJudgment, ChatPracticeResult, LessonCheckResult } from '../types/certification'
 
 function enrolledPath(path: string, enrollmentId?: string) {
   return enrollmentId ? `${path}?enrollment_id=${encodeURIComponent(enrollmentId)}` : path
@@ -105,10 +105,17 @@ export function savePosition(enrollmentId: string, moduleId: string, lessonId: s
   })
 }
 
-/** Tell chat a lesson was opened in the lesson card. Navigation only. */
+/** Tell chat a lesson was opened. It counts as read only when it has no knowledge check. */
 export function markLessonRead(moduleId: string, lessonId: string, enrollmentId?: string) {
-  return apiFetch<{ module_id: string; lessons_read: number[]; unread_lessons: number[] }>(enrolledPath('/api/certification/lessons/read', enrollmentId), {
+  return apiFetch<{ module_id: string; lesson_ids_read: string[]; lessons_read: number[]; unread_lessons: number[] }>(enrolledPath('/api/certification/lessons/read', enrollmentId), {
     method: 'POST', body: JSON.stringify({ module_id: moduleId, lesson_id: lessonId }),
+  })
+}
+
+/** Answer a lesson's knowledge check; a correct answer records the lesson as read. */
+export function answerLessonCheck(moduleId: string, lessonId: string, choice: number, enrollmentId?: string) {
+  return apiFetch<LessonCheckResult>(enrolledPath('/api/certification/lessons/check', enrollmentId), {
+    method: 'POST', body: JSON.stringify({ module_id: moduleId, lesson_id: lessonId, choice }),
   })
 }
 

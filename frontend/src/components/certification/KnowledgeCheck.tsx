@@ -80,3 +80,63 @@ export function KnowledgeCheck({ data, storageKey }: { data: KnowledgeCheckData;
     </fieldset>
   )
 }
+
+
+export interface RequiredCheck {
+  /** The lesson's check is already passed. */
+  passed: boolean
+  /** Grade one answer on the server. */
+  onAnswer: (choice: number) => Promise<{ correct: boolean; explanation: string }>
+}
+
+/**
+ * A lesson's mandatory knowledge check, graded on the server. A correct
+ * answer completes the lesson and opens the next; a wrong one shows why and
+ * lets the learner try again. Support ticket: the practice check was
+ * optional, so clicking Next lesson through a module counted as reading it.
+ */
+export function RequiredKnowledgeCheck({ question, options, check }: { question: string; options: string[]; check: RequiredCheck }) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const [pending, setPending] = useState(false)
+  const [result, setResult] = useState<{ correct: boolean; explanation: string } | null>(null)
+  const [failed, setFailed] = useState(false)
+  const id = useId()
+  const passed = check.passed || result?.correct === true
+  async function submit() {
+    if (selected === null || pending || passed) return
+    setPending(true); setFailed(false)
+    try { setResult(await check.onAnswer(selected)) }
+    catch { setFailed(true) }
+    finally { setPending(false) }
+  }
+  return (
+    <fieldset className="my-4 min-w-0 rounded-lg border-2 border-indigo-200 bg-indigo-50/30 px-[8px] py-4 [overflow-wrap:anywhere] sm:p-4">
+      <legend className="flex items-center gap-2 px-1 text-xs font-bold text-indigo-800">
+        <HelpCircle size={16} aria-hidden="true" /> Knowledge check · required
+      </legend>
+      <p id={`${id}-question`} className="mb-3 text-sm font-medium text-gray-900">{question}</p>
+      <div role="radiogroup" aria-labelledby={`${id}-question`} className="space-y-2">
+        {options.map((text, index) => (
+          <label key={index} className="flex cursor-pointer items-start gap-[8px] rounded-md border border-gray-300 bg-white px-[8px] py-3 text-sm text-gray-800 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-indigo-700 sm:gap-2 sm:p-3">
+            <input type="radio" name={id} checked={selected === index} disabled={passed || pending}
+              onChange={() => { setSelected(index); setResult(null) }} className="mt-0.5 shrink-0" />
+            <span className="min-w-0">{text}</span>
+          </label>
+        ))}
+      </div>
+      {!passed && <button type="button" disabled={selected === null || pending || result !== null} onClick={() => void submit()} className="mt-3 min-h-11 rounded-md border border-indigo-800 bg-white px-3 py-2 text-sm font-medium text-indigo-900 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2">
+        {pending ? 'Checking…' : 'Check answer'}
+      </button>}
+      <div role="status" aria-live="polite">
+        {result && <p className={`mt-3 text-sm ${result.correct ? 'text-green-800' : 'text-amber-900'}`}>
+          <strong>{result.correct ? 'Correct. ' : 'Not quite. '}</strong>{result.explanation}
+          {!result.correct && ' Choose another answer and check again.'}
+        </p>}
+        {failed && <p className="mt-3 text-sm text-amber-900">Your answer couldn’t be checked. Try again.</p>}
+      </div>
+      <p className="mt-2 text-xs text-gray-600">{passed
+        ? 'Passed. This lesson is complete, and the next one is open.'
+        : 'Answer correctly to complete this lesson and open the next one.'}</p>
+    </fieldset>
+  )
+}

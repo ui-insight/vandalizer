@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { markLessonRead } from '../../api/certification'
 import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Loader2, Target, Upload } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
@@ -7,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import type { CertExercise, LessonSection } from '../../types/certification'
 import { LessonContent } from './LessonContent'
 import { observeCertificationJourney } from '../../api/certificationJourney'
+import { useLessonGate } from '../../hooks/useLessonGate'
 
 function estimateReadTime(content: string): number {
   const words = content.split(/\s+/).length
@@ -73,11 +73,13 @@ export function LessonStepper({
     } catch { setPositionStatus('error') }
     finally { savingPosition.current = false }
   }, [onSavePosition])
+  const gate = useLessonGate(moduleId, lessons, enrollmentId)
+  const canOpenLesson = gate.canOpen
   const setCurrentIndex = useCallback((index: number) => {
-    if (savingPosition.current) return
+    if (savingPosition.current || !canOpenLesson(index)) return
     setCurrentPosition(enrollmentId ? (lessons[index]?.id ?? index) : index)
     if (enrollmentId && lessons[index]?.id) void savePlace(lessons[index].id!)
-  }, [enrollmentId, lessons, savePlace])
+  }, [enrollmentId, lessons, savePlace, canOpenLesson])
   const [readLessons, setReadLessons] = useState<Set<number>>(() => new Set())
   const { toast } = useToast()
 
@@ -92,7 +94,9 @@ export function LessonStepper({
 
   // Clamp index if it ever goes out of bounds
   const currentIndex = typeof currentPosition === 'string' ? lessons.findIndex(lesson => lesson.id === currentPosition) : currentPosition
-  const safeIndex = currentIndex < 0 || currentIndex >= lessons.length ? 0 : currentIndex
+  const inRange = currentIndex < 0 || currentIndex >= lessons.length ? 0 : currentIndex
+  // A saved place past the first lesson whose check isn't passed shows that lesson.
+  const safeIndex = gate.canOpen(inRange) ? inRange : Math.max(gate.firstUnread, 0)
   const observedRestoration = useRef<{ key: string; lessonId?: string; reported: boolean } | null>(null)
   useEffect(() => {
     const key = `${enrollmentId}:${moduleId}`
@@ -136,13 +140,18 @@ export function LessonStepper({
     })
   }, [safeIndex])
 
-  // And record it, so chat's guided course knows the panel taught it.
+  // And record it, so chat's guided course knows the panel taught it. A
+  // lesson with a knowledge check counts as read only once it is passed.
   const shownLessonId = lessons[safeIndex]?.id
+  const recordOpened = gate.opened
   useEffect(() => {
-    if (shownLessonId) markLessonRead(moduleId, shownLessonId, enrollmentId).catch(() => {})
-  }, [moduleId, shownLessonId, enrollmentId])
+    if (shownLessonId) recordOpened(shownLessonId)
+  }, [shownLessonId, recordOpened])
 
-  const allRead = readLessons.size >= lessons.length
+  // Where checks are required, "read" is the server's record of passed
+  // lessons; otherwise, every lesson viewed here.
+  const allRead = gate.required ? gate.allRead : readLessons.size >= lessons.length
+  const currentPassed = !gate.required || gate.isRead(safeIndex)
   const [showChallengePreview, setShowChallengePreview] = useState(false)
 
   const goNext = useCallback(() => {
@@ -151,11 +160,11 @@ export function LessonStepper({
       setCurrentIndex(nextIdx)
       setReadLessons(prev => {
         if (prev.has(nextIdx)) return new Set([...prev])
-        toast(`Lesson ${safeIndex + 1} of ${lessons.length} viewed`, 'success')
+        if (!gate.required) toast(`Lesson ${safeIndex + 1} of ${lessons.length} viewed`, 'success')
         return new Set([...prev, nextIdx])
       })
     }
-  }, [safeIndex, lessons.length, toast, setCurrentIndex])
+  }, [safeIndex, lessons.length, toast, setCurrentIndex, gate.required])
 
   const goPrev = useCallback(() => {
     if (safeIndex > 0) {
@@ -183,17 +192,19 @@ export function LessonStepper({
           <button
             key={i}
             type="button"
-            disabled={positionStatus === 'saving'}
+            disabled={positionStatus === 'saving' || !gate.canOpen(i)}
             onClick={() => setCurrentIndex(i)}
-            aria-label={`Lesson ${i + 1}: ${lessons[i].title}${readLessons.has(i) ? ", viewed" : ""}`}
+            aria-label={`Lesson ${i + 1}: ${lessons[i].title}${gate.required
+              ? gate.isRead(i) ? ', passed' : gate.canOpen(i) ? '' : ', opens after the previous lesson’s check'
+              : readLessons.has(i) ? ', viewed' : ''}`}
             aria-current={i === safeIndex ? "step" : undefined}
             className={cn(
               'min-h-11 min-w-0 text-sm font-semibold transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900',
               i === safeIndex
                 ? 'bg-highlight text-highlight-text ring-2 ring-inset ring-highlight-text'
-                : readLessons.has(i)
+                : (gate.required ? gate.isRead(i) : readLessons.has(i))
                   ? 'bg-green-400 text-gray-900'
-                  : 'bg-gray-200 text-gray-900',
+                  : gate.canOpen(i) ? 'bg-gray-200 text-gray-900' : 'bg-gray-100 text-gray-400 cursor-not-allowed',
             )}
             style={{
               borderRadius: 'var(--ui-radius, 12px)',
@@ -225,7 +236,12 @@ export function LessonStepper({
 
       {/* Lesson content with transition */}
       <div className="cert-slide-in" key={safeIndex}>
-        <LessonContent section={lessons[safeIndex]} manifestSha256={manifestSha256} practiceScope={lessons[safeIndex].id && lessons[safeIndex].revision ? {
+        <LessonContent section={lessons[safeIndex]} manifestSha256={manifestSha256}
+          requiredCheck={gate.required && lessons[safeIndex].knowledgeCheck && lessons[safeIndex].id ? {
+            passed: gate.isRead(safeIndex),
+            onAnswer: choice => gate.answer(lessons[safeIndex].id!, choice),
+          } : undefined}
+          practiceScope={lessons[safeIndex].id && lessons[safeIndex].revision ? {
           userId: user?.user_id || '', enrollmentId, moduleId, lessonId: lessons[safeIndex].id!, revision: lessons[safeIndex].revision!,
         } : undefined} />
       </div>
@@ -336,7 +352,9 @@ export function LessonStepper({
         {isLastLesson ? (
           <button
             onClick={onGoToChallenge}
-            className="flex items-center gap-1.5 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
+            disabled={!currentPassed}
+            title={currentPassed ? undefined : 'Pass this lesson’s knowledge check first'}
+            className="disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
             style={{ borderRadius: 'var(--ui-radius, 12px)' }}
           >
             Go to Challenge
@@ -345,8 +363,9 @@ export function LessonStepper({
         ) : (
           <button
             onClick={goNext}
-            disabled={positionStatus === 'saving'}
-            className="flex items-center gap-1.5 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
+            disabled={positionStatus === 'saving' || !currentPassed}
+            title={currentPassed ? undefined : 'Pass this lesson’s knowledge check first'}
+            className="disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all"
             style={{ borderRadius: 'var(--ui-radius, 12px)' }}
           >
             Next

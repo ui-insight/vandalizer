@@ -38,6 +38,8 @@ interface CertificationPanelContextValue {
   getExercise: (moduleId: string) => Promise<CertExercise>
   submitAssessment: (moduleId: string, answers: Record<string, string>) => Promise<unknown>
   savePosition: (moduleId: string, lessonId: string) => Promise<void>
+  /** Merge lessons the server now counts as read into progress. */
+  noteLessonsRead: (moduleId: string, lessonIds: string[]) => void
 }
 
 const CertificationPanelContext = createContext<CertificationPanelContextValue | null>(null)

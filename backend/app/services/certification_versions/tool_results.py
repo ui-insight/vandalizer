@@ -189,6 +189,13 @@ class KnowledgeCheck(BaseModel):
         return self
 
 
+class LessonCheckPrompt(BaseModel):
+    """A lesson's knowledge check as chat sees it: no answer key."""
+    model_config = ConfigDict(strict=True, extra='forbid')
+    question: Text
+    options: list[Text] = Field(min_length=2)
+
+
 class LessonResult(Result):
     module_id: Text
     module_title: Text
@@ -199,6 +206,7 @@ class LessonResult(Result):
     lesson_count: Annotated[int, Field(gt=0)]
     is_last: bool
     knowledge_check: KnowledgeCheck | None = None
+    lesson_check: LessonCheckPrompt | None = None
     diagram: str | None = None
 
     @model_validator(mode='after')

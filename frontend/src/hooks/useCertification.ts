@@ -267,5 +267,16 @@ export function useCertification() {
     }
   }
 
-  return { pendingCompletions, progress, course, loading, refresh, refreshAfterWrite, refreshError, savedWritePendingRefresh, validate, complete, provision, getExercise, submitAssessment, savePosition }
+  // Lessons the server now counts as read (a passed check, or an opened
+  // lesson without one), merged in without waiting for a progress reload.
+  const noteLessonsRead = useCallback((moduleId: string, lessonIds: string[]) => {
+    setProgress(previous => {
+      if (!previous) return previous
+      const known = previous.lessons_read?.[moduleId] ?? []
+      const added = lessonIds.filter(id => !known.includes(id))
+      return added.length ? { ...previous, lessons_read: { ...previous.lessons_read, [moduleId]: [...known, ...added] } } : previous
+    })
+  }, [])
+
+  return { pendingCompletions, progress, course, loading, refresh, refreshAfterWrite, refreshError, savedWritePendingRefresh, validate, complete, provision, getExercise, submitAssessment, savePosition, noteLessonsRead }
 }

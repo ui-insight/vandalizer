@@ -317,7 +317,10 @@ async def test_get_lesson_returns_content_and_position():
     assert result["title"] == "L2"
     assert result["content"] == "second"
     assert result["variant"] == "insight"
-    assert result["knowledge_check"]["question"] == "Q?"
+    # The model gets the question, never the answer key.
+    assert result["lesson_check"] == {"question": "Q?", "options": ["Inspect the source", "Trust the claim"]}
+    assert "knowledge_check" not in result
+    assert result["check_required"] is True
     assert result["is_last"] is True
 
 
@@ -599,11 +602,14 @@ async def test_real_lesson_export_preserves_identity_diagrams_and_practice():
             assert result['lesson_id'] not in identities
             identities.add(result['lesson_id'])
             assert result['diagram'] == lesson.get('diagram')
-            assert result['knowledge_check'] == lesson.get('knowledge_check')
+            # Every lesson has a mandatory check; chat sees it without answers.
+            assert result['lesson_check'] == cert_svc.lesson_check_for_learner(lesson)
+            assert result['check_required'] is True
+            assert all(isinstance(option, str) for option in result['lesson_check']['options'])
             if result['diagram']:
                 diagrams.add(result['diagram'])
-            if result['knowledge_check']:
+            if result['lesson_check']:
                 practice_count += 1
     assert len(identities) == 74
     assert len(diagrams) == 8
-    assert practice_count == 18
+    assert practice_count == 74

@@ -3,7 +3,7 @@ import { BookOpen, Lightbulb, Play } from 'lucide-react'
 import { renderCertificationMarkdown } from '../../lib/certificationMarkdown'
 import { cn } from '../../lib/cn'
 import type { LessonSection } from '../../types/certification'
-import { KnowledgeCheck } from './KnowledgeCheck'
+import { KnowledgeCheck, RequiredKnowledgeCheck, type RequiredCheck } from './KnowledgeCheck'
 import { EditorialCorrection } from './EditorialCorrection'
 import { practiceStorageKey, type PracticeScope } from '../../lib/certificationPractice'
 import { HowLLMWorksDiagram } from './diagrams/HowLLMWorks'
@@ -57,7 +57,7 @@ function parseKeyTerms(content: string): { term: string; definition: string }[] 
   return terms.length >= 2 ? terms : null
 }
 
-export function LessonContent({ section, practiceScope, manifestSha256 }: { section: LessonSection; practiceScope?: PracticeScope; manifestSha256?: string }) {
+export function LessonContent({ section, practiceScope, manifestSha256, requiredCheck }: { section: LessonSection; practiceScope?: PracticeScope; manifestSha256?: string; requiredCheck?: RequiredCheck }) {
   const style = VARIANT_STYLES[section.variant]
   const Icon = style.icon
 
@@ -101,7 +101,7 @@ export function LessonContent({ section, practiceScope, manifestSha256 }: { sect
         )}
 
       </div>
-      <LessonExtras diagram={section.diagram} knowledgeCheck={section.knowledgeCheck} practiceScope={practiceScope} />
+      <LessonExtras diagram={section.diagram} knowledgeCheck={section.knowledgeCheck} practiceScope={practiceScope} requiredCheck={requiredCheck} />
     </div>
   )
 }
@@ -118,8 +118,10 @@ const DIAGRAM_TEXT: Record<string, string> = {
   'validation-plan-example': 'The example below lists validation checks and distinguishes passed, failed and review-needed results in text.',
 }
 
-/** Shared practice and illustrations for chat and the learning panel. */
-export function LessonExtras({ diagram, knowledgeCheck, practiceScope, practiceDisabled = false }: Pick<LessonSection, 'diagram' | 'knowledgeCheck'> & { practiceScope?: PracticeScope; practiceDisabled?: boolean }) {
+/** Shared knowledge check and illustrations for chat and the learning panel.
+ *  With requiredCheck, the check is the lesson's mandatory one, graded on the
+ *  server; checkPrompt supplies its question when only that is known. */
+export function LessonExtras({ diagram, knowledgeCheck, practiceScope, practiceDisabled = false, requiredCheck, checkPrompt }: Pick<LessonSection, 'diagram' | 'knowledgeCheck'> & { practiceScope?: PracticeScope; practiceDisabled?: boolean; requiredCheck?: RequiredCheck; checkPrompt?: { question: string; options: string[] } }) {
   const Diagram = diagram ? DIAGRAM_MAP[diagram] : null
   const storageKey = practiceStorageKey(practiceScope)
   return <>
@@ -127,6 +129,10 @@ export function LessonExtras({ diagram, knowledgeCheck, practiceScope, practiceD
       <figcaption className="mb-2 text-sm leading-relaxed text-gray-700">{DIAGRAM_TEXT[diagram!]}</figcaption>
       <div className="overflow-auto [&>*]:min-w-[480px]" role="region" aria-label="Lesson diagram" tabIndex={0}><Diagram /></div>
     </figure>}
-    {knowledgeCheck && <fieldset disabled={practiceDisabled} className="min-w-0 border-0 p-0"><KnowledgeCheck key={`${storageKey}:${JSON.stringify(knowledgeCheck)}`} data={knowledgeCheck} storageKey={storageKey} /></fieldset>}
+    {requiredCheck && (knowledgeCheck || checkPrompt)
+      ? <RequiredKnowledgeCheck key={JSON.stringify(knowledgeCheck ?? checkPrompt)} check={requiredCheck}
+          question={knowledgeCheck?.question ?? checkPrompt!.question}
+          options={knowledgeCheck ? knowledgeCheck.options.map(option => option.text) : checkPrompt!.options} />
+      : knowledgeCheck && <fieldset disabled={practiceDisabled} className="min-w-0 border-0 p-0"><KnowledgeCheck key={`${storageKey}:${JSON.stringify(knowledgeCheck)}`} data={knowledgeCheck} storageKey={storageKey} /></fieldset>}
   </>
 }

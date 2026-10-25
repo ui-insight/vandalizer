@@ -67,7 +67,10 @@ async def test_panel_direct_lesson_and_chat_keep_original_teaching_and_expose_sa
     assert rendered['editorialNotices'] == direct['editorial_notices'] == chat['editorial_notices']
     assert chat['content'] == direct['content'] == rendered['content'] == original['content']
     assert chat['lesson_revision'] == direct['revision'] == rendered['revision'] == original['revision']
-    assert direct.get('knowledge_check') == chat['knowledge_check'] == original.get('knowledge_check')
+    assert direct.get('knowledge_check') == original.get('knowledge_check')
+    # Chat gets the same check without its answer key.
+    from app.services.certification_service import lesson_check_for_learner
+    assert chat['lesson_check'] == lesson_check_for_learner(original)
     assert package.artifact_bytes == original_bytes
     assert set(chat['editorial_notices'][0]) == {'id', 'issued_at', 'title', 'paragraphs', 'assessment_changed', 'identity_basis'}
     unknown = corrections.notices_for(None, None, original['content'])
