@@ -14,7 +14,7 @@ from app.services.certification_versions.catalog import CourseCatalogError
 from tests.integration import test_certification_enrollments as base
 
 repo = base.repo
-pytestmark = base.pytestmark
+pytestmark = [base.pytestmark, pytest.mark.usefixtures("completion_approved", "lessons_read")]
 
 
 async def test_legacy_retry_after_changed_answers_returns_original_result_without_grading_again(repo, monkeypatch):
@@ -190,6 +190,8 @@ async def test_live_chat_derives_a_stable_request_reference_and_preserves_explic
     assert await chat_tools.complete_certification_module(context, 'ai_literacy') == first
     context.tool_call_id = 'new-call'
     assert await chat_tools.complete_certification_module(context, 'ai_literacy', request_id=first['attempt_id']) == first
+    # A new request is checked first (adbea744): the edited answers fail, so
+    # nothing is graded or recorded, and the original completion stands.
     different = await chat_tools.complete_certification_module(context, 'ai_literacy', expected_attempts=1)
-    assert different['error'] == 'Validation did not pass' and different['attempt_id'] != first['attempt_id']
+    assert "isn't ready to complete" in different['error'] and 'attempt_id' not in different
     assert (await service.get_progress(learner)).total_xp == 125

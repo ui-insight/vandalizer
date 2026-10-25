@@ -1879,6 +1879,12 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                     f"**Website task** — fetches content from `{url}` and passes text to next step."
                 )
 
+            elif task_name == "WebSearch":
+                step_desc_parts.append(
+                    f"**Web Search task** — searches the web for `{data.get('query', '')}` and "
+                    "passes the results, each with its URL, to the next step."
+                )
+
             elif task_name == "AddDocument":
                 step_desc_parts.append(
                     "**Add Document task** — loads document text into the pipeline."

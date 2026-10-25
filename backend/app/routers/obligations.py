@@ -40,9 +40,15 @@ async def list_obligations(
     if project_uuid:
         project = await _project_for(project_uuid, user, manage=False)
         return {"items": await obligation_service.project_obligations(project, user)}
+    projects = await obligation_service.inbox_projects(user)
     return {
-        "items": await obligation_service.inbox(user, include_dismissed=include_dismissed),
+        "items": await obligation_service.inbox(
+            user, include_dismissed=include_dismissed, projects=projects,
+        ),
         "inbox_hidden": bool(getattr(user, "home_inbox_hidden", False)),
+        # How many projects the list covers, so an empty inbox can say what
+        # it checked instead of vanishing (#1014 item 34).
+        "project_count": len(projects),
     }
 
 

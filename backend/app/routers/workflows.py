@@ -291,7 +291,7 @@ async def stream_workflow_status(
                 last_json = current_json
                 yield f"data: {current_json}\n\n"
 
-            if status.get("status") in ("completed", "error", "failed"):
+            if status.get("status") in ("completed", "error", "failed", "canceled"):
                 return
 
             await asyncio.sleep(1.5)

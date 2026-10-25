@@ -891,7 +891,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           {chatUploads.uploads.map(upload => (
             <div key={upload.id} className="chat-upload-item">
               <div role="status"><strong>{upload.file.name}</strong><span>
-                {upload.status === 'uploading' ? 'Uploading…' : upload.status === 'canceled' ? 'Upload canceled. Check Files before retrying if the transfer had already reached the server.' : `Upload failed: ${upload.error}`}
+                {upload.status === 'uploading' ? 'Uploading… It will be attached to your next question. Nothing runs until you send it.' : upload.status === 'canceled' ? 'Upload canceled. Check Files before retrying if the transfer had already reached the server.' : `Upload failed: ${upload.error}`}
               </span></div>
               {upload.status === 'uploading'
                 ? <button type="button" onClick={() => chatUploads.cancel(upload.id)} aria-label={`Cancel upload: ${upload.file.name}`}>Cancel upload</button>

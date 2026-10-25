@@ -96,11 +96,8 @@ scripts/ui_endpoint_map.*
 *.orig
 *.rej
 
-# Visual-review captures and diagnostic archives are local generated evidence.
-# Keep the report builder, selected-evidence records and report in version control.
-/artifacts/visual-review/*/
-!/artifacts/visual-review/upgrade-review/
-/artifacts/visual-review/upgrade-review/*.png
+# Screenshot reviews, QA run captures and other generated evidence stay local.
+/artifacts/
 
 # Local certification release authoring locks and atomic-write staging.
 backend/certification-data/courses/.authoring.lock

@@ -1,6 +1,7 @@
 """Shared fixtures for integration tests."""
 
 import os
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -75,3 +76,26 @@ async def clean_collections(request, mongo_db_name):
     for name in await db.list_collection_names():
         await db[name].delete_many({})
     client.close()
+
+
+# ---------------------------------------------------------------------------
+# Certification: chat's learner-facing gates
+# ---------------------------------------------------------------------------
+# Chat completion shows an approval card first (adbea744) and the guided course
+# refuses a module's steps until its lessons are read (4774ff98). Tests of
+# enrollment, persistence and assessment routing start past both gates; the
+# gates have their own tests (test_chat_cert_completion_approval.py,
+# test_guided_course.py).
+
+@pytest.fixture
+def completion_approved():
+    """The learner already approved completing the module."""
+    with patch("app.services.chat_tools._confirm_gate", new=AsyncMock(return_value=None)):
+        yield
+
+
+@pytest.fixture
+def lessons_read():
+    """The learner already read the module's lessons."""
+    with patch("app.services.certification_service.lesson_gate", new=AsyncMock(return_value=None)):
+        yield

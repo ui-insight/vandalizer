@@ -1,7 +1,7 @@
 const labels: Record<string, string> = {
   Extraction: 'Extract fields', Prompt: 'Prompt', Formatter: 'Format output', Format: 'Format output',
   AddDocument: 'Add document', AddWebsite: 'Read a web page', CrawlerNode: 'Crawl a website',
-  ResearchNode: 'Deep analysis', KnowledgeBaseQuery: 'Ask a knowledge base', APINode: 'Call an API',
+  ResearchNode: 'Deep analysis', WebSearch: 'Search the web', KnowledgeBaseQuery: 'Ask a knowledge base', APINode: 'Call an API',
   DocumentRenderer: 'Create a document', FormFiller: 'Fill a form', DataExport: 'Export data',
   Approval: 'Request approval', Browser: 'Browser automation', DescribeImage: 'Describe an image',
   CodeNode: 'Run code', PackageBuilder: 'Build a package',

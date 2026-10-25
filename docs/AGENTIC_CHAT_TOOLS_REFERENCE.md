@@ -203,6 +203,8 @@ Fetches one public web page and returns its readable text. Auto-fires when the u
 |---|---|---|---|
 | `url` | `str` | required | HTTP(S) |
 
+The page becomes a source chip, so an answer built from it shows where it came from.
+
 Limits: 20s timeout, 2 MB raw HTML, ~25k characters of extracted text passed to the model. Does **not** work for pages behind login (SharePoint, Google Docs, Confluence) — those return login HTML, and the tool tells the user to upload an export or use M365 intake instead. Does not fetch arbitrary file types; PDFs and archives should be uploaded to Files so they get OCR'd.
 
 ### `web_search`
@@ -214,7 +216,9 @@ Searches the public web and returns ranked results (title, URL, snippet).
 | `query` | `str` | required | |
 | `max_results` | `int` | `5` | |
 
-Requires an admin-configured provider (`web_search_provider`, `web_search_endpoint`, `web_search_api_key` in System Config — serper, tavily, or brave). With no provider configured the tool reports that web search is unavailable rather than failing the turn.
+Requires an admin-configured provider (`web_search_provider`, `web_search_endpoint`, `web_search_api_key` in System Config — mindrouter, tavily, searxng or brave). With no provider configured the tool reports that web search is unavailable rather than failing the turn.
+
+Each result becomes a source chip. A result worded as an instruction to an AI comes back with its snippet removed and `screened: true`, and the response carries `untrusted_content_note`. No provider-written summary is returned (Tavily's `answer` is not requested): the model answers only from results it can cite. The query goes to a third-party provider, so the tool and prompt tell the model to ask the public question and leave names, award numbers, budget figures and unpublished text out of it.
 
 The prompt orders these deliberately: workspace first (`search_documents`, `search_knowledge_base`), web only when the answer isn't in the user's own material or the question needs current external information. `web_search` discovers pages from a query; `fetch_url` reads one page you already have the link to.
 

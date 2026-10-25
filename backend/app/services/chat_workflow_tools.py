@@ -27,6 +27,7 @@ _TASK_TYPES = {
     "ResearchNode": "research",
     "KnowledgeBaseQuery": "knowledge_base_query",
     "AddWebsite": "website",
+    "WebSearch": "web_search",
     "Approval": "approval",
 }
 _INSTRUCTION_KEYS = ("prompt", "format_template", "question", "query", "review_instructions", "url")

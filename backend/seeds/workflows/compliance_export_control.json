@@ -81,6 +81,14 @@
           "category": "content",
           "description": "Every favourable conclusion (fundamental research, no license needed, no concerns) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
+      ],
+      "validation_inputs": [
+        {
+          "id": "23e3ff7f-bb77-559e-aa59-b5ebc66c3fa1",
+          "type": "text",
+          "label": "Fictional research agreement summary. Answer key: the fundamental research exclusion is NOT available. The sponsor must approve every publication in writing, which goes beyond the prepublication reviews 15 CFR 734.8(b) permits (patent protection or sponsor-furnished proprietary information), so results are not intended to be published. The inertial navigation unit's export classification is not stated, so it must be classified and cannot be assumed EAR99 or license-free. The foreign national graduate students (citizens of India and Brazil) working on restricted results call for a Technology Control Plan review. The countries named (Germany, India, Brazil) are not under a comprehensive embargo in 15 CFR Part 746. Rated Medium or High, not Low.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL AGREEMENT\nSponsored Research Agreement Summary — Example University\nProject title: Autonomous Navigation for Long-Endurance Underwater Gliders\nSponsor: Example Maritime Systems Corp. (U.S. company)\nPrincipal Investigator: Jordan Example, Mechanical Engineering\nPeriod: January 1, 2027 through December 31, 2028\n\nPublication: The University may publish results only after the Sponsor has reviewed and approved the proposed publication in writing. The Sponsor may withhold approval at its discretion.\n\nCollaborators: Dr. Lena Example, University of Example (Germany), will contribute simulation software developed at her institution.\n\nProject personnel: two graduate research assistants who are citizens of India and Brazil, and one U.S. citizen postdoctoral researcher.\n\nEquipment: a commercial inertial navigation unit purchased from a U.S. vendor for installation on the glider. The vendor did not provide an export classification, and none has been determined.\n\nSoftware: navigation algorithms developed under this project; MATLAB.\n\nControlled Unclassified Information: none identified by the Sponsor."
+        }
       ]
     }
   ]

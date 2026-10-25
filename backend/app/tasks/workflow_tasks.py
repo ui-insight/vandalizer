@@ -1646,6 +1646,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         PackageBuilderNode,
         PromptNode,
         ResearchNode,
+        WebSearchNode,
         WebsiteNode,
         WorkflowEngine,
         WorkflowStepError,
@@ -1720,6 +1721,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = BrowserAutomationNode(data=task_data)
     elif task_name == "KnowledgeBaseQuery":
         process_node = KnowledgeBaseQueryNode(data=task_data)
+    elif task_name == "WebSearch":
+        process_node = WebSearchNode(data=task_data)
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 

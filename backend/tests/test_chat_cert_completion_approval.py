@@ -31,6 +31,13 @@ def _context(turn: int, pending: list | None = None):
     return ctx
 
 
+@pytest.fixture(autouse=True)
+def _new_request():
+    """Each call is a new completion request unless a test says otherwise."""
+    with patch("app.services.certification_service.completion_recorded", new=AsyncMock(return_value=False)) as recorded:
+        yield recorded
+
+
 def _service(check: dict):
     return (
         patch("app.services.certification_service.validate_module", new=AsyncMock(return_value=check)),
@@ -83,6 +90,31 @@ async def test_the_learners_approval_completes_the_module():
         result = await complete_certification_module(_context(turn=6, pending=armed), "foundations", confirmed=True, expected_attempts=0)
     completed.assert_awaited_once()
     assert result["xp_earned"] == 100 and result["title"] == "Foundations"
+
+
+@pytest.mark.asyncio
+async def test_a_retry_of_a_recorded_completion_replays_it_without_a_new_check(_new_request):
+    """A recorded request returns its original result, even after the answers
+    changed: re-checking them first said a completed module "isn't ready"."""
+    _new_request.return_value = True
+    validate, complete = _service(FAILING)
+    with validate as validated, complete as completed:
+        result = await complete_certification_module(_context(turn=6), "foundations", request_id="a" * 32)
+    validated.assert_not_awaited()
+    completed.assert_awaited_once()
+    assert completed.await_args.kwargs["request_id"] == "a" * 32
+    assert result["xp_earned"] == 100 and not result.get("needs_confirmation")
+
+
+@pytest.mark.asyncio
+async def test_a_live_retry_is_looked_up_by_its_derived_request_identity(_new_request):
+    """With no request_id, the identity derived from the turn and tool call is
+    the one checked for a recorded completion."""
+    validate, complete = _service(PASSING)
+    with validate, complete:
+        await complete_certification_module(_context(turn=4), "foundations")
+    user_id, module_id, request_id = _new_request.await_args.args
+    assert (user_id, module_id) == ("user1", "foundations") and len(request_id) == 32
 
 
 def test_saving_answers_no_longer_tells_chat_to_complete():

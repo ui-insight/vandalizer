@@ -82,6 +82,14 @@
           "category": "content",
           "description": "Every favourable conclusion (allowable, allocable, reasonable) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
+      ],
+      "validation_inputs": [
+        {
+          "id": "f10a624b-8c6b-5a60-8433-c19e4d9b050b",
+          "type": "text",
+          "label": "Fictional cost listing. Answer key: (1) Lab reagents $2,400 is allowable and allocable: it was used only on this project (2 CFR 200.405). (2) The $650 holiday reception is unallowable: entertainment with no programmatic purpose (200.438), and its $180 of wine is unallowable as alcohol (200.423). (3) The $3,000 freezer service contract benefits three projects equally, so only $1,000 is allocable to this award under 200.405(d); $2,000 is overcharged. (4) The $4,000 of administrative assistant salary is normally indirect. Direct charging needs all three conditions of 200.413(c), which the listing does not establish, so it is not shown allowable. A total of $6,650 (the reception, the freezer overcharge and the salary) is questioned or unallowable.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL LEDGER\nDirect Cost Review — Example University\nAward number: EXA-2027-0310 (Federal research award)\nPeriod reviewed: January 1, 2027 through March 31, 2027\n\n1. Laboratory reagents — $2,400. Used only for the experiments on this award. Invoices attached.\n2. Department holiday reception — $650, including $180 for wine. Attended by department faculty and staff.\n3. Ultra-low freezer service contract — $3,000, charged 100% to this award. The freezer stores samples for three projects, each using it equally.\n4. Administrative assistant salary — $4,000 (Pat Example, 25% effort for the quarter). The assistant schedules meetings and processes purchases for the department.\n\nSpecial award conditions: none."
+        }
       ]
     }
   ]

@@ -32,6 +32,7 @@ const mockUpdateModel = vi.fn()
 const mockDeleteModel = vi.fn()
 const mockSetDefaultModel = vi.fn()
 const mockTestOcr = vi.fn()
+const mockTestWebSearch = vi.fn()
 const mockTestModel = vi.fn()
 const mockTestPrompt = vi.fn()
 const mockProbeModel = vi.fn()
@@ -52,6 +53,7 @@ vi.mock('../../api/admin', () => ({
   deleteModel: (...a: unknown[]) => mockDeleteModel(...a),
   setDefaultModel: (...a: unknown[]) => mockSetDefaultModel(...a),
   testOcr: (...a: unknown[]) => mockTestOcr(...a),
+  testWebSearch: (...a: unknown[]) => mockTestWebSearch(...a),
   testModel: (...a: unknown[]) => mockTestModel(...a),
   testPrompt: (...a: unknown[]) => mockTestPrompt(...a),
   probeModel: (...a: unknown[]) => mockProbeModel(...a),
@@ -422,6 +424,25 @@ describe('ConfigTab — load-failure guard (plan 003)', () => {
 // ---------------------------------------------------------------------------
 
 describe('ConfigTab — "***" API-key sentinel (plans 003 / 011)', () => {
+  it('tests the web search values on screen, before they are saved', async () => {
+    // The Test button used to run the saved settings, so a test before saving
+    // checked the old provider. It sends the form's values; an untouched key
+    // field holds the "***" sentinel, meaning the saved key.
+    mockGetSystemConfig.mockResolvedValue(makeConfig({ web_search_provider: 'tavily', web_search_api_key: '***' }))
+    mockTestWebSearch.mockResolvedValue({ status: 'ok', result_count: 3, message: 'Web search returned 3 result(s).' })
+    await renderConfigTab()
+
+    fireEvent.change(screen.getByLabelText('Web search provider'), { target: { value: 'searxng' } })
+    fireEvent.change(screen.getByLabelText('Web search endpoint'), { target: { value: 'https://searx.campus.edu' } })
+    fireEvent.click(screen.getByRole('button', { name: /Test Search/i }))
+
+    await screen.findByText('Web search returned 3 result(s).')
+    expect(mockTestWebSearch).toHaveBeenCalledWith({
+      web_search_provider: 'searxng', web_search_endpoint: 'https://searx.campus.edu', web_search_api_key: '***',
+    })
+    expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
+  })
+
   it('never sends an empty OCR key for an untouched field, and sends an edited one', async () => {
     await renderConfigTab()
 

@@ -161,6 +161,8 @@ export interface FeatureFlags {
   compliance_enabled?: boolean
   // True only on the fleet collector instance — gates the admin Telemetry tab.
   telemetry_collector_enabled?: boolean
+  // A web search provider is configured (chat web_search, workflow Web Search steps).
+  web_search_enabled?: boolean
 }
 
 export function getFeatureFlags() {

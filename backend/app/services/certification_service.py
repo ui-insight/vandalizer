@@ -708,6 +708,21 @@ async def validate_module(user_id: str, module_id: str, *, enrollment_id: str | 
     return legacy_check_roles(module_id, await with_legacy_field_access(validator, user_id)(user_id))
 
 
+async def completion_recorded(user_id: str, module_id: str, request_id: str) -> bool:
+    """Whether ``request_id`` is a completion request complete_module already
+    recorded, so a retry replays its original result instead of grading again.
+
+    The same two lookups complete_module replays from: the attempt journal on a
+    versioned course, the legacy completion receipts otherwise.
+    """
+    operation = current_operation()
+    if operation:
+        from .certification_versions.attempts import AttemptRepository
+        return bool(await AttemptRepository().records.find_one({'uuid': request_id}))
+    from .certification_versions import legacy_completions
+    return await legacy_completions.previous(await get_progress(user_id), module_id, request_id) is not None
+
+
 @course_operation(write=True)
 async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | None = None, request_id: str | None = None, assessment_selection: dict | None = None, expected_attempts: int | None = None, require_attempt_counter: bool = False) -> dict:
     """Mark a module complete after validation passes. Returns updated progress.

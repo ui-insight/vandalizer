@@ -361,13 +361,16 @@ Configure web search under **Admin → System Config → Endpoints**:
 
 | Field | Description |
 |-------|-------------|
-| **Web Search Provider** | `serper`, `tavily`, or `brave` — selects the response shape to parse |
-| **Web Search Endpoint** | The provider's search API URL |
+| **Web Search Provider** | `mindrouter` (campus search proxy), `tavily`, `searxng` (self-hosted) or `brave`. Any other value is rejected on save |
+| **Web Search Endpoint** | The provider's search API URL. Optional for `mindrouter` and `tavily`, which have defaults. A SearXNG on a private address needs its host in **Outbound URL allowed hosts** |
 | **Web Search API Key** | Provider API key, encrypted at rest with `CONFIG_ENCRYPTION_KEY` |
 
 With no provider configured, `web_search` reports itself unavailable and the agent falls back to the user's own documents. It fails closed — there is no default provider and no implicit egress.
 
 Operational notes:
+
+- **Results are screened.** A result whose title or snippet is worded as an instruction to an AI is blanked and flagged before the model sees it. Provider requests never follow redirects; a redirecting endpoint is reported with the address to configure instead.
+- **Usage.** Every search, from chat, a workflow step, knowledge-base topic search or the admin test, writes a row to `web_search_usage`, which is the count to reconcile with a paid provider's bill.
 
 - **Air-gapped installs.** Leave web search unconfigured. To also disable `fetch_url`, block outbound HTTP egress from the API and Celery containers at the network layer; there is no separate application toggle for it.
 - **Egress posture.** `fetch_url` retrieves a URL supplied through chat, so the backend can be pointed at hosts a user names. If the API container sits on a network with reachable internal services, restrict its egress (allowlist, or route through a forward proxy) rather than relying on the application layer.

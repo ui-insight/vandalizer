@@ -75,15 +75,24 @@ describe('RA inbox', () => {
     expect(api.setInboxHidden).toHaveBeenCalledWith(true)
   })
 
-  it('shows nothing when the inbox is hidden or empty', async () => {
-    api.getInbox.mockResolvedValueOnce({ items: [DEADLINE], inbox_hidden: true })
+  it('shows nothing when the inbox is hidden or there are no projects to cover', async () => {
+    api.getInbox.mockResolvedValueOnce({ items: [DEADLINE], inbox_hidden: true, project_count: 1 })
     const { unmount } = render(<RAInbox />)
     await act(async () => {})
     expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
     unmount()
-    api.getInbox.mockResolvedValueOnce({ items: [], inbox_hidden: false })
-    render(<RAInbox />)
+    api.getInbox.mockResolvedValueOnce({ items: [], inbox_hidden: false, project_count: 0 })
+    const { container } = render(<RAInbox />)
     await act(async () => {})
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('says what an empty inbox covered instead of vanishing (#1014 item 34)', async () => {
+    api.getInbox.mockResolvedValueOnce({ items: [], inbox_hidden: false, project_count: 3 })
+    render(<RAInbox />)
+    expect(await screen.findByText(/Nothing due or missing in your 3 projects/)).toHaveTextContent(
+      'Only deadlines and materials saved to a project appear here.',
+    )
     expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
   })
 

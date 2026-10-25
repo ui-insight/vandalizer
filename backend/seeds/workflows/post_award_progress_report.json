@@ -63,6 +63,14 @@
           "category": "content",
           "description": "Every favourable conclusion (on track, complete, adequate) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
         }
+      ],
+      "validation_inputs": [
+        {
+          "id": "9c9d98dd-1b2b-5c51-ba0d-2384643ea932",
+          "type": "text",
+          "label": "Fictional annual progress report. Answer key: Aim 1 is complete; Aim 2 is about 6 months behind, with a mitigation (a loaner instrument); Aim 3 is a stated objective with NO progress reported, which must be flagged. $98,000 spent of the $150,000 year 1 budget (65.3%) leaves $52,000 (34.7%) unspent, with no explanation of the balance. The one publication is \"in preparation\", so it is not a published output. Two graduate students are supported. Data sharing is stated as none this period. Do not call the project on track overall.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL REPORT\nAnnual Progress Report — Year 1 of 3\nAward number: EXA-2026-0777\nReporting period: September 1, 2026 through August 31, 2027\nPrincipal Investigator: Avery Example\n\nProject objectives\n- Aim 1: Build a database of 500 annotated river-sediment cores.\n- Aim 2: Measure microplastic concentrations in 200 cores with Raman spectroscopy.\n- Aim 3: Develop a predictive model of microplastic deposition.\n\nAccomplishments\n- Aim 1: Completed. 512 cores were collected and annotated.\n- Aim 2: The Raman spectrometer was backordered and arrived in June 2027, about six months late. 20 cores have been measured. A loaner instrument from the vendor has been arranged to recover the schedule in year 2.\n\nProblems encountered: instrument delivery delay (see Aim 2).\n\nBudget: expenditures to date $98,000 of the $150,000 year 1 budget.\n\nPublications: Example, A. et al. \"Microplastics in Idaho river sediments.\" In preparation.\nPatents: none.\nPersonnel changes: none.\nStudents supported: two graduate students (Sam Example, Jamie Example).\nData sharing activities: none this period.\n\nPlans for next period: measure the remaining 180 cores; begin manuscript submission."
+        }
       ]
     }
   ]

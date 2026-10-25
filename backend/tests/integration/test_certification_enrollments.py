@@ -38,6 +38,12 @@ VERSION = 'legacy-2026-10-02.1'
 pytestmark = pytest.mark.skipif(not os.environ.get('CERTIFICATION_TEST_MONGO_URL'), reason='Requires an explicitly configured disposable MongoDB test connection')
 
 
+@pytest.fixture(autouse=True)
+def _past_chat_gates(completion_approved, lessons_read):
+    # Module-local, not in pytestmark: other files reuse this module's pytestmark.
+    yield
+
+
 @pytest_asyncio.fixture
 async def repo(tmp_path):
     client = AsyncIOMotorClient(os.environ['CERTIFICATION_TEST_MONGO_URL'], serverSelectionTimeoutMS=3000)
