@@ -47,6 +47,7 @@ from app.services.context_budget import (
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
 from app.services.approval_claims import unprepared_card_note
+from app.services import kb_no_evidence
 from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
@@ -1865,6 +1866,8 @@ async def chat_stream(
     have_context = bool(doc_segments or attachment_segments)
     reminder_blocks: list[str] = []
     kb_empty_mode = False
+    # Knowledge bases attached, searched, and nothing came back.
+    no_kb_evidence = False
 
     # Mode rules — same precedence as the pre-Phase-1 per-turn prompt swap:
     # KB retrieval hit > attached documents > empty-KB project > first-session
@@ -1899,10 +1902,11 @@ async def chat_stream(
     elif active_kbs:
         # A project/KB chat was requested but retrieval returned nothing (empty
         # KB, docs not indexed yet, or no match). Do NOT skip the rules block —
-        # that lets the model freely hallucinate document contents. Tell it the
-        # KB was empty for this query while still allowing general-knowledge
-        # answers.
+        # that lets the model freely hallucinate document contents. Its rules
+        # refuse an answer from memory, and the finished answer is held back
+        # and checked before it is shown (kb_no_evidence).
         kb_empty_mode = True
+        no_kb_evidence = True
         reminder_blocks.append(
             build_project_kb_empty_reminder(_build_manifest_block(kb_manifest))
         )
@@ -1938,6 +1942,7 @@ async def chat_stream(
     # The attached knowledge bases' real state, whatever mode this turn is in:
     # sources ready and failed, and whether each was ever validated.
     kb_status_entries: list[dict] = []
+    kb_status_block = ""
     if active_kbs:
         try:
             kb_status_entries = await _kb_status_entries(active_kbs, manifests)
@@ -2380,6 +2385,14 @@ async def chat_stream(
     # Citations accumulated this turn: pre-agent KB context (classic path)
     # plus any search_knowledge_base tool calls (agentic path).
     streamed_citations: list[dict] = list(kb_sources)
+    # A turn with no knowledge-base evidence shows its answer only once it has
+    # been read for anything recalled from memory (see kb_no_evidence).
+    hold_text = no_kb_evidence
+
+    def _shown(parts: list[str]) -> list[str]:
+        """The text a turn that ends early keeps: a held answer was never
+        read for what it recalled, so none of it is kept."""
+        return [] if hold_text else parts
 
     def _completed_work() -> dict:
         """What a turn that ends early finished, for _save_failed_assistant_turn."""
@@ -2493,7 +2506,8 @@ async def chat_stream(
                                             streamed_segments[-1]["content"] += text
                                         else:
                                             streamed_segments.append({"kind": "text", "content": text})
-                                        yield json.dumps({"kind": "text", "content": text}) + "\n"
+                                        if not hold_text:
+                                            yield json.dumps({"kind": "text", "content": text}) + "\n"
 
                     # Flush any remaining buffered content from the parser
                     for kind, text in think_parser.flush():
@@ -2506,7 +2520,8 @@ async def chat_stream(
                                 streamed_segments[-1]["content"] += text
                             else:
                                 streamed_segments.append({"kind": "text", "content": text})
-                            yield json.dumps({"kind": "text", "content": text}) + "\n"
+                            if not hold_text:
+                                yield json.dumps({"kind": "text", "content": text}) + "\n"
 
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
@@ -2592,7 +2607,8 @@ async def chat_stream(
                         streamed_segments[-1]["content"] += note
                     else:
                         streamed_segments.append({"kind": "text", "content": note})
-                    yield json.dumps({"kind": "text", "content": note}) + "\n"
+                    if not hold_text:
+                        yield json.dumps({"kind": "text", "content": note}) + "\n"
                 # Safety-net: strip any residual think tags the parser missed
                 # Stored with the model's own 【…】 citation syntax rewritten as
                 # plain "(file, p. N)" text, which is also what names the file
@@ -2601,6 +2617,37 @@ async def chat_stream(
                     _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 )
                 thinking_text = "".join(full_thinking) or None
+
+                if hold_text:
+                    # No knowledge base returned a passage. Unless the agent's
+                    # own search found some, the answer may carry over what the
+                    # conversation and the tools gave it, and report what was
+                    # not found, but nothing recalled from memory.
+                    if not kb_no_evidence.kb_evidence(streamed_citations):
+                        web_ok = kb_no_evidence.asks_for_web(message)
+                        carried = [text for _, text in _recent_turns(previous_messages, max_turns=12)]
+                        carried += [
+                            r["content"] if isinstance(r["content"], str)
+                            else json.dumps(r["content"], default=str)
+                            for r in streamed_tool_results
+                            if web_ok or r.get("tool_name") not in ("web_search", "fetch_url")
+                        ]
+                        carried += [kb_status_block, _build_manifest_block(kb_manifest)]
+                        shown, leaks = kb_no_evidence.enforce(
+                            assistant_message, message=message, carried=carried,
+                            kb_titles=kb_no_evidence.kb_titles_of(kb_status_entries, active_kbs),
+                        )
+                        if shown != assistant_message:
+                            logger.info(
+                                "No-evidence KB turn answered from memory; refused instead "
+                                "(kb_uuids=%s, leaked=%r)",
+                                [u for u, _ in active_kbs], leaks[:3],
+                            )
+                            assistant_message = shown
+                            streamed_segments[:] = [
+                                s for s in streamed_segments if s.get("kind") != "text"
+                            ] + [{"kind": "text", "content": shown}]
+                    yield json.dumps({"kind": "text", "content": assistant_message}) + "\n"
 
                 # Only the snippets the answer cites are its sources; the rest
                 # were searched and not used. Stored with the numbers expanded,
@@ -2801,7 +2848,7 @@ async def chat_stream(
             await _save_failed_assistant_turn(
                 conversation,
                 _build_interrupted_body(
-                    full_response, "stopped at the per-turn tool budget", kb_sources,
+                    _shown(full_response), "stopped at the per-turn tool budget", kb_sources,
                 ),
                 activity_id,
                 "usage limit",
@@ -2838,7 +2885,7 @@ async def chat_stream(
                 await ev.save()
     except asyncio.CancelledError:
         await _save_cancelled_turn(
-            conversation, full_response, kb_sources, activity_id,
+            conversation, _shown(full_response), kb_sources, activity_id,
             thinking="".join(full_thinking) or None,
             thinking_duration=thinking_duration,
             completed_work=_completed_work(),
@@ -2855,7 +2902,7 @@ async def chat_stream(
         try:
             await _save_failed_assistant_turn(
                 conversation,
-                _build_interrupted_body(full_response, user_message[:200], kb_sources),
+                _build_interrupted_body(_shown(full_response), user_message[:200], kb_sources),
                 activity_id,
                 str(e),
                 thinking="".join(full_thinking) or None,

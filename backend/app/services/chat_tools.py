@@ -737,10 +737,12 @@ async def search_knowledge_base(
             "no_results": True,
             "note": (
                 f"No content in knowledge base \"{kb.title}\" matched this "
-                "query above its relevance threshold. Tell the user the "
-                "knowledge base had no matching content for this question. If "
-                "you answer from general knowledge instead, clearly label the "
-                "answer as NOT coming from their documents."
+                "query above its relevance threshold. You may search once "
+                "more with the source's own terms or a section number. If that "
+                "finds nothing either, tell the user nothing in the knowledge "
+                "base matched and suggest naming the section or policy. Do not "
+                "answer from general knowledge instead: a rule or figure from "
+                "memory may be out of date or wrong."
             ),
         }]
 
