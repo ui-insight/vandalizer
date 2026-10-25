@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { RetainedPanel } from '../shared/PanelVisibility'
 import { ItemPickerModal } from './ItemPickerModal'
 import type { LibraryItem } from '../../types/library'
 import React from 'react'
@@ -134,4 +135,29 @@ it('consumes picker Escape before a parent window handler can dismiss its draft'
   } finally {
     window.removeEventListener('keydown', parentEscape)
   }
+})
+
+
+describe('picker overlay placement', () => {
+  it('renders viewport dialogs outside workspace stacking contexts and removes them on unmount', async () => {
+    listItems.mockResolvedValue([])
+    const { container, unmount } = render(<div style={{ position: 'relative', zIndex: 1 }}><ItemPickerModal kind="workflow" onSelect={vi.fn()} onClose={vi.fn()} /></div>)
+    const dialog = await screen.findByRole('dialog', { name: 'Select Workflow' })
+    expect(container.contains(dialog)).toBe(false)
+    expect(document.body.contains(dialog)).toBe(true)
+    unmount()
+    expect(document.body.contains(dialog)).toBe(false)
+  })
+})
+
+
+it('hides a portaled picker when its retained workspace panel becomes inactive', async () => {
+  listItems.mockResolvedValue([])
+  const picker = <ItemPickerModal kind="workflow" onSelect={vi.fn()} onClose={vi.fn()} />
+  const { rerender } = render(<RetainedPanel active>{picker}</RetainedPanel>)
+  await screen.findByRole('dialog', { name: 'Select Workflow' })
+  rerender(<RetainedPanel active={false}>{picker}</RetainedPanel>)
+  expect(screen.queryByRole('dialog', { name: 'Select Workflow' })).not.toBeInTheDocument()
+  rerender(<RetainedPanel active>{picker}</RetainedPanel>)
+  expect(screen.getByRole('dialog', { name: 'Select Workflow' })).toBeInTheDocument()
 })

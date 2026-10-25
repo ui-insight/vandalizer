@@ -1,5 +1,6 @@
+import { ValidationNav } from '../shared/ValidationNav'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
+import { ShieldCheck, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   listKBTestQueries,
   getKBQuality,
@@ -58,13 +59,6 @@ type KBHistoryItem = {
  * must never stand in for the KB's quality score in the header. */
 const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
 
-const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
-  { id: 'queries', label: 'Test questions' },
-  { id: 'run', label: 'Check answer quality' },
-  { id: 'history', label: 'History' },
-  { id: 'autovalidate', label: 'Advanced: improve retrieval', icon: Sparkles },
-]
-
 /** Provenance summary for the score chip in the validation header. We surface
  * judge model, eval-set size, mode, and age so users can tell whether the
  * "85" they see is fresh, on a comparable judge, and on a comparable set —
@@ -86,6 +80,9 @@ type LatestQualitySummary = {
 
 export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, onRunCompleted, collapsed = false, onToggleCollapsed }: Props) {
   const [tab, setTab] = useState<Tab>('queries')
+  const [editingQuestion, setEditingQuestion] = useState(false)
+  const [draftNotice, setDraftNotice] = useState(false)
+  useEffect(() => { if (!editingQuestion) setDraftNotice(false) }, [editingQuestion])
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
   // Persisted uuid of the run shown in the Run-now tab, so its results can be
@@ -105,6 +102,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // A "Run selected" hand-off applies to the visit it opened; choosing a tab
   // from the strip starts clean, so a later Run visit opens on the full set.
   const selectTab = (id: Tab) => {
+    if (id !== 'queries' && editingQuestion) { setDraftNotice(true); return }
     setHandedSelection(null)
     setTab(id)
   }
@@ -122,21 +120,6 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
-
-  // Roving focus for the tab strip (keyboard arrow navigation).
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const onTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
-    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return
-    e.preventDefault()
-    const n = TAB_LABELS.length
-    const next =
-      e.key === 'ArrowRight' ? (idx + 1) % n
-      : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
-      : e.key === 'Home' ? 0
-      : n - 1
-    selectTab(TAB_LABELS[next].id)
-    tabRefs.current[next]?.focus()
-  }
 
   const refreshQueries = useCallback(async () => {
     try {
@@ -266,7 +249,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     : null
 
   return (
-    <div
+    <div className="validation-workspace"
       style={{
         marginTop: 'var(--workspace-space-12)',
         padding: 'var(--workspace-space-12)',
@@ -344,56 +327,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       </button>
 
       {!collapsed && (<>
-      {/* Orientation hint — single sentence above the tab strip so new users
-          know what each tab is for without clicking through. */}
-      <div
-        style={{
-          fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5,
-        }}
-      >
-        Choose representative questions and expected answers → check answer quality → inspect failures. Advanced retrieval tuning is optional.
-      </div>
-
-      {/* Tabs */}
-      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 'var(--workspace-space-2)', flexWrap: 'wrap', borderBottom: '1px solid var(--workspace-border)', marginBottom: 'var(--workspace-space-12)' }}>
-        {TAB_LABELS.map((t, idx) => {
-          const active = tab === t.id
-          const Icon = t.icon
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`vtab-${t.id}`}
-              aria-selected={active}
-              aria-controls="vtabpanel"
-              tabIndex={active ? 0 : -1}
-              ref={el => { tabRefs.current[idx] = el }}
-              onKeyDown={e => onTabKeyDown(e, idx)}
-              onClick={() => selectTab(t.id)}
-              style={{
-                fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-                background: 'transparent',
-                color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
-                border: 'none',
-                padding: "var(--workspace-space-6) var(--workspace-space-12)",
-                fontSize: 'var(--workspace-font-meta)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                borderBottom: active
-                  ? '2px solid var(--highlight-color, #eab308)'
-                  : '2px solid transparent',
-                marginBottom: -1,
-              }}
-            >
-              {Icon && <Icon size={12} style={{ color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)' }} aria-hidden="true" />}
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
-
+      <ValidationNav active={tab === 'queries' ? 'examples' : tab === 'autovalidate' ? 'improve' : 'check'}
+        onChange={stage => selectTab(stage === 'examples' ? 'queries' : stage === 'improve' ? 'autovalidate' : 'run')}
+        running={running} summary={tab === 'queries' ? `${queries.length} test questions. Save expected answers to measure quality.`
+          : tab === 'autovalidate' ? 'Compare retrieval and answer settings, then review proposed changes.'
+          : 'Check answers against your examples. Review failures and their source evidence.'} />
+      {(tab === 'run' || tab === 'history') && <button type="button" onClick={() => selectTab(tab === 'history' ? 'run' : 'history')}
+        style={{ marginBottom: 12, padding: '8px 12px', background: '#fff', border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer' }}>
+        {tab === 'history' ? 'Back to latest result' : 'View run history'}
+      </button>}
       {tab !== 'run' && progress && (
         <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: "var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
           <div>{progress.message}</div>
@@ -401,8 +343,9 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 'var(--workspace-space-8)', padding: "7px var(--workspace-space-12)", color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer' }}>Check status / reconnect</button>}
         </div>
       )}
+      {draftNotice && <p role="alert" className="validation-save-error">Save or cancel your question edits before leaving Examples. Your draft is still here.</p>}
       {/* Tab content */}
-      <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
+      <div role="region" aria-label={tab === 'queries' ? 'Knowledge base examples' : tab === 'run' ? 'Knowledge base run and results' : tab === 'history' ? 'Validation history' : 'Improve knowledge base'}>
       {loading ? (
         <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
@@ -425,8 +368,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           canManage={canManage}
           queries={queries}
           onChange={refreshQueries}
+          onEditingChange={setEditingQuestion}
           running={running}
           onRunSelected={uuids => {
+            if (editingQuestion) { setDraftNotice(true); return }
             // Review before running: Run now opens on this selection (judge
             // only, so it costs what the handful of questions costs) and
             // states the count and categories; the user starts it there.
@@ -465,7 +410,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             setDisplayedRunDate(createdAt ?? null)
             setHandedSelection(null)
             setTab('run')
-            tabRefs.current[2]?.focus()
+
           }}
         />
       )}

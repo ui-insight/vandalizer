@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
+import { getFeatureFlags } from '../../api/config'
 import { createAutomation, updateAutomation } from '../../api/automations'
 
 vi.mock('focus-trap-react', () => ({
@@ -184,5 +185,24 @@ describe('AutomationCreationWizard branch drafts and requirements', () => {
       trigger_type: 'api', trigger_config: undefined, action_id: 'wf-1',
       output_config: expect.objectContaining({ storage: { enabled: true, destination_folder: 'folder-1', format: 'text' } }),
     })))
+  })
+})
+
+
+describe('supported automation setup choices', () => {
+  it('explains Microsoft 365 prerequisites without offering an unconnected activation path', async () => {
+    vi.mocked(getFeatureFlags).mockResolvedValueOnce({ m365_enabled: true } as never)
+    render(<AutomationCreationWizard onClose={vi.fn()} onCreate={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'Intake review' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    const help = await screen.findByText('Using Microsoft 365?')
+    fireEvent.click(help)
+    expect(screen.getByText(/Creating or enabling an automation here does not connect that source/)).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /M365/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /API Endpoint/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('radio', { name: /Run Workflow/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Run Extraction/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Run Task/ })).not.toBeInTheDocument()
   })
 })

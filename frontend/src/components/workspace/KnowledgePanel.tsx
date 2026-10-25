@@ -1842,16 +1842,6 @@ export function KnowledgePanel() {
 
             </div>
             <div role="tabpanel" id="kb-content-validation" aria-labelledby="kb-view-validation" hidden={detailView !== 'validation'}>
-            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
-            <KBTrustBanner
-              score={selectedKB.last_validation_score}
-              baseline={selectedKB.last_validation_baseline_score}
-              lift={selectedKB.last_validation_lift}
-              validatedAt={selectedKB.last_validated_at}
-              metric={selectedKB.last_validation_metric}
-              configState={selectedKB.last_validation_config_state}
-            />
-
             {/* Validation panel — gates on ready KB and management permission */}
             <KBValidationPanel
               key={selectedKB.uuid}
@@ -1861,6 +1851,16 @@ export function KnowledgePanel() {
               canManage={canManageKB}
               kbHasSources={hasSources}
               onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
+            />
+
+            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
+            <KBTrustBanner
+              score={selectedKB.last_validation_score}
+              baseline={selectedKB.last_validation_baseline_score}
+              lift={selectedKB.last_validation_lift}
+              validatedAt={selectedKB.last_validated_at}
+              metric={selectedKB.last_validation_metric}
+              configState={selectedKB.last_validation_config_state}
             />
 
             </div>

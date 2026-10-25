@@ -108,7 +108,7 @@ export function deriveStepInput(step: Pick<WorkflowStep, 'data' | 'tasks'>): {
   if (definesInput(step.data)) {
     return { value: readInputValue(step.data), fromStep: true, divergentTasks: [] }
   }
-  const configured = (step.tasks || []).filter(t => definesInput(t.data))
+  const configured = (step.tasks || []).filter(t => !taskOverridesStepInput(t) && definesInput(t.data))
   if (configured.length === 0) {
     return { value: { ...DEFAULT_STEP_INPUT }, fromStep: false, divergentTasks: [] }
   }

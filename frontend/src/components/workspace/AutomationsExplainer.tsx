@@ -160,7 +160,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
 
           {/* How to use */}
           <Section title="How you'd set one up" delay="480ms">
-            <Step num="1" title="Pick a trigger" body="Watch a folder, expose an API endpoint, run on a schedule, or connect an M365 inbox." />
+            <Step num="1" title="Pick a trigger" body="Watch a folder, expose an API endpoint, run on a schedule, or use an API request. Microsoft 365 intake is configured separately by your administrator." />
             <Step num="2" title="Pick what to run" body="Choose a workflow, an extraction template, or a single task." />
             <Step num="3" title="Choose where results go" body="Save to a folder, email a recipient list, or both." />
             <Step num="4" title="Enable it" body="That's the whole job. Files arrive, work happens, results land where you need them." />

@@ -56,13 +56,14 @@ function HistorySession({ automationId, open, canRun, onPrepareRun }: Props) {
     </div>}
     {loaded && !loading && !error && rows.length === 0 && <p style={{ marginTop: 'var(--workspace-space-12)' }}>No recorded runs yet.{canRun && ' Use Run now to test the current configuration.'}</p>}
     <ol style={{ listStyle: 'none', padding: 0, margin: "var(--workspace-space-12) 0", display: 'grid', gap: 'var(--workspace-space-8)' }}>
-      {rows.map(row => <li key={row.trigger_event_id} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-12)' }}>
+      {rows.map(row => <li className="automation-history-row" key={row.trigger_event_id} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-12)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <strong style={{ textTransform: 'capitalize', color: row.status === 'failed' || row.status === 'error' ? '#b91c1c' : '#374151' }}>{row.status}</strong>
-          <span>{row.action_type === 'extraction' ? 'Extraction' : 'Workflow / task'}</span>
+          <span>{row.action_type === 'extraction' ? 'Extraction' : 'Workflow'}</span>
+          {runDuration(row.started_at, row.completed_at) && <span className="automation-run-duration">{runDuration(row.started_at, row.completed_at)}</span>}
           <time dateTime={row.created_at ?? undefined}>{timestamp(row.created_at)}</time>
         </div>
-        <p style={{ margin: "var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-meta)' }}>Run {row.trigger_event_id}</p>
+
         {row.error && <p style={{ color: '#b91c1c', margin: "var(--workspace-space-6) 0" }}>{row.error}</p>}
         <button type="button" style={buttonStyle} aria-label={`Open run ${row.trigger_event_id}`} aria-pressed={selected?.trigger_event_id === row.trigger_event_id} onClick={event => { selectedTrigger.current = event.currentTarget; setSelected(row) }}>
           {ACTIVE.has(row.status) ? 'Watch run' : 'View result'}
@@ -102,10 +103,10 @@ function RunDetails({ automationId, event, open, canRun, onPrepareRun, onClose }
   const current = run ?? event
   return <section aria-label={`Run details ${event.trigger_event_id}`} style={{ marginTop: 'var(--workspace-space-16)', padding: 'var(--workspace-space-12)', border: '1px solid #9ca3af', borderRadius: 'var(--workspace-radius-medium)' }}>
     <h3 ref={heading} tabIndex={-1} style={{ fontSize: 'var(--workspace-font-card-title)', margin: "0 0 var(--workspace-space-8)" }}>Run details</h3>
-    <p>Run {event.trigger_event_id}</p>
+    <details className="automation-run-reference"><summary>Run reference</summary><code>{event.trigger_event_id}</code></details>
     <p role="status" style={{ margin: "var(--workspace-space-8) 0" }}>{checking && !run ? 'Checking recorded run…' : `${error ? 'Last recorded status' : 'Status'}: ${current.status}`}</p>
     <p>Started: {timestamp(current.started_at)}</p>
-    <p>Finished: {timestamp(current.completed_at)}</p>
+    <p>Finished: {timestamp(current.completed_at)}{runDuration(current.started_at, current.completed_at) && ` · ${runDuration(current.started_at, current.completed_at)}`}</p>
     {current.error && <p style={{ color: '#b91c1c', marginTop: 'var(--workspace-space-8)' }}>{current.error}</p>}
     {error && <div role="alert" style={{ marginTop: 'var(--workspace-space-8)', color: '#b91c1c' }}><p>{error} The run may still finish. Checking again does not launch it again.</p><button type="button" style={buttonStyle} onClick={() => setAttempt(n => n + 1)}>Retry run details</button></div>}
     {run?.output != null && run.output !== '' && <pre role="region" tabIndex={0} aria-label="Recorded run output" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto', fontSize: 'var(--workspace-font-meta)', background: '#f9fafb', padding: 'var(--workspace-space-12)', marginTop: 'var(--workspace-space-12)' }}>{typeof run.output === 'string' ? run.output : JSON.stringify(run.output, null, 2)}</pre>}
@@ -116,4 +117,15 @@ function RunDetails({ automationId, event, open, canRun, onPrepareRun, onClose }
     </div>
     {run && !ACTIVE.has(run.status) && canRun && <p style={{ marginTop: 'var(--workspace-space-8)' }}>A new run uses the current trigger, input and output settings. Review them before starting.</p>}
   </section>
+}
+
+/** Show recorded elapsed time only; never invent timing for pending or incomplete runs. */
+export function runDuration(start?: string | null, end?: string | null): string | null {
+  if (!start || !end) return null
+  const ms = Date.parse(end) - Date.parse(start)
+  if (!Number.isFinite(ms) || ms < 0) return null
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  return seconds % 60 ? `${minutes}m ${seconds % 60}s` : `${minutes}m`
 }

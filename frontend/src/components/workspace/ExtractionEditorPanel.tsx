@@ -1,8 +1,10 @@
+import { ValidationNav, type ValidationStage } from '../shared/ValidationNav'
 import { ExtractionFieldInstructions } from '../extractions/ExtractionFieldInstructions'
 import { useTestCaseSave } from '../../hooks/useTestCaseSave'
 import React, { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ExtractionTutorial } from './ExtractionTutorial'
+import { ExtractionInputs } from './ExtractionInputs'
+import './extraction-workspace.css'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, ChevronUp, Play, TrendingUp, Sparkles, FileText, AlertTriangle, AlertCircle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2, FolderInput } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -111,7 +113,7 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
-  const { openExtractionId, extractionOpenSignal, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, viewDocument, bumpActivitySignal, consumeExtractionResults, activeProjectUuid, activeProjectRootFolder } = useWorkspace()
+  const { openExtractionId, extractionOpenSignal, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms, viewDocument, bumpActivitySignal, consumeExtractionResults, activeProjectUuid, activeProjectRootFolder } = useWorkspace()
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
@@ -123,6 +125,9 @@ export function ExtractionEditorPanel() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [newTerm, setNewTerm] = useState('')
+  const [addingFields, setAddingFields] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+  const addingFieldsRef = useRef(false)
   const [running, setRunning] = useState(false)
   const runPending = useRef(false)
   const [runError, setRunError] = useState<string | null>(null)
@@ -162,7 +167,7 @@ export function ExtractionEditorPanel() {
     if (!el) return
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        setTabsCompact(entry.contentRect.width < 480)
+        setTabsCompact(entry.contentRect.width < 640)
       }
     })
     observer.observe(el)
@@ -266,15 +271,27 @@ export function ExtractionEditorPanel() {
   // Commas separate fields, as in the workflow task's field input, so a pasted
   // "PI Name, Institution, Total Budget" becomes three fields.
   const addTerms = async (text: string) => {
-    if (!text.trim()) return
+    if (!text.trim() || addingFieldsRef.current) return
     if (blockedByVerified()) return
     const terms = splitFieldTerms(text, items.map(i => i.searchphrase))
-    setNewTerm('')
     if (terms.length === 0) {
       toast('Already in this extraction', 'info')
       return
     }
-    for (const term of terms) await add(term)
+    addingFieldsRef.current = true
+    setAddingFields(true)
+    setAddError(null)
+    let completed = 0
+    try {
+      for (const term of terms) { await add(term); completed++ }
+      setNewTerm('')
+    } catch (reason) {
+      setNewTerm(terms.slice(completed).join(', '))
+      setAddError(reason instanceof Error ? reason.message : 'Could not save these fields. Try Add again.')
+    } finally {
+      addingFieldsRef.current = false
+      setAddingFields(false)
+    }
   }
 
   const handleAddItem = () => addTerms(newTerm)
@@ -571,13 +588,17 @@ export function ExtractionEditorPanel() {
   }
 
   const [buildingFromDoc, setBuildingFromDoc] = useState(false)
+  const [buildError, setBuildError] = useState<string | null>(null)
   const handleBuildFromDocument = async () => {
     if (!openExtractionId || selectedDocUuids.length === 0) return
     setBuildingFromDoc(true)
+    setBuildError(null)
     try {
       await buildFromDocument(openExtractionId, selectedDocUuids)
       refreshItems()
       setActiveTab('design')
+    } catch (reason) {
+      setBuildError(reason instanceof Error ? reason.message : 'Could not build fields. Try again.')
     } finally {
       setBuildingFromDoc(false)
     }
@@ -607,7 +628,6 @@ export function ExtractionEditorPanel() {
       // there and the upload looked broken.
       const message = err instanceof ApiError ? err.message : 'Could not attach the template'
       setTemplateError(message)
-      toast(message, 'error')
     } finally {
       setAttachingTemplate(false)
     }
@@ -616,10 +636,13 @@ export function ExtractionEditorPanel() {
   const handleGenerateTemplate = async () => {
     if (!openExtractionId) return
     setGeneratingTemplate(true)
+    setTemplateError(null)
     try {
       await generateExampleTemplate(openExtractionId)
       await refresh()
       refreshItems()
+    } catch (reason) {
+      setTemplateError(reason instanceof Error ? reason.message : 'Could not generate the template. Try again.')
     } finally {
       setGeneratingTemplate(false)
     }
@@ -680,9 +703,10 @@ export function ExtractionEditorPanel() {
   const hasResults = Object.keys(results).length > 0
 
   return (
-    <div className="extraction-editor flex h-full min-w-0 flex-col" style={{ backgroundColor: '#fff' }}>
+    <div className={`extraction-editor flex h-full min-w-0 flex-col${tabsCompact ? ' extraction-compact' : ''}`} style={{ backgroundColor: '#fff' }}>
       {/* Header */}
       <div
+        className="extraction-header"
         style={{
           display: 'flex',
           flexWrap: tabsCompact ? 'wrap' : undefined,
@@ -694,7 +718,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        <div style={{ flex: tabsCompact ? '1 0 100%' : 1, minWidth: 0 }}>
+        <div className="extraction-heading" style={{ flex: 1, minWidth: 0 }}>
           {editingTitle ? (
             <input
               autoFocus
@@ -717,8 +741,8 @@ export function ExtractionEditorPanel() {
               }}
             />
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-              <span
+            <div className="extraction-title-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+              <span className="extraction-title" title={searchSet.title}
                 style={{
                   fontSize: tabsCompact ? 16 : 'var(--workspace-font-section-title)',
                   fontWeight: 600,
@@ -739,7 +763,7 @@ export function ExtractionEditorPanel() {
                   border: 'none',
                   cursor: 'pointer',
                   padding: 'var(--workspace-space-4)',
-                  color: '#6b7280',
+                  color: '#526071',
                   display: 'flex',
                   flexShrink: 0,
                 }}
@@ -757,25 +781,19 @@ export function ExtractionEditorPanel() {
                 </>
               )}
               {searchSet.last_validated_at && (
-                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap' }}>
                   Validated {relativeTime(searchSet.last_validated_at)}
                 </span>
               )}
             </div>
           )}
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-2)' }}>
-            {selectedDocUuids.length > 0
-              ? `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`
-              : activeProjectUuid
-                ? 'All project files'
-                : '0 documents selected'}
-          </div>
         </div>
         <button
           type="button"
           onClick={() => shareLink('extraction', searchSet.uuid, searchSet.title)}
           title="Copy share link"
           aria-label="Copy share link"
+          className="extraction-share"
           style={{
             background: 'none',
             border: 'none',
@@ -793,6 +811,7 @@ export function ExtractionEditorPanel() {
           type="button"
           onClick={closeExtraction}
           aria-label="Close extraction"
+          className="extraction-close"
           title="Close"
           style={{
             background: 'none',
@@ -838,6 +857,7 @@ export function ExtractionEditorPanel() {
       {/* Tab bar */}
       <div
         ref={tabBarRef}
+        className="extraction-tabs"
         role="tablist"
         aria-label="Extraction editor sections"
         style={{
@@ -856,7 +876,7 @@ export function ExtractionEditorPanel() {
           if (tab === 'validate' && qualityStatus) {
             if (qualityStatus.status === 'unvalidated') tabDot = '#9ca3af'
             else if (qualityStatus.stale) tabDot = '#eab308'
-            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#dc2626'
+            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#b91c1c'
           }
           return (
             <button
@@ -885,7 +905,7 @@ export function ExtractionEditorPanel() {
               aria-label={label}
               style={{
                 padding: tabsCompact ? '8px 6px' : '10px 16px',
-                fontSize: 'var(--workspace-font-control)',
+                fontSize: tabsCompact ? 12 : 'var(--workspace-font-control)',
                 fontWeight: isActive ? 600 : 400,
                 fontFamily: 'inherit',
                 color: isActive ? '#202124' : '#5f6368',
@@ -901,7 +921,7 @@ export function ExtractionEditorPanel() {
             >
               {!tabsCompact && <TabIcon style={{ width: 14, height: 14 }} aria-hidden="true" />}
               {label}
-              {tabDot && (
+              {tabDot && !tabsCompact && (
                 <span aria-hidden="true" style={{
                   width: 6, height: 6, borderRadius: '50%',
                   backgroundColor: tabDot, display: 'inline-block',
@@ -914,8 +934,22 @@ export function ExtractionEditorPanel() {
 
       {/* Tab content — all tabs stay mounted to preserve state */}
       <div role="tabpanel" tabIndex={0} id="extraction-tabpanel-design" aria-labelledby="extraction-tab-design" hidden={activeTab !== 'design'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
+        <ExtractionInputs
+          documents={selectedDocUuids.map(uuid => ({ uuid, title: selectedDocNames[uuid] ?? uuid }))}
+          usesProjectFiles={Boolean(activeProjectUuid)}
+          combined={combinedContext}
+          onCombinedChange={setCombinedContext}
+          onAdd={documents => {
+            setSelectedDocUuids(previous => [...new Set([...previous, ...documents.map(doc => doc.uuid)])])
+            setSelectedDocNames(previous => ({ ...previous, ...Object.fromEntries(documents.map(doc => [doc.uuid, doc.title])) }))
+          }}
+          onRemove={uuid => setSelectedDocUuids(previous => previous.filter(id => id !== uuid))}
+        />
         <DesignTab
           items={items}
+          onAddFields={addTerms}
+          onOpenTools={() => setActiveTab('tools')}
+          onValidate={() => setActiveTab('validate')}
           itemsLoading={itemsLoading}
           results={results}
           hasResults={hasResults}
@@ -987,6 +1021,7 @@ export function ExtractionEditorPanel() {
           onExportPdf={handleExportPdf}
           onBuildFromDocument={handleBuildFromDocument}
           buildingFromDoc={buildingFromDoc}
+          buildError={buildError}
           attachingTemplate={attachingTemplate}
           templateError={templateError}
           generatingTemplate={generatingTemplate}
@@ -1065,7 +1100,7 @@ export function ExtractionEditorPanel() {
             }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)',
-              color: '#6b7280', display: 'flex',
+              color: '#526071', display: 'flex',
             }}
           >
             <X style={{ width: 12, height: 12 }} aria-hidden="true" />
@@ -1073,9 +1108,10 @@ export function ExtractionEditorPanel() {
         </div>
       )}
 
-      {/* Bottom toolbar (Design tab only) */}
+      {/* Field entry and primary run action */}
       {activeTab === 'design' && (
         <div
+          className="extraction-run-toolbar"
           style={{
             flexShrink: 0,
             borderTop: "1px solid var(--workspace-border)",
@@ -1087,10 +1123,11 @@ export function ExtractionEditorPanel() {
             alignItems: 'center',
           }}
         >
-          <div style={{ flex: tabsCompact ? '1 0 100%' : 1, minWidth: 0, position: 'relative' }}>
+          <div className="extraction-field-entry" style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
             <input
               value={newTerm}
-              aria-label="Add term to extract"
+              disabled={addingFields}
+              aria-label="Add field to extract"
               onChange={(e) => setNewTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
               onPaste={(e) => {
@@ -1100,7 +1137,7 @@ export function ExtractionEditorPanel() {
                 const { selectionStart: start, selectionEnd: end } = e.currentTarget
                 addTerms(newTerm.slice(0, start ?? newTerm.length) + pasted + newTerm.slice(end ?? newTerm.length))
               }}
-              placeholder="Add term to extract..."
+              placeholder="Add a field…"
               style={{
                 width: '100%',
                 padding: "var(--workspace-space-12) 70px var(--workspace-space-12) var(--workspace-space-16)",
@@ -1115,6 +1152,7 @@ export function ExtractionEditorPanel() {
             <button
               type="button"
               onClick={handleAddItem}
+              disabled={!newTerm.trim() || addingFields}
               style={{
                 position: 'absolute',
                 right: 4,
@@ -1131,27 +1169,11 @@ export function ExtractionEditorPanel() {
                 cursor: 'pointer',
               }}
             >
-              Add
+              {addingFields ? 'Adding…' : 'Add'}
             </button>
           </div>
-          {selectedDocUuids.length > 1 && (
-            <label
-              title="Merge all selected documents into a single context and run one extraction over the combined text. Off: run a separate extraction on each document and show results as numbered tabs."
-              style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-                fontSize: 'var(--workspace-font-meta)', color: '#374151', cursor: 'pointer', userSelect: 'none',
-                whiteSpace: 'nowrap', flexShrink: 0,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={combinedContext}
-                onChange={e => setCombinedContext(e.target.checked)}
-                style={{ accentColor: 'var(--highlight-color, #eab308)' }}
-              />
-              Combine input
-            </label>
-          )}
+          {addError && <p role="alert" style={{ flexBasis: '100%', color: '#991b1b', fontSize: 12 }}>{addError} Your remaining fields are kept above.</p>}
+          <span className="extraction-run-hint">{items.length === 0 ? 'Add your first field to begin' : selectedDocUuids.length === 0 && !activeProjectUuid ? 'Choose documents above to run' : `${items.length} field${items.length === 1 ? '' : 's'} · ${selectedDocUuids.length || 'Project'} ${selectedDocUuids.length === 1 ? 'document' : 'documents'}`}</span>
           {runError && <div role="alert" style={{ flexBasis: '100%', color: '#991b1b', fontSize: 'var(--workspace-font-control)' }}>{runError} Your selection is kept; use Run to retry.</div>}
           <button
             type="button"
@@ -1283,7 +1305,7 @@ function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) 
             ? `No cross-field check could be evaluated on these values`
             : `All ${summary.pass} cross-field check${summary.pass === 1 ? '' : 's'} passed`}
         {summary.unparseable > 0 && (
-          <span style={{ fontWeight: 400, color: '#6b7280' }}>
+          <span style={{ fontWeight: 400, color: '#526071' }}>
             {' '}· {summary.unparseable} could not be evaluated
           </span>
         )}
@@ -1411,6 +1433,9 @@ export function DocumentWarningsStrip({ warnings }: { warnings: DocumentWarning[
 }
 
 function DesignTab({
+  onAddFields,
+  onOpenTools,
+  onValidate,
   items,
   itemsLoading,
   results,
@@ -1435,6 +1460,9 @@ function DesignTab({
   activeResultIdx,
   onSetActiveResultIdx,
 }: {
+  onAddFields: (text: string) => Promise<void>
+  onOpenTools: () => void
+  onValidate: () => void
   items: { id: string; title?: string | null; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   itemsLoading: boolean
   results: Record<string, string>
@@ -1475,17 +1503,12 @@ function DesignTab({
         setExportMenuOpen(false)
       }
     }
+    exportMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [exportMenuOpen])
   const [enumDraft, setEnumDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
-  // Delays single-click expand so a double-click (rename) can cancel it
-  const nameClickTimer = useRef<number | null>(null)
-  useEffect(() => () => {
-    if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
-  }, [])
-
   const toggleSettings = (item: { id: string; enum_values: string[] }) => {
     setExpandedSettingsId(prev => {
       const opening = prev !== item.id
@@ -1543,9 +1566,17 @@ function DesignTab({
           marginBottom: 'var(--workspace-space-16)',
         }}
       >
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Extractions</div>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{hasResults ? 'Results' : 'Fields to extract'} <span className="extraction-field-count">{items.length}</span></div>
         {hasResults && (
-          <div ref={exportMenuRef} style={{ position: 'relative' }}>
+          <div ref={exportMenuRef} style={{ position: 'relative' }} onKeyDown={event => {
+            if (event.key === 'Escape') { event.preventDefault(); setExportMenuOpen(false); exportMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              const buttons = [...(exportMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
+              const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+              buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus()
+            }
+          }}>
             <button
               type="button"
               onClick={() => setExportMenuOpen(v => !v)}
@@ -1680,7 +1711,7 @@ function DesignTab({
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)',
           padding: "var(--workspace-space-8) 0", borderBottom: "1px solid var(--workspace-border)",
         }}>
-          <span id="result-set-selector-label" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
+          <span id="result-set-selector-label" style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontWeight: 500 }}>
             Document:
           </span>
           <div
@@ -1721,7 +1752,7 @@ function DesignTab({
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginLeft: 'var(--workspace-space-4)' }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginLeft: 'var(--workspace-space-4)' }}>
             {resultSets.length} result{resultSets.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -1734,7 +1765,13 @@ function DesignTab({
           Loading...
         </div>
       ) : items.length === 0 ? (
-        <ExtractionTutorial />
+        <div className="extraction-empty">
+          <FileText size={28} aria-hidden="true" />
+          <h3>What do you want to find?</h3>
+          <p>Add a field below, or start with a common set. You can refine each field’s instructions afterward.</p>
+          <button type="button" onClick={() => void onAddFields('Award amount, Principal investigator, End date')}>Add award details <Plus size={14} aria-hidden="true" /></button>
+          <button type="button" onClick={onOpenTools}>Build from a document or PDF form <ChevronRight size={14} aria-hidden="true" /></button>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {items.map((item, idx) => {
@@ -1758,7 +1795,7 @@ function DesignTab({
                   transition: 'opacity 0.15s',
                 }}
               >
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
+                <div className="extraction-field-heading" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                   <GripVertical
                     aria-hidden="true"
                     style={{
@@ -1773,7 +1810,7 @@ function DesignTab({
                     style={{
                       fontSize: 'var(--workspace-font-meta)',
                       fontWeight: 500,
-                      color: '#6b7280',
+                      color: '#526071',
                       width: 20,
                       textAlign: 'right',
                       flexShrink: 0,
@@ -1785,8 +1822,8 @@ function DesignTab({
                   {editingId === item.id ? (
                     <>
                     {expandedSettingsId === item.id
-                      ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
-                      : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                      ? <ChevronDown style={{ width: 12, height: 12, color: '#526071', flexShrink: 0 }} aria-hidden="true" />
+                      : <ChevronRight style={{ width: 12, height: 12, color: '#526071', flexShrink: 0 }} aria-hidden="true" />
                     }
                     <input
                       autoFocus
@@ -1819,40 +1856,20 @@ function DesignTab({
                   ) : (
                     <button
                       type="button"
-                      onClick={(e) => {
-                        if (e.detail > 1) return
-                        if (e.detail === 0) {
-                          toggleSettings(item)
-                          return
-                        }
-                        if (window.getSelection()?.toString()) return
-                        if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
-                        nameClickTimer.current = window.setTimeout(() => {
-                          nameClickTimer.current = null
-                          toggleSettings(item)
-                        }, 200)
-                      }}
-                      onDoubleClick={() => {
-                        if (nameClickTimer.current) {
-                          window.clearTimeout(nameClickTimer.current)
-                          nameClickTimer.current = null
-                        }
-                        setEditingId(item.id)
-                        setEditDraft(fieldName)
-                      }}
+                      onClick={() => toggleSettings(item)}
                       aria-expanded={expandedSettingsId === item.id}
                       aria-controls={`field-settings-${item.id}`}
-                      title="Click for settings, double-click to rename"
+                      title="Edit field settings"
                       style={{
                         background: 'none', border: 'none', padding: 0, margin: 0,
-                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: '1 1 12rem',
+                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: 1,
                         minWidth: 0, cursor: 'pointer', textAlign: 'left',
                         display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                       }}
                     >
                       {expandedSettingsId === item.id
-                        ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
-                        : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                        ? <ChevronDown style={{ width: 12, height: 12, color: '#526071', flexShrink: 0 }} aria-hidden="true" />
+                        : <ChevronRight style={{ width: 12, height: 12, color: '#526071', flexShrink: 0 }} aria-hidden="true" />
                       }
                       {fieldName}
                       {item.is_optional && (
@@ -1863,62 +1880,6 @@ function DesignTab({
                       )}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => moveItem(idx, -1)}
-                    disabled={idx === 0}
-                    aria-label={`Move ${fieldName} up`}
-                    title="Move up"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: idx === 0 ? 'default' : 'pointer',
-                      marginLeft: 'auto',
-                      padding: 'var(--workspace-space-4)',
-                      color: '#6b7280',
-                      opacity: idx === 0 ? 0.4 : 1,
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ChevronUp style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveItem(idx, 1)}
-                    disabled={idx === items.length - 1}
-                    aria-label={`Move ${fieldName} down`}
-                    title="Move down"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: idx === items.length - 1 ? 'default' : 'pointer',
-                      padding: 'var(--workspace-space-4)',
-                      color: '#6b7280',
-                      opacity: idx === items.length - 1 ? 0.4 : 1,
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveItem(item.id)}
-                    aria-label={`Remove ${fieldName}`}
-                    title="Remove"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 'var(--workspace-space-4)',
-                      color: '#6b7280',
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <X style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
                 </div>
                 {hasResults && resultVal === undefined && <p style={{ margin: '4px 0 0 42px', fontSize: 12, color: '#92400e' }}>No value returned for this field. Check the source.</p>}
                 {resultVal !== undefined && (() => {
@@ -1968,6 +1929,65 @@ function DesignTab({
                     border: "1px solid var(--workspace-border)",
                     fontSize: 'var(--workspace-font-meta)',
                   }}>
+                    <div className="extraction-field-actions">
+                      <button type="button" onClick={() => { setEditingId(item.id); setEditDraft(fieldName) }} aria-label={`Rename ${fieldName}`}><Pencil size={14} aria-hidden="true" /> Rename</button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(idx, -1)}
+                    disabled={idx === 0}
+                    aria-label={`Move ${fieldName} up`}
+                    title="Move up"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: idx === 0 ? 'default' : 'pointer',
+                      marginLeft: 'auto',
+                      padding: 'var(--workspace-space-4)',
+                      color: '#526071',
+                      opacity: idx === 0 ? 0.4 : 1,
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevronUp style={{ width: 14, height: 14 }} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(idx, 1)}
+                    disabled={idx === items.length - 1}
+                    aria-label={`Move ${fieldName} down`}
+                    title="Move down"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: idx === items.length - 1 ? 'default' : 'pointer',
+                      padding: 'var(--workspace-space-4)',
+                      color: '#526071',
+                      opacity: idx === items.length - 1 ? 0.4 : 1,
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveItem(item.id)}
+                    aria-label={`Remove ${fieldName}`}
+                    title="Remove"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 'var(--workspace-space-4)',
+                      color: '#526071',
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <X style={{ width: 14, height: 14 }} aria-hidden="true" />
+                  </button>
+                    </div>
                     <ExtractionFieldInstructions fieldName={fieldName} instruction={item.searchphrase} onSave={value => onUpdateItem(item.id, { searchphrase: value })} />
                     <label style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', marginBlock: 'var(--workspace-space-8)' }}>
                       <input
@@ -1977,7 +1997,7 @@ function DesignTab({
                         style={{ accentColor: '#2563eb' }}
                       />
                       <span style={{ color: '#374151', fontWeight: 500 }}>Optional</span>
-                      <span style={{ color: '#6b7280' }}>skip accuracy penalty when not found</span>
+                      <span style={{ color: '#526071' }}>skip accuracy penalty when not found</span>
                     </label>
                     <div>
                       <label htmlFor={`allowed-values-${item.id}`} style={{ display: 'block', color: '#374151', fontWeight: 500, marginBottom: 'var(--workspace-space-4)' }}>Allowed values</label>
@@ -2007,7 +2027,7 @@ function DesignTab({
                           boxSizing: 'border-box',
                         }}
                       />
-                      <div style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-4)' }}>
+                      <div style={{ color: '#526071', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-4)' }}>
                         Comma-separated. LLM will pick from these values.
                       </div>
                     </div>
@@ -2020,7 +2040,7 @@ function DesignTab({
       )}
 
       {/* Quality Pulse card */}
-      <QualityPulse searchSetUuid={searchSetUuid} itemCount={items.length} />
+      <div className="extraction-quality-link"><QualityPulse searchSetUuid={searchSetUuid} itemCount={items.length} />{items.length > 0 && <button type="button" onClick={onValidate}>Check reliability <ChevronRight size={14} aria-hidden="true" /></button>}</div>
 
     </div>
   )
@@ -2046,14 +2066,14 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
         borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fafafa',
         display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
       }}>
-        <Shield aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
+        <Shield aria-hidden="true" style={{ width: 20, height: 20, color: '#526071', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>No validation data yet</div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
             Run validation to check extraction reliability
           </div>
                         {assertedTierNote(status.tier_asserted) && (
-                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                             {assertedTierNote(status.tier_asserted)}
                           </div>
                         )}
@@ -2082,7 +2102,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
             regressionPending={status.regression_pending_review}
           />
           {status.last_validated_at && (
-            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
               {relativeTime(status.last_validated_at)}
             </span>
           )}
@@ -2107,6 +2127,7 @@ export function ToolsTab({
   onExportPdf,
   onBuildFromDocument,
   buildingFromDoc,
+  buildError,
   attachingTemplate,
   templateError,
   generatingTemplate,
@@ -2123,6 +2144,7 @@ export function ToolsTab({
   onExportPdf: () => void
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
+  buildError?: string | null
   attachingTemplate: boolean
   templateError: string | null
   generatingTemplate: boolean
@@ -2133,26 +2155,15 @@ export function ToolsTab({
   hasItems: boolean
 }) {
   return (
-    <div style={{ padding: 'var(--workspace-space-24)' }}>
-      <div
+    <div className="extraction-tools" style={{ padding: 'var(--workspace-space-24)' }}>
+      <p className="extraction-section-intro">Build fields, prepare a PDF, or reuse this extraction.</p>
+      <div className="extraction-tools-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 'var(--workspace-space-16)',
         }}
       >
-        {/* Export PDF */}
-        <ToolCard
-          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
-          description={
-            hasTemplate
-              ? 'Download a filled copy of the PDF template with extracted values'
-              : 'Download extraction results as a PDF report'
-          }
-          onClick={onExportPdf}
-          disabled={exportingPdf || !hasResults}
-          style={{ gridColumn: '1 / -1' }}
-        />
         {/* From Document */}
         <ToolCard
           title={buildingFromDoc ? 'Building...' : 'From Document'}
@@ -2163,12 +2174,7 @@ export function ToolsTab({
           }
           onClick={onBuildFromDocument}
           disabled={buildingFromDoc || !hasDocuments}
-        />
-        {/* Clone */}
-        <ToolCard
-          title="Clone"
-          description="Create a copy of this extraction"
-          onClick={onClone}
+          error={buildError}
         />
         {/* Attach Template */}
         <ToolCard
@@ -2187,6 +2193,24 @@ export function ToolsTab({
             disabled: generatingTemplate || attachingTemplate || !hasItems,
           }}
           style={{ gridColumn: '1 / -1' }}
+        />
+        {/* Export PDF */}
+        <ToolCard
+          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
+          description={
+            hasTemplate
+              ? 'Download a filled copy of the PDF template with extracted values'
+              : 'Download extraction results as a PDF report'
+          }
+          onClick={onExportPdf}
+          disabled={exportingPdf || !hasResults}
+          style={{ gridColumn: '1 / -1' }}
+        />
+        {/* Clone */}
+        <ToolCard
+          title="Clone"
+          description="Create a copy of this extraction"
+          onClick={onClone}
         />
         {/* Delete */}
         <ToolCard
@@ -2221,90 +2245,13 @@ function ToolCard({
   error?: string | null
 }) {
   return (
-    <div
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-disabled={disabled || undefined}
-      onClick={() => { if (!disabled) onClick() }}
-      onKeyDown={(e) => {
-        if (disabled) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--workspace-space-6)',
-        padding: 'var(--workspace-space-16)',
-        border: danger ? '1px solid #fecaca' : '1px solid #e5e7eb',
-        borderRadius: 'var(--workspace-radius-medium)',
-        backgroundColor: disabled ? '#f9fafb' : danger ? '#fef2f2' : '#fff',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        textAlign: 'left',
-        fontFamily: 'inherit',
-        transition: 'box-shadow 0.15s',
-        ...style,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--workspace-space-6)',
-          fontSize: 'var(--workspace-font-body)',
-          fontWeight: 600,
-          color: danger ? '#dc2626' : '#202124',
-        }}
-      >
-        {danger && <Trash2 style={{ width: 14, height: 14 }} aria-hidden="true" />}
-        {title}
-      </div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
-      {error && (
-        <div
-          role="alert"
-          style={{
-            fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4, color: '#991b1b',
-            background: '#fef2f2', border: '1px solid #fecaca',
-            borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
-          }}
-        >
-          {error}
-        </div>
-      )}
-      {secondaryAction && (
-        <>
-          <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 'var(--workspace-space-4)' }} />
-          <span
-            role="button"
-            tabIndex={secondaryAction.disabled ? -1 : 0}
-            aria-disabled={secondaryAction.disabled || undefined}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!secondaryAction.disabled) secondaryAction.onClick()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                e.stopPropagation()
-                if (!secondaryAction.disabled) secondaryAction.onClick()
-              }
-            }}
-            style={{
-              fontSize: 'var(--workspace-font-meta)',
-              color: secondaryAction.disabled ? '#6b7280' : '#2563eb',
-              cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
-              fontWeight: 500,
-              paddingTop: 'var(--workspace-space-2)',
-            }}
-          >
-            {secondaryAction.label}
-          </span>
-        </>
-      )}
+    <div className={`extraction-tool-card${danger ? ' extraction-tool-danger' : ''}`} style={style}>
+      <button type="button" role="button" disabled={disabled} aria-disabled={disabled || undefined} tabIndex={disabled ? -1 : 0} onClick={onClick}>
+        <span className="extraction-tool-title">{danger && <Trash2 size={16} aria-hidden="true" />}{title}</span>
+        <span className="extraction-tool-description">{description}</span>
+      </button>
+      {error && <div role="alert" className="extraction-tool-error">{error}</div>}
+      {secondaryAction && <button type="button" className="extraction-tool-secondary" disabled={secondaryAction.disabled} onClick={secondaryAction.onClick}>{secondaryAction.label}</button>}
     </div>
   )
 }
@@ -2348,14 +2295,14 @@ export function AdvancedTab({
   }
 
   return (
-    <div style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
+    <div className="extraction-advanced" style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
       {/* Import / Export Definition. Import is at its most useful on an empty
           extraction, so it stays available; export has nothing to write out
           until there is at least one field. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-16)' }}>
+      <div className="extraction-tools-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-16)' }}>
         <ToolCard
           title="Import Definition"
-          description="Create a new extraction from an exported JSON file"
+          description="Load fields and settings from an exported JSON file"
           onClick={onImportDefinition}
         />
         <ToolCard
@@ -2527,13 +2474,13 @@ export function AdvancedTab({
           return nothing useful, so hold the copy-ready snippets back and say
           why rather than grey out a section that is only informational. */}
       {searchSetUuid && (hasFields ? (
-        <ApiTab searchSetUuid={searchSetUuid} />
+        <details className="extraction-api-disclosure"><summary>API access &amp; examples</summary><ApiTab searchSetUuid={searchSetUuid} /></details>
       ) : (
         <div style={cardStyle}>
           <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
             Run this extraction via API
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6 }}>
             Add at least one field to this extraction and the endpoint, its UUID, and ready-to-copy
             Python and cURL examples will appear here.
           </div>
@@ -2651,8 +2598,8 @@ print(response.json())`
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', border: 'none',
-    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
-    color: active ? '#fff' : '#6b7280',
+    backgroundColor: active ? '#1d4ed8' : '#e5e7eb',
+    color: active ? '#fff' : '#374151',
   })
 
   return (
@@ -2679,26 +2626,26 @@ print(response.json())`
           </div>
         </div>
 
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.6 }}>
           Call this extraction directly from any HTTP client. No automation required. The endpoint runs synchronously
           and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
           the top-right menu. Rate-limited to 10 requests/minute.
         </div>
 
         <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Endpoint
           </div>
-          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+          <div tabIndex={0} style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
             <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
           </div>
         </div>
 
         <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             This extraction's UUID
           </div>
-          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+          <div tabIndex={0} style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
             {searchSetUuid}
           </div>
         </div>
@@ -2731,19 +2678,19 @@ print(response.json())`
         />
 
         <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Response
           </div>
-          <div style={codeBlockStyle}>
+          <div tabIndex={0} style={codeBlockStyle}>
             {responseExample}
           </div>
         </div>
 
         <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Status lookup (optional)
           </div>
-          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 'var(--workspace-space-8)' }}>
+          <div tabIndex={0} style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 'var(--workspace-space-8)' }}>
             <span style={{ color: '#22d3ee' }}>GET</span>{' '}{statusEndpoint}
           </div>
           <ApiCodeBlock
@@ -2756,7 +2703,7 @@ print(response.json())`
           />
         </div>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
         Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
         <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
         <code>text</code> (optional, raw text to extract from) with an optional{' '}
@@ -2764,8 +2711,8 @@ print(response.json())`
         <code>text</code> must be provided.
       </div>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
-        <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
+        <strong style={{ color: '#526071' }}>Empty <code>results</code>?</strong>{' '}
         Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
         with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
         service couldn't extract text. <code>task_status: "error"</code> means text extraction
@@ -2783,7 +2730,7 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
   return (
     <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-6)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
@@ -2793,14 +2740,14 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
             display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)',
             fontWeight: 500, fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
-            color: copied === id ? '#16a34a' : '#6b7280',
+            color: copied === id ? '#166534' : '#4b5563',
           }}
         >
           {copied === id ? <Check style={{ width: 12, height: 12 }} aria-hidden="true" /> : <Copy style={{ width: 12, height: 12 }} aria-hidden="true" />}
           {copied === id ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div style={style}>{code}</div>
+      <div tabIndex={0} role="region" aria-label={`${title} code`} style={style}>{code}</div>
     </div>
   )
 }
@@ -3080,7 +3027,7 @@ function ValidationProgressDisplay({
       </div>
 
       {/* Elapsed time */}
-      <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
         Elapsed: {progress.elapsed < 60 ? `${progress.elapsed}s` : `${Math.floor(progress.elapsed / 60)}m ${progress.elapsed % 60}s`}
       </div>
     </div>
@@ -3198,6 +3145,7 @@ function ValidateTab({
 }) {
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const { toast } = useToast()
+  const [stage, setStage] = useState<ValidationStage>('examples')
   const [sources, setSources] = useState<SourceLocal[]>([])
   const [loadingSources, setLoadingSources] = useState(true)
   const [sourceLoadError, setSourceLoadError] = useState<string | null>(null)
@@ -3467,7 +3415,7 @@ function ValidateTab({
           <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
             Validate & Improve
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.5 }}>
             Choose representative sources and enter the expected values before checking the extraction.
           </div>
         </div>
@@ -3480,18 +3428,19 @@ function ValidateTab({
     )
   }
 
-  return (
-    <div style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-20)' }}>
-      <div>
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
-          Validate & Improve
-        </div>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
-          Choose representative sources and enter the expected values before checking the extraction.
-          Run detailed validation, compare each result with its source, then consider optional tuning.
-        </div>
-      </div>
+  const reviewFields = results?.sources.flatMap((source, sourceIndex) => source.fields
+    .filter(field => field.accuracy == null || field.accuracy < 1 || field.consistency < 1)
+    .map(field => ({ source, sourceIndex, field }))) ?? []
 
+  return (
+    <div className="validation-workspace" style={{ padding: 'var(--workspace-space-24)' }}>
+      <ValidationNav active={stage} onChange={async next => {
+        if (next === 'improve' && !await testCaseSave.retry()) return
+        setStage(next)
+      }} running={validating}
+        summary={stage === 'examples' ? `${sources.length} test sources · ${items.length} fields. Save expected values to measure accuracy.`
+          : stage === 'check' ? 'Compare extracted values with your examples. Each repeat checks consistency.'
+          : 'Compare alternative settings, then review changes before applying them.'} />
       {creatingSources && <p role="status">{autoFilling ? 'Adding expected values…' : 'Adding test cases…'}</p>}
       {sourceCreateError && <div role="alert">{sourceCreateError} <button type="button" disabled={creatingSources} onClick={() => void retrySourcesRef.current?.()}>Retry adding test cases</button></div>}
       {sourceLoadError && <div role="alert">{sourceLoadError} <button type="button" onClick={() => setSourceLoadAttempt(n => n + 1)}>Retry loading test cases</button></div>}
@@ -3499,6 +3448,7 @@ function ValidateTab({
       {testCaseSave.error && <div role="alert">{testCaseSave.error} <button type="button" onClick={() => void testCaseSave.retry()}>Retry saving test cases</button></div>}
       {validationError && <div role="alert">{validationError} <button type="button" disabled={validating} onClick={() => void handleRunValidation()}>Retry validation</button></div>}
 
+      <section hidden={stage !== 'examples'} aria-label="Extraction examples">
       {/* Test cases — the shared input to tuning + detailed validation. */}
       <div>
         <div
@@ -3521,14 +3471,14 @@ function ValidateTab({
         >
           {sources.length > 0 && (
             sourcesCollapsed
-              ? <ChevronRight style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
-              : <ChevronDown style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
+              ? <ChevronRight style={{ width: 14, height: 14, color: '#526071' }} aria-hidden="true" />
+              : <ChevronDown style={{ width: 14, height: 14, color: '#526071' }} aria-hidden="true" />
           )}
           <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>
             Test cases
           </span>
           {sources.length > 0 && sourcesCollapsed && (
-            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontWeight: 400 }}>
               ({sources.length} source{sources.length !== 1 ? 's' : ''})
             </span>
           )}
@@ -3542,7 +3492,7 @@ function ValidateTab({
               padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)',
               backgroundColor: '#fef2f2', border: '1px solid #fecaca',
             }}>
-              <AlertTriangle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
+              <AlertTriangle style={{ width: 16, height: 16, color: '#b91c1c', flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#7f1d1d', lineHeight: 1.5 }}>
                 <strong>{portability.missing_snapshot_count} of {portability.document_count} document-bound test case{portability.document_count !== 1 ? 's' : ''} {portability.missing_snapshot_count === 1 ? 'has' : 'have'} no saved text snapshot.</strong>
                 {' '}They will only run for users with access to the original document.
@@ -3614,11 +3564,11 @@ function ValidateTab({
             textAlign: 'center', padding: "var(--workspace-space-32) var(--workspace-space-16)",
             border: "1px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
           }}>
-            <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#6b7280', margin: "0 auto var(--workspace-space-12)" }} />
+            <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#526071', margin: "0 auto var(--workspace-space-12)" }} />
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
               Validate your extraction
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>
               Add documents with expected values to measure accuracy and consistency across multiple runs.
             </div>
             <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', justifyContent: 'center' }}>
@@ -3659,13 +3609,13 @@ function ValidateTab({
               return (
                 <div key={src.id} style={{ padding: "var(--workspace-space-12) 0", borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-                    <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                    <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
                     <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
                       {label}
                     </span>
                     {docMissing && (
                       <span
-                        style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic', flexShrink: 0 }}
+                        style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontStyle: 'italic', flexShrink: 0 }}
                         title="The source document was deleted. Validation still runs against the saved snapshot."
                       >
                         source deleted
@@ -3682,7 +3632,7 @@ function ValidateTab({
                       <button
                         type="button"
                         onClick={() => viewDocument(src.document_uuid!, src.document_title || label)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex' }}
                         title="View document"
                         aria-label={`View document ${label}`}
                       >
@@ -3692,7 +3642,7 @@ function ValidateTab({
                     <button
                       type="button"
                       onClick={() => toggleExpanded(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex' }}
                       title="Expected Values"
                       aria-label={`Expected values for ${label}`}
                       aria-expanded={!!src.expanded}
@@ -3706,7 +3656,7 @@ function ValidateTab({
                     <button
                       type="button"
                       onClick={() => removeSource(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex' }}
                       aria-label={`Remove ${label}`}
                       title="Remove"
                     >
@@ -3760,7 +3710,7 @@ function ValidateTab({
                       </div>
                       <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBottom: 8 }}>Check expected values against the original source. Blank expectations measure consistency, not correctness; auto-filled values still need human review.</p>
                       {fillError && !fillingSourceId && (
-                        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 'var(--workspace-space-6)' }}>
+                        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#b91c1c', marginBottom: 'var(--workspace-space-6)' }}>
                           {fillError}
                         </div>
                       )}
@@ -3880,17 +3830,19 @@ function ValidateTab({
         fieldNames={items.map(i => i.searchphrase)}
       />
 
+      <div className="validation-continue"><button type="button" onClick={() => setStage('check')}>Continue to run &amp; results →</button></div>
+      </section>
+      <section hidden={stage !== 'check'} aria-label="Extraction run and results">
       {/* Check current settings before considering optional tuning. */}
       <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-16)' }}>
         <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
           Detailed validation
         </div>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
-          Run the test cases as-is, record quality history, and inspect expected vs. extracted values per source and field.
-          Each replicate repeats every test case and uses additional model calls. The default is three runs to compare consistency.
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)' }}>
+          Each repeat checks every example and uses model calls. Three repeats help measure consistency.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
-          <label htmlFor="detailed-validation-replicates" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Replicates:</label>
+          <label htmlFor="detailed-validation-replicates" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Repeats:</label>
           <input
             id="detailed-validation-replicates"
             type="number"
@@ -3919,7 +3871,7 @@ function ValidateTab({
             {validating ? (
               <><Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
             ) : (
-              <><Play aria-hidden="true" style={{ width: 14, height: 14 }} /> Run detailed validation</>
+              <><Play aria-hidden="true" style={{ width: 14, height: 14 }} /> Run check</>
             )}
           </button>
         </div>
@@ -3937,163 +3889,6 @@ function ValidateTab({
           </div>
         )}
       </div>
-
-      {/* 3. Quality History — graph only, expandable run table */}
-      {qualityHistory.length > 1 && (
-        <div style={{
-          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)',
-          backgroundColor: '#fff',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
-            <TrendingUp aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280' }} />
-            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
-            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
-          </div>
-          <QualityHistoryChart runs={qualityHistory} />
-
-          {/* Expand toggle for run details */}
-          <button
-            type="button"
-            onClick={() => setHistoryExpanded(!historyExpanded)}
-            aria-expanded={historyExpanded}
-            aria-controls="quality-history-run-table"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-8)',
-              fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: 'none', border: 'none',
-              cursor: 'pointer', padding: "var(--workspace-space-4) 0", fontFamily: 'inherit',
-            }}
-          >
-            {historyExpanded
-              ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
-              : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
-            {historyExpanded ? 'Hide run details' : 'Show all runs'}
-          </button>
-
-          {/* Collapsible run comparison table */}
-          {historyExpanded && (
-            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 'var(--workspace-space-4)' }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
-                  <th style={{ width: 20, padding: "var(--workspace-space-4) var(--workspace-space-2)" }} />
-                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Date</th>
-                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Score</th>
-                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Acc</th>
-                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Cons</th>
-                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Config</th>
-                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Model</th>
-                </tr>
-              </thead>
-              <tbody>
-                {qualityHistory.map((run) => {
-                  const scoreColor = run.score >= 90 ? '#15803d' : run.score >= 70 ? '#92400e' : '#dc2626'
-                  const isExpanded = expandedRunId === run.uuid
-                  return (
-                    <Fragment key={run.uuid}>
-                      <tr
-                        role="button"
-                        tabIndex={0}
-                        aria-expanded={isExpanded}
-                        aria-label={`Run from ${new Date(run.created_at).toLocaleDateString()}, score ${Math.round(run.score)}`}
-                        style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
-                        onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            setExpandedRunId(isExpanded ? null : run.uuid)
-                          }
-                        }}
-                      >
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-2)", color: '#6b7280' }}>
-                          {isExpanded
-                            ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
-                            : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#374151' }}>
-                          {new Date(run.created_at).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                          {Math.round(run.score)}
-                          {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
-                            <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
-                              style={{ color: '#92400e', fontSize: 'var(--workspace-font-meta)', marginLeft: 'var(--workspace-space-2)', verticalAlign: 'super' }}>*</span>
-                          )}
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
-                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '-'}
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
-                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '-'}
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>
-                          <span style={{
-                            display: 'inline-block', padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
-                            backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 'var(--workspace-font-meta)',
-                          }}>
-                            {_summarizeConfig(run.extraction_config)}
-                          </span>
-                        </td>
-                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
-                          {run.model || '-'}
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={7} style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-24)", backgroundColor: '#f9fafb' }}>
-                            {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
-                              <div style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
-                                padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
-                                backgroundColor: '#fffbeb', border: '1px solid #fde68a',
-                              }}>
-                                <AlertTriangle style={{ width: 14, height: 14, color: '#92400e', flexShrink: 0, marginTop: 1 }} />
-                                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
-                                  <strong>Score reduced by sample size confidence penalty</strong>
-                                  <br />
-                                  Raw score: <strong>{Math.round(run.score_breakdown.raw_score)}</strong> → Final: <strong>{Math.round(run.score_breakdown.final_score)}</strong> ({`-${Math.round(run.score_breakdown.sample_size_penalty)} pts`})
-                                  <br />
-                                  <span style={{ color: '#78350f' }}>
-                                    {run.score_breakdown.test_cases_needed > 0 && run.score_breakdown.runs_needed > 0
-                                      ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} and increase to ${3} runs per test case to reach full confidence.`
-                                      : run.score_breakdown.test_cases_needed > 0
-                                        ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} to reach full confidence.`
-                                        : `Increase to ${3} runs per test case to reach full confidence.`
-                                    }
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            <div style={{ fontWeight: 600, color: '#4b5563', marginBottom: 'var(--workspace-space-4)' }}>Field results</div>
-                            {searchSetUuid && <QualityRunResults searchSetUuid={searchSetUuid} runUuid={run.uuid} />}
-                            <div style={{ fontWeight: 600, color: '#4b5563', margin: 'var(--workspace-space-12) 0 var(--workspace-space-4)' }}>Extraction settings</div>
-                            {_renderConfigDetails(run.extraction_config)}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* Share — offered at any score; the server takes any score */}
-      <EditorShareCallout
-        itemKind="search_set"
-        itemId={searchSetUuid}
-        itemTitle={itemTitle}
-        kindNoun="extraction"
-        score={
-          qualityHistory.length > 0
-            ? qualityHistory[0].score
-            : results
-              // No quality record yet: the same estimate this run's summary uses
-              ? Math.round((results.executive_summary.mean_accuracy ?? 0) * 60 + (results.executive_summary.mean_consistency ?? 0) * 40)
-              : null
-        }
-        verified={verified}
-      />
 
       {/* 4. Results — Executive Summary */}
       {results && (
@@ -4134,14 +3929,23 @@ function ValidateTab({
             </div>
           </div>
 
-          <section aria-label="Extraction validation review summary" style={{ padding: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
-            <strong>What to review</strong>
-            <p>{results.num_sources} test sources, {results.num_runs} runs per source; {results.challenging_fields.length} field/source pairs flagged for closer review.</p>
-            <p>Start with Challenging Fields and failed cross-field rules. Compare each extracted value with the saved expected value and source; repeated answers measure consistency, which can include a consistently wrong answer.</p>
-            {results.sources.some(source => source.fields.some(field => field.accuracy == null)) && <p>Some fields have no measured accuracy. Add or check their expected values before drawing a correctness conclusion.</p>}
-            <p>These results describe the saved test cases. Detailed validation records quality history without applying tuning settings.</p>
+          <section aria-label="Extraction validation review summary" className="validation-review-summary">
+            <strong>{reviewFields.length} {reviewFields.length === 1 ? 'result needs' : 'results need'} review</strong>
+            <p>{results.num_sources} {results.num_sources === 1 ? 'source' : 'sources'} · {results.num_runs} runs per source. Compare flagged values with their expected answer.</p>
+            <details><summary>How to interpret this result</summary><p>Consistency measures repeated answers, including consistently wrong answers. Fields without expected values have no measured accuracy. These results describe the saved test cases and do not apply tuning settings.</p></details>
           </section>
 
+          <div className="validation-evidence-list" role="region" aria-label="Fields needing review">
+            {reviewFields.map(({ source, sourceIndex, field }) => (
+              <article className="validation-field-evidence" key={`${sourceIndex}-${field.field_name}`}>
+                <header><strong>{field.field_name}</strong><span>{field.accuracy == null ? 'Ungraded' : field.accuracy < 1 ? 'Check answer' : 'Inconsistent'}</span></header>
+                <p>{source.source_label}</p>
+                <dl><div><dt>Expected</dt><dd>{field.expected || 'No expected value saved'}</dd></div>
+                  <div><dt>Extracted</dt><dd>{[...new Set(field.extracted_values)].join(' · ') || 'No value returned'}</dd></div></dl>
+              </article>
+            ))}
+          </div>
+          <details className="validation-details"><summary>Metrics &amp; improvement suggestions</summary>
           {/* Raw accuracy and consistency explain individual failures; the saved quality score may also include sample-size penalties. */}
 
           {/* Executive Summary Card */}
@@ -4182,7 +3986,7 @@ function ValidateTab({
             </div>
             <div>
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Worst Run</div>
-              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#dc2626' }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#b91c1c' }}>
                 Src {results.executive_summary.worst_run.source_index + 1}, Run {results.executive_summary.worst_run.run_index + 1} ({results.executive_summary.worst_run.correct} correct)
               </div>
             </div>
@@ -4283,6 +4087,7 @@ function ValidateTab({
             </div>
           )}
 
+          </details>
           {/* 6. Per-Source Expandable Details */}
           {results.sources.map((sr, si) => (
             <div key={si} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', overflow: 'hidden' }}>
@@ -4346,13 +4151,13 @@ function ValidateTab({
                                   {Math.round(f.accuracy * 100)}%
                                 </span>
                               ) : (
-                                <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>N/A</span>
+                                <span style={{ color: '#526071', fontSize: 'var(--workspace-font-meta)' }}>N/A</span>
                               )}
                             </td>
                             <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)' }}>
                               {errorEntries.length > 0
                                 ? errorEntries.map(([t, c]) => `${t}:${c}`).join(', ')
-                                : <span style={{ color: '#6b7280' }}>-</span>
+                                : <span style={{ color: '#526071' }}>-</span>
                               }
                             </td>
                           </tr>
@@ -4365,36 +4170,6 @@ function ValidateTab({
             </div>
           ))}
 
-          {/* 7. Challenging Fields */}
-          {results.challenging_fields.length > 0 && (
-            <div style={{
-              border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-12)',
-              backgroundColor: '#fffbeb',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
-                <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#92400e' }} />
-                <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
-                {results.challenging_fields.map((cf, i) => (
-                  <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600 }}>{cf.field_name}</span>
-                    <span style={{ color: '#92400e' }}>({cf.source_label})</span>
-                    {cf.accuracy !== null && (
-                      <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(cf.accuracy), color: _scoreColor(cf.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
-                        {Math.round(cf.accuracy * 100)}% acc
-                      </span>
-                    )}
-                    <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(cf.consistency), color: _scoreColor(cf.consistency), fontSize: 'var(--workspace-font-meta)' }}>
-                      {Math.round(cf.consistency * 100)}% cons
-                    </span>
-                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e' }}>({cf.most_common_error})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* 8. Error Type Summary */}
           {Object.keys(results.error_type_summary).length > 0 && (
             <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
@@ -4403,7 +4178,7 @@ function ValidateTab({
                   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                   padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)',
                   backgroundColor: type === 'missing' ? '#fef2f2' : type === 'wrong_value' ? '#fef2f2' : type === 'format_difference' ? '#fffbeb' : '#eff6ff',
-                  color: type === 'missing' ? '#dc2626' : type === 'wrong_value' ? '#dc2626' : type === 'format_difference' ? '#92400e' : '#1d4ed8',
+                  color: type === 'missing' ? '#b91c1c' : type === 'wrong_value' ? '#b91c1c' : type === 'format_difference' ? '#92400e' : '#1d4ed8',
                   fontWeight: 600,
                 }}>
                   {type.replace('_', ' ')}: {count}
@@ -4415,8 +4190,166 @@ function ValidateTab({
         </div>
       )}
 
-      <section aria-label="Advanced: tune extraction">
-        <h3 style={{ fontWeight: 600 }}>Advanced: tune extraction</h3>
+      {/* 3. Quality History — graph only, expandable run table */}
+      {qualityHistory.length > 1 && (
+        <div style={{
+          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)',
+          backgroundColor: '#fff',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
+            <TrendingUp aria-hidden="true" style={{ width: 14, height: 14, color: '#526071' }} />
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>({qualityHistory.length} runs)</span>
+          </div>
+          <QualityHistoryChart runs={qualityHistory} />
+
+          {/* Expand toggle for run details */}
+          <button
+            type="button"
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            aria-expanded={historyExpanded}
+            aria-controls="quality-history-run-table"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-8)',
+              fontSize: 'var(--workspace-font-meta)', color: '#526071', background: 'none', border: 'none',
+              cursor: 'pointer', padding: "var(--workspace-space-4) 0", fontFamily: 'inherit',
+            }}
+          >
+            {historyExpanded
+              ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
+              : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
+            {historyExpanded ? 'Hide run details' : 'Show all runs'}
+          </button>
+
+          {/* Collapsible run comparison table */}
+          {historyExpanded && (
+            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 'var(--workspace-space-4)' }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
+                  <th style={{ width: 20, padding: "var(--workspace-space-4) var(--workspace-space-2)" }} />
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Date</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Score</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Acc</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Cons</th>
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Config</th>
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Model</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qualityHistory.map((run) => {
+                  const scoreColor = run.score >= 90 ? '#15803d' : run.score >= 70 ? '#92400e' : '#b91c1c'
+                  const isExpanded = expandedRunId === run.uuid
+                  return (
+                    <Fragment key={run.uuid}>
+                      <tr
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        aria-label={`Run from ${new Date(run.created_at).toLocaleDateString()}, score ${Math.round(run.score)}`}
+                        style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                        onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setExpandedRunId(isExpanded ? null : run.uuid)
+                          }
+                        }}
+                      >
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-2)", color: '#526071' }}>
+                          {isExpanded
+                            ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
+                            : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#374151' }}>
+                          {new Date(run.created_at).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', fontWeight: 600, color: scoreColor }}>
+                          {Math.round(run.score)}
+                          {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
+                            <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
+                              style={{ color: '#92400e', fontSize: 'var(--workspace-font-meta)', marginLeft: 'var(--workspace-space-2)', verticalAlign: 'super' }}>*</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
+                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '-'}
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
+                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '-'}
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>
+                          <span style={{
+                            display: 'inline-block', padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
+                            backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 'var(--workspace-font-meta)',
+                          }}>
+                            {_summarizeConfig(run.extraction_config)}
+                          </span>
+                        </td>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontSize: 'var(--workspace-font-meta)' }}>
+                          {run.model || '-'}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-24)", backgroundColor: '#f9fafb' }}>
+                            {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
+                              <div style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+                                padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
+                                backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+                              }}>
+                                <AlertTriangle style={{ width: 14, height: 14, color: '#92400e', flexShrink: 0, marginTop: 1 }} />
+                                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
+                                  <strong>Score reduced by sample size confidence penalty</strong>
+                                  <br />
+                                  Raw score: <strong>{Math.round(run.score_breakdown.raw_score)}</strong> → Final: <strong>{Math.round(run.score_breakdown.final_score)}</strong> ({`-${Math.round(run.score_breakdown.sample_size_penalty)} pts`})
+                                  <br />
+                                  <span style={{ color: '#78350f' }}>
+                                    {run.score_breakdown.test_cases_needed > 0 && run.score_breakdown.runs_needed > 0
+                                      ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} and increase to ${3} runs per test case to reach full confidence.`
+                                      : run.score_breakdown.test_cases_needed > 0
+                                        ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} to reach full confidence.`
+                                        : `Increase to ${3} runs per test case to reach full confidence.`
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ fontWeight: 600, color: '#4b5563', marginBottom: 'var(--workspace-space-4)' }}>Field results</div>
+                            {searchSetUuid && <QualityRunResults searchSetUuid={searchSetUuid} runUuid={run.uuid} />}
+                            <div style={{ fontWeight: 600, color: '#4b5563', margin: 'var(--workspace-space-12) 0 var(--workspace-space-4)' }}>Extraction settings</div>
+                            {_renderConfigDetails(run.extraction_config)}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Share — offered at any score; the server takes any score */}
+      <EditorShareCallout
+        itemKind="search_set"
+        itemId={searchSetUuid}
+        itemTitle={itemTitle}
+        kindNoun="extraction"
+        score={
+          qualityHistory.length > 0
+            ? qualityHistory[0].score
+            : results
+              // No quality record yet: the same estimate this run's summary uses
+              ? Math.round((results.executive_summary.mean_accuracy ?? 0) * 60 + (results.executive_summary.mean_consistency ?? 0) * 40)
+              : null
+        }
+        verified={verified}
+      />
+
+      </section>
+      <section hidden={stage !== 'improve'} aria-label="Advanced: tune extraction">
+        <h3 style={{ fontWeight: 600 }}>Improve extraction</h3>
         <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBlock: 8 }}>Optional: compare alternative settings using additional model calls. Review the wizard’s budget and application options before starting. Detailed validation above checks current settings and records quality history without changing extraction settings. Tuning can propose or apply different settings according to the options you choose.</p>
       {/* Applying tuning writes the shared ValidationRun / quality tile. */}
       <ExtractionAutovalidatePanel
@@ -4502,7 +4435,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
   const data = qualityChartData(runs)
   const showRaw = data.some(d => d.raw != null)
   const latestScore = data.length > 0 ? data[data.length - 1].score : 0
-  const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#92400e' : '#dc2626'
+  const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#92400e' : '#b91c1c'
 
   return (
     <div>
@@ -4524,7 +4457,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
         <span><span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: `2px solid ${lineColor}`, verticalAlign: 'middle', marginRight: 4 }} />Score (as in the run table)</span>
         {showRaw && (
           <span><span aria-hidden="true" style={{ display: 'inline-block', width: 14, borderTop: '2px dashed #9ca3af', verticalAlign: 'middle', marginRight: 4 }} />Before the sample-size penalty</span>
@@ -4543,13 +4476,13 @@ function _summarizeConfig(config?: Record<string, unknown> | null): string {
 
 function _renderConfigDetails(config?: Record<string, unknown> | null): React.ReactNode {
   if (!config || Object.keys(config).length === 0) {
-    return <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic' }}>System defaults were used</span>
+    return <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontStyle: 'italic' }}>System defaults were used</span>
   }
 
   const kvStyle: React.CSSProperties = {
     display: 'grid', gridTemplateColumns: 'auto 1fr', gap: "var(--workspace-space-2) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)',
   }
-  const labelStyle: React.CSSProperties = { color: '#6b7280', fontWeight: 500 }
+  const labelStyle: React.CSSProperties = { color: '#526071', fontWeight: 500 }
   const valStyle: React.CSSProperties = { color: '#374151' }
   const sectionStyle: React.CSSProperties = { fontWeight: 600, color: '#4b5563', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-2)' }
 
@@ -4654,7 +4587,7 @@ function _scoreColor(score: number | null): string {
   if (score === null) return '#9ca3af'
   if (score >= 0.9) return '#15803d'
   if (score >= 0.7) return '#92400e'
-  return '#dc2626'
+  return '#b91c1c'
 }
 
 function _scoreBg(score: number | null): string {

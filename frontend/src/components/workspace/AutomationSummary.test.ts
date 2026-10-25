@@ -22,6 +22,14 @@ describe('automation configuration summaries', () => {
   })
   it('covers API and Microsoft 365 inputs, extraction outputs and fallback action names', () => {
     expect(describeAutomation({ ...base, trigger_type: 'api', action_type: 'extraction', action_name: null, output_config: { storage: { enabled: true, destination_folder: 'out' } } }, names, 'Award fields')).toMatchObject({ input: 'Documents or text provided by the caller', action: 'Extraction: Award fields', output: 'CSV → Proposals / Reviewed' })
-    expect(describeAutomation({ ...base, trigger_type: 'm365_intake' }, names)).toMatchObject({ trigger: 'On Microsoft 365 intake', input: 'Files from the configured Microsoft 365 source' })
+    expect(describeAutomation({ ...base, trigger_type: 'm365_intake' }, names)).toMatchObject({ trigger: 'On Microsoft 365 intake', input: 'Source connection managed separately' })
   })
+})
+
+
+it('summarizes email recipients and conditions without inventing an owner recipient', () => {
+  const configured = { ...base, output_config: { notifications: [{ channel: 'email', recipients: ['review@example.test'], conditions: 'failure' }] } }
+  expect(describeAutomation(configured, names).output).toBe('Email 1 recipient · on failure')
+  configured.output_config.notifications[0] = { ...configured.output_config.notifications[0], notify_owner: true } as typeof configured.output_config.notifications[0]
+  expect(describeAutomation(configured, names).output).toBe('Email owner + 1 recipient · on failure')
 })

@@ -1,0 +1,54 @@
+.automation-filter-pills { display: flex; flex: 1; align-items: center; flex-wrap: wrap; gap: 6px; }
+.automation-mobile-trigger { display: none; }
+.automation-editor-header { position: relative; }
+.automation-editor-title { padding-right: 32px !important; }
+.automation-editor-title > svg { flex-shrink: 0; }
+.automation-editor-close { position: absolute; right: 18px; top: 14px; }
+.automation-editor-actions { gap: 8px; }
+.automation-more { position: relative; }
+.automation-more > summary { list-style: none; border: 1px solid var(--workspace-border); border-radius: 16px; padding: 6px 12px; cursor: pointer; font-size: var(--workspace-font-meta); background: white; }
+.automation-more > summary::-webkit-details-marker { display: none; }
+.automation-more-controls { position: absolute; z-index: 20; right: 0; top: calc(100% + 8px); display: flex; flex-direction: column; gap: 12px; min-width: 180px; padding: 14px; background: white; border: 1px solid var(--workspace-border); border-radius: 10px; box-shadow: 0 8px 24px #17223022; }
+.automation-more:not([open]) .automation-more-controls { display: none; }
+.automation-more-controls button { justify-content: flex-start; min-height: 36px; }
+.automation-more-controls button[title="Delete automation"] { gap: 8px; font-size: var(--workspace-font-control); }
+.automation-save-state { padding-block: 7px !important; }
+.automation-editor-body textarea[aria-label="Automation description"] { margin-bottom: 12px !important; }
+.automation-intake-guide { font-size: var(--workspace-font-control); line-height: 1.6; color: #374151; padding: 14px; background: #f8fafc; border: 1px solid var(--workspace-border); border-radius: 8px; }
+.automation-intake-guide p { margin: 8px 0; }
+.automation-intake-guide ol { list-style: decimal; padding-left: 20px; margin: 8px 0; }
+.automation-integration-help { margin-top: 16px; font-size: var(--workspace-font-control); }
+.automation-integration-help > summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.automation-integration-current { border: 1px solid #a9b9cf; border-radius: 8px; padding: 12px; background: #f1f5f9; display: flex; flex-wrap: wrap; gap: 8px; font-size: var(--workspace-font-control); }
+.automation-integration-current span { color: #526071; }
+.automation-run-duration { color: #526071; font-variant-numeric: tabular-nums; }
+.automation-history-row time { flex-basis: 100%; color: #526071; font-size: var(--workspace-font-meta); }
+.automation-history-row > button { margin-top: 10px; }
+.automation-run-reference { margin: 8px 0; color: #526071; font-size: var(--workspace-font-meta); }
+.automation-run-reference summary { cursor: pointer; }
+.automation-run-reference code { display: block; padding: 8px 0; user-select: all; }
+
+@media (max-width: 767px) {
+  .automations-panel > .workspace-section-header { padding: 12px !important; }
+  .automations-panel .workspace-section-heading { flex-wrap: nowrap; gap: 8px; }
+  .automations-panel .workspace-section-title { min-width: 0; gap: 6px; }
+  .automations-panel .workspace-section-title h2 { font-size: 18px; }
+  .automations-panel .workspace-section-title > button { font-size: 0 !important; padding: 6px !important; gap: 0 !important; }
+  .automations-panel .workspace-section-actions button { padding: 8px 12px !important; }
+  .automation-filter-pills { display: none; }
+  .automation-mobile-trigger { display: block; flex: 1; min-width: 0; width: 100px; padding: 8px; background: white; border: 1px solid var(--workspace-border); border-radius: 6px; font-size: var(--workspace-font-meta); }
+  .automation-sort { flex: 1 !important; min-width: 0; }
+  .automation-sort > svg { display: none; }
+  .automation-sort select { width: 100%; min-width: 0; padding: 8px !important; }
+  .automation-editor-header { padding: 12px !important; }
+  .automation-editor-title > span { font-size: 16px !important; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .automation-editor-close { right: 8px; top: 10px; }
+  .automation-editor-actions { gap: 6px !important; }
+  .automation-editor-actions > button { padding-inline: 10px !important; }
+  .automation-more { position: static; }
+  .automation-more > summary { padding-inline: 8px; }
+  .automation-more-controls { right: 12px; top: calc(100% - 2px); max-width: calc(100% - 24px); }
+  .automation-save-state { padding-inline: 12px !important; font-size: 11px !important; }
+  .automation-editor-body { padding: 16px 12px !important; }
+  .automation-editor .automation-summary { padding: 12px; margin-bottom: 16px; }
+}

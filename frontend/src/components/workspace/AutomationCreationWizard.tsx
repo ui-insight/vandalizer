@@ -1,9 +1,10 @@
+import { Microsoft365IntakeGuide } from './Microsoft365IntakeGuide'
 import { FieldLabel } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
-import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail, CalendarClock } from 'lucide-react'
+import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, CalendarClock } from 'lucide-react'
 import { createAutomation, updateAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
@@ -27,12 +28,9 @@ const BASE_TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof Fo
   { value: 'schedule', label: 'Schedule', icon: CalendarClock, description: 'Run daily, weekly or monthly at a set time' },
 ]
 
-const M365_TRIGGER_OPTION = { value: 'm365_intake' as TriggerType, label: 'M365 Intake', icon: Mail, description: 'Trigger when files arrive in a Microsoft 365 source' }
-
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[] = [
   { value: 'workflow', label: 'Run Workflow', description: 'Execute a workflow on triggered documents' },
   { value: 'extraction', label: 'Run Extraction', description: 'Run an extraction template' },
-  { value: 'task', label: 'Run Task', description: 'Execute a standalone task' },
 ]
 
 // The filter can only ever match extensions the uploader accepts, so the
@@ -47,10 +45,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
     getFeatureFlags().then(f => setM365Enabled(f.m365_enabled)).catch(() => {})
   }, [])
 
-  const triggerOptions = useMemo(
-    () => m365Enabled ? [...BASE_TRIGGER_OPTIONS, M365_TRIGGER_OPTION] : BASE_TRIGGER_OPTIONS,
-    [m365Enabled],
-  )
+  const triggerOptions = BASE_TRIGGER_OPTIONS
 
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
@@ -391,6 +386,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   )
                 })}
               </div>
+              {m365Enabled && <details className="automation-integration-help"><summary>Using Microsoft 365?</summary><Microsoft365IntakeGuide /></details>}
               <p className="wizard-field-help">Each trigger keeps its settings while you edit. Only the selected trigger is used when you create.</p>
               {triggerType === 'api' && <p className="wizard-field-help">The endpoint and request examples are available in the automation editor after creation. Requests require an API key, which you can generate from My Account. Keep your key private.</p>}
             </div>
@@ -603,7 +599,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               {(actionType === 'workflow' || actionType === 'extraction' || actionType === 'task') && (
                 <div>
                   <label id="wizard-action-label" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Select {actionType === 'extraction' ? 'Extraction' : actionType === 'task' ? 'Workflow Task' : 'Workflow'} <span style={{ color: '#ef4444' }}>*</span>
+                    Select {actionType === 'extraction' ? 'Extraction' : 'Workflow'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <button
                     type="button"

@@ -4,7 +4,7 @@ import { createPortal } from '../shared/panelPortal'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
-  Search, ShieldCheck, BookOpen, Workflow, FileSearch, MessageSquare,
+  Braces, Search, ShieldCheck, BookOpen, Workflow, FileSearch, MessageSquare,
   FolderOpen, Star, X, Plus, ArrowUpDown,
   Bookmark, ArrowLeft, Loader2, Tag, ExternalLink, Link2, Users,
   Pin, PinOff,
@@ -76,6 +76,11 @@ const KIND_CONFIG = {
   },
   prompt: {
     label: 'Prompt', icon: MessageSquare,
+    bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200',
+    heroBg: 'from-gray-600 to-gray-800',
+  },
+  formatter: {
+    label: 'Formatter', icon: Braces,
     bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200',
     heroBg: 'from-gray-600 to-gray-800',
   },
@@ -155,7 +160,7 @@ export function ItemDetailModal({
     } finally { adoptingRef.current = false; setAdopting(null) }
   }
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
-  const kindConf = KIND_CONFIG[(item.kind === 'search_set' && item.set_type === 'prompt' ? 'prompt' : item.kind) as keyof typeof KIND_CONFIG]
+  const kindConf = KIND_CONFIG[(item.kind === 'search_set' && (item.set_type === 'prompt' || item.set_type === 'formatter') ? item.set_type : item.kind) as keyof typeof KIND_CONFIG]
   const shareLink = useShareLink()
   const shareKind: 'workflow' | 'extraction' | 'kb' | null =
     item.kind === 'workflow' ? 'workflow'
@@ -395,7 +400,7 @@ function CatalogCard({
   return (
     <article
       style={{ overflowWrap: 'anywhere', minWidth: 0 }}
-      className={`group flex flex-col rounded-xl border bg-white p-4 text-left transition-all hover:shadow-md ${
+      className={`library-catalog-card group flex flex-col rounded-xl border bg-white p-4 text-left transition-all hover:shadow-md ${
         tierStyle ? `ring-1 ${tierStyle.ring} hover:${tierStyle.glow}` : 'border-gray-200 hover:border-gray-300'
       }`}
     >
@@ -409,12 +414,12 @@ function CatalogCard({
             </button>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <KindBadge kind={item.kind === 'search_set' && item.set_type === 'prompt' ? 'prompt' : item.kind} />
+            <KindBadge kind={item.kind === 'search_set' && (item.set_type === 'prompt' || item.set_type === 'formatter') ? item.set_type : item.kind} />
           </div>
         </div>
       </div>
 
-      <p className="text-sm text-gray-700 mb-3">{item.description || 'The author has not described the task. Open the setup and inspect its inputs and output before saving or running it.'}</p>
+      <p className="library-catalog-description text-sm text-gray-700 mb-3">{item.description || 'No description yet. Review the setup before use.'}</p>
       <CatalogUsage item={item} compact />
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <QualityBadge
@@ -622,7 +627,7 @@ export function ExploreTab() {
   const kindFilters: [KindFilter, string][] = [
     ['', 'All'],
     ['workflow', 'Workflows'],
-    ['search_set', 'Extractions & prompts'],
+    ['search_set', 'Extractions & text tools'],
     ['knowledge_base', 'Knowledge Bases'],
   ]
 
@@ -635,7 +640,7 @@ export function ExploreTab() {
         <div id="explore-collections" className="explore-collections w-56 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-3" data-open={collectionsOpen}>
           <button
             aria-pressed={!selectedCollectionId}
-            onClick={() => setSelectedCollectionId(null)}
+            onClick={() => { setSelectedCollectionId(null); setCollectionsOpen(false) }}
             className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-1 ${
               !selectedCollectionId
                 ? 'bg-gray-900 text-white'
@@ -659,7 +664,7 @@ export function ExploreTab() {
                   key={col.id}
                   collection={col}
                   active={selectedCollectionId === col.id}
-                  onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
+                  onClick={() => { setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id); setCollectionsOpen(false) }}
                 />
               ))}
             </div>
@@ -676,7 +681,7 @@ export function ExploreTab() {
                       key={col.id}
                       collection={col}
                       active={selectedCollectionId === col.id}
-                      onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
+                      onClick={() => { setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id); setCollectionsOpen(false) }}
                     />
                   ))}
               </div>
@@ -693,7 +698,7 @@ export function ExploreTab() {
                 <div className="flex items-center gap-3 mb-2">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Explore shared tools</h2>
-                    <p className="text-sm text-gray-500">Browse workflows, extractions, and knowledge bases. Review details and measured quality before adding one.</p>
+                    <p className="text-sm text-gray-500">Find a starting point. Review its inputs, output, and quality before use.</p>
                   </div>
                 </div>
               </div>
@@ -703,7 +708,7 @@ export function ExploreTab() {
             {activeCollection && (
               <div className="mb-6">
                 <button
-                  onClick={() => setSelectedCollectionId(null)}
+                  onClick={() => { setSelectedCollectionId(null); setCollectionsOpen(false) }}
                   className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 mb-2"
                 >
                   <ArrowLeft className="h-3 w-3" /> All Items
@@ -720,8 +725,8 @@ export function ExploreTab() {
             )}
 
             {/* Search + Filters */}
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <div className="relative flex-1 min-w-0 basis-[200px] max-w-sm">
+            <div className="library-catalog-filters">
+              <div className="library-catalog-search relative flex-1 min-w-0 basis-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                 <input
                   type="text"
@@ -733,7 +738,10 @@ export function ExploreTab() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
+              <select className="library-catalog-kind-select" aria-label="Filter catalog by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
+                {kindFilters.map(([value, label]) => <option key={value} value={value}>{value === '' ? 'All types' : label}</option>)}
+              </select>
+              <div className="library-catalog-kind-chips flex flex-wrap items-center gap-1.5">
                 {kindFilters.map(([val, label]) => (
                   <button
                     key={val}
@@ -761,7 +769,7 @@ export function ExploreTab() {
                 ))}
               </select>
 
-              <div className="flex items-center gap-1">
+              <div className="library-catalog-sort flex items-center gap-1">
                 <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
                 <select
                   value={sortOption}
@@ -788,7 +796,7 @@ export function ExploreTab() {
                 {selectedCollectionId && activeCollection && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
                     <FolderOpen className="h-2.5 w-2.5" /> {activeCollection.title}
-                    <button type="button" onClick={() => setSelectedCollectionId(null)} aria-label="Remove collection filter" className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => { setSelectedCollectionId(null); setCollectionsOpen(false) }} aria-label="Remove collection filter" className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">
@@ -838,18 +846,18 @@ export function ExploreTab() {
               <>
                 {/* Featured collections (hero landing only) */}
                 {showHero && !activeCollection && featuredCollections.length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-sm font-bold text-gray-900 mb-3">Featured Collections</h3>
+                  <details className="library-featured-collections mb-4">
+                    <summary className="text-sm font-semibold text-gray-700">Featured collections <span>{featuredCollections.length}</span></summary>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {featuredCollections.map(col => (
                         <FeaturedCollectionCard
                           key={col.id}
                           collection={col}
-                          onClick={() => setSelectedCollectionId(col.id)}
+                          onClick={() => { setSelectedCollectionId(col.id); setCollectionsOpen(false) }}
                         />
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
 
                 {/* Top-tier spotlight (hero landing only) */}

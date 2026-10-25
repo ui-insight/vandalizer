@@ -5,9 +5,9 @@ export type AutomationStatus = 'running' | 'active' | 'paused'
 /** What the row's status pill says. The dot alone (green/grey/pulsing yellow)
  *  left users guessing, so the state is always named. */
 export const AUTOMATION_STATUS: Record<AutomationStatus, { label: string; color: string; bg: string; title: string }> = {
-  running: { label: 'Running', color: '#eab308', bg: 'rgba(234, 179, 8, 0.12)', title: 'Running right now' },
-  active: { label: 'Active', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.12)', title: 'On — runs when its trigger fires' },
-  paused: { label: 'Paused', color: '#9ca3af', bg: 'rgba(107, 114, 128, 0.18)', title: 'Off — its trigger is ignored until you turn it back on' },
+  running: { label: 'Running', color: '#854d0e', bg: 'rgba(234, 179, 8, 0.12)', title: 'Running right now' },
+  active: { label: 'Active', color: '#166534', bg: 'rgba(34, 197, 94, 0.12)', title: 'On — runs when its trigger fires' },
+  paused: { label: 'Paused', color: '#4b5563', bg: 'rgba(107, 114, 128, 0.18)', title: 'Off — its trigger is ignored until you turn it back on' },
 }
 
 export function automationStatus(auto: Automation, isRunning: boolean): AutomationStatus {

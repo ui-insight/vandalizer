@@ -1,0 +1,53 @@
+.validation-workspace { container-type: inline-size; color: #20252a; }
+.validation-navigation { margin-bottom: 20px; }
+.validation-stages { display: flex; gap: 4px; border-bottom: 1px solid #dce1e7; }
+.validation-stages button { display: flex; gap: 8px; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #526071; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1.35; cursor: pointer; }
+.validation-stages button[aria-current] { color: #20252a; border-bottom-color: #d5a400; background: #fff9e8; }
+.validation-stage-number { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #c7cdd5; font-size: 12px; flex-shrink: 0; }
+.validation-stages button[aria-current] .validation-stage-number { border-color: #b08a16; background: #f6df88; }
+.validation-stage-summary { margin: 10px 0 0; color: #526071; font-size: 13px; line-height: 1.5; }
+.validation-running { width: 7px; height: 7px; background: #2765b0; border-radius: 50%; }
+.validation-workspace [hidden] { display: none !important; }
+.validation-review-summary { padding: 14px 16px; background: #fff9eb; border: 1px solid #e6d49b; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.validation-review-summary p { margin: 4px 0; }
+.validation-review-summary details { margin-top: 8px; }
+.validation-review-summary summary, .validation-details > summary { cursor: pointer; color: #526071; font-size: 13px; font-weight: 600; }
+.validation-details { border: 1px solid #dce1e7; border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.validation-details[open] > summary { margin-bottom: 14px; }
+.validation-continue { display: flex; justify-content: flex-end; padding-top: 16px; }
+.validation-continue button, .validation-primary { border: 1px solid #b58c0c; background: #efbd05; color: #202124; min-height: 42px; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 650; cursor: pointer; }
+.validation-workspace :is(button,summary,input,select,textarea):focus-visible { outline: 2px solid #1f5b9b; outline-offset: 3px; }
+@container (max-width: 440px) {
+  .validation-stages button { flex: 1; padding: 9px 5px; gap: 5px; font-size: 12px; }
+  .validation-stage-number { display: none; }
+  .validation-review-summary { padding: 10px 12px; }
+}
+
+.validation-evidence-list { display: grid; gap: 12px; }
+.validation-field-evidence { border: 1px solid #dfc78c; border-radius: 10px; padding: 14px 16px; background: #fffdf7; font-size: 13px; }
+.validation-field-evidence header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.validation-field-evidence header span { color: #8a4b0b; font-size: 12px; }
+.validation-field-evidence p { margin: 5px 0 12px; color: #526071; }
+.validation-field-evidence dl { margin: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.validation-field-evidence dt { font-size: 12px; color: #526071; margin-bottom: 4px; }
+.validation-field-evidence dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+@container (max-width: 420px) { .validation-field-evidence dl { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .validation-workspace { padding: 12px !important; } }
+.validation-save-error {
+  padding: 16px;
+  border: 1px solid #fca5a5;
+  border-radius: var(--workspace-radius-medium);
+  background: #fef2f2;
+  color: #991b1b;
+  line-height: 1.5;
+}
+.validation-save-error p { margin: 6px 0 12px; }
+.validation-save-error button {
+  padding: 8px 12px;
+  border: 1px solid #991b1b;
+  border-radius: var(--workspace-radius-small);
+  background: #fff;
+  color: #991b1b;
+  font: inherit;
+  cursor: pointer;
+}

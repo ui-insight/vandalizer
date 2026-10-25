@@ -1,4 +1,6 @@
-import { TaskHelpLink } from '../shared/TaskHelpLink'
+import { ValidationNav, type ValidationStage } from '../shared/ValidationNav'
+import { workflowTaskLabel, workflowTaskTitle } from './workflowTaskLabels'
+import './workflow-builder.css'
 import { PanelEditorSurface } from '../shared/PanelEditorSurface'
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -16,6 +18,7 @@ import {
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useValidationDraftSave } from '../../hooks/useValidationDraftSave'
 import { withAdminRemedy } from '../../utils/truncationWarning'
 import { useShareLink } from '../../lib/shareLink'
 import { runModelLabel } from '../../lib/runModel'
@@ -41,7 +44,7 @@ import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
-import { searchDocuments } from '../../api/documents'
+import { searchDocuments, pollStatus as pollDocumentStatus } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { listCredentials } from '../../api/credentials'
@@ -104,13 +107,13 @@ interface TaskTypeDef {
 }
 
 const TASK_TYPES: TaskTypeDef[] = [
-  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true,
+  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#b91c1c', categories: ['all', 'text'], enabled: true,
     description: 'Pulls structured fields out of the step input (names, dates, amounts, etc.) using prompts you define per field.' },
-  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true,
-    description: 'Sends free-form instructions to the LLM and captures the response as text. Use for summaries, rewrites, or open-ended analysis.' },
-  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true,
+  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#1d4ed8', categories: ['all', 'text'], enabled: true,
+    description: 'Write instructions to summarize, rewrite, or analyze the input.' },
+  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#15803d', categories: ['all', 'text'], enabled: true,
     description: 'Reformats the step input into a target shape (markdown, JSON, table, etc.) without further analysis.' },
-  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false,
+  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#1d4ed8', categories: ['all', 'web'], enabled: false,
     description: 'Drives a real browser to interact with web pages: click, type, scroll, capture results.' },
   { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true,
     description: 'Pulls a document from your library or files into the workflow as input for later steps.' },
@@ -123,9 +126,9 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
   { name: 'ResearchNode', label: 'Deep Analysis', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
-    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
+    description: 'Find key points in your documents and turn them into a research report.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
-    description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
+    description: 'Get a cited answer or matching passages from a knowledge base.' },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
     description: 'Calls an external HTTP API and returns the parsed response for downstream steps to use.' },
   { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true,
@@ -133,7 +136,7 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true,
     description: 'Maps the step output into the fields of a target form template and produces the filled form.' },
   { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true,
-    description: 'Exports tabular step output to CSV or XLSX so it can be downloaded or sent to an external sink.' },
+    description: 'Export structured data as a downloadable JSON or CSV file.' },
   { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false,
     description: 'Bundles multiple workflow outputs together into a single zip package.' },
   { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true,
@@ -150,7 +153,7 @@ const CATEGORIES: { key: TaskCategory; label: string }[] = [
 
 const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
   { key: 'design', label: 'Design', icon: PenTool },
-  { key: 'input', label: 'Input', icon: Zap },
+  { key: 'input', label: 'Inputs & outputs', icon: Zap },
   { key: 'validate', label: 'Validate', icon: ClipboardCheck },
   { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
   { key: 'versions', label: 'Versions', icon: GitBranch },
@@ -164,7 +167,7 @@ const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
 function getTaskColor(name: string): string {
   const found = TASK_TYPES.find(t => t.name === name)
   if (found) return found.color
-  if (name === 'Format') return '#16a34a'
+  if (name === 'Format') return '#15803d'
   return '#6b7280'
 }
 
@@ -175,17 +178,6 @@ function getTaskIcon(name: string) {
   return FileText
 }
 
-const checkerboardBg: CSSProperties = {
-  backgroundColor: '#F0F2F8',
-  backgroundImage: [
-    'linear-gradient(45deg, #EAECF2 25%, transparent 25%)',
-    'linear-gradient(-45deg, #EAECF2 25%, transparent 25%)',
-    'linear-gradient(45deg, transparent 75%, #EAECF2 75%)',
-    'linear-gradient(-45deg, transparent 75%, #EAECF2 75%)',
-  ].join(', '),
-  backgroundSize: '30px 30px',
-  backgroundPosition: '0 0, 0 15px, 15px -15px, -15px 0px',
-}
 
 const TEST_MESSAGES = [
   'Preparing document...',
@@ -807,7 +799,7 @@ export function WorkflowEditorPanel() {
                 onClick={() => { setTitleValue(workflow.name); setEditingTitle(true) }}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
               >
-                <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+                <Pencil style={{ width: 14, height: 14, color: '#526071' }} />
               </button>
               {((workflow as Workflow & { verified?: boolean }).verified || !canManage) && (
                 <span
@@ -832,7 +824,7 @@ export function WorkflowEditorPanel() {
                 </>
               )}
               {qualityStatus?.last_validated_at && (
-                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap' }}>
                   Validated {relativeTime(qualityStatus.last_validated_at)}
                 </span>
               )}
@@ -922,14 +914,14 @@ export function WorkflowEditorPanel() {
               onClick={() => { setDescValue(workflow.description ?? ''); setEditingDesc(true) }}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }}
             >
-              <Pencil style={{ width: 12, height: 12, color: '#6b7280' }} />
+              <Pencil style={{ width: 12, height: 12, color: '#526071' }} />
             </button>
           </div>
         ) : canManage ? (
           <button
             type="button"
             onClick={() => { setDescValue(''); setEditingDesc(true) }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginTop: 'var(--workspace-space-4)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#526071', marginTop: 'var(--workspace-space-4)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' }}
           >
             <Pencil style={{ width: 12, height: 12 }} />
             <span>Add a description</span>
@@ -947,7 +939,7 @@ export function WorkflowEditorPanel() {
           if (tab.key === 'validate' && qualityStatus) {
             if (qualityStatus.status === 'unvalidated') tabDot = '#9ca3af'
             else if (qualityStatus.stale) tabDot = '#eab308'
-            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#dc2626'
+            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#b91c1c'
           }
           return (
             <button
@@ -1025,6 +1017,7 @@ export function WorkflowEditorPanel() {
               showDownloadPopup={showDownloadPopup}
               setShowDownloadPopup={setShowDownloadPopup}
               onClickStep={setEditingStepId}
+              onEditInput={() => setActiveTab('input')}
               onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
               onMoveStep={handleMoveStep}
               onDropStep={handleDropStep}
@@ -1042,14 +1035,14 @@ export function WorkflowEditorPanel() {
                       borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fafafa',
                       display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
                     }}>
-                      <ShieldCheck style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
+                      <ShieldCheck style={{ width: 20, height: 20, color: '#526071', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>No validation data yet</div>
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                           Run validation to check workflow output quality
                         </div>
                         {assertedTierNote(qualityStatus.tier_asserted) && (
-                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                             {assertedTierNote(qualityStatus.tier_asserted)}
                           </div>
                         )}
@@ -1076,7 +1069,7 @@ export function WorkflowEditorPanel() {
                   }}>
                     <ShieldCheck style={{
                       width: 20, height: 20, flexShrink: 0,
-                      color: qualityStatus.config_changed ? '#d97706' : qualityStatus.tier === 'excellent' ? '#16a34a' : qualityStatus.tier === 'good' ? '#2563eb' : '#d97706',
+                      color: qualityStatus.config_changed ? '#d97706' : qualityStatus.tier === 'excellent' ? '#15803d' : qualityStatus.tier === 'good' ? '#1d4ed8' : '#d97706',
                     }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
@@ -1086,7 +1079,7 @@ export function WorkflowEditorPanel() {
                           regressionPending={qualityStatus.regression_pending_review}
                         />
                         {qualityStatus.last_validated_at && (
-                          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                             {relativeTime(qualityStatus.last_validated_at)}
                           </span>
                         )}
@@ -1110,10 +1103,10 @@ export function WorkflowEditorPanel() {
         )}
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} canManage={canManage} onRefresh={refresh} />}
-        {activeTab === 'validate' && <div className="px-6 pt-3"><TaskHelpLink topic="validation">Choose examples and inspect validation results</TaskHelpLink></div>}
         {activeTab === 'validate' && (
           hasSteps ? (
             <ValidateTab
+              key={openWorkflowId}
               workflowId={openWorkflowId}
               itemTitle={workflow?.name}
               selectedDocUuids={selectedDocUuids}
@@ -1163,14 +1156,14 @@ export function WorkflowEditorPanel() {
           padding: "var(--workspace-space-8) var(--workspace-space-24)", backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexShrink: 0,
         }}>
-          <ShieldCheck style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} />
+          <ShieldCheck style={{ width: 14, height: 14, color: '#1d4ed8', flexShrink: 0 }} />
           <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#1e40af', flex: 1 }}>
             Check output quality with validation
           </span>
           <button
             onClick={() => setActiveTab('validate')}
             style={{
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#2563eb', background: 'none',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#1d4ed8', background: 'none',
               border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: "var(--workspace-space-2) var(--workspace-space-6)",
             }}
           >
@@ -1185,7 +1178,7 @@ export function WorkflowEditorPanel() {
             }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)',
-              color: '#6b7280', display: 'flex',
+              color: '#526071', display: 'flex',
             }}
           >
             <X style={{ width: 12, height: 12 }} />
@@ -1214,7 +1207,7 @@ export function WorkflowEditorPanel() {
               }}
             />
             {selectedDocUuids.length > 0 && (
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <FileText style={{ width: 12, height: 12 }} />
                 + {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
               </div>
@@ -1237,19 +1230,19 @@ export function WorkflowEditorPanel() {
           )
         )}
         {!hasSteps && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <Info style={{ width: 12, height: 12 }} />
             Add a step below — there is nothing for this workflow to do yet
           </div>
         )}
         {hasSteps && runInput.hint && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <FileText style={{ width: 12, height: 12 }} />
             {runInput.hint}
           </div>
         )}
         {isNoInput && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <Play style={{ width: 12, height: 12 }} />
             No input required, runs directly
           </div>
@@ -1270,7 +1263,7 @@ export function WorkflowEditorPanel() {
             style={{
               width: '100%', padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 700,
               fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
-              backgroundColor: '#dc2626', color: '#fff',
+              backgroundColor: '#b91c1c', color: '#fff',
               cursor: runner.cancelling ? 'wait' : 'pointer',
               opacity: runner.cancelling ? 0.7 : 1,
               textTransform: 'uppercase', letterSpacing: '0.05em',
@@ -1504,6 +1497,7 @@ function DesignCanvas({
   showDownloadPopup,
   setShowDownloadPopup,
   onClickStep,
+  onEditInput,
   onAddStep,
   onMoveStep,
   onDropStep,
@@ -1521,6 +1515,7 @@ function DesignCanvas({
   runElapsed: number
   showDownloadPopup: boolean
   setShowDownloadPopup: (v: boolean) => void
+  onEditInput: () => void
   onClickStep: (stepId: string) => void
   onAddStep: () => void
   onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
@@ -1539,87 +1534,30 @@ function DesignCanvas({
   }, [])
 
   return (
-    <div style={{
-      ...checkerboardBg,
-      border: '1px solid #2f2f2fc2',
-      padding: '30px 30px 150px 30px',
-      minHeight: '100%',
-    }}>
-      <section aria-label="Workflow run overview" style={{ marginBottom: 16, padding: 12, border: '1px solid var(--workspace-border)', borderRadius: 8, background: '#fff', color: '#374151', fontSize: 13, lineHeight: 1.5 }}>
-        <strong>Before running</strong>
-        <p style={{ margin: '4px 0' }}>Deliverable steps: {(workflow.steps.some(step => step.is_output) ? workflow.steps.filter(step => step.is_output) : workflow.steps.filter(step => step.tasks.length > 0).slice(-1)).map(step => step.name).join(', ') || 'None configured'}.</p>
-        <p style={{ margin: '4px 0' }}>{workflow.steps.some(step => step.tasks.some(task => task.name === 'Approval')) ? `Pauses for human review in: ${workflow.steps.filter(step => step.tasks.some(task => task.name === 'Approval')).map(step => step.name).join(', ')}.` : 'No human-review step is configured.'}</p>
-        <details><summary style={{ cursor: 'pointer' }}>How steps and tasks work</summary><p style={{ margin: '4px 0' }}>Steps run in order. Tasks within a step run together, using the step’s input unless a task has its own input override. Open a step’s Input and Output sections to inspect its sources and combined result.</p></details>
+    <div className="workflow-canvas">
+      <section aria-label="Workflow run overview" className="workflow-overview">
+        <strong>{workflow.steps.length} {workflow.steps.length === 1 ? 'step' : 'steps'}</strong>
+        <details><summary>Outputs & review</summary>
+          <p>Deliverable steps: {(workflow.steps.some(step => step.is_output) ? workflow.steps.filter(step => step.is_output) : workflow.steps.filter(step => step.tasks.length > 0).slice(-1)).map(step => step.name).join(', ') || 'None configured'}.</p>
+          <p>{workflow.steps.some(step => step.tasks.some(task => task.name === 'Approval')) ? `Pauses for human review in: ${workflow.steps.filter(step => step.tasks.some(task => task.name === 'Approval')).map(step => step.name).join(', ')}.` : 'No human-review step is configured.'}</p>
+        </details>
+        <details><summary>How steps and tasks work</summary><p>Steps run in order. Tasks in a step run together on the same input. Open a step to choose its sources, tasks and deliverables.</p></details>
       </section>
-      {/* Trigger pill */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <div style={{
-          backgroundColor: '#404040', color: '#fff', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-          padding: "var(--workspace-space-6) 0", width: 120, textAlign: 'center', borderRadius: 20,
-        }}>
-          Trigger
-        </div>
+      <div className="workflow-input-summary">
+        <FileText size={16} aria-hidden="true" />
+        <strong>{workflow.input_config?.trigger_type === 'no_input' ? 'Run directly' : workflow.input_config?.trigger_type === 'text_input' ? 'Text input' : 'Documents'}</strong>
+        <span>{workflow.input_config?.trigger_type === 'no_input' ? 'No input needed' : workflow.input_config?.trigger_type === 'text_input' ? 'Provided when you run' : `${selectedDocCount} selected · ${workflow.input_config?.fixed_documents?.length || 0} fixed`}</span>
+        <button type="button" onClick={onEditInput}>Configure</button>
       </div>
-
-      <ConnectionLine />
-
-      {/* Input card — adapts to trigger type */}
-      <div style={{
-        backgroundColor: '#fff', border: '2px solid var(--highlight-color, #eab308)',
-        borderRadius: 'var(--ui-radius, 8px)', padding: 15, textAlign: 'center',
-        boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
-      }}>
-        {workflow.input_config?.trigger_type === 'no_input' ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-8)' }}>
-              <Play style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
-              <span style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)' }}>No Input</span>
-            </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
-              Runs directly without documents or text
-            </div>
-          </>
-        ) : workflow.input_config?.trigger_type === 'text_input' ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-8)' }}>
-              <Type style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
-              <span style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)' }}>Text Input</span>
-            </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
-              Text provided at run time
-              {selectedDocCount > 0 && ` + ${selectedDocCount} document${selectedDocCount !== 1 ? 's' : ''}`}
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-8)' }}>
-              <FileText style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
-              <span style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)' }}>Documents Selected</span>
-            </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
-              {selectedDocCount} document{selectedDocCount !== 1 ? 's' : ''} selected
-            </div>
-          </>
-        )}
-      </div>
-
-      <ConnectionLine />
-
-      {/* Workflow-level model — the default every step runs on. A step with its
-          own Model Override still wins (see the task editor). */}
-      <details style={{
-        backgroundColor: '#fff', border: "1px solid var(--workspace-border)",
-        borderRadius: 'var(--ui-radius, 8px)', padding: 15,
-        boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
-      }}>
-        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Advanced: model selection · {defaultModel || 'Automatic'}</summary>
+      <details className="workflow-model">
+        <summary>Model: {defaultModel || 'Automatic'} · change</summary>
         <label htmlFor="workflow-default-model" style={{
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
           fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)',
         }}>
           <Cpu style={{ width: 15, height: 15, color: 'var(--highlight-color, #eab308)' }} />
           Model
-          <span style={{ fontWeight: 400, color: '#6b7280' }}>— all steps</span>
+          <span style={{ fontWeight: 400, color: '#526071' }}>— all steps</span>
         </label>
         <select
           id="workflow-default-model"
@@ -1640,7 +1578,7 @@ function DesignCanvas({
             return <option key={m.name} value={m.name}>{label}</option>
           })}
         </select>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
           Runs every step on this model. A step with its own model override keeps it.
         </div>
       </details>
@@ -1763,29 +1701,7 @@ function DesignCanvas({
 function ConnectionLine() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: 2, height: 20, backgroundColor: '#bcbcbc' }} />
-    </div>
-  )
-}
-
-function Connector({ position }: { position: 'top' | 'bottom' }) {
-  const isTop = position === 'top'
-  return (
-    <div style={{
-      position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-      ...(isTop ? { top: -13 } : { bottom: -13 }),
-      width: 22, height: 11,
-      border: '2px solid #e0e0e0',
-      ...(isTop
-        ? { borderBottom: 'none', borderRadius: '11px 11px 0 0' }
-        : { borderTop: 'none', borderRadius: '0 0 11px 11px' }),
-      backgroundColor: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        width: 5, height: 5, borderRadius: '50%', backgroundColor: '#d1d5db',
-        ...(isTop ? { marginTop: 'var(--workspace-space-2)' } : { marginBottom: 'var(--workspace-space-2)' }),
-      }} />
+      <div style={{ width: 2, height: 12, backgroundColor: '#bcbcbc' }} />
     </div>
   )
 }
@@ -1815,26 +1731,24 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
   return (
     <div
       ref={cardRef}
+      className="workflow-step-card"
       style={{
         position: 'relative',
-        backgroundColor: isExplicitOutput ? undefined : '#fff',
-        ...(isExplicitOutput ? { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' } : {}),
-        boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
+        backgroundColor: '#fff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
         borderRadius: 'var(--ui-radius, 8px)',
         padding: 15, cursor: 'pointer',
         border: isActive
           ? '2px solid var(--highlight-color, #eab308)'
           : isImplicitOutput
-            ? '2px dashed #a78bfa'
-            : '2px solid transparent',
+            ? '1px solid #c4b8df'
+            : '1px solid #d7dde5',
         transition: 'border-color 0.2s',
-        marginTop: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)',
+        marginTop: 0, marginBottom: 0,
         opacity: isDragging ? 0.4 : 1,
       }}
     >
       <button type="button" className="card-open-action" aria-label={`Open step: ${step.name}`} onClick={onClick} />
-      <Connector position="top" />
-      <Connector position="bottom" />
       {dropIndicator && (
         <div style={{
           position: 'absolute', left: 8, right: 8,
@@ -1866,7 +1780,7 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             onDragEnd={onDragEnd}
             style={{
               position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', cursor: 'grab',
-              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              color: '#526071',
               flexShrink: 0, marginLeft: -6, marginRight: -6,
             }}
           >
@@ -1875,25 +1789,25 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
         )}
         <div style={{
           width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)',
-          backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : isImplicitOutput ? '#ede9fe' : '#f3f4f6',
+          backgroundColor: isDeliverable ? '#f0ebf8' : '#f3f4f6',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}>
           {isDeliverable ? (
-            <Flag style={{ width: 18, height: 18, color: isExplicitOutput ? '#fff' : '#7c3aed' }} />
+            <Flag style={{ width: 18, height: 18, color: '#624397' }} />
           ) : (
             <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: '#374151' }}>{index + 1}</span>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)', color: isExplicitOutput ? '#fff' : '#202124' }}>
+          <div style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)', color: '#202124' }}>
             {step.name}
             {isDeliverable && (
               <span style={{
                 marginLeft: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em',
                 padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
-                color: isExplicitOutput ? '#fff' : '#7c3aed',
-                backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : '#ede9fe',
+                color: '#624397',
+                backgroundColor: '#f0ebf8',
               }}>
                 {isExplicitOutput ? 'DELIVERABLE' : 'DELIVERABLE (DEFAULT)'}
               </span>
@@ -1907,8 +1821,8 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
               }} />
             )}
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: isExplicitOutput ? 'rgba(255,255,255,0.7)' : '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
-            {`${step.tasks.length} task${step.tasks.length !== 1 ? 's' : ''}`}
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
+            {step.tasks.length ? `${step.tasks.slice(0, 3).map(workflowTaskTitle).join(' · ')}${step.tasks.length > 3 ? ` · +${step.tasks.length - 3} more` : ''}` : 'Choose a task to get started'}
           </div>
         </div>
         {/* Move up/down buttons */}
@@ -1920,8 +1834,8 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             disabled={index === 0}
             style={{
               background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer',
-              padding: 'var(--workspace-space-2)', display: 'flex',
-              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              padding: 5, display: 'flex', minWidth: 26, minHeight: 26,
+              color: '#526071',
               opacity: index === 0 ? 0.3 : 1,
             }}
           >
@@ -1934,17 +1848,17 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             disabled={index === totalSteps - 1}
             style={{
               background: 'none', border: 'none', cursor: index === totalSteps - 1 ? 'default' : 'pointer',
-              padding: 'var(--workspace-space-2)', display: 'flex',
-              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              padding: 5, display: 'flex', minWidth: 26, minHeight: 26,
+              color: '#526071',
               opacity: index === totalSteps - 1 ? 0.3 : 1,
             }}
           >
             <ArrowDown style={{ width: 14, height: 14 }} />
           </button>
         </div>
-        <SlidersHorizontal style={{
+        <SlidersHorizontal className="workflow-step-settings-icon" style={{
           width: 16, height: 16,
-          color: isExplicitOutput ? 'rgba(255,255,255,0.6)' : '#9ca3af',
+          color: '#526071',
           flexShrink: 0,
         }} />
       </div>
@@ -2014,7 +1928,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(x => !x) } }}
         style={{
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer',
-          fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071',
           textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-12)',
         }}
       >
@@ -2027,7 +1941,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
           border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)', backgroundColor: '#fafafa',
         }}>
           {/* Caption */}
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: hasValue || warning ? 12 : 0 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: hasValue || warning ? 12 : 0 }}>
             Combined output{taskCount > 0 ? ` · ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}
             {lastRunMeta?.finishedAt && <> · from last run {relativeTime(lastRunMeta.finishedAt)}</>}
           </div>
@@ -2059,7 +1973,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
               </pre>
             )
           ) : (
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071' }}>
               {stepsOutput
                 ? 'This step produced no output on the last run.'
                 : "This step hasn't produced output yet. Run the workflow to see its last output here."}
@@ -2079,7 +1993,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
 type StepTab = 'basic' | 'input' | 'output'
 
 const STEP_TABS: { key: StepTab; label: string }[] = [
-  { key: 'basic', label: 'Basic Setup' },
+  { key: 'basic', label: 'Tasks' },
   { key: 'input', label: 'Input' },
   { key: 'output', label: 'Output' },
 ]
@@ -2144,7 +2058,7 @@ function EditStepOverlay({
   }
 
   const sectionHeading: CSSProperties = {
-    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
+    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071',
     textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-12)',
   }
 
@@ -2182,7 +2096,7 @@ function EditStepOverlay({
                   onClick={() => { setNameValue(step.name); setEditingName(true) }}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
                 >
-                  <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+                  <Pencil style={{ width: 14, height: 14, color: '#526071' }} />
                 </button>
               )}
             </div>
@@ -2233,19 +2147,19 @@ function EditStepOverlay({
           <>
             <div style={sectionHeading}>Tasks</div>
             <div style={{
-              fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)', lineHeight: 1.5,
+              fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)', lineHeight: 1.5,
             }}>
               What this step does. Every task here gets the same input — set once on the
               Input tab — and they run at the same time, so a task only configures its own
               work.
             </div>
 
-            {/* Task list in checkerboard container */}
+            {/* Tasks run in parallel on the step input. */}
             <div style={{
-              ...checkerboardBg,
-              border: '1px solid #2f2f2fc2',
+              backgroundColor: '#f7f8fa',
+              border: '1px solid var(--workspace-border)',
               borderRadius: 'var(--ui-radius, 8px)',
-              padding: 'var(--workspace-space-20)',
+              padding: 'var(--workspace-space-12)',
             }}>
               {step.tasks.map(task => {
                 const color = getTaskColor(task.name)
@@ -2256,12 +2170,12 @@ function EditStepOverlay({
                     style={{
                       position: 'relative', backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
                       padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-8)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      border: '1px solid var(--workspace-border)',
                       display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
                       cursor: 'pointer',
                     }}
                   >
-                    <button type="button" className="card-open-action" aria-label={`Edit task: ${String(task.data?.name || task.name)}`} onClick={() => onEditTask(task)} />
+                    <button type="button" className="card-open-action" aria-label={`Edit task: ${workflowTaskTitle(task)}`} onClick={() => onEditTask(task)} />
                     <div style={{
                       width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)',
                       backgroundColor: color + '18',
@@ -2271,7 +2185,7 @@ function EditStepOverlay({
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
-                        <span>{(task.data as Record<string, unknown>)?.name as string || task.name}</span>
+                        <span>{workflowTaskTitle(task)}</span>
                         {promptTaskIsEmpty(task.name, task.data) && (
                           <span
                             title="This step has no prompt — open it and add instructions"
@@ -2300,13 +2214,13 @@ function EditStepOverlay({
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 1 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 1 }}>
                         {describeTaskType(task.name)}
                       </div>
                     </div>
                     {canManage && (
                       <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
-                        position: 'relative', zIndex: 2, background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex',
+                        position: 'relative', zIndex: 2, background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex',
                       }}>
                         <Trash2 style={{ width: 14, height: 14 }} />
                       </button>
@@ -2346,7 +2260,7 @@ function EditStepOverlay({
               backgroundColor: '#f3f4f6', borderRadius: 'var(--workspace-radius-small)',
               border: "1px solid var(--workspace-border)",
             }}>
-              <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
+              <Info style={{ width: 14, height: 14, color: '#526071', flexShrink: 0, marginTop: 1 }} />
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#374151', lineHeight: 1.5 }}>
                 <strong>Set once for the whole step.</strong> {step.tasks.length === 1
                   ? 'This step\u2019s task receives what you pick here.'
@@ -2422,7 +2336,7 @@ function EditStepOverlay({
                 <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: step.is_output ? '#7c3aed' : '#374151' }}>
                   Include in deliverables
                 </div>
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 1 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 1 }}>
                   When set, this step's output is included in the download. Mark multiple steps to bundle them as a ZIP.
                   If no step is marked, the last step is used by default.
                 </div>
@@ -2447,7 +2361,7 @@ function EditStepOverlay({
             style={{
               padding: "var(--workspace-space-12) var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               border: '1px solid #fca5a5', borderRadius: 'var(--ui-radius, 8px)',
-              backgroundColor: '#fff', color: '#dc2626', cursor: 'pointer',
+              backgroundColor: '#fff', color: '#b91c1c', cursor: 'pointer',
             }}
           >
             Delete Step
@@ -2495,9 +2409,9 @@ function StepOutputExplainer({ step }: { step: WorkflowStep }) {
     return (
       <div style={{
         padding: 'var(--workspace-space-16)', backgroundColor: '#fafafa', border: "1px solid var(--workspace-border)",
-        borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#6b7280',
+        borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#526071',
       }}>
-        This step has no tasks yet, so it produces no output. Add one on the Basic Setup tab.
+        This step has no tasks yet, so it produces no output. Add one on the Tasks tab.
       </div>
     )
   }
@@ -2522,17 +2436,17 @@ function StepOutputExplainer({ step }: { step: WorkflowStep }) {
         <ol style={{ margin: 0, paddingLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
           {step.tasks.map(task => (
             <li key={task.id} style={{ fontSize: 'var(--workspace-font-meta)', color: '#374151' }}>
-              <strong>{(task.data as Record<string, unknown>)?.name as string || task.name}</strong>
-              <span style={{ color: '#6b7280' }}> — {describeTaskType(task.name)}</span>
+              <strong>{workflowTaskTitle(task)}</strong>
+              <span style={{ color: '#526071' }}> — {describeTaskType(task.name)}</span>
               {typeof task.data?.post_process_prompt === 'string' && (task.data.post_process_prompt as string).trim() !== '' && (
-                <span style={{ color: '#6b7280' }}> · post-processed before it joins the list</span>
+                <span style={{ color: '#526071' }}> · post-processed before it joins the list</span>
               )}
             </li>
           ))}
         </ol>
       )}
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-12)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6, marginTop: 'var(--workspace-space-12)' }}>
         Warnings, citations and errors from every task are merged onto the step's result.
         Post-processing a single task's output is set on that task, under Design.
       </div>
@@ -2576,207 +2490,34 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
   onSelect: (type: TaskTypeDef) => void
   onClose: () => void
 }) {
-  const filteredTypes = TASK_TYPES.filter(t =>
-    category === 'all' ? true : t.categories.includes(category)
-  )
-
-  const [tooltip, setTooltip] = useState<{
-    task: TaskTypeDef
-    x: number
-    y: number
-    placement: 'top' | 'bottom'
-  } | null>(null)
-
-  const showTooltip = (taskType: TaskTypeDef, target: HTMLElement) => {
-    const rect = target.getBoundingClientRect()
-    const placeAbove = rect.top > 140
-    setTooltip({
-      task: taskType,
-      x: rect.left + rect.width / 2,
-      y: placeAbove ? rect.top - 8 : rect.bottom + 8,
-      placement: placeAbove ? 'top' : 'bottom',
-    })
-  }
-  const hideTooltip = () => setTooltip(null)
-
-  return (
-    <PanelEditorSurface label="Add a task" onClose={onClose} layer={1001}>
-      {/* Header */}
-      <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 600, color: '#202124' }}>Add a Task</span>
-          <button type="button" aria-label="Close" onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#5f6368', display: 'flex',
-          }}>
-            <X style={{ width: 20, height: 20 }} />
-          </button>
-        </div>
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [search, setSearch] = useState('')
+  const matches = TASK_TYPES.filter(task => task.enabled && (category === 'all' || task.categories.includes(category))
+    && `${workflowTaskLabel(task.name)} ${task.description}`.toLowerCase().includes(search.trim().toLowerCase()))
+  return <PanelEditorSurface label="Add a task" onClose={onClose} layer={1001}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--workspace-border)' }}>
+      <strong style={{ fontSize: 18 }}>Add a task</strong>
+      <button type="button" aria-label="Close" onClick={onClose} style={{ padding: 8, border: 0, background: 'none', cursor: 'pointer' }}><X size={20} /></button>
+    </div>
+    <div className="workflow-task-picker">
+      <input ref={searchRef} className="workflow-task-search" type="search" aria-label="Search tasks" placeholder="What should this step do?" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="workflow-task-categories" role="group" aria-label="Task categories">
+        {CATEGORIES.map(cat => <button key={cat.key} type="button" aria-pressed={category === cat.key} onClick={() => setCategory(cat.key)}>{cat.label}</button>)}
       </div>
-
-      {/* Two-column layout */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* Category sidebar */}
-        <div style={{
-          width: '25%', backgroundColor: '#f4f4f4',
-          borderRight: "1px solid var(--workspace-border)", padding: "var(--workspace-space-16) 0", overflowY: 'auto',
-        }}>
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.key}
-              onClick={() => setCategory(cat.key)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: "var(--workspace-space-12) var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)',
-                fontWeight: category === cat.key ? 700 : 500,
-                fontFamily: 'inherit',
-                background: category === cat.key ? '#fff' : 'none',
-                border: 'none', cursor: 'pointer',
-                color: category === cat.key ? '#202124' : '#6b7280',
-                borderRight: category === cat.key
-                  ? '2px solid var(--highlight-color, #eab308)'
-                  : '2px solid transparent',
-              }}
-            >
-              {cat.label}
-            </button>
-          ))}
+      <div className="workflow-task-options">
+        <div className="workflow-task-list">
+          {matches.map(task => <button type="button" className="workflow-task-option" key={task.name} aria-label={workflowTaskLabel(task.name)} onClick={() => onSelect(task)}>
+            <span className="workflow-task-icon"><task.icon size={20} color={task.color} aria-hidden="true" /></span>
+            <span><strong>{workflowTaskLabel(task.name)}</strong><small>{task.description}</small></span>
+          </button>)}
         </div>
-
-        {/* Task cards grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--workspace-space-20)' }}>
-          {/* Enabled tasks */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 'var(--workspace-space-12)',
-          }}>
-            {filteredTypes.filter(t => t.enabled).map(taskType => {
-              const Icon = taskType.icon
-              return (
-                <button
-                  key={taskType.name}
-                  onClick={() => onSelect(taskType)}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-8)',
-                    padding: 'var(--workspace-space-16)', border: "1px solid var(--workspace-border)",
-                    borderRadius: 'var(--ui-radius, 8px)',
-                    backgroundColor: '#fff',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    transition: 'box-shadow 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
-                    showTooltip(taskType, e.currentTarget)
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.boxShadow = 'none'
-                    hideTooltip()
-                  }}
-                  onFocus={e => showTooltip(taskType, e.currentTarget)}
-                  onBlur={hideTooltip}
-                >
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 'var(--workspace-radius-medium)',
-                    backgroundColor: taskType.color + '15',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon style={{ width: 20, height: 20, color: taskType.color }} />
-                  </div>
-                  <span style={{
-                    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textAlign: 'center',
-                    color: '#202124',
-                  }}>
-                    {taskType.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Coming Soon section */}
-          {filteredTypes.some(t => !t.enabled) && (
-            <>
-              <div style={{
-                margin: "var(--workspace-space-24) 0 var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase',
-                color: '#6b7280', letterSpacing: '0.5px',
-              }}>
-                Coming Soon
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                gap: 'var(--workspace-space-12)',
-              }}>
-                {filteredTypes.filter(t => !t.enabled).map(taskType => {
-                  const Icon = taskType.icon
-                  return (
-                    <button
-                      key={taskType.name}
-                      disabled
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-8)',
-                        padding: 'var(--workspace-space-16)', border: "1px solid var(--workspace-border)",
-                        borderRadius: 'var(--ui-radius, 8px)',
-                        backgroundColor: '#fff',
-                        cursor: 'default',
-                        opacity: 0.4,
-                        fontFamily: 'inherit',
-                      }}
-                      onMouseEnter={e => showTooltip(taskType, e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 'var(--workspace-radius-medium)',
-                        backgroundColor: '#f3f4f6',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Icon style={{ width: 20, height: 20, color: '#6b7280' }} />
-                      </div>
-                      <span style={{
-                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textAlign: 'center',
-                        color: '#6b7280',
-                      }}>
-                        {taskType.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        {matches.length === 0 && <div role="status"><p>No tasks match this search.</p><button type="button" onClick={() => { setSearch(''); setCategory('all'); searchRef.current?.focus() }}>Clear filters</button></div>}
+        <details className="workflow-task-unavailable"><summary>Coming soon · 4 tasks</summary>
+          {TASK_TYPES.filter(task => !task.enabled).map(task => <p key={task.name}>{workflowTaskLabel(task.name)}</p>)}
+        </details>
       </div>
-
-      {/* Hover tooltip — fixed position so it escapes the scrollable grid */}
-      {tooltip && (
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltip.x,
-            top: tooltip.y,
-            transform: tooltip.placement === 'top'
-              ? 'translate(-50%, -100%)'
-              : 'translate(-50%, 0)',
-            maxWidth: 280,
-            background: '#1f2937',
-            color: '#fff',
-            padding: "var(--workspace-space-8) var(--workspace-space-12)",
-            borderRadius: 'var(--workspace-radius-medium)',
-            fontSize: 'var(--workspace-font-meta)',
-            lineHeight: 1.4,
-            pointerEvents: 'none',
-            zIndex: 1100,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-          }}
-          role="tooltip"
-        >
-          <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-2)' }}>{tooltip.task.label}</div>
-          <div style={{ opacity: 0.9 }}>{tooltip.task.description}</div>
-        </div>
-      )}
-    </PanelEditorSurface>
-  )
+    </div>
+  </PanelEditorSurface>
 }
 
 // ---------------------------------------------------------------------------
@@ -2841,7 +2582,7 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
             onClick={(e) => { e.stopPropagation(); removeTag(i) }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-              color: '#6b7280', display: 'flex', alignItems: 'center',
+              color: '#526071', display: 'flex', alignItems: 'center',
             }}
           >
             <X style={{ width: 12, height: 12 }} />
@@ -2903,7 +2644,7 @@ export function describeRunInput(input: {
 /** Which document a Test Step result came from, shown under its heading. */
 function TestedAgainst({ title }: { title: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', margin: '-2px 0 8px', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', margin: '-2px 0 8px', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
       <FileText style={{ width: 12, height: 12, flexShrink: 0 }} />
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         Tested against <b style={{ color: '#374151' }}>{title}</b>
@@ -2931,14 +2672,15 @@ export function describeTestStepInput(input: {
   fixedDocUuids: string[]
   /** The document picked under "Test against"; ignored once it is no longer a candidate. */
   chosenDocUuid?: string | null
+  pinnedDocUuid?: string
 }): { docUuids: string[]; candidates: string[]; blockedHint: string | null } {
-  const { taskName, triggerType, selectedDocUuids, fixedDocUuids, chosenDocUuid } = input
+  const { taskName, triggerType, selectedDocUuids, fixedDocUuids, chosenDocUuid, pinnedDocUuid } = input
   // A test runs on one document, so it stays one cheap call however many are
   // selected. It used to be silently the first, and with several selected
   // people went looking for the other results (support ticket); the author now
   // picks which, defaulting to the first. The fixed documents stand in for a
   // selection exactly as they do for the Run button.
-  const candidates = selectedDocUuids.length > 0 ? selectedDocUuids : fixedDocUuids
+  const candidates = pinnedDocUuid ? [pinnedDocUuid] : selectedDocUuids.length > 0 ? selectedDocUuids : fixedDocUuids
   const docUuids = chosenDocUuid && candidates.includes(chosenDocUuid)
     ? [chosenDocUuid]
     : candidates.slice(0, 1)
@@ -3087,11 +2829,11 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
   const hasSource = fields.some(f => f.document_title)
   return (
     <div style={{ marginTop: 'var(--workspace-space-12)' }}>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-6)' }}>{fillReportSummary(fields)}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-6)' }}>{fillReportSummary(fields)}</div>
       <div style={{ overflowX: 'auto', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fff' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-meta)' }}>
           <thead>
-            <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+            <tr style={{ backgroundColor: '#f9fafb', color: '#526071', textAlign: 'left' }}>
               <th style={{ padding: "var(--workspace-space-6) var(--workspace-space-12)", fontWeight: 600 }}>Field</th>
               <th style={{ padding: "var(--workspace-space-6) var(--workspace-space-12)", fontWeight: 600 }}>Value</th>
               {hasSource && <th style={{ padding: "var(--workspace-space-6) var(--workspace-space-12)", fontWeight: 600 }}>Source</th>}
@@ -3108,7 +2850,7 @@ function FillReportTable({ fields }: { fields: FillReportField[] }) {
                 <tr key={f.name} style={{ borderTop: '1px solid #f3f4f6', verticalAlign: 'top' }}>
                   <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-12)", color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' }}>
                     {f.name}
-                    {f.label && <div style={{ fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'normal' }}>{f.label}</div>}
+                    {f.label && <div style={{ fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'normal' }}>{f.label}</div>}
                   </td>
                   <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-12)", color: '#374151', wordBreak: 'break-word', maxWidth: 320 }}>
                     {f.status === 'missing' ? <span style={{ color: '#9ca3af' }}>—</span> : fillValueText(f.value)}
@@ -3142,9 +2884,9 @@ function FileOutputChip({ payload }: { payload: { filename?: string; file_type?:
       display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
       border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fff', fontSize: 'var(--workspace-font-control)', color: '#374151',
     }}>
-      <FileText style={{ width: 16, height: 16, color: '#6b7280', flexShrink: 0 }} />
+      <FileText style={{ width: 16, height: 16, color: '#526071', flexShrink: 0 }} />
       <span style={{ fontWeight: 600 }}>{fileDownloadSummary(payload)}</span>
-      <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>— use Download to save it</span>
+      <span style={{ color: '#526071', fontSize: 'var(--workspace-font-meta)' }}>— use Download to save it</span>
     </div>
   )
 }
@@ -3181,7 +2923,7 @@ function PdfTemplatePicker({ value, onChange }: {
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
           backgroundColor: '#f3f4f6', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', color: '#374151',
         }}>
-          <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+          <FileText style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
             {value.title || value.uuid}
           </span>
@@ -3189,7 +2931,7 @@ function PdfTemplatePicker({ value, onChange }: {
             type="button"
             aria-label="Change template PDF"
             onClick={() => { onChange(null); setOpen(true) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', color: '#2563eb', fontFamily: 'inherit', padding: 0 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', color: '#1d4ed8', fontFamily: 'inherit', padding: 0 }}
           >
             Change
           </button>
@@ -3217,7 +2959,7 @@ function PdfTemplatePicker({ value, onChange }: {
               boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, maxHeight: 200, overflowY: 'auto',
             }}>
               {results.length === 0 ? (
-                <div style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>No PDF documents found</div>
+                <div style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', color: '#526071' }}>No PDF documents found</div>
               ) : results.map(doc => (
                 <div
                   key={doc.uuid}
@@ -3226,7 +2968,7 @@ function PdfTemplatePicker({ value, onChange }: {
                   onMouseDown={() => { onChange(doc); setOpen(false); setQuery('') }}
                   style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}
                 >
-                  <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                  <FileText style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</span>
                 </div>
               ))}
@@ -3258,9 +3000,19 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   // unless it carries the advanced per-task override.
   const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
   const stepInput = step ? deriveStepInput(step).value : { ...DEFAULT_STEP_INPUT }
+  const [documentPickerOpen, setDocumentPickerOpen] = useState(false)
+  const [pinnedDocumentTitle, setPinnedDocumentTitle] = useState('')
   const [inputOverride, setInputOverride] = useState(() => taskOverridesStepInput(task))
-  const [showInputOverride, setShowInputOverride] = useState(() => taskOverridesStepInput(task))
+  const [showInputOverride, setShowInputOverride] = useState(false)
   const [overrideInput, setOverrideInput] = useState<StepInputValue>(() => readInputValue(task.data))
+  useEffect(() => {
+    if (task.name !== 'AddDocument' || !overrideInput.selectedDocUuid) return
+    let current = true
+    pollDocumentStatus(overrideInput.selectedDocUuid).then(doc => {
+      if (current && doc.title) setPinnedDocumentTitle(doc.title)
+    }).catch(() => {})
+    return () => { current = false }
+  }, [task.name, overrideInput.selectedDocUuid])
   const effectiveInput = inputOverride ? overrideInput : stepInput
   const inputSource: TaskInputSource = effectiveInput.sources[0] || 'step_input'
   const stepInputSummary = stepInput.sources
@@ -3420,10 +3172,12 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     selectedDocUuids,
     fixedDocUuids,
     chosenDocUuid: testDocUuid,
+    pinnedDocUuid: effectiveInput.sources.length === 1 && effectiveInput.sources[0] === 'select_document' ? effectiveInput.selectedDocUuid : undefined,
   })
   const testUsesDocument = !TEST_STEP_NO_DOCUMENT_TYPES.has(task.name)
   const testDocTitle = (uuid: string) =>
-    selectedDocNames[uuid]
+    (uuid === overrideInput.selectedDocUuid && pinnedDocumentTitle)
+    || selectedDocNames[uuid]
     || fixedDocuments.find(d => d.uuid === uuid)?.title
     || `Document ${testInput.candidates.indexOf(uuid) + 1}`
   // Whichever reason applies is what the button's tooltip says — a disabled
@@ -3687,8 +3441,13 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   }
 
   return (
-    <PanelEditorSurface label={`Edit task: ${String(task.data?.name || task.name)}`} onClose={onClose} layer={1002}>
+    <PanelEditorSurface label={`Edit task: ${workflowTaskTitle(task)}`} onClose={onClose} layer={1002}>
       <p style={{ margin: 0, padding: '12px 20px 0', color: '#59616b', fontSize: 12, overflowWrap: 'anywhere' }}>Step: {step?.name || 'Current step'} → Task settings</p>
+      {documentPickerOpen && <DocumentPickerDialog single title="Choose a document" zIndex={1003} excludeUuids={[]} onClose={() => setDocumentPickerOpen(false)} onSelect={docs => {
+        const doc = docs[0]
+        if (doc) { setInputOverride(true); setOverrideInput({ ...overrideInput, sources: ['select_document'], selectedDocUuid: doc.uuid }); setPinnedDocumentTitle(doc.title) }
+        setDocumentPickerOpen(false)
+      }} />}
       {/* Header */}
       <div style={{
         padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)", flexShrink: 0,
@@ -3703,8 +3462,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               {React.createElement(taskIcon, { style: { width: 16, height: 16, color } })}
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>{task.name}</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 1 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>{workflowTaskLabel(task.name)}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 1 }}>
                 {task.name === 'Extraction' ? 'Extract specific information from text using AI'
                   : task.name === 'Prompt' ? 'Uses AI to perform your instructions on text'
                   : task.name === 'Formatter' || task.name === 'Format' ? 'Format and structure output data'
@@ -3735,7 +3494,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
       </div>
 
       {/* Body — a task configures only what it does. */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--workspace-space-20)' }}>
+      <div className="workflow-task-form" style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        <div className="workflow-source-preview"><strong>Input</strong><span>{effectiveInput.sources.map(src => INPUT_SOURCE_LABELS[src]).join(' + ')}</span><ArrowRight size={14} aria-hidden="true" /><strong>{workflowTaskLabel(task.name)}</strong><ArrowRight size={14} aria-hidden="true" /><span>Step result</span></div>
         {/* ===== DESIGN — what this task does ===== */}
           <div>
             {task.name === 'Extraction' && (
@@ -3756,7 +3516,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   >
                     <span>{getTextValue('name') && getTextValue('search_set_uuid') ? getTextValue('name') : 'Browse extractions...'}</span>
-                    <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                    <ChevronDown style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
                   </button>
                   {showSetPicker && (
                     <ItemPickerModal
@@ -3776,7 +3536,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         Extraction fields
                       </label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                           From saved set, edit in the Extractions library
                         </span>
                         <button
@@ -3801,10 +3561,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       }}
                     >
                       {linkedSetLoading && linkedSetItems.length === 0 && (
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>Loading fields…</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>Loading fields…</span>
                       )}
                       {!linkedSetLoading && linkedSetItems.length === 0 && (
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>No fields in this saved set</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>No fields in this saved set</span>
                       )}
                       {linkedSetItems.map(item => (
                         <span
@@ -3863,7 +3623,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       </div>
                     )}
                     {!suggestError && selectedDocUuids.length === 0 && (
-                      <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                      <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                         Tip: select a document in the workspace to enable AI-suggested fields.
                       </div>
                     )}
@@ -3925,7 +3685,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   >
                     <span>{savedPromptUuid && getTextValue('name') ? getTextValue('name') : 'Browse prompts...'}</span>
-                    <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                    <ChevronDown style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
                   </button>
                   {showPromptPicker && (
                     <ItemPickerModal
@@ -3944,7 +3704,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       Prompt
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                         From saved prompt, edit in the Library
                       </span>
                       <button
@@ -3970,8 +3730,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     whiteSpace: 'pre-wrap', lineHeight: 1.5, minHeight: 38,
                   }}>
                     {linkedSavedLoading
-                      ? <span style={{ color: '#6b7280' }}>Loading prompt…</span>
-                      : linkedSavedBody || <span style={{ color: '#6b7280' }}>This saved prompt has no content yet.</span>}
+                      ? <span style={{ color: '#526071' }}>Loading prompt…</span>
+                      : linkedSavedBody || <span style={{ color: '#526071' }}>This saved prompt has no content yet.</span>}
                   </div>
                 </div>
                 ) : (
@@ -4121,7 +3881,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   >
                     <span>{savedFormatterUuid && getTextValue('name') ? getTextValue('name') : 'Browse formatters...'}</span>
-                    <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                    <ChevronDown style={{ width: 14, height: 14, color: '#526071', flexShrink: 0 }} />
                   </button>
                   {showFormatterPicker && (
                     <ItemPickerModal
@@ -4140,7 +3900,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       Format Template
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                         From saved formatter, edit in the Library
                       </span>
                       <button
@@ -4166,8 +3926,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     whiteSpace: 'pre-wrap', lineHeight: 1.5, minHeight: 38,
                   }}>
                     {linkedSavedLoading
-                      ? <span style={{ color: '#6b7280' }}>Loading formatter…</span>
-                      : linkedSavedBody || <span style={{ color: '#6b7280' }}>This saved formatter has no content yet.</span>}
+                      ? <span style={{ color: '#526071' }}>Loading formatter…</span>
+                      : linkedSavedBody || <span style={{ color: '#526071' }}>This saved formatter has no content yet.</span>}
                   </div>
                 </div>
                 ) : (
@@ -4177,6 +3937,14 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   }}>
                     Format Template
                   </label>
+                  {!getTextValue('format_template') && !getTextValue('prompt') && <div className="workflow-starters" role="group" aria-label="Format starters">
+                    <span>Start with</span>
+                    {[
+                      ['Markdown', 'Format the input as a readable Markdown document. Use headings and lists to preserve its structure. Keep all facts and values; do not add information.'],
+                      ['JSON', 'Return only valid JSON. Use the field names and values in the input. Preserve all records. Use null for missing values; do not invent information.'],
+                      ['Table', 'Format the input records as a Markdown table. Use the input field names as column headings. Include every record and leave missing cells blank.'],
+                    ].map(([label, template]) => <button key={label} type="button" onClick={() => { setTextValue('format_template', template); requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Format template"]')?.focus()) }}>{label}</button>)}
+                  </div>}
                   <textarea
                     aria-label="Format template"
                     value={getTextValue('format_template') || getTextValue('prompt')}
@@ -4202,7 +3970,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
             {task.name === 'AddWebsite' && (
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-8)' }}>
-                  URL <span style={{ color: '#dc2626' }} aria-hidden="true">*</span>
+                  URL <span style={{ color: '#b91c1c' }} aria-hidden="true">*</span>
                 </label>
                 <input
                   aria-label="URL"
@@ -4214,7 +3982,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   placeholder="https://example.com"
                   style={{
                     width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
-                    fontFamily: 'inherit', border: `1px solid ${saveError ? '#dc2626' : '#d1d5db'}`, borderRadius: 'var(--workspace-radius-small)',
+                    fontFamily: 'inherit', border: `1px solid ${saveError ? '#b91c1c' : '#d1d5db'}`, borderRadius: 'var(--workspace-radius-small)',
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
@@ -4222,16 +3990,12 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
             )}
 
             {task.name === 'AddDocument' && (
-              <div>
-                <div style={{
-                  padding: 'var(--workspace-space-12)', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
-                  borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', color: '#0369a1', lineHeight: 1.5,
-                }}>
-                  The document this task inserts comes from the step's{' '}
-                  <strong>Input</strong> tab, shared with every task in the step.
-                  Choose "Select a Document" there to pin a specific document, or
-                  "Step Input" to use text from the previous step.
-                </div>
+              <div className="validation-details">
+                <strong>Document source</strong>
+                <p style={{ fontSize: 13, color: '#526071' }}>{inputOverride && overrideInput.selectedDocUuid ? `Pinned document: ${pinnedDocumentTitle || selectedDocNames[overrideInput.selectedDocUuid] || fixedDocuments.find(doc => doc.uuid === overrideInput.selectedDocUuid)?.title || 'Selected document'}` : `Using the step’s input: ${stepInputSummary}`}</p>
+                <button type="button" className="validation-primary" disabled={!canManage} onClick={() => setDocumentPickerOpen(true)}>Choose document</button>
+                {inputOverride && <button type="button" disabled={!canManage} onClick={() => { setInputOverride(false); setTaskData(prev => ({ ...prev, ...inputValuePatch(stepInput) })) }} style={{ marginLeft: 12, padding: 10, background: '#fff', border: '1px solid #dce1e7', borderRadius: 8 }}>Use step input</button>}
+                <p style={{ fontSize: 12, color: '#526071' }}>A pinned document is used by this task on every run. Other tasks keep their current input. Save changes to apply your selection.</p>
               </div>
             )}
 
@@ -4291,7 +4055,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                   }}
                 />
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                   The input from the previous step is available as <code style={{ backgroundColor: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 3 }}>data</code>.
                   Set the <code style={{ backgroundColor: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 3 }}>result</code> variable to produce output.
                   Available modules: json, re, math, datetime.
@@ -4352,7 +4116,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       outline: 'none', boxSizing: 'border-box',
                     }}
                   />
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                     Comma-separated list. Include a path (e.g. example.com/docs) to limit
                     the crawl to that section. Defaults to the starting URL's domain.
                   </div>
@@ -4407,7 +4171,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
                 </div>
@@ -4431,10 +4195,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                     Use passages when a later step needs the raw evidence (extraction, form filling);
                     use a synthesized answer when this step should resolve the question itself.
                   </div>
@@ -4455,7 +4219,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                     }}
                   />
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                     Supports {'{{ inputs.output }}'} to query with the previous step's output,
                     e.g. look up the sponsor name an earlier step extracted.
                   </div>
@@ -4497,7 +4261,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         outline: 'none', boxSizing: 'border-box',
                       }}
                     />
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                       Drop passages below this similarity (0–1; 0 keeps all).
                     </div>
                   </div>
@@ -4523,7 +4287,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       outline: 'none', boxSizing: 'border-box',
                     }}
                   />
-                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
                     Insert the previous step's output with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, e.g.
                     {' '}<code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'.../records/{{ inputs.output.id }}'}</code>. Works in URL, Headers, and Request Body.
                   </p>
@@ -4551,7 +4315,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
                 </div>
@@ -4583,7 +4347,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
                   {getTextValue('auth_strategy') && getTextValue('auth_strategy') !== 'none' && (() => {
@@ -4612,7 +4376,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                             </select>
                             <ChevronDown style={{
                               position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                              width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                              width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                             }} />
                           </div>
                           <button
@@ -4634,7 +4398,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         {credentialError && <p role="alert" className="mt-2 text-sm text-red-800">{credentialError} <button type="button" onClick={reloadCredentials} className="underline">Retry credentials</button></p>}
                         {!credentialsLoading && !credentialError && getTextValue('credential_id') && !matching.some(c => c.id === getTextValue('credential_id')) && <p role="alert" className="mt-2 text-sm text-red-800">This workflow references a connection that is unavailable to your account or no longer exists. Ask the integration maintainer to restore access or choose a replacement before running it.</p>}
                         {!credentialError && credentials && matching.length === 0 && (
-                          <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                          <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                             No matching credentials yet. Click <strong>New</strong> to create one.
                           </p>
                         )}
@@ -4652,6 +4416,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     }}
                   />
                 </div>
+                <details className="validation-details" open={!!(getTextValue('headers') || getTextValue('body')) || undefined}>
+                  <summary>Headers &amp; request body · optional</summary>
                 <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
                   <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-8)' }}>
                     Headers (JSON)
@@ -4668,7 +4434,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                     }}
                   />
-                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
                     A JSON Request Body is sent with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>Content-Type: application/json</code> automatically. Add it here only to override.
                   </p>
                 </div>
@@ -4688,12 +4454,13 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                       outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                     }}
                   />
-                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
                     Wrap the previous step's output with <code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{{ inputs.output }}'}</code>, and it's inserted as JSON, so
                     {' '}<code style={{ color: '#4b5563', fontFamily: 'monospace', background: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)' }}>{'{"records": {{ inputs.output }}}'}</code> stays valid. Don't add your own quotes around it.
                     {' '}Leave this blank on a POST/PUT/PATCH and the upstream output is sent as the body automatically.
                   </p>
                 </div>
+                </details>
               </div>
             )}
 
@@ -4721,10 +4488,10 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                     PDF and Word render the previous step&apos;s markdown as a formatted document (headings, lists, tables);
                     structured output becomes a table. Markdown and plain text save the text as-is.
                   </div>
@@ -4732,7 +4499,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                 {(getTextValue('format') || 'md') === 'pdf' && (
                   <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
                     <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-8)' }}>
-                      Document title <span style={{ fontWeight: 400, color: '#6b7280' }}>(optional — defaults to the filename)</span>
+                      Document title <span style={{ fontWeight: 400, color: '#526071' }}>(optional — defaults to the filename)</span>
                     </label>
                     <input
                       aria-label="Document title"
@@ -4805,7 +4572,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         template_document_title: doc?.title ?? '',
                       }))}
                     />
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                       The form&apos;s own fields are filled and the step&apos;s output is the filled PDF.
                       Values are copied verbatim from the input; a field the input doesn&apos;t answer is left blank.
                       Every value is checked against the input and listed with its source document and page on the run result.
@@ -4825,7 +4592,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                       }}
                     />
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                       Use <code style={{ backgroundColor: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 3 }}>{'{{placeholder}}'}</code> syntax.
                       Values are copied verbatim from the input and everything outside the placeholders is kept exactly as written.
                       A placeholder the input doesn&apos;t answer is marked <code style={{ backgroundColor: '#f3f4f6', padding: "1px var(--workspace-space-4)", borderRadius: 3 }}>[Not provided: name]</code> in the form and listed in the step&apos;s warning — a &quot;not provided&quot; sentence from the model is treated the same way, never written into the form.
@@ -4858,7 +4625,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
+                      width: 14, height: 14, color: '#526071', pointerEvents: 'none',
                     }} />
                   </div>
                 </div>
@@ -4899,7 +4666,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                   Creates a .zip containing output.json and output.txt from the input data.
                 </div>
               </div>
@@ -4976,7 +4743,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         Reviewers
                       </label>
                       {approvalTeamMembers.length === 0 ? (
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                           No team members available. Use Workflow owner or Team admins, or add members in Team Settings.
                         </div>
                       ) : (
@@ -5012,7 +4779,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', boxSizing: 'border-box',
                       }}
                     />
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
                       0 = no deadline. The timeout action below fires once this many days elapse.
                     </div>
                   </div>
@@ -5043,7 +4810,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                         Escalate to
                       </label>
                       {approvalTeamMembers.length === 0 ? (
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>No team members available.</div>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>No team members available.</div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-8)', maxHeight: 200, overflowY: 'auto' }}>
                           {approvalTeamMembers.map(m => (
@@ -5068,10 +4835,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
             {(LLM_TASKS.includes(task.name)
               || (task.name === 'KnowledgeBaseQuery' && (getTextValue('mode') || 'passages') === 'answer'))
               && models.length > 0 && (
-              <div style={{ marginTop: 'var(--workspace-space-16)' }}>
-                <label style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
-                  Model Override <span style={{ fontWeight: 400, color: '#6b7280' }}>(optional)</span>
-                </label>
+              <details className="validation-details" open={!!taskData.model || undefined} style={{ marginTop: 'var(--workspace-space-16)' }}>
+                <summary>Model · {String(taskData.model || 'Workflow default')}</summary>
                 <select
                   aria-label="Model override"
                   value={(taskData.model as string) || ''}
@@ -5088,7 +4853,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     return <option key={m.name} value={m.name}>{label}</option>
                   })}
                 </select>
-              </div>
+              </details>
             )}
 
             {/* Test result display */}
@@ -5096,7 +4861,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               <div style={{ marginTop: 'var(--workspace-space-16)' }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)',
-                  fontSize: 'var(--workspace-font-control)', color: testWarning ? '#b45309' : '#16a34a', fontWeight: 600,
+                  fontSize: 'var(--workspace-font-control)', color: testWarning ? '#b45309' : '#15803d', fontWeight: 600,
                 }}>
                   {testWarning
                     ? <AlertTriangle style={{ width: 14, height: 14 }} />
@@ -5161,7 +4926,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               <div role="alert" style={{ marginTop: 'var(--workspace-space-16)' }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-                  fontSize: 'var(--workspace-font-control)', color: '#dc2626', fontWeight: 600,
+                  fontSize: 'var(--workspace-font-control)', color: '#b91c1c', fontWeight: 600,
                 }}>
                   <XCircle style={{ width: 14, height: 14 }} />
                   {testError}
@@ -5173,13 +4938,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
 
         {/* Post-processing is genuinely per-task: it rewrites this one task's
             output before it joins the step's combined result. */}
-        <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-20)', marginTop: 'var(--workspace-space-4)' }}>
-          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
-            Post-Processing
-          </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
-            Optional. Rewrites this task's own output before it joins the step's result.
-          </div>
+        <details className="validation-details" open={postProcessEnabled || undefined}>
+          <summary>Post-processing <span style={{ fontWeight: 400 }}>· optional</span></summary>
+          <p style={{ fontSize: 12, color: '#526071' }}>Rewrite this task’s output before it joins the step result.</p>
           <label style={{
             display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: 'var(--workspace-space-12)',
           }}>
@@ -5206,7 +4967,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               }}
             />
           )}
-        </div>
+        </details>
 
         {/* Advanced: the escape hatch for a task that genuinely needs a
             different source than the rest of its step. Collapsed by default —
@@ -5220,7 +4981,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', background: 'none', border: 'none',
               padding: 0, cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071',
             }}
           >
             {showInputOverride ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
@@ -5242,14 +5003,14 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   type="checkbox"
                   checked={inputOverride}
                   disabled={!canManage}
-                  onChange={e => setInputOverride(e.target.checked)}
+                  onChange={e => { setInputOverride(e.target.checked); if (!e.target.checked) setTaskData(prev => ({ ...prev, ...inputValuePatch(stepInput) })) }}
                   style={{ marginTop: 'var(--workspace-space-2)' }}
                 />
                 <div>
                   <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
                     Give this task a different input from the rest of the step
                   </div>
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                     Rarely needed. Every task in a step normally receives the same input,
                     set once on the step's Input tab{stepInputSummary ? ` — currently ${stepInputSummary}` : ''}.
                   </div>
@@ -5299,7 +5060,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
       {saveError && (
         <div role="alert" style={{
           display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-8) var(--workspace-space-20)",
-          borderTop: "1px solid var(--workspace-border)", fontSize: 'var(--workspace-font-control)', color: '#dc2626', fontWeight: 600,
+          borderTop: "1px solid var(--workspace-border)", fontSize: 'var(--workspace-font-control)', color: '#b91c1c', fontWeight: 600,
         }}>
           <XCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
           {saveError}
@@ -5325,7 +5086,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               <option key={uuid} value={uuid}>{testDocTitle(uuid)}</option>
             ))}
           </select>
-          <span style={{ fontWeight: 400, color: '#6b7280', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 400, color: '#526071', whiteSpace: 'nowrap' }}>
             1 of {testInput.candidates.length} documents
           </span>
         </label>
@@ -5367,13 +5128,13 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               opacity: saving || promptMissing ? 0.6 : 1,
             }}
           >
-            {saving ? 'Updating...' : 'Update'}
+            {saving ? 'Saving…' : 'Save task'}
           </button>
         ) : (
           <div style={{
             flex: 1, padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600,
             border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#f9fafb',
-            color: '#6b7280', textAlign: 'center',
+            color: '#526071', textAlign: 'center',
           }}>
             View-only — use "Save a copy to {user?.current_team ? 'Team Library' : 'Mine'}" to edit this workflow
           </div>
@@ -5581,7 +5342,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           }}>
             {formatApiRequest(req)}
           </pre>
-          <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
+          <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)' }}>
             Sensitive header values are redacted.
           </p>
         </details>
@@ -5652,16 +5413,18 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                   )}
                   {Object.keys(approval.data_for_review).length > 0 && (
                     <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
-                      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 'var(--workspace-space-4)' }}>Data for Review</div>
-                      <pre tabIndex={0} role="region" aria-label="Approval data for review" style={{ backgroundColor: '#f9fafb', border: "1px solid var(--workspace-border)",
-                        borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)',
-                        overflowX: 'auto', maxHeight: 200, overflowY: 'auto' }}>
-                        {JSON.stringify(approval.data_for_review, null, 2)}
-                      </pre>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', marginBottom: 'var(--workspace-space-4)' }}>Data for Review</div>
+                      <div role="region" aria-label="Approval data for review" className="workflow-review-data">
+                        <dl>{Object.entries(approval.data_for_review).map(([key, value]) => <div key={key}>
+                          <dt>{key.replaceAll('_', ' ')}</dt>
+                          <dd>{typeof value === 'string' ? value : <pre>{JSON.stringify(value, null, 2)}</pre>}</dd>
+                        </div>)}</dl>
+                      </div>
+                      <details className="validation-details"><summary>View raw JSON</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12 }}>{JSON.stringify(approval.data_for_review, null, 2)}</pre></details>
                     </div>
                   )}
                   <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
-                    <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
+                    <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
                       Comments (optional)
                     </label>
                     <textarea
@@ -5677,7 +5440,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                     />
                   </div>
                   {approvalError && (
-                    <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 'var(--workspace-space-8)' }}>{approvalError}</div>
+                    <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#b91c1c', marginBottom: 'var(--workspace-space-8)' }}>{approvalError}</div>
                   )}
                   <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
                     <button
@@ -5697,7 +5460,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                       disabled={approvalProcessing}
                       style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                         padding: "7px var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                        backgroundColor: '#dc2626', color: '#fff',
+                        backgroundColor: '#b91c1c', color: '#fff',
                         fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: approvalProcessing ? 'not-allowed' : 'pointer',
                         opacity: approvalProcessing ? 0.6 : 1, fontFamily: 'inherit' }}
                     >
@@ -5717,10 +5480,10 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
       {/* Running state */}
       {running && (
         <div>
-          <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 'var(--workspace-space-4)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071', marginBottom: 'var(--workspace-space-4)' }}>
             {status?.current_step_name || 'Preparing...'}
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
             {runElapsed}s elapsed
             {status && status.num_steps_total > 0 && (
               <> - Step {status.num_steps_completed + 1} of {status.num_steps_total}</>
@@ -5764,7 +5527,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               ? `Completed with ${stepWarnings.length} warning${stepWarnings.length === 1 ? '' : 's'} — check the output before using it`
               : 'Completed'}
             {runModelLabel(status) && (
-              <span style={{ marginLeft: 'auto', color: '#6b7280', fontWeight: 400, fontSize: 'var(--workspace-font-meta)' }}>
+              <span style={{ marginLeft: 'auto', color: '#526071', fontWeight: 400, fontSize: 'var(--workspace-font-meta)' }}>
                 {runModelLabel(status)}
               </span>
             )}
@@ -5850,7 +5613,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff' }}
                   >
                     <span>{label}</span>
-                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>{desc}</span>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontWeight: 400 }}>{desc}</span>
                   </a>
                 ))}
               </div>
@@ -5887,7 +5650,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 
       {/* Error */}
       {isError && (
-        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', color: '#dc2626', fontWeight: 500 }}>
+        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', color: '#b91c1c', fontWeight: 500 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
             <XCircle style={{ width: 16, height: 16 }} />
             {status?.error || 'Failed'}
@@ -6003,8 +5766,8 @@ function ConvertWorkflowDocsButton({
         alignSelf: 'flex-start',
         display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
         padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-        border: '1px solid #dc2626', borderRadius: 'var(--workspace-radius-small)',
-        backgroundColor: '#dc2626', color: '#fff',
+        border: '1px solid #b91c1c', borderRadius: 'var(--workspace-radius-small)',
+        backgroundColor: '#b91c1c', color: '#fff',
         cursor: converting ? 'not-allowed' : 'pointer',
         opacity: converting ? 0.6 : 1,
       }}
@@ -6129,9 +5892,9 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
       </div>
 
       {/* Progress summary */}
-      <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 'var(--workspace-space-8)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071', marginBottom: 'var(--workspace-space-8)' }}>
         {batchStatus.completed} of {batchStatus.total} completed
-        {batchStatus.failed > 0 && <span style={{ color: '#dc2626' }}> ({batchStatus.failed} failed)</span>}
+        {batchStatus.failed > 0 && <span style={{ color: '#b91c1c' }}> ({batchStatus.failed} failed)</span>}
         {(batchStatus.canceled ?? 0) > 0 && (
           <span style={{ color: '#b45309' }}> ({batchStatus.canceled} stopped)</span>
         )}
@@ -6182,16 +5945,16 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
                   backgroundColor: itemDone ? '#f0fdf4' : itemFailed ? '#fef2f2' : itemCanceled ? '#fffbeb' : '#fff',
                 }}
               >
-                {itemDone && <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />}
-                {itemFailed && <XCircle style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />}
-                {itemRunning && <Loader2 aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, animation: 'spin 1s linear infinite' }} />}
+                {itemDone && <CheckCircle style={{ width: 14, height: 14, color: '#15803d', flexShrink: 0 }} />}
+                {itemFailed && <XCircle style={{ width: 14, height: 14, color: '#b91c1c', flexShrink: 0 }} />}
+                {itemRunning && <Loader2 aria-hidden="true" style={{ width: 14, height: 14, color: '#526071', flexShrink: 0, animation: 'spin 1s linear infinite' }} />}
                 {itemCanceled && <MinusCircle aria-label="Stopped" style={{ width: 14, height: 14, color: '#b45309', flexShrink: 0 }} />}
                 {!itemDone && !itemFailed && !itemRunning && !itemCanceled && <Circle style={{ width: 14, height: 14, color: '#d1d5db', flexShrink: 0 }} />}
                 <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.document_title || item.session_id}
                 </span>
                 {itemRunning && item.current_step_name && (
-                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', flexShrink: 0 }}>{item.current_step_name}</span>
+                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', flexShrink: 0 }}>{item.current_step_name}</span>
                 )}
                 {itemDone && (
                   <a
@@ -6204,7 +5967,7 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
                     aria-label={`Download output for ${item.document_title || item.session_id}`}
                     style={{
                       display: 'flex', alignItems: 'center', flexShrink: 0,
-                      color: '#6b7280', textDecoration: 'none',
+                      color: '#526071', textDecoration: 'none',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.color = '#111827' }}
                     onMouseLeave={e => { e.currentTarget.style.color = '#6b7280' }}
@@ -6214,7 +5977,7 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
                 )}
                 {itemDone && (
                   <ChevronDown style={{
-                    width: 14, height: 14, color: '#6b7280', flexShrink: 0,
+                    width: 14, height: 14, color: '#526071', flexShrink: 0,
                     transition: 'transform 0.15s',
                     transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                   }} />
@@ -6259,7 +6022,7 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
           >
             <Package style={{ width: 14, height: 14 }} />
             Download all (.zip)
-            {completedCount < batchStatus.total && <span style={{ fontWeight: 400, color: '#6b7280' }}>({completedCount})</span>}
+            {completedCount < batchStatus.total && <span style={{ fontWeight: 400, color: '#526071' }}>({completedCount})</span>}
           </a>
         </div>
       )}
@@ -6272,12 +6035,12 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
 // ---------------------------------------------------------------------------
 
 const BROWSER_ACTION_TYPES = [
-  { type: 'navigate', label: 'Navigate', icon: ArrowRight, color: '#2563eb', description: 'Go to a URL' },
+  { type: 'navigate', label: 'Navigate', icon: ArrowRight, color: '#1d4ed8', description: 'Go to a URL' },
   { type: 'click', label: 'Click', icon: Hand, color: '#7c3aed', description: 'Click an element' },
-  { type: 'fill_form', label: 'Fill Form', icon: Keyboard, color: '#16a34a', description: 'Enter text into fields' },
+  { type: 'fill_form', label: 'Fill Form', icon: Keyboard, color: '#15803d', description: 'Enter text into fields' },
   { type: 'extract', label: 'Extract', icon: Download, color: '#ea580c', description: 'Extract data from page' },
   { type: 'smart_action', label: 'Smart Action', icon: Sparkles, color: '#ec4899', description: 'AI-driven action' },
-  { type: 'login_pause', label: 'Login Pause', icon: Pause, color: '#ca8a04', description: 'Wait for manual login' },
+  { type: 'login_pause', label: 'Login Pause', icon: Pause, color: '#854d0e', description: 'Wait for manual login' },
   { type: 'verify', label: 'Verify', icon: ShieldCheck, color: '#0d9488', description: 'Assert a condition' },
 ] as const
 
@@ -6347,13 +6110,13 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
             border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)',
           }}>
             <Circle style={{ width: 10, height: 10, fill: '#d1d5db', color: '#d1d5db' }} />
-            <span style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>Extension not connected</span>
+            <span style={{ fontSize: 'var(--workspace-font-control)', color: '#526071' }}>Extension not connected</span>
           </div>
           <div style={{
             padding: 'var(--workspace-space-16)', backgroundColor: '#fafafa', border: "1px solid var(--workspace-border)",
             borderRadius: 'var(--workspace-radius-medium)', textAlign: 'center',
           }}>
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071', marginBottom: 'var(--workspace-space-12)' }}>
               Install the Chrome extension and connect to start recording browser actions.
             </div>
             <button
@@ -6361,7 +6124,7 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
               style={{
                 padding: "var(--workspace-space-8) var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                 borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                backgroundColor: '#e5e7eb', color: '#6b7280', cursor: 'not-allowed',
+                backgroundColor: '#e5e7eb', color: '#526071', cursor: 'not-allowed',
               }}
             >
               Start Recording
@@ -6410,7 +6173,7 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
 
           {/* Actions list */}
           <div style={{
-            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071',
             textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-8)',
           }}>
             Actions ({actions.length})
@@ -6457,7 +6220,7 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
                   )}
                 </div>
                 <button type="button" aria-label="Remove action" onClick={() => removeAction(idx)} style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex', flexShrink: 0,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex', flexShrink: 0,
                 }}>
                   <Trash2 style={{ width: 13, height: 13 }} />
                 </button>
@@ -6630,7 +6393,7 @@ function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
         <div
           role="note"
           style={{
-            fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+            fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-16)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
             border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#f9fafb',
           }}
         >
@@ -6666,7 +6429,7 @@ function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
             <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
               Fixed Documents
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)' }}>
               Pre-assign documents that will always be included when this workflow runs — pick them from your Vandalizer library or upload from your computer.
               They count as the selection: with a fixed document, Run works without selecting anything else,
               and any documents you do select are added alongside them.
@@ -6689,7 +6452,7 @@ function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
                 Text Input
               </div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                 Provide text directly when running this workflow. A text area will appear in the run panel below.
                 You can also select documents to include alongside the text.
               </div>
@@ -6700,7 +6463,7 @@ function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
                 Fixed Documents (optional)
               </div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)' }}>
                 Pre-assign documents to always include alongside the text input.
               </div>
               <FixedDocumentsZone
@@ -6721,7 +6484,7 @@ function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
             <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
               No Input
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
               The workflow runs with no documents or text. Use this for steps that
               generate or fetch their own content: API calls, knowledge-base
               queries, or static prompts. Just press Run.
@@ -6807,14 +6570,14 @@ function OutputConfigCard({
           Save workflow output as a document
         </span>
       </label>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginLeft: 'var(--workspace-space-24)', marginTop: -4, marginBottom: enabled ? 12 : 0 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginLeft: 'var(--workspace-space-24)', marginTop: -4, marginBottom: enabled ? 12 : 0 }}>
         Each run writes the output to the chosen folder so downstream workflows can pick it up as input.
       </div>
 
       {enabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingLeft: 'var(--workspace-space-24)' }}>
           <div>
-            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
+            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Destination Folder
             </label>
             <select
@@ -6835,7 +6598,7 @@ function OutputConfigCard({
           </div>
 
           <div>
-            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
+            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Format
             </label>
             <select
@@ -6855,13 +6618,13 @@ function OutputConfigCard({
               <option value="pdf">PDF</option>
               <option value="docx">Word (.docx)</option>
             </select>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
               Markdown is the most chainable format. PDF, Word, and CSV files are saved as-is but their text content is rendered as Markdown for downstream workflows.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
+            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               File Naming Pattern
             </label>
             <input
@@ -6875,13 +6638,13 @@ function OutputConfigCard({
                 border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', outline: 'none', boxSizing: 'border-box',
               }}
             />
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
               Variables: {'{workflow_name}'}, {'{date}'}, {'{time}'}, {'{workflow_id}'}, {'{run_id}'}
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 'var(--workspace-space-6)' }}>
+            <label style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', display: 'block', marginBottom: 'var(--workspace-space-6)' }}>
               On Re-run
             </label>
             <div style={{ display: 'flex', gap: 'var(--workspace-space-16)' }}>
@@ -6930,11 +6693,11 @@ function OutputConfigCard({
 // ---------------------------------------------------------------------------
 
 const GRADE_COLORS: Record<string, { bg: string; text: string }> = {
-  A: { bg: '#dcfce7', text: '#16a34a' },
-  B: { bg: '#dbeafe', text: '#2563eb' },
-  C: { bg: '#fef3c7', text: '#ca8a04' },
+  A: { bg: '#dcfce7', text: '#15803d' },
+  B: { bg: '#dbeafe', text: '#1d4ed8' },
+  C: { bg: '#fef3c7', text: '#854d0e' },
   D: { bg: '#fed7aa', text: '#ea580c' },
-  F: { bg: '#fee2e2', text: '#dc2626' },
+  F: { bg: '#fee2e2', text: '#b91c1c' },
 }
 
 const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -7080,13 +6843,12 @@ function ValidateTab({
   // Unified-flow layout: "Validate & improve" (autovalidate) leads the tab;
   // test data and the per-check diagnostic run are collapsible support
   // sections so first-time users see exactly one button.
-  const [setupOpen, setSetupOpen] = useState(false)
-  const [diagOpen, setDiagOpen] = useState(true)
+  const [stage, setStage] = useState<ValidationStage>('examples')
 
   // A stale plan needs user attention — pop the setup section open so the
   // StalePlanBanner inside it isn't hidden behind the collapse.
   useEffect(() => {
-    if (planStale) setSetupOpen(true)
+    if (planStale) setStage('examples')
   }, [planStale])
 
   // Progress tracking for Run & Validate
@@ -7110,34 +6872,38 @@ function ValidateTab({
     return () => { if (runElapsedTimerRef.current) clearInterval(runElapsedTimerRef.current) }
   }, [runPhase])
 
-  // Debounce timers
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const inputsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const savePlan = useCallback((updatedChecks: ValidationCheckDefinition[]) => {
-    setPlanChecks(updatedChecks)
+  const persistPlan = useCallback(async (draft: ValidationCheckDefinition[]) => {
     if (!workflowId) return
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      updateValidationPlan(workflowId, updatedChecks)
-        .then(() => {
-          // Saving the plan blesses the current workflow definition on the
-          // backend, so any stale warning no longer applies.
-          setPlanStale(false)
-          setOrphanedCheckIds([])
-        })
-        .catch(() => {})
-    }, 800)
+    await updateValidationPlan(workflowId, draft)
+    setPlanStale(false)
+    setOrphanedCheckIds([])
   }, [workflowId])
-
-  const saveInputs = useCallback((updatedInputs: ValidationInputDefinition[]) => {
-    setInputs(updatedInputs)
-    if (!workflowId) return
-    if (inputsSaveTimerRef.current) clearTimeout(inputsSaveTimerRef.current)
-    inputsSaveTimerRef.current = setTimeout(() => {
-      updateValidationInputs(workflowId, updatedInputs).catch(() => {})
-    }, 800)
+  const persistInputs = useCallback(async (draft: ValidationInputDefinition[]) => {
+    if (workflowId) await updateValidationInputs(workflowId, draft)
   }, [workflowId])
+  const planSave = useValidationDraftSave(persistPlan)
+  const inputSave = useValidationDraftSave(persistInputs)
+  const savePlan = (draft: ValidationCheckDefinition[]) => {
+    setPlanChecks(draft)
+    planSave.save(draft)
+  }
+  const saveInputs = (draft: ValidationInputDefinition[]) => {
+    setInputs(draft)
+    inputSave.save(draft)
+  }
+  const flushDrafts = async () => {
+    const results = await Promise.all([planSave.flush(), inputSave.flush()])
+    return results.every(Boolean)
+  }
+  const selectStage = async (next: ValidationStage) => {
+    if (next !== 'examples' && (editingIdx !== null || addingCheck)) {
+      setError('Save or cancel your quality-check edits before leaving Examples. Your draft is still here.')
+      return
+    }
+    setError(null)
+    if (next === 'improve' && !await flushDrafts()) return
+    setStage(next)
+  }
 
   // Load plan, inputs, and quality history on mount — auto-generate plan if empty
   useEffect(() => {
@@ -7309,7 +7075,8 @@ function ValidateTab({
     if (!workflowId) return
     setConfirmingPlanFresh(true)
     try {
-      await updateValidationPlan(workflowId, planChecks)
+      planSave.save(planChecks)
+      if (!await planSave.flush()) return
       setPlanStale(false)
       setOrphanedCheckIds([])
     } catch {
@@ -7331,6 +7098,7 @@ function ValidateTab({
     setError(null)
     setSuggestions(null)
     try {
+      if (!await flushDrafts()) return
       const res = await validateWorkflow(workflowId)
       setChecks(res.checks)
       setGradeInfo({
@@ -7380,6 +7148,7 @@ function ValidateTab({
     setRunProgress('Preparing inputs...')
 
     try {
+      if (!await flushDrafts()) return
       // Collect document UUIDs from document inputs, skipping any whose
       // source document was deleted (those would 404 the run).
       const docUuids: string[] = inputs
@@ -7579,10 +7348,10 @@ function ValidateTab({
   }
 
   const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-    completeness: { bg: '#dbeafe', text: '#2563eb' },
+    completeness: { bg: '#dbeafe', text: '#1d4ed8' },
     formatting: { bg: '#fae8ff', text: '#a21caf' },
-    content: { bg: '#dcfce7', text: '#16a34a' },
-    accuracy: { bg: '#fef3c7', text: '#ca8a04' },
+    content: { bg: '#dcfce7', text: '#15803d' },
+    accuracy: { bg: '#fef3c7', text: '#854d0e' },
   }
 
   const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
@@ -7591,57 +7360,29 @@ function ValidateTab({
   const isBusy = runPhase !== 'idle' || validating
 
   return (
-    <div style={{ padding: 'var(--workspace-space-24)' }}>
-      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
-        Validate & Improve
-      </div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>
-        Choose representative inputs, supply expected outputs and quality checks, then run a check and inspect problems. Optional tuning follows the routine checks.
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-
+    <div className="validation-workspace" style={{ padding: 'var(--workspace-space-24)' }}>
+      <ValidationNav active={stage} onChange={next => void selectStage(next)} running={isBusy}
+        summary={stage === 'examples' ? `${inputs.length} inputs · ${expectedOutputs.length} expected outputs · ${planChecks.length} quality checks`
+          : stage === 'check' ? 'Check the current workflow against your examples. Review failures first.'
+          : 'Compare alternative settings, then review changes before applying them.'} />
+      {(planSave.saving || inputSave.saving) && <p role="status">Saving validation examples and checks…</p>}
+      {(planSave.error || inputSave.error) && <div role="alert" className="validation-save-error">
+        <strong>Validation changes are not saved.</strong>
+        <p>{planSave.error || inputSave.error} Your edits are kept here. Save them before running a check or improving this workflow.</p>
+        <button type="button" onClick={() => void flushDrafts()}>Retry saving validation changes</button>
+      </div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (
           <div role="alert" style={{
             padding: 'var(--workspace-space-12)', backgroundColor: '#fee2e2', border: '1px solid #fca5a5',
-            borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#dc2626',
+            borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#b91c1c',
           }}>
             {error}
           </div>
         )}
 
-        {/* ---- Test data & quality checks (collapsible setup) ---- */}
-        <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff' }}>
-          <button
-            type="button"
-            aria-expanded={setupOpen}
-            onClick={() => setSetupOpen(o => !o)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
-              padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'none', border: 'none',
-              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-            }}
-          >
-            {setupOpen
-              ? <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-              : <ChevronRight style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />}
-            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Test data & quality checks</span>
-            {planStale && (
-              <span style={{
-                fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
-                backgroundColor: '#fef3c7', color: '#92400e', whiteSpace: 'nowrap',
-              }}>
-                PLAN NEEDS REVIEW
-              </span>
-            )}
-            <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap' }}>
-              {inputs.length} {inputs.length === 1 ? 'input' : 'inputs'}
-              {' · '}{expectedOutputs.length} expected {expectedOutputs.length === 1 ? 'output' : 'outputs'}
-              {' · '}{planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'}
-            </span>
-          </button>
-          {setupOpen && (
-          <div style={{ padding: "0 var(--workspace-space-16) var(--workspace-space-16)", display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-
+        <section hidden={stage !== 'examples'} aria-label="Workflow examples">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* ---- Test Inputs Section ---- */}
         <div style={{
           border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)', backgroundColor: '#fafafa',
@@ -7649,7 +7390,7 @@ function ValidateTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-8)' }}>
             <div>
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Test Inputs</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                 Documents or text blocks to run the workflow against during validation.
               </div>
             </div>
@@ -7711,18 +7452,18 @@ function ValidateTab({
 
           {inputsLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-16)', justifyContent: 'center' }}>
-              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
-              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>Loading inputs...</span>
+              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#526071' }} />
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>Loading inputs...</span>
             </div>
           ) : inputs.length === 0 ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-8)',
               padding: "var(--workspace-space-16)", border: "2px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', marginTop: 'var(--workspace-space-4)',
             }}>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textAlign: 'center' }}>
-                No test inputs yet. Add documents or text blocks, then use "Run & Validate" to test.
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', textAlign: 'center' }}>
+                Add a representative document or text example to test the workflow.
               </div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                 Without inputs, validation evaluates the last execution's output.
               </div>
             </div>
@@ -7744,7 +7485,7 @@ function ValidateTab({
                     padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', fontWeight: 700,
                     letterSpacing: '0.05em', textTransform: 'uppercase',
                     backgroundColor: input.type === 'document' ? '#dbeafe' : '#f3e8ff',
-                    color: input.type === 'document' ? '#2563eb' : '#7c3aed',
+                    color: input.type === 'document' ? '#1d4ed8' : '#7c3aed',
                     whiteSpace: 'nowrap', marginTop: 'var(--workspace-space-4)',
                   }}>
                     {input.type === 'document' ? 'DOC' : 'TEXT'}
@@ -7752,7 +7493,7 @@ function ValidateTab({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {input.type === 'document' ? (
                       <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
-                        <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
+                        <FileText style={{ width: 13, height: 13, color: '#526071', flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {input.document_title || input.document_uuid}
                         </span>
@@ -7801,7 +7542,7 @@ function ValidateTab({
                     type="button"
                     aria-label="Remove input"
                     onClick={() => removeInput(input.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex', flexShrink: 0 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex', flexShrink: 0 }}
                     title="Remove input"
                   >
                     <Trash2 style={{ width: 13, height: 13 }} />
@@ -7823,7 +7564,7 @@ function ValidateTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-8)' }}>
             <div>
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Expected Outputs</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                 Saved outputs from past runs. The optimizer compares trial configurations against these.
               </div>
             </div>
@@ -7847,7 +7588,7 @@ function ValidateTab({
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-6)',
               padding: "var(--workspace-space-16) var(--workspace-space-16)", border: "2px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', marginTop: 'var(--workspace-space-4)',
             }}>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textAlign: 'center' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', textAlign: 'center' }}>
                 {canValidate
                   ? 'None saved yet. Run the workflow at least once, then "Suggest from history" to nominate candidates.'
                   : 'None saved yet. Only the workflow owner, a team admin, or an examiner reviewing it can add expected outputs.'}
@@ -7870,7 +7611,7 @@ function ValidateTab({
                     padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', fontWeight: 700,
                     letterSpacing: '0.05em', textTransform: 'uppercase',
                     backgroundColor: eo.source === 'test_case_generator' ? '#dcfce7' : '#dbeafe',
-                    color: eo.source === 'test_case_generator' ? '#15803d' : '#2563eb',
+                    color: eo.source === 'test_case_generator' ? '#15803d' : '#1d4ed8',
                     whiteSpace: 'nowrap', marginTop: 'var(--workspace-space-4)',
                   }}>
                     {eo.source === 'test_case_generator' ? 'AUTO' : 'GOLD'}
@@ -7881,7 +7622,7 @@ function ValidateTab({
                     </div>
                     {eo.output_text && (
                       <div style={{
-                        fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)',
+                        fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)',
                         overflow: 'hidden', textOverflow: 'ellipsis',
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                       }}>
@@ -7894,7 +7635,7 @@ function ValidateTab({
                       type="button"
                       aria-label="Remove expected output"
                       onClick={() => handleDeleteExpectedOutput(eo.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex', flexShrink: 0 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex', flexShrink: 0 }}
                       title="Remove expected output"
                     >
                       <Trash2 style={{ width: 13, height: 13 }} />
@@ -7913,7 +7654,7 @@ function ValidateTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-8)' }}>
             <div>
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Validation Plan</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>
                 Quality checks evaluated against the workflow's actual output.
               </div>
             </div>
@@ -7925,7 +7666,7 @@ function ValidateTab({
                   display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                   padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
-                  color: '#6b7280', cursor: generating ? 'not-allowed' : 'pointer',
+                  color: '#526071', cursor: generating ? 'not-allowed' : 'pointer',
                   opacity: generating ? 0.6 : 1,
                 }}
               >
@@ -7947,8 +7688,8 @@ function ValidateTab({
 
           {planLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-16)', justifyContent: 'center' }}>
-              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
-              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>Loading plan...</span>
+              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#526071' }} />
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>Loading plan...</span>
             </div>
           ) : planChecks.length === 0 && !generating ? (
             <div style={{ marginTop: 'var(--workspace-space-8)' }}>
@@ -7981,8 +7722,8 @@ function ValidateTab({
             </div>
           ) : generating ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-16)', justifyContent: 'center' }}>
-              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
-              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>Generating quality checks...</span>
+              <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#526071' }} />
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>Generating quality checks...</span>
             </div>
           ) : (
             /* Editable check list */
@@ -8030,7 +7771,7 @@ function ValidateTab({
                             onChange={e => setEditDesc(e.target.value)}
                             placeholder="What should the evaluator look for..."
                             style={{
-                              fontSize: 'var(--workspace-font-meta)', color: '#6b7280',
+                              fontSize: 'var(--workspace-font-meta)', color: '#526071',
                               border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-8)",
                               fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box',
                               resize: 'vertical', minHeight: 40,
@@ -8055,26 +7796,33 @@ function ValidateTab({
                             )}
                           </div>
                           {check.description && (
-                            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>{check.description}</div>
+                            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>{check.description}</div>
                           )}
                         </>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--workspace-space-4)', flexShrink: 0 }}>
                       {isEditing ? (
+                        <>
+                        <button type="button" aria-label="Cancel check edits" title="Cancel check edits"
+                          onClick={() => { setEditingIdx(null); setError(null) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071' }}>
+                          <X aria-hidden="true" style={{ width: 14, height: 14 }} />
+                        </button>
                         <button
                           onClick={() => handleSaveEdit(idx)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#16a34a', display: 'flex' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#15803d', display: 'flex' }}
                           title="Save"
                         >
                           <CheckCircle style={{ width: 14, height: 14 }} />
                         </button>
+                        </>
                       ) : (
                         <button
                           type="button"
                           aria-label="Edit check"
                           onClick={() => handleStartEdit(idx)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex' }}
                           title="Edit check"
                         >
                           <Pencil style={{ width: 13, height: 13 }} />
@@ -8084,7 +7832,7 @@ function ValidateTab({
                         type="button"
                         aria-label="Remove check"
                         onClick={() => handleDeletePlanCheck(idx)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#526071', display: 'flex' }}
                         title="Remove check"
                       >
                         <X style={{ width: 14, height: 14 }} />
@@ -8143,7 +7891,7 @@ function ValidateTab({
                       style={{
                         padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                         border: 'none', borderRadius: 'var(--workspace-radius-small)', cursor: newName.trim() ? 'pointer' : 'not-allowed',
-                        backgroundColor: '#16a34a', color: '#fff', opacity: newName.trim() ? 1 : 0.5,
+                        backgroundColor: '#15803d', color: '#fff', opacity: newName.trim() ? 1 : 0.5,
                       }}
                     >
                       Add
@@ -8166,7 +7914,7 @@ function ValidateTab({
                   style={{
                     display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
                     width: '100%', background: 'none', border: 'none', borderTop: '1px solid #f3f4f6',
-                    cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontFamily: 'inherit',
+                    cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', color: '#526071', fontFamily: 'inherit',
                   }}
                 >
                   <Plus style={{ width: 13, height: 13 }} /> Add Check
@@ -8177,34 +7925,9 @@ function ValidateTab({
         </div>
 
           </div>
-          )}
-        </div>
-
-        {/* ---- Detailed check results (diagnostic, collapsible) ----
-            Runs the validation plan as-is against the current config and shows
-            per-check pass/fail. Optional tuning follows the routine results. */}
-        <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff' }}>
-          <button
-            type="button"
-            aria-expanded={diagOpen}
-            onClick={() => setDiagOpen(o => !o)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
-              padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'none', border: 'none',
-              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-            }}
-          >
-            {diagOpen
-              ? <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-              : <ChevronRight style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />}
-            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Detailed check results</span>
-            <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#59616b' }}>
-              check current settings
-            </span>
-          </button>
-          {diagOpen && (
-          <div style={{ padding: "0 var(--workspace-space-16) var(--workspace-space-16)", display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-
+          <div className="validation-continue"><button type="button" onClick={() => void selectStage('check')}>Continue to run &amp; results →</button></div>
+        </section>
+        <section hidden={stage !== 'check'} aria-label="Workflow run and results" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* ---- Run Buttons ---- */}
         <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
           {hasInputs && hasChecks ? (
@@ -8224,7 +7947,7 @@ function ValidateTab({
               {runPhase !== 'idle' && <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
               {runPhase === 'running' ? runProgress
                 : runPhase === 'validating' ? 'Evaluating output...'
-                : 'Run & Validate'}
+                : 'Run check'}
             </button>
           ) : (
             <button
@@ -8241,13 +7964,13 @@ function ValidateTab({
               }}
             >
               {validating && <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
-              {validating ? 'Evaluating output...' : 'Run Validation'}
+              {validating ? 'Evaluating output...' : 'Check latest run'}
             </button>
           )}
         </div>
         {!hasChecks && !planLoading && !generating && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textAlign: 'center', marginTop: -8 }}>
-            Generate or add checks to your validation plan first.
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', textAlign: 'center', marginTop: -8 }}>
+            <button type="button" onClick={() => setStage('examples')}>Set up examples and quality checks</button>
           </div>
         )}
 
@@ -8301,7 +8024,7 @@ function ValidateTab({
               </span>
             </div>
 
-            <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+            <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
               Elapsed: {runElapsedValidate < 60 ? `${runElapsedValidate}s` : `${Math.floor(runElapsedValidate / 60)}m ${runElapsedValidate % 60}s`}
             </div>
           </div>
@@ -8310,11 +8033,48 @@ function ValidateTab({
         {/* ---- Validation Results ---- */}
         {gradeInfo && (
           <>
-            <section aria-label="Workflow validation review summary" style={{ padding: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
-              <strong>What to review</strong>
-              <p>{checks.length} recorded checks: {checks.filter(check => check.status === 'FAIL').length} failed, {checks.filter(check => check.status === 'WARN').length} need review, {checks.filter(check => check.status === 'SKIP').length} skipped.</p>
-              <p>Read failed and warning details in Check Results, then compare the affected step’s output with its expected answer and source. Skipped checks provide no correctness evidence. This result describes the tested inputs and plan; it does not apply tuning changes.</p>
+            <section aria-label="Workflow validation review summary" className="validation-review-summary">
+              <strong>{gradeInfo.grade} · {checks.filter(check => check.status === 'FAIL').length} failed · {checks.filter(check => check.status === 'WARN').length} need review · {checks.filter(check => check.status === 'SKIP').length} skipped</strong>
+              <p>Compare failed checks with the expected output and source. Skipped checks provide no correctness evidence.</p>
             </section>
+            {/* Check results */}
+            <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', overflow: 'hidden' }}>
+              <div style={{
+                padding: "var(--workspace-space-12) var(--workspace-space-16)", backgroundColor: '#f9fafb',
+                borderBottom: "1px solid var(--workspace-border)",
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151',
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                Check Results
+              </div>
+              {[...checks].sort((a, b) => ['FAIL', 'WARN', 'SKIP', 'PASS'].indexOf(a.status) - ['FAIL', 'WARN', 'SKIP', 'PASS'].indexOf(b.status)).map((check, idx) => {
+                const statusStyle = CHECK_STATUS_STYLES[check.status] || CHECK_STATUS_STYLES.SKIP
+                return (
+                  <div
+                    key={check.check_id || idx}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                      borderBottom: idx < checks.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    }}
+                  >
+                    <span style={{
+                      padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
+                      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em',
+                      backgroundColor: statusStyle.bg, color: statusStyle.text,
+                      whiteSpace: 'nowrap', marginTop: 'var(--workspace-space-2)',
+                    }}>
+                      {check.status}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124' }}>{check.name}</div>
+                      {check.detail && (
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)', lineHeight: 1.5 }}>{check.detail}</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
             {/* Grade badge */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-16)',
@@ -8331,8 +8091,8 @@ function ValidateTab({
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Validation Grade</div>
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>{gradeInfo.summary}</div>
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>{gradeInfo.summary}</div>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)', lineHeight: 1.4 }}>
                   A <TermDef term="judge" theme="light">judge</TermDef> compared each step's output to your expected answers. Lower grade = more checks failed or scored low.
                 </div>
                 {resultPlanStale && (
@@ -8350,7 +8110,7 @@ function ValidateTab({
               </div>
               {gradeInfo.variancePts != null && (
                 <div style={{
-                  fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap',
+                  fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap',
                   padding: "var(--workspace-space-4) var(--workspace-space-8)", backgroundColor: '#f3f4f6',
                   borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit',
                 }}
@@ -8378,7 +8138,7 @@ function ValidateTab({
                     display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                     padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                     borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
-                    color: '#6b7280', cursor: 'pointer',
+                    color: '#526071', cursor: 'pointer',
                   }}
                 >
                   JSON
@@ -8455,15 +8215,15 @@ function ValidateTab({
                 failed: r.checks_failed,
               }))
               const latestScore = chartData.length > 0 ? chartData[chartData.length - 1].score : 0
-              const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#d97706' : '#dc2626'
+              const lineColor = latestScore >= 90 ? '#15803d' : latestScore >= 70 ? '#d97706' : '#b91c1c'
               return (
                 <div style={{
                   border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)', backgroundColor: '#fff',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
-                    <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
+                    <TrendingUp style={{ width: 14, height: 14, color: '#526071' }} />
                     <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
-                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>({qualityHistory.length} runs)</span>
                   </div>
                   <div style={{ width: '100%', height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -8495,7 +8255,7 @@ function ValidateTab({
                     onClick={() => setHistoryExpanded(!historyExpanded)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-8)',
-                      fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: 'none', border: 'none',
+                      fontSize: 'var(--workspace-font-meta)', color: '#526071', background: 'none', border: 'none',
                       cursor: 'pointer', padding: "var(--workspace-space-4) 0", fontFamily: 'inherit',
                     }}
                   >
@@ -8511,16 +8271,16 @@ function ValidateTab({
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
                           <th style={{ width: 20, padding: "var(--workspace-space-4) var(--workspace-space-2)" }} />
-                          <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Date</th>
-                          <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Score</th>
-                          <th style={{ textAlign: 'center', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Grade</th>
-                          <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Checks</th>
-                          <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Model</th>
+                          <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Date</th>
+                          <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Score</th>
+                          <th style={{ textAlign: 'center', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Grade</th>
+                          <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Checks</th>
+                          <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontWeight: 500 }}>Model</th>
                         </tr>
                       </thead>
                       <tbody>
                         {qualityHistory.map((run) => {
-                          const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
+                          const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#b91c1c'
                           const gc = run.grade ? (GRADE_COLORS[run.grade] || GRADE_COLORS.F) : GRADE_COLORS.F
                           const isExpanded = expandedRunId === run.uuid
                           return (
@@ -8532,7 +8292,7 @@ function ValidateTab({
                                 onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedRunId(isExpanded ? null : run.uuid) } }}
                               >
-                                <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-2)", color: '#6b7280' }}>
+                                <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-2)", color: '#526071' }}>
                                   {isExpanded
                                     ? <ChevronDown style={{ width: 12, height: 12 }} />
                                     : <ChevronRight style={{ width: 12, height: 12 }} />}
@@ -8554,14 +8314,14 @@ function ValidateTab({
                                 <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
                                   {run.checks_passed}/{run.checks_passed + run.checks_failed}
                                 </td>
-                                <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
+                                <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#526071', fontSize: 'var(--workspace-font-meta)' }}>
                                   {run.model || '-'}
                                 </td>
                               </tr>
                               {isExpanded && (
                                 <tr>
                                   <td colSpan={6} style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-24)", backgroundColor: '#f9fafb' }}>
-                                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6 }}>
+                                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6 }}>
                                       <div><strong>Checks passed:</strong> {run.checks_passed}</div>
                                       <div><strong>Checks failed:</strong> {run.checks_failed}</div>
                                       <div><strong>Total checks:</strong> {run.num_checks}</div>
@@ -8592,52 +8352,12 @@ function ValidateTab({
               />
             )}
 
-            {/* Check results */}
-            <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', overflow: 'hidden' }}>
-              <div style={{
-                padding: "var(--workspace-space-12) var(--workspace-space-16)", backgroundColor: '#f9fafb',
-                borderBottom: "1px solid var(--workspace-border)",
-                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-              }}>
-                Check Results
-              </div>
-              {checks.map((check, idx) => {
-                const statusStyle = CHECK_STATUS_STYLES[check.status] || CHECK_STATUS_STYLES.SKIP
-                return (
-                  <div
-                    key={check.check_id || idx}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-16)",
-                      borderBottom: idx < checks.length - 1 ? '1px solid #f3f4f6' : 'none',
-                    }}
-                  >
-                    <span style={{
-                      padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
-                      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em',
-                      backgroundColor: statusStyle.bg, color: statusStyle.text,
-                      whiteSpace: 'nowrap', marginTop: 'var(--workspace-space-2)',
-                    }}>
-                      {check.status}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124' }}>{check.name}</div>
-                      {check.detail && (
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)', lineHeight: 1.5 }}>{check.detail}</div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           </>
         )}
 
-          </div>
-          )}
-        </div>
-        <section aria-label="Advanced: tune workflow">
-          <h3 style={{ fontWeight: 600 }}>Advanced: tune workflow</h3>
+        </section>
+        <section hidden={stage !== 'improve'} aria-label="Advanced: tune workflow">
+          <h3 style={{ fontWeight: 600 }}>Improve workflow</h3>
           <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginBlock: 8 }}>Optional: compare alternative settings using additional model calls. Review the wizard’s budget, grader and application options before starting. Routine checks above evaluate current settings and record quality history. Tuning can propose or apply different settings according to the options you choose.</p>
         {workflowId && (
           <WorkflowAutovalidatePanel
@@ -8649,7 +8369,7 @@ function ValidateTab({
               expectedOutputs: expectedOutputs.length,
               checks: planChecks.length,
             }}
-            onOpenTestData={() => setSetupOpen(true)}
+            onOpenTestData={() => setStage('examples')}
           />
         )}
 
@@ -8688,7 +8408,7 @@ function ValidateTab({
                 <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111827' }}>
                   Suggest test cases from past runs
                 </div>
-                <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                <div style={{ fontSize: 'var(--workspace-font-control)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                   Select the runs you want to keep as expected outputs. The optimizer will
                   score trial configurations against each one.
                 </div>
@@ -8698,7 +8418,7 @@ function ValidateTab({
                 aria-label="Close"
                 onClick={() => !proposalsLoading && setProposalsOpen(false)}
                 disabled={proposalsLoading}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 'var(--workspace-space-4)' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#526071', padding: 'var(--workspace-space-4)' }}
               >
                 <X style={{ width: 18, height: 18 }} />
               </button>
@@ -8714,19 +8434,19 @@ function ValidateTab({
             )}
 
             {proposalsLoading && proposals.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--workspace-space-32)', gap: 'var(--workspace-space-8)', color: '#6b7280' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--workspace-space-32)', gap: 'var(--workspace-space-8)', color: '#526071' }}>
                 <Loader2 aria-hidden="true" style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
                 <span style={{ fontSize: 'var(--workspace-font-control)' }}>Scoring candidates…</span>
               </div>
             ) : proposalsNote ? (
               <div style={{
                 padding: 'var(--workspace-space-16)', background: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)',
-                fontSize: 'var(--workspace-font-control)', color: '#6b7280',
+                fontSize: 'var(--workspace-font-control)', color: '#526071',
               }}>
                 {proposalsNote}
               </div>
             ) : proposals.length === 0 ? (
-              <div style={{ padding: 'var(--workspace-space-16)', fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
+              <div style={{ padding: 'var(--workspace-space-16)', fontSize: 'var(--workspace-font-control)', color: '#526071' }}>
                 No candidates found.
               </div>
             ) : (
@@ -8777,7 +8497,7 @@ function ValidateTab({
                           </span>
                         </div>
                         {p.why && (
-                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic', marginBottom: 'var(--workspace-space-6)' }}>
+                          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', fontStyle: 'italic', marginBottom: 'var(--workspace-space-6)' }}>
                             {p.why}
                           </div>
                         )}
@@ -8789,7 +8509,7 @@ function ValidateTab({
                         }}>
                           {p.output_preview.slice(0, 400)}
                         </div>
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
                           {p.output_length} chars · session {p.session_id.slice(0, 8)}
                         </div>
                       </div>
@@ -8817,7 +8537,7 @@ function ValidateTab({
                   disabled={proposalsLoading || proposals.filter(p => p.selected).length === 0}
                   style={{
                     padding: "var(--workspace-space-6) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)',
-                    background: '#16a34a', color: '#fff', border: 'none',
+                    background: '#15803d', color: '#fff', border: 'none',
                     fontSize: 'var(--workspace-font-control)', fontWeight: 600,
                     cursor: proposalsLoading || proposals.filter(p => p.selected).length === 0 ? 'not-allowed' : 'pointer',
                     opacity: proposalsLoading || proposals.filter(p => p.selected).length === 0 ? 0.6 : 1,
@@ -8913,8 +8633,8 @@ function AdvancedTab({
           padding: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)',
           border: "1px solid var(--workspace-border)", display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
         }}>
-          <Info style={{ width: 16, height: 16, color: '#6b7280', flexShrink: 0 }} />
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
+          <Info style={{ width: 16, height: 16, color: '#526071', flexShrink: 0 }} />
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.5 }}>
             Add at least one step to run this workflow via the API. Instructions
             and code samples appear here once it does something.
           </div>
@@ -8942,7 +8662,7 @@ function NoStepsNotice({
         padding: 'var(--workspace-space-24)', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
         backgroundColor: '#fafafa', display: 'flex', gap: 'var(--workspace-space-12)', alignItems: 'flex-start',
       }}>
-        <ClipboardCheck style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
+        <ClipboardCheck style={{ width: 20, height: 20, color: '#526071', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{headline}</div>
           <div style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368', marginTop: 'var(--workspace-space-6)', lineHeight: 1.5 }}>{body}</div>
@@ -9028,8 +8748,8 @@ print(response.json())`
   const tabStyle = (active: boolean): CSSProperties => ({
     padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', border: 'none',
-    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
-    color: active ? '#fff' : '#6b7280',
+    backgroundColor: active ? '#1d4ed8' : '#e5e7eb',
+    color: active ? '#fff' : '#4b5563',
   })
 
   return (
@@ -9046,14 +8766,14 @@ print(response.json())`
 
       <div id="api-tabpanel" role="tabpanel" aria-labelledby={`api-lang-${lang}`}>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.6 }}>
         Trigger this workflow directly from any HTTP client. The endpoint queues the run asynchronously
         and returns a <code>session_id</code> you can poll for status. Requires an API key; generate one from{' '}
         <strong>My Account</strong> in the top-right menu. Rate-limited to 10 requests/minute.
       </div>
 
       <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           Endpoint
         </div>
         <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -9062,7 +8782,7 @@ print(response.json())`
       </div>
 
       <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           This workflow's ID
         </div>
         <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -9080,14 +8800,14 @@ print(response.json())`
       />
 
       <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           Response
         </div>
         <div style={codeBlockStyle}>{responseExample}</div>
       </div>
 
       <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           Status lookup
         </div>
         <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 'var(--workspace-space-8)' }}>
@@ -9103,7 +8823,7 @@ print(response.json())`
         />
       </div>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
         Parameters: <code>workflow_id</code> (required) and one or more <code>files</code> (multipart uploads).
         At least one file must be provided.
       </div>
@@ -9119,7 +8839,7 @@ function WorkflowApiCodeBlock({ title, code, id, copied, onCopy, style }: {
   return (
     <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-6)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#526071', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
@@ -9128,7 +8848,7 @@ function WorkflowApiCodeBlock({ title, code, id, copied, onCopy, style }: {
             display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)',
             fontWeight: 500, fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
-            color: copied === id ? '#16a34a' : '#6b7280',
+            color: copied === id ? '#15803d' : '#6b7280',
           }}
         >
           {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
@@ -9157,7 +8877,7 @@ function NoWorkflowLiftCard({
   const { baselineScore, workflowScore, lift } = info
   const liftPositive = lift > 5
   const liftNeutral = lift >= -5 && lift <= 5
-  const liftColor = liftPositive ? '#16a34a' : liftNeutral ? '#d97706' : '#dc2626'
+  const liftColor = liftPositive ? '#15803d' : liftNeutral ? '#d97706' : '#b91c1c'
   const liftBg = liftPositive ? '#f0fdf4' : liftNeutral ? '#fffbeb' : '#fef2f2'
   const liftBorder = liftPositive ? '#bbf7d0' : liftNeutral ? '#fde68a' : '#fecaca'
 
@@ -9216,7 +8936,7 @@ function NoWorkflowLiftCard({
 function ScoreRow({ label, score, color }: { label: string; score: number; color: string }) {
   return (
     <div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-2)' }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-2)' }}>{label}</div>
       <div style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color }}>
         {score.toFixed(0)}%
       </div>
@@ -9259,7 +8979,7 @@ function StaticDiagnosticsCard({
   const warnings = diagnostics.filter(d => d.level === 'warning')
   const info = diagnostics.filter(d => d.level === 'info')
   const ordered = [...errors, ...warnings, ...info]
-  const headerColor = errors.length > 0 ? '#dc2626' : warnings.length > 0 ? '#d97706' : '#6b7280'
+  const headerColor = errors.length > 0 ? '#b91c1c' : warnings.length > 0 ? '#d97706' : '#6b7280'
   const headerBg = errors.length > 0 ? '#fef2f2' : warnings.length > 0 ? '#fffbeb' : '#f9fafb'
   const headerBorder = errors.length > 0 ? '#fecaca' : warnings.length > 0 ? '#fde68a' : '#e5e7eb'
   const headerText = errors.length > 0
@@ -9345,7 +9065,7 @@ function DiagnosticRow({
   }
 }) {
   const [expanded, setExpanded] = useState(false)
-  const color = diagnostic.level === 'error' ? '#dc2626' : diagnostic.level === 'warning' ? '#d97706' : '#2563eb'
+  const color = diagnostic.level === 'error' ? '#b91c1c' : diagnostic.level === 'warning' ? '#d97706' : '#1d4ed8'
   const Icon = diagnostic.level === 'error' ? XCircle : diagnostic.level === 'warning' ? AlertTriangle : Info
   const guide = DIAGNOSTIC_GUIDE[diagnostic.code]
   return (
@@ -9371,7 +9091,7 @@ function DiagnosticRow({
           </div>
         )}
         {diagnostic.target_step && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)' }}>
             Step: {diagnostic.target_step}
           </div>
         )}
@@ -9436,7 +9156,7 @@ function StepBreakdownCard({
         <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>
           Per-step quality
         </span>
-        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
           {allStrong
             ? 'Every step is performing well.'
             : `Weakest: ${worst.step}`}
@@ -9486,7 +9206,7 @@ function StepRow({
       {variancePts != null && variancePts > 0 && (
         <div
           style={{
-            fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap',
+            fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap',
             padding: "var(--workspace-space-2) var(--workspace-space-6)", backgroundColor: '#f3f4f6', borderRadius: 'var(--workspace-radius-small)',
             minWidth: 50, textAlign: 'center',
           }}
@@ -9496,10 +9216,10 @@ function StepRow({
         </div>
       )}
       {/* Status counts */}
-      <div style={{ display: 'flex', gap: 'var(--workspace-space-4)', minWidth: 110, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
-        {step.pass > 0 && <Pill label={`${step.pass} pass`} color="#16a34a" />}
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-4)', minWidth: 110, fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+        {step.pass > 0 && <Pill label={`${step.pass} pass`} color="#15803d" />}
         {step.warn > 0 && <Pill label={`${step.warn} warn`} color="#d97706" />}
-        {step.fail > 0 && <Pill label={`${step.fail} fail`} color="#dc2626" />}
+        {step.fail > 0 && <Pill label={`${step.fail} fail`} color="#b91c1c" />}
         {step.skip > 0 && <Pill label={`${step.skip} skip`} color="#9ca3af" />}
       </div>
     </div>
@@ -9521,7 +9241,7 @@ function Pill({ label, color }: { label: string; color: string }) {
 
 
 function scoreColorForStep(s: number): string {
-  if (s >= 85) return '#16a34a'
+  if (s >= 85) return '#15803d'
   if (s >= 60) return '#d97706'
-  return '#dc2626'
+  return '#b91c1c'
 }

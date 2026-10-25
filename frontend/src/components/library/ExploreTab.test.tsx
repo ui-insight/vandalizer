@@ -278,3 +278,12 @@ it('names a prompt correctly and shows its inputs before validation evidence in 
   const evidence = within(dialog).getByRole('region', { name: 'Validation evidence' })
   expect(usage.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
+
+it('identifies a formatter as a formatter on its card and in its details', async () => {
+  vi.mocked(listVerifiedItems).mockResolvedValue({ items: [makeItem({ kind: 'search_set', set_type: 'formatter', name: 'Award summary format' })], total: 1 })
+  render(<ExploreTab />)
+  const title = await screen.findByRole('button', { name: 'Award summary format' })
+  expect(within(title.closest('article')!).getByText('Formatter')).toBeInTheDocument()
+  fireEvent.click(title)
+  expect(within(await screen.findByRole('dialog')).getByText('Shared Formatter')).toBeInTheDocument()
+})

@@ -100,7 +100,54 @@ export function KBValidationRunTab({
 
   return (
     <div>
-      {!running && <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.6, margin: "0 0 var(--workspace-space-12)" }}>Test questions describe what people should be able to ask this KB. An expected answer gives the grader a reference; expected sources identify where supporting information should come from. Review both before measuring quality.</p>}
+      {/* Run controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={disabled}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            color: disabled ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
+            backgroundColor: disabled ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
+            border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'transparent'),
+            borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+          {running ? 'Running…' : queries.length > 0 ? `Run ${n} ${n === 1 ? 'question' : 'questions'}` : 'Run Validation'}
+        </button>
+        <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
+          Mode:
+          <select
+            value={running && activeOptions ? activeOptions.skip_judge ? 'retrieval' : activeOptions.mode || mode : mode}
+            disabled={running}
+            onChange={e => setMode(e.target.value as KBValidationMode)}
+            style={selectStyle}
+          >
+            <option value="judge+baseline">Score vs. no-KB (recommended)</option>
+            <option value="judge">Score only</option>
+            {running && activeOptions?.skip_judge && <option value="retrieval">Retrieval only</option>}
+          </select>
+        </label>
+        {grader?.model && (
+          <span
+            data-testid="validation-grader"
+            title={
+              'Every validation run is graded by one model, set by your administrator in System Config, '
+              + 'whoever starts the run. Scores graded by different models are not directly comparable.'
+            }
+            style={{ fontSize: 'var(--workspace-font-meta)', color: grader.fallback ? 'var(--workspace-warning)' : 'var(--workspace-muted)' }}
+          >
+            Next check · Graded by {grader.model}
+            {grader.fallback
+              ? ` — the chosen grader ${grader.fallback.configured} is no longer configured`
+              : grader.configured ? '' : ' (default model)'}
+          </span>
+        )}
+      </div>
+
       {/* Question set — which questions this run covers */}
       {queries.length > 0 && !running && (
         <div style={{
@@ -197,59 +244,11 @@ export function KBValidationRunTab({
         </div>
       )}
 
-      {!running && queries.length > 0 && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginBottom: 'var(--workspace-space-12)' }}>
+      {!running && queries.length > 0 && <details className="validation-details" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginBottom: 'var(--workspace-space-12)' }}><summary>What this check measures, time &amp; cost</summary>
         <p style={{ margin: "0 0 var(--workspace-space-6)" }}>{mode === 'judge+baseline' ? 'The same questions are answered with the KB and with the model alone. Their answer grades show whether the KB adds useful information. This comparison makes additional model calls.' : 'Grades answers produced with this KB against the expected answers. It does not measure how well the model answers without the KB.'}</p>
         <p style={{ margin: "0 0 var(--workspace-space-6)" }}>Retrieval checks compare the sources found with your expected sources; they are separate from grading the answer itself.</p>
         <p style={{ margin: 0 }}>Time depends on the question count, model and queue; a check may take several minutes. It uses model tokens. A cost estimate and per-check spending limit are not available here.</p>
-      </div>}
-
-      {/* Run controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={handleRun}
-          disabled={disabled}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-            color: disabled ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
-            backgroundColor: disabled ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
-            border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'transparent'),
-            borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
-          {running ? 'Running…' : queries.length > 0 ? `Run ${n} ${n === 1 ? 'question' : 'questions'}` : 'Run Validation'}
-        </button>
-        <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
-          Mode:
-          <select
-            value={running && activeOptions ? activeOptions.skip_judge ? 'retrieval' : activeOptions.mode || mode : mode}
-            disabled={running}
-            onChange={e => setMode(e.target.value as KBValidationMode)}
-            style={selectStyle}
-          >
-            <option value="judge+baseline">Score vs. no-KB (recommended)</option>
-            <option value="judge">Score only</option>
-            {running && activeOptions?.skip_judge && <option value="retrieval">Retrieval only</option>}
-          </select>
-        </label>
-        {grader?.model && (
-          <span
-            data-testid="validation-grader"
-            title={
-              'Every validation run is graded by one model, set by your administrator in System Config, '
-              + 'whoever starts the run. Scores graded by different models are not directly comparable.'
-            }
-            style={{ fontSize: 'var(--workspace-font-meta)', color: grader.fallback ? 'var(--workspace-warning)' : 'var(--workspace-muted)' }}
-          >
-            Next check · Graded by {grader.model}
-            {grader.fallback
-              ? ` — the chosen grader ${grader.fallback.configured} is no longer configured`
-              : grader.configured ? '' : ' (default model)'}
-          </span>
-        )}
-      </div>
+      </details>}
 
       {error && (
         <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', marginBottom: 'var(--workspace-space-12)' }}>{error}</div>
@@ -273,21 +272,6 @@ export function KBValidationRunTab({
         </div>
       )) : (
         <div>
-          <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflowWrap: 'anywhere' }}>{displayedRunLabel || 'Saved validation result'}{running && ' · Previous result shown while the new check runs.'}</p>
-          <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflowWrap: 'anywhere', lineHeight: 1.6 }}>Recorded grader: {latestRun.judge_model || 'not recorded'} · Mode: {latestRun.mode || 'not recorded'}{latestRun.answer_model && <> · Answer model: {latestRun.answer_model}</>}</p>
-          {/* Export the displayed run for outside-Vandalizer analysis */}
-          {onExport && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
-              <Download size={11} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
-              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Export results
-              </span>
-              {(['csv', 'xlsx', 'json'] as const).map(f => (
-                <ExportButton key={f} format={f} onExport={onExport} />
-              ))}
-            </div>
-          )}
-
           {latestRun.query_selection && (
             <div
               role="note"
@@ -328,14 +312,25 @@ export function KBValidationRunTab({
             </div>
           )}
 
-          <section aria-label="Validation review summary" style={{ padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6 }}>
-            <strong>What to review</strong>
-            <p>{latestRun.num_test_queries} questions checked against {latestRun.num_sources} recorded sources. Recorded verdicts: {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'FAIL').length} failed, {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'WARN').length} need review, {latestRun.retrieval_precision.details.filter(detail => !detail.judge || detail.judge.verdict === 'SKIPPED').length} ungraded.</p>
-            <p>Open the question rows below to compare saved expected answers, generated answers and the grader’s evidence. Start with failed, warning or ungraded rows; a passing score still needs a source check before use.</p>
-            {latestRun.retrieval_precision.details.some(detail => !detail.expected_answer?.trim()) && <p>Some questions have no saved expected answer. Add a reference answer before treating their scores as evidence of correctness.</p>}
-            <p>This check records results for the tested questions; it does not apply tuning settings.</p>
+          <section aria-label="Validation review summary" className="validation-review-summary">
+            <strong>{latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'FAIL').length} failed, {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'WARN').length} need review, {latestRun.retrieval_precision.details.filter(detail => !detail.judge || detail.judge.verdict === 'SKIPPED').length} ungraded</strong>
+            <p>{latestRun.num_test_queries} questions · {latestRun.num_sources} sources. Open a question to compare the answer with its reference and evidence.</p>
+            {latestRun.retrieval_precision.details.some(detail => !detail.expected_answer?.trim()) && <p>Missing expected answers leave some questions ungraded.</p>}
           </section>
 
+          {/* Per-query details */}
+          <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
+            {latestRun.retrieval_precision.details.map((d, i) => ({ d, i })).sort((a, b) => ['FAIL', 'WARN', 'SKIPPED', 'PASS'].indexOf(a.d.judge?.verdict || 'SKIPPED') - ['FAIL', 'WARN', 'SKIPPED', 'PASS'].indexOf(b.d.judge?.verdict || 'SKIPPED')).map(({ d, i }) => (
+              <DetailRow
+                key={d.query_uuid || i}
+                detail={d}
+                hasBaseline={latestRun.mode === 'judge+baseline'}
+                expanded={expanded.has(d.query_uuid || String(i))}
+                onToggle={() => toggle(d.query_uuid || String(i))}
+              />
+            ))}
+          </div>
+          <details className="validation-details"><summary>Quality score &amp; baseline comparison</summary>
           {/* Certified quality headline — same score as the KB quality tile */}
           <CertifiedQualityCard run={latestRun} />
 
@@ -361,18 +356,26 @@ export function KBValidationRunTab({
             </div>
           )}
 
-          {/* Per-query details */}
-          <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
-            {latestRun.retrieval_precision.details.map((d, i) => (
-              <DetailRow
-                key={d.query_uuid || i}
-                detail={d}
-                hasBaseline={latestRun.mode === 'judge+baseline'}
-                expanded={expanded.has(d.query_uuid || String(i))}
-                onToggle={() => toggle(d.query_uuid || String(i))}
-              />
-            ))}
-          </div>
+
+          </details>
+          <details className="validation-details"><summary>Run details &amp; export</summary>
+          <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflowWrap: 'anywhere' }}>{displayedRunLabel || 'Saved validation result'}{running && ' · Previous result shown while the new check runs.'}</p>
+          <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflowWrap: 'anywhere', lineHeight: 1.6 }}>Recorded grader: {latestRun.judge_model || 'not recorded'} · Mode: {latestRun.mode || 'not recorded'}{latestRun.answer_model && <> · Answer model: {latestRun.answer_model}</>}</p>
+          {/* Export the displayed run for outside-Vandalizer analysis */}
+          {onExport && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
+              <Download size={11} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Export results
+              </span>
+              {(['csv', 'xlsx', 'json'] as const).map(f => (
+                <ExportButton key={f} format={f} onExport={onExport} />
+              ))}
+            </div>
+          )}
+
+          </details>
+
         </div>
       )}
     </div>

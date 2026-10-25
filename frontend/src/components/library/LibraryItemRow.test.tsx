@@ -75,7 +75,7 @@ describe('LibraryItemRow', () => {
 
   it('shows kind label for extraction (search_set)', () => {
     render(<LibraryItemRow item={makeItem({ kind: 'search_set', name: 'NSF Extractor' })} {...defaultProps} />)
-    expect(screen.getByText('Extraction Task')).toBeTruthy()
+    expect(screen.getByText('Extraction')).toBeTruthy()
   })
 
   it('renders tags', () => {

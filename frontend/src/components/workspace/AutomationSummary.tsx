@@ -23,15 +23,23 @@ export function describeAutomation(automation: Automation, names: AutomationFold
   } else if (automation.trigger_type === 'api') {
     trigger = 'On an API request'; input = 'Documents or text provided by the caller'
   } else if (automation.trigger_type === 'm365_intake') {
-    trigger = 'On Microsoft 365 intake'; input = 'Files from the configured Microsoft 365 source'
+    trigger = 'On Microsoft 365 intake'; input = 'Source connection managed separately'
   }
-  const kind = automation.action_type === 'extraction' ? 'Extraction' : automation.action_type === 'task' ? 'Task' : 'Workflow'
+  const kind = automation.action_type === 'extraction' ? 'Extraction' : 'Workflow'
   const action = automation.action_id ? `${kind}: ${automation.action_name || actionName || 'Name unavailable'}` : `Choose a ${kind.toLowerCase()}`
   const outputConfig = automation.output_config || {}
   const storage = outputConfig.storage as { enabled?: boolean; destination_folder?: string; format?: string } | undefined
   const deliveries: string[] = []
   if (storage?.enabled) deliveries.push(`${(storage.format || (automation.action_type === 'extraction' ? 'csv' : 'text')).toUpperCase()} → ${folder(storage.destination_folder)}`)
-  if (Array.isArray(outputConfig.notifications) && outputConfig.notifications.length) deliveries.push('Notifications configured')
+  if (Array.isArray(outputConfig.notifications) && outputConfig.notifications.length) {
+    const notification = outputConfig.notifications[0] as { channel?: string; recipients?: string[]; notify_owner?: boolean; conditions?: string }
+    if (notification.channel === 'email') {
+      const count = notification.recipients?.length ?? 0
+      const recipients = [notification.notify_owner === true && 'owner', count > 0 && `${count} recipient${count === 1 ? '' : 's'}`].filter(Boolean).join(' + ')
+      const condition = notification.conditions === 'failure' ? 'on failure' : notification.conditions === 'success' ? 'on success' : 'after each run'
+      deliveries.push(`Email ${recipients || 'recipients not set'} · ${condition}`)
+    } else deliveries.push('Notifications configured')
+  }
   if (Array.isArray(outputConfig.webhooks) && outputConfig.webhooks.length) deliveries.push(`${outputConfig.webhooks.length} webhook${outputConfig.webhooks.length === 1 ? '' : 's'}`)
   if (Array.isArray(outputConfig.chains) && outputConfig.chains.length) deliveries.push(`${outputConfig.chains.length} follow-up automation${outputConfig.chains.length === 1 ? '' : 's'}`)
   if ((outputConfig.onedrive as { enabled?: boolean } | undefined)?.enabled) deliveries.push('OneDrive delivery')

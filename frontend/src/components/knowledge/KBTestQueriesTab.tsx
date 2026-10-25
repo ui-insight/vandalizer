@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil, Upload, Play, Search } from 'lucide-react'
 import {
   createKBTestQuery,
@@ -19,6 +19,7 @@ interface Props {
   canManage: boolean
   queries: KBTestQuery[]
   onChange: () => void
+  onEditingChange?: (editing: boolean) => void
   /** Hand the selected queries to the Run tab, which shows their count and
    *  category mix before the user starts the (smoke-test) run. Absent when
    *  running is not offered. */
@@ -112,7 +113,7 @@ export function draftToUpdatePayload(draft: DraftShape) {
 }
 
 export function KBTestQueriesTab({
-  kbUuid, kbReady, canManage, queries, onChange, onRunSelected, running = false,
+  kbUuid, kbReady, canManage, queries, onChange, onRunSelected, running = false, onEditingChange,
 }: Props) {
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -137,6 +138,11 @@ export function KBTestQueriesTab({
   const [deletingUuid, setDeletingUuid] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const busy = adding || saving || bulkDeleting || deletingUuid !== null
+  useEffect(() => {
+    onEditingChange?.(showAdd || editingUuid !== null || busy)
+  }, [showAdd, editingUuid, busy, onEditingChange])
+  useEffect(() => () => onEditingChange?.(false), [onEditingChange])
+
 
   const autoCount = useMemo(() => queries.filter(q => q.auto_generated).length, [queries])
   const userCount = queries.length - autoCount

@@ -7,6 +7,16 @@ const search = vi.mocked(searchDocuments)
 const response = (uuid: string) => ({ items: [{ uuid, title: uuid }], total: 1 }) as Awaited<ReturnType<typeof searchDocuments>>
 
 describe('nested document selection', () => {
+  it('replaces the prior selection when a task accepts one document', async () => {
+    search.mockResolvedValueOnce(response('First')).mockResolvedValueOnce(response('Second'))
+    const select = vi.fn()
+    render(<DocumentPickerDialog single excludeUuids={[]} onSelect={select} onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('radio', { name: 'First' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search documents' }), { target: { value: 'Second' } })
+    fireEvent.click(await screen.findByRole('radio', { name: 'Second' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use document' }))
+    expect(select).toHaveBeenCalledWith([{ uuid: 'Second', title: 'Second' }])
+  })
   it('preserves choices across searches and retries a failed search', async () => {
     search.mockResolvedValueOnce(response('First')).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(response('Second'))
     const select = vi.fn()

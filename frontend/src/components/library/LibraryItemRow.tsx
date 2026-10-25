@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from '../shared/panelPortal'
 import {
-  MoreHorizontal,
+  MoreHorizontal, Workflow, FileSearch, MessageSquare, Braces,
   Pin,
   Star,
   Copy,
@@ -69,7 +69,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
     setFlipUp(shouldFlip)
     setMenuPos({
       top: shouldFlip ? rect.top : rect.bottom + 4,
-      left: rect.right - 200, // align right edge with button
+      left: Math.max(8, Math.min(rect.right - 200, window.innerWidth - 208)), // align right edge with button
     })
   }, [])
 
@@ -80,7 +80,9 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
         ? 'Prompt'
         : item.set_type === 'formatter'
           ? 'Formatter'
-          : 'Extraction Task'
+          : 'Extraction'
+
+  const KindIcon = item.kind === 'workflow' ? Workflow : item.set_type === 'prompt' ? MessageSquare : item.set_type === 'formatter' ? Braces : FileSearch
 
   useEffect(() => {
     if (!menuOpen) return
@@ -133,6 +135,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             gap: 'var(--workspace-space-6)',
           }}
         >
+          <span className="library-kind-icon" data-kind={item.kind === 'workflow' ? 'workflow' : item.set_type || 'extraction'}><KindIcon size={16} aria-hidden="true" /></span>
           {item.name}
           {item.verified && (
             <span
@@ -149,9 +152,9 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
         </button>
-        {item.kind === 'workflow' && item.description && (
+        {item.description && (
           <div
-            title={item.description}
+            className="library-item-description" title={item.description}
             style={{
               fontSize: 'var(--workspace-font-meta)',
               color: '#5f6368',

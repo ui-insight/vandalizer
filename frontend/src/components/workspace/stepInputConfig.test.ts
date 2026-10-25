@@ -86,6 +86,15 @@ describe('sameInputValue', () => {
 })
 
 describe('deriveStepInput', () => {
+  it('keeps a pinned task document out of the shared step input', () => {
+    const pinned = task('pinned', { override_step_input: true, input_sources: ['select_document'], selected_document_uuid: 'private-reference' })
+    const sibling = task('sibling', { prompt: 'Summarize the previous step' })
+    const value = deriveStepInput(step({}, [pinned, sibling]))
+    expect(value.value).toEqual({ sources: ['step_input'], selectedDocUuid: '' })
+    expect(value.divergentTasks).toEqual([])
+    expect(effectiveTaskInput(step({}, [pinned, sibling]), pinned).selectedDocUuid).toBe('private-reference')
+    expect(effectiveTaskInput(step({}, [pinned, sibling]), sibling).sources).toEqual(['step_input'])
+  })
   it('uses the step when the step has been configured', () => {
     const s = step({ input_sources: ['workflow_documents'] }, [
       task('t1', { input_sources: ['step_input'] }),

@@ -7,12 +7,13 @@ import { FieldLabel, FieldMessage } from './FormField'
 
 type DocumentChoice = { uuid: string; title: string }
 
-export function DocumentPickerDialog({ onSelect, onClose, excludeUuids, title = 'Add Documents', zIndex = 1000 }: {
+export function DocumentPickerDialog({ onSelect, onClose, excludeUuids, title = 'Add Documents', zIndex = 1000, single = false }: {
   onSelect: (docs: DocumentChoice[]) => void
   onClose: () => void
   excludeUuids: string[]
   title?: string
   zIndex?: number
+  single?: boolean
 }) {
   const id = useId()
   const [query, setQuery] = useState('')
@@ -53,7 +54,8 @@ export function DocumentPickerDialog({ onSelect, onClose, excludeUuids, title = 
             <FieldMessage id={`${id}-error`} error>Your selections are preserved. Try searching again.</FieldMessage>
             <ActionButton variant="secondary" onClick={() => setRetry(n => n + 1)}>Retry search</ActionButton>
           </div> : results.length === 0 ? <p>No documents found. Try a different search.</p> : results.map(doc => <label key={doc.uuid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', borderBottom: '1px solid var(--workspace-border)' }}>
-            <input type="checkbox" checked={selected.has(doc.uuid)} onChange={() => setSelected(previous => {
+            <input type={single ? 'radio' : 'checkbox'} name={single ? `${id}-document` : undefined} checked={selected.has(doc.uuid)} onChange={() => setSelected(previous => {
+              if (single) return new Map([[doc.uuid, doc]])
               const next = new Map(previous)
               if (next.has(doc.uuid)) next.delete(doc.uuid)
               else next.set(doc.uuid, doc)
@@ -65,7 +67,7 @@ export function DocumentPickerDialog({ onSelect, onClose, excludeUuids, title = 
         </div>
         <div className="workspace-dialog-footer">
           <ActionButton variant="secondary" onClick={onClose}>Cancel</ActionButton>
-          <ActionButton variant="primary" disabled={selected.size === 0} onClick={() => { onSelect([...selected.values()]); onClose() }}>Add {selected.size > 0 ? `${selected.size} ` : ''}Selected</ActionButton>
+          <ActionButton variant="primary" disabled={selected.size === 0} onClick={() => { onSelect([...selected.values()]); onClose() }}>{single ? 'Use document' : `Add ${selected.size > 0 ? `${selected.size} ` : ''}Selected`}</ActionButton>
         </div>
       </div>
     </FocusTrap>

@@ -1,3 +1,4 @@
+import { createPortal } from '../shared/panelPortal'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -193,7 +194,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
     bronze: { bg: '#fed7aa', text: '#9a3412' },
   }
 
-  return (
+  const dialog = (
     <div
       ref={backdropRef}
       onClick={e => { if (e.target === backdropRef.current) onClose() }}
@@ -436,4 +437,5 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
       </FocusTrap>
     </div>
   )
+  return inline ? dialog : createPortal(dialog, document.body)
 }

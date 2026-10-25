@@ -39,11 +39,11 @@ export function EditorShareCallout({
 
   const high = score !== null && score >= HIGH_SCORE
   const rounded = score === null ? null : Math.round(score)
-  const accent = high ? '#059669' : '#374151'
+  const accent = high ? '#047857' : '#374151'
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
       padding: '12px 16px', borderRadius: 8,
       backgroundColor: high ? '#ecfdf5' : '#f9fafb',
       border: `1px solid ${high ? '#a7f3d0' : '#e5e7eb'}`,
@@ -51,7 +51,7 @@ export function EditorShareCallout({
       {high
         ? <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: accent, flexShrink: 0 }} />
         : <Share2 aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />}
-      <div style={{ flex: 1, fontSize: 13, color: high ? '#065f46' : '#374151' }}>
+      <div style={{ flex: '1 1 160px', minWidth: 0, fontSize: 13, color: high ? '#065f46' : '#374151' }}>
         {high ? (
           <><strong>Great results!</strong> This {kindNoun} scored {rounded}%. Share it so colleagues can use it too.</>
         ) : (

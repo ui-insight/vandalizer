@@ -1,3 +1,5 @@
+import { Microsoft365IntakeGuide } from './Microsoft365IntakeGuide'
+import './automation-workspace.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle, Play, CalendarClock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -30,7 +32,6 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderO
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string; enabled: boolean }[] = [
   { value: 'workflow', label: 'Run Workflow', description: 'Execute a workflow on triggered documents', enabled: true },
   { value: 'extraction', label: 'Run Extraction', description: 'Run an extraction template', enabled: true },
-  { value: 'task', label: 'Run Task', description: 'Execute a standalone task', enabled: true },
 ]
 
 export function AutomationEditorPanel() {
@@ -163,7 +164,7 @@ export function AutomationEditorPanel() {
 
   if (loading) {
     return (
-      <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+      <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <EditorHeader title="Loading..." onClose={closeAfterSave} />
         <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)' }}>Loading automation...</div>
       </div>
@@ -172,7 +173,7 @@ export function AutomationEditorPanel() {
 
   if (!automation) {
     return (
-      <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+      <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <EditorHeader title="Automation" onClose={closeAfterSave} />
         <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 'var(--workspace-font-control)' }}>{loadError || 'Automation not found.'}<button type="button" onClick={refresh} style={{ display: 'block', margin: "var(--workspace-space-12) auto" }}>Retry loading</button></div>
       </div>
@@ -180,9 +181,9 @@ export function AutomationEditorPanel() {
   }
 
   return (
-    <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: 'var(--workspace-surface)', position: 'relative' }}>
+    <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: 'var(--workspace-surface)', position: 'relative' }}>
       {/* Header */}
-      <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", width: '100%', maxWidth: 1040, margin: '0 auto', borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
+      <div className="automation-editor-header" style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", width: '100%', maxWidth: 1040, margin: '0 auto', borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)' }}>
           {editingTitle ? (
             <div style={{ display: 'flex', flex: '1 1 240px', minWidth: 0, gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
@@ -207,7 +208,7 @@ export function AutomationEditorPanel() {
             <button type="button" disabled={busySaving} onClick={() => setEditingTitle(false)}>Cancel rename</button>
             </div>
           ) : (
-            <button type="button" aria-label="Rename automation" disabled={!canManage}
+            <button type="button" className="automation-editor-title" title={automation.name} aria-label="Rename automation" disabled={!canManage}
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: canManage ? 'pointer' : 'default', flex: '1 1 100%', minWidth: 0, overflowWrap: 'anywhere', background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit' }}
               onClick={() => {
                 if (!canManage) return
@@ -221,7 +222,7 @@ export function AutomationEditorPanel() {
               {canManage && <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />}
             </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', flexShrink: 1, maxWidth: '100%' }}>
+          <div className="automation-editor-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', flexShrink: 1, maxWidth: '100%' }}>
             {/* Run now — a real one-off run through the automation's pipeline */}
             <button
               onClick={() => setRunNowOpen(o => !o)}
@@ -265,6 +266,11 @@ export function AutomationEditorPanel() {
               }} />
               {automation.enabled ? 'Enabled' : 'Disabled'}
             </button>
+            <details className="automation-more" onKeyDown={event => {
+              if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() }
+            }}>
+              <summary aria-label="More automation actions">More</summary>
+              <div className="automation-more-controls">
             {/* Visible to team toggle */}
             <button
               onClick={handleToggleShared}
@@ -273,7 +279,7 @@ export function AutomationEditorPanel() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-4) var(--workspace-space-12)",
                 fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                color: automation.shared_with_team ? 'rgb(0, 128, 128)' : '#555e68',
+                color: automation.shared_with_team ? '#0f6363' : '#555e68',
                 backgroundColor: automation.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#f3f4f6',
                 border: '1px solid ' + (automation.shared_with_team ? 'rgba(0, 128, 128, 0.3)' : '#e5e7eb'),
                 borderRadius: 16, cursor: canManage ? 'pointer' : 'not-allowed',
@@ -289,12 +295,14 @@ export function AutomationEditorPanel() {
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#d93025', display: 'flex' }}
                 title="Delete automation"
               >
-                <Trash2 style={{ width: 16, height: 16 }} />
+                <Trash2 aria-hidden="true" style={{ width: 16, height: 16 }} /><span>Delete automation</span>
               </button>
             )}
+              </div>
+            </details>
             {/* Close */}
             <button
-              aria-label="Close automation"
+              className="automation-editor-close" aria-label="Close automation"
               onClick={closeAfterSave}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#5f6368', display: 'flex' }}
             >
@@ -304,12 +312,12 @@ export function AutomationEditorPanel() {
         </div>
       </div>
 
-      <div role={autosave.state === 'error' ? 'alert' : 'status'} aria-live="polite" style={{ padding: "var(--workspace-space-12) var(--workspace-space-24)", maxWidth: 1040, width: '100%', margin: '0 auto', fontSize: 'var(--workspace-font-meta)', color: autosave.state === 'error' ? '#b91c1c' : '#555e68', borderBottom: "1px solid var(--workspace-border)" }}>
+      <div className="automation-save-state" role={autosave.state === 'error' ? 'alert' : 'status'} aria-live="polite" style={{ padding: "var(--workspace-space-12) var(--workspace-space-24)", maxWidth: 1040, width: '100%', margin: '0 auto', fontSize: 'var(--workspace-font-meta)', color: autosave.state === 'error' ? '#b91c1c' : '#555e68', borderBottom: "1px solid var(--workspace-border)" }}>
         {autosave.state === 'saved' ? 'All changes saved automatically' : autosave.state === 'pending' ? 'Unsaved changes · saving shortly…' : autosave.state === 'saving' ? 'Saving changes…' : `Changes not saved. ${autosave.error}`}
         {autosave.state === 'error' && <><span> Your edits are kept in this tab until you reload.</span><button type="button" disabled={!canManage} onClick={() => { void autosave.flush() }} style={{ marginLeft: 'var(--workspace-space-12)', padding: "var(--workspace-space-4) var(--workspace-space-12)", border: '1px solid #b91c1c', borderRadius: 'var(--workspace-radius-small)', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>Retry save</button></>}
       </div>
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-24)", minHeight: 0, width: '100%', maxWidth: 1040, margin: '0 auto' }}>
+      <div className="automation-editor-body" style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-24)", minHeight: 0, width: '100%', maxWidth: 1040, margin: '0 auto' }}>
         {!canManage && (
           <div style={{
             padding: "var(--workspace-space-12) var(--workspace-space-16)", marginBottom: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-small)',
@@ -322,7 +330,7 @@ export function AutomationEditorPanel() {
         )}
         {/* Description */}
         <textarea
-          rows={3}
+          rows={2}
           aria-label="Automation description"
           value={automation.description || ''}
           disabled={!canManage}
@@ -352,12 +360,14 @@ export function AutomationEditorPanel() {
         {/* Section A — Trigger */}
         <CollapsibleSection title="Trigger" summary={triggerSummary(automation)} testId="automation-trigger-section">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', margin: "var(--workspace-space-8) 0 var(--workspace-space-16)" }}>
+          {automation.trigger_type === 'm365_intake' && <div className="automation-integration-current"><strong>Microsoft 365 intake</strong><span>Managed separately</span></div>}
           {TRIGGER_OPTIONS.map(opt => {
             const Icon = opt.icon
             const selected = automation.trigger_type === opt.value
             return (
               <button
                 key={opt.value}
+                type="button" aria-pressed={selected}
                 onClick={() => handleTriggerTypeChange(opt.value)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
@@ -396,10 +406,11 @@ export function AutomationEditorPanel() {
         <CollapsibleSection title="Action" summary={automation.action_name || 'Nothing selected yet'} testId="automation-action-section">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', margin: "var(--workspace-space-8) 0 var(--workspace-space-16)" }}>
           {ACTION_OPTIONS.map(opt => {
-            const selected = automation.action_type === opt.value
+            const selected = automation.action_type === opt.value || (automation.action_type === 'task' && opt.value === 'workflow')
             return (
               <button
                 key={opt.value}
+                type="button" aria-pressed={selected}
                 onClick={() => opt.enabled && handleActionTypeChange(opt.value)}
                 disabled={!opt.enabled}
                 style={{
@@ -439,7 +450,7 @@ export function AutomationEditorPanel() {
         {/* Action selector */}
         {(automation.action_type === 'workflow' || automation.action_type === 'extraction' || automation.action_type === 'task') && (() => {
           const actionKind = automation.action_type === 'extraction' ? 'extraction' : 'workflow'
-          const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : automation.action_type === 'task' ? 'Workflow Task' : 'Workflow'
+          const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : 'Workflow'
           // Resolve current action name from API response, falling back to local lookup
           let currentName = automation.action_name || ''
           if (!currentName && automation.action_id) {
@@ -489,7 +500,7 @@ export function AutomationEditorPanel() {
         </CollapsibleSection>
 
         {/* Section C — Post-Action Output */}
-        <CollapsibleSection title="Post-Action Output" summary={outputSummary(automation)} testId="automation-output-section">
+        <CollapsibleSection title="Results & delivery" summary={outputSummary(automation)} testId="automation-output-section">
         <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
         <OutputStorageCard automation={automation} onSave={debouncedSave} />
         <OutputNotificationCard automation={automation} onSave={debouncedSave} />
@@ -552,6 +563,7 @@ function EditorHeader({ title, onClose }: { title: string; onClose: () => void }
 
 /** One line for the folded Trigger section. */
 function triggerSummary(automation: Automation): string {
+  if (automation.trigger_type === 'm365_intake') return 'Microsoft 365 · managed separately'
   const label = TRIGGER_OPTIONS.find(o => o.value === automation.trigger_type)?.label ?? automation.trigger_type
   if (automation.trigger_type === 'schedule') {
     return `${label} · ${describeSchedule(toScheduleConfig(automation.trigger_config))}`
@@ -578,6 +590,7 @@ function TriggerConfigCard({ automation, onSave }: { automation: Automation; onS
   if (automation.trigger_type === 'schedule') {
     return <ScheduleConfig automation={automation} onSave={onSave} />
   }
+  if (automation.trigger_type === 'm365_intake') return <Microsoft365IntakeGuide existing />
   return null
 }
 
@@ -1082,7 +1095,7 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
   const notif = notifications[0] || {}
   const enabled = notifications.length > 0 && notif.channel === 'email'
   const recipients = ((notif.recipients || []) as string[]).join(', ')
-  const notifyOwner = (notif.notify_owner as boolean) ?? true
+  const notifyOwner = (notif.notify_owner as boolean) ?? false
   const conditions = (notif.conditions as string) || 'always'
 
   const updateNotification = (patch: Record<string, unknown> & { recipients_str?: string }) => {

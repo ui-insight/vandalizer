@@ -1,3 +1,4 @@
+import './automation-workspace.css'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpDown, CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
@@ -165,19 +166,27 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
       {/* Filter bar */}
       {(base.length > 0 || search || filter !== 'all') && (
-        <div style={{
+        <div className="automation-filters" style={{
           display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-6)',
           padding: "var(--workspace-space-8) var(--workspace-space-12)",
           backgroundColor: 'var(--workspace-canvas)',
           borderBottom: '1px solid var(--workspace-border)',
           flexShrink: 0,
         }}>
+          <div className="automation-filter-pills">
           <FilterPill label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
           <FilterPill label="Folder Watch" count={counts.folder_watch} active={filter === 'folder_watch'} onClick={() => setFilter('folder_watch')} icon={<FolderSearch size={10} />} />
           <FilterPill label="API" count={counts.api} active={filter === 'api'} onClick={() => setFilter('api')} icon={<Globe size={10} />} />
           {(counts.schedule > 0 || filter === 'schedule') && <FilterPill label="Schedule" count={counts.schedule} active={filter === 'schedule'} onClick={() => setFilter('schedule')} icon={<CalendarClock size={10} />} />}
           {(m365Enabled || counts.m365_intake > 0 || filter === 'm365_intake') && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
-          <div style={{ flex: 1 }} />
+          </div>
+          <select className="automation-mobile-trigger" aria-label="Filter automations by trigger" value={filter} onChange={e => setFilter(e.target.value as FilterMode)}>
+            <option value="all">All ({counts.all})</option>
+            <option value="folder_watch">Folder ({counts.folder_watch})</option>
+            <option value="api">API ({counts.api})</option>
+            {(counts.schedule > 0 || filter === 'schedule') && <option value="schedule">Schedule ({counts.schedule})</option>}
+            {(m365Enabled || counts.m365_intake > 0 || filter === 'm365_intake') && <option value="m365_intake">Microsoft 365 ({counts.m365_intake})</option>}
+          </select>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
             padding: "0 var(--workspace-space-12)", minHeight: 'var(--workspace-control-height)', order: -1, flexBasis: '100%',
@@ -207,7 +216,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', flexShrink: 0 }}>
+          <div className="automation-sort" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', flexShrink: 0 }}>
             <ArrowUpDown size={12} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
             <select
               aria-label="Sort automations"
