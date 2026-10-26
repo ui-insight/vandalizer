@@ -3,23 +3,27 @@ import { ChatPanel } from '../chat/ChatPanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useTeams } from '../../hooks/useTeams'
 
-const DRAFT_KEY = 'vandalizer:chat-draft:'
-
-/** Map-like draft store backed by sessionStorage; falls back to memory. */
-const sessionDrafts = (() => {
+/** Map-like per-scope store backed by sessionStorage; falls back to memory. */
+function sessionStore(prefix: string) {
   const memory = new Map<string, string>()
   return {
     get(scope: string): string | undefined {
-      try { return sessionStorage.getItem(DRAFT_KEY + scope) ?? undefined } catch { return memory.get(scope) }
+      try { return sessionStorage.getItem(prefix + scope) ?? undefined } catch { return memory.get(scope) }
     },
-    set(scope: string, draft: string) {
-      try { sessionStorage.setItem(DRAFT_KEY + scope, draft) } catch { memory.set(scope, draft) }
+    set(scope: string, value: string) {
+      try { sessionStorage.setItem(prefix + scope, value) } catch { memory.set(scope, value) }
     },
     delete(scope: string) {
-      try { sessionStorage.removeItem(DRAFT_KEY + scope) } catch { memory.delete(scope) }
+      try { sessionStorage.removeItem(prefix + scope) } catch { memory.delete(scope) }
     },
   }
-})()
+}
+
+const sessionDrafts = sessionStore('vandalizer:chat-draft:')
+// The conversation open in each scope. Web links and uploads attached before
+// sending live on that conversation, so reopening it on return restores them
+// along with the draft (#1014 item 50).
+const sessionConversations = sessionStore('vandalizer:chat-conversation:')
 
 export function AssistantTab() {
   const {
@@ -33,6 +37,7 @@ export function AssistantTab() {
     setVerificationCompletion,
     setWorkspaceMode,
     activeProjectUuid,
+    currentConversationUuid,
   } = useWorkspace()
   const { currentTeam, loading: teamsLoading, error: teamError, refreshTeams } = useTeams()
   const draftScope = `${currentTeam?.uuid ?? 'personal'}:${activeProjectUuid ?? 'home'}`
@@ -45,6 +50,16 @@ export function AssistantTab() {
   const lastLoadedRef = useRef<string | null>(null)
   const [resetKey, setResetKey] = useState(0)
 
+  // Remember the scope's conversation when the panel's conversation changes,
+  // not when the scope does: right after a scope switch the context still
+  // holds the previous scope's conversation until the old panel unmounts.
+  const lastConversationRef = useRef(currentConversationUuid)
+  useEffect(() => {
+    if (currentConversationUuid === lastConversationRef.current) return
+    lastConversationRef.current = currentConversationUuid
+    if (currentConversationUuid) sessionConversations.set(draftScope, currentConversationUuid)
+  }, [currentConversationUuid, draftScope])
+
   useEffect(() => {
     if (loadConversationId && loadConversationId !== lastLoadedRef.current) {
       lastLoadedRef.current = loadConversationId
@@ -52,10 +67,18 @@ export function AssistantTab() {
     }
   }, [loadConversationId, setLoadConversationId])
 
-  // When newChatSignal changes, force a remount of ChatPanel to reset it
+  // When newChatSignal changes, force a remount of ChatPanel to reset it.
+  // Compare with the signal seen at mount: the signal stays above zero after
+  // any earlier New Chat or scope switch, and remounting the Assistant (after
+  // leaving the workspace) is not a new chat — it must not wipe the draft.
+  const lastSignalRef = useRef(newChatSignal)
   useEffect(() => {
-    if (newChatSignal > 0) {
-      if (previousScope.current === draftScope) drafts.current.delete(draftScope)
+    if (newChatSignal !== lastSignalRef.current) {
+      lastSignalRef.current = newChatSignal
+      if (previousScope.current === draftScope) {
+        drafts.current.delete(draftScope)
+        sessionConversations.delete(draftScope)
+      }
       lastLoadedRef.current = null
       setResetKey(newChatSignal)
     }
@@ -90,7 +113,7 @@ export function AssistantTab() {
         workspaceLabel={currentTeam ? `Team: ${currentTeam.name}` : 'Personal workspace'}
         initialDraft={drafts.current.get(draftScope) ?? ''}
         onDraftChange={draft => { if (draft) drafts.current.set(draftScope, draft); else drafts.current.delete(draftScope) }}
-        conversationToLoad={lastLoadedRef.current}
+        conversationToLoad={lastLoadedRef.current ?? sessionConversations.get(draftScope) ?? null}
         pendingMessage={pendingChatMessage}
         onPendingMessageConsumed={clearPendingChatMessage}
       />
