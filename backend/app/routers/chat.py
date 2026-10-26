@@ -32,6 +32,7 @@ from app.schemas.chat import (
     ChatRequest,
     ClearContextRequest,
     CompactContextRequest,
+    MemoryPauseRequest,
     QueueMessageRequest,
     StopTurnRequest,
     TruncateContextRequest,
@@ -1089,6 +1090,23 @@ async def get_user_memory(
 
     team_id = str(user.current_team) if user.current_team else None
     return await user_memory_service.get_patterns(user.user_id, team_id)
+
+
+@router.put("/memory/paused")
+async def set_user_memory_paused(
+    req: MemoryPauseRequest,
+    user: User = Depends(get_current_user),
+):
+    """Turn assistant memory off or on for the current team scope.
+
+    While paused nothing new is recorded and the system prompt gets no
+    "Your patterns" block; what is already stored is kept.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    paused = await user_memory_service.set_paused(user.user_id, team_id, req.paused)
+    return {"paused": paused}
 
 
 @router.delete("/memory")

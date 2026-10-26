@@ -60,3 +60,7 @@ class QueueMessageRequest(BaseModel):
 
 class StopTurnRequest(BaseModel):
     conversation_uuid: str
+
+
+class MemoryPauseRequest(BaseModel):
+    paused: bool

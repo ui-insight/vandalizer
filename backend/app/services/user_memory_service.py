@@ -67,6 +67,8 @@ async def _record(
         return
     try:
         doc = await _get_or_create(user_id, team_id)
+        if doc.paused:
+            return
         bucket: dict = getattr(doc, field)
         entry = bucket.get(item_id) or {"title": title, "count": 0}
         entry["title"] = title or entry.get("title") or item_id
@@ -121,7 +123,7 @@ async def build_patterns_block(user_id: str, team_id: Optional[str]) -> str:
         UserMemory.user_id == user_id,
         UserMemory.team_id == team_id,
     )
-    if doc is None:
+    if doc is None or doc.paused:
         return ""
 
     cutoff = _utcnow() - datetime.timedelta(days=_RECENCY_CUTOFF_DAYS)
@@ -157,14 +159,28 @@ async def get_patterns(user_id: str, team_id: Optional[str]) -> dict:
         UserMemory.team_id == team_id,
     )
     if doc is None:
-        return {"extractions": [], "workflows": [], "kbs": []}
+        return {"extractions": [], "workflows": [], "kbs": [], "paused": False}
 
     cutoff = _utcnow() - datetime.timedelta(days=_RECENCY_CUTOFF_DAYS)
     return {
         "extractions": _top_recent(doc.extraction_runs, cutoff),
         "workflows": _top_recent(doc.workflow_runs, cutoff),
         "kbs": _top_recent(doc.kb_queries, cutoff),
+        "paused": doc.paused,
     }
+
+
+async def set_paused(user_id: str, team_id: Optional[str], paused: bool) -> bool:
+    """Turn memory off (or back on) for this (user, team) scope.
+
+    Pausing keeps what is already stored, so turning memory back on restores
+    it; clearing is the separate, destructive action.
+    """
+    doc = await _get_or_create(user_id, team_id)
+    doc.paused = paused
+    doc.updated_at = _utcnow()
+    await doc.save()
+    return doc.paused
 
 
 async def clear_memory(user_id: str, team_id: Optional[str]) -> bool:
@@ -175,5 +191,12 @@ async def clear_memory(user_id: str, team_id: Optional[str]) -> bool:
     )
     if doc is None:
         return False
+    removed = bool(doc.extraction_runs or doc.workflow_runs or doc.kb_queries)
+    if doc.paused:
+        # Clearing must not quietly turn memory back on.
+        doc.extraction_runs, doc.workflow_runs, doc.kb_queries = {}, {}, {}
+        doc.updated_at = _utcnow()
+        await doc.save()
+        return removed
     await doc.delete()
     return True

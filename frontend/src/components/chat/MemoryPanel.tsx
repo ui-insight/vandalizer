@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Brain, Loader2, Trash2 } from 'lucide-react'
-import { getUserMemory, clearUserMemory, type UserMemoryResponse, type MemoryItem } from '../../api/chat'
+import { getUserMemory, clearUserMemory, setUserMemoryPaused, type UserMemoryResponse, type MemoryItem } from '../../api/chat'
 import { useToast } from '../../contexts/ToastContext'
 
 /** Format an ISO timestamp as a short relative age ("3d ago", "2h ago"). */
@@ -54,7 +54,18 @@ export function MemoryPanel() {
   const [loading, setLoading] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [memory, setMemory] = useState<UserMemoryResponse | null>(null)
+  const [paused, setPaused] = useState(false)
+  const [savingPause, setSavingPause] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  // The button shows whether memory is on, so read the state before it opens.
+  useEffect(() => {
+    let cancelled = false
+    getUserMemory()
+      .then((m) => { if (!cancelled) setPaused(Boolean(m.paused)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // Close on outside click
   useEffect(() => {
@@ -69,7 +80,7 @@ export function MemoryPanel() {
   const load = () => {
     setLoading(true)
     getUserMemory()
-      .then(setMemory)
+      .then((m) => { setMemory(m); setPaused(Boolean(m.paused)) })
       .catch(() => toast('Could not load memory', 'error'))
       .finally(() => setLoading(false))
   }
@@ -78,6 +89,18 @@ export function MemoryPanel() {
     const next = !open
     setOpen(next)
     if (next) load()
+  }
+
+  const handlePauseToggle = () => {
+    const next = !paused
+    setSavingPause(true)
+    setUserMemoryPaused(next)
+      .then((res) => {
+        setPaused(res.paused)
+        toast(res.paused ? 'Memory turned off for this team' : 'Memory turned on for this team', 'success')
+      })
+      .catch(() => toast('Could not change memory setting', 'error'))
+      .finally(() => setSavingPause(false))
   }
 
   const handleClear = () => {
@@ -103,11 +126,12 @@ export function MemoryPanel() {
         onClick={handleToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="What the assistant remembers about you"
-        aria-label="Assistant memory: what the assistant remembers about you"
-        className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors"
+        title={paused ? 'Assistant memory is off' : 'Assistant memory is on: what the assistant remembers about you'}
+        aria-label={`Assistant memory: ${paused ? 'off' : 'on'}`}
+        className="flex items-center justify-center gap-1 rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors"
       >
-        <Brain className="h-4 w-4" />
+        <Brain className="h-4 w-4" style={paused ? { opacity: 0.55 } : undefined} />
+        {paused && <span aria-hidden="true" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>Off</span>}
       </button>
 
       {open && (
@@ -120,9 +144,24 @@ export function MemoryPanel() {
         >
           <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", borderBottom: '1px solid #f3f4f6' }}>
             <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1f2937' }}>What the assistant remembers</div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 'var(--workspace-space-2)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
               Habits it references to tailor suggestions. Scoped to your current team.
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#374151', cursor: savingPause ? 'default' : 'pointer' }}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={!paused}
+                disabled={savingPause}
+                onChange={handlePauseToggle}
+              />
+              {paused ? 'Memory is off' : 'Memory is on'}
+            </label>
+            {paused && (
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)', lineHeight: 1.5 }}>
+                Nothing new is recorded, and the assistant doesn't use what's listed below. Turning memory back on restores it.
+              </div>
+            )}
           </div>
 
           <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", maxHeight: 320, overflowY: 'auto' }}>

@@ -28,6 +28,10 @@ class UserMemory(Document):
     workflow_runs: dict[str, dict] = Field(default_factory=dict)
     kb_queries: dict[str, dict] = Field(default_factory=dict)
 
+    # The user turned memory off for this scope: nothing is recorded and the
+    # assistant gets no patterns block until they turn it back on.
+    paused: bool = False
+
     updated_at: datetime.datetime = Field(default_factory=_utcnow)
 
     class Settings:

@@ -270,10 +270,19 @@ export interface UserMemoryResponse {
   extractions: MemoryItem[]
   workflows: MemoryItem[]
   kbs: MemoryItem[]
+  /** Memory is turned off for this team: nothing recorded, nothing in the prompt. */
+  paused?: boolean
 }
 
 export function getUserMemory() {
   return apiFetch<UserMemoryResponse>('/api/chat/memory')
+}
+
+export function setUserMemoryPaused(paused: boolean) {
+  return apiFetch<{ paused: boolean }>('/api/chat/memory/paused', {
+    method: 'PUT',
+    body: JSON.stringify({ paused }),
+  })
 }
 
 export function clearUserMemory() {
