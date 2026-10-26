@@ -140,17 +140,25 @@ class CrossEncoder:
     def scores(self, query: str, passages: list[str]) -> list[float]:
         import numpy as np
 
-        out: list[float] = []
-        for start in range(0, len(passages), BATCH_SIZE):
-            batch = passages[start:start + BATCH_SIZE]
-            enc = self.tokenizer.encode_batch([(query, p[:MAX_PASSAGE_CHARS]) for p in batch])
+        # A batch is padded to its longest pair, so passages are batched
+        # shortest first and their scores put back in the order given: the
+        # padding is masked, so every score is the same as in any other
+        # order, and on knowledge-base candidates a quarter of the tokens
+        # scored were padding.
+        cut = [p[:MAX_PASSAGE_CHARS] for p in passages]
+        order = sorted(range(len(cut)), key=lambda i: len(cut[i]))
+        out: list[float] = [0.0] * len(cut)
+        for start in range(0, len(order), BATCH_SIZE):
+            batch = order[start:start + BATCH_SIZE]
+            enc = self.tokenizer.encode_batch([(query, cut[i]) for i in batch])
             feed = {"input_ids": np.array([e.ids for e in enc], dtype=np.int64)}
             if "attention_mask" in self.input_names:
                 feed["attention_mask"] = np.array([e.attention_mask for e in enc], dtype=np.int64)
             if "token_type_ids" in self.input_names:
                 feed["token_type_ids"] = np.array([e.type_ids for e in enc], dtype=np.int64)
             logits = self.session.run(None, feed)[0]
-            out.extend(float(v) for v in logits[:, 0])
+            for i, v in zip(batch, logits[:, 0]):
+                out[i] = float(v)
         return out
 
 

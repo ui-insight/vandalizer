@@ -759,6 +759,87 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
     return pool
 
 
+def paraphrase_pool(dm, kb_uuid: str, query: str, phrases: list[str], *, k: int,
+                    floor: float, min_score: Optional[float] = None) -> Optional[list[dict]]:
+    """The passages a question that kept nothing finds through paraphrases of
+    it in the base's own words (:mod:`app.services.kb_paraphrase`), or None
+    when precise retrieval cannot run here.
+
+    Each paraphrase is searched like the general lane of :func:`_precise_pool`
+    and its passages are scored against the paraphrase, so they must clear
+    the paraphrase cut (``min_score``, by default ``PARAPHRASE_MIN_SCORE``),
+    not the question's; a short query in the base's words ranks what it
+    finds near the top, so only its first ``RESCUE_RERANK_POOL`` candidates
+    are scored. A passage several paraphrases find keeps its best score; the
+    best ``k`` are handed over."""
+    from app.services import kb_retrieval as kr
+
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or not kr.ready():
+        return None
+    cut = kr.PARAPHRASE_MIN_SCORE if min_score is None else min_score
+    cache_key = (kb_uuid, index.revision, index.count, index.built_at, ("paraphrase", query, tuple(phrases), cut),
+                 k, floor)
+    hit = kr.cached(cache_key)
+    if hit is not None:
+        return hit
+    found: dict[str, dict] = {}
+    for phrase in phrases:
+        expanded = kr.expand(index, phrase)
+        lane = kr.candidates(dm, index, kb_uuid, expanded, floor=floor)[: kr.RESCUE_RERANK_POOL]
+        scored = kr.rerank(index, expanded, lane)
+        for r in kr.keep(scored, anchor_section=None, index=index, min_score=cut):
+            cid = str(r.get("chunk_id"))
+            if cid not in found or r["rerank_score"] > found[cid]["rerank_score"]:
+                found[cid] = r
+    best = sorted(found.values(), key=lambda r: -r["rerank_score"])[:k]
+    pool = attach_lead_ins(dm, kb_uuid, best)
+    kr.remember(cache_key, pool)
+    return pool
+
+
+def with_neighbours(dm, kb_uuid: str, query: str, pool: list[dict], *, k: int) -> list[dict]:
+    """``pool`` followed by the chunks either side of its passages — same
+    source, same section, not already handed over — that the cross-encoder
+    scores at least ``NEIGHBOUR_MIN_SCORE`` against ``query``, best first,
+    up to ``k`` passages in all.
+
+    A rule is often cut across chunks: the answer's last clause, the
+    exception after it or the list it introduces sits in the next chunk,
+    which scores below the relevance cut on its own. Its section has already
+    cleared that cut, so its neighbours are held to a lower one."""
+    from app.services import kb_retrieval as kr
+
+    if not pool or len(pool) >= k:
+        return pool
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or not kr.ready():
+        return pool
+    held: set[int] = set()
+    for r in pool:
+        for cid in (str(r.get("chunk_id")), *(r.get("_covers") or ())):
+            if cid in index.position:
+                held.add(index.position[cid])
+
+    def source(i: int):
+        return (index.chunks[i].get("metadata") or {}).get("source_id")
+
+    near: list[int] = []
+    for r in pool:
+        i = index.position.get(str(r.get("chunk_id")))
+        if i is None:
+            continue
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(index.chunks) and j not in held and j not in near \
+                    and index.keys[j] == index.keys[i] and source(j) == source(i) and j not in index.excluded:
+                near.append(j)
+    if not near:
+        return pool
+    scored = kr.rerank(index, kr.expand(index, query), [kr._chunk_result(index, j) for j in near])
+    added = [r for r in scored if r["rerank_score"] >= kr.NEIGHBOUR_MIN_SCORE][: k - len(pool)]
+    return pool + attach_lead_ins(dm, kb_uuid, added) if added else pool
+
+
 def precise_cut(dm, kb_uuid: str, query: str, results: list[dict]) -> Optional[list[dict]]:
     """Chunks another lane found — a source the message names, a passage
     that amends one retrieved — scored by the cross-encoder against

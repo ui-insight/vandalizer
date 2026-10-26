@@ -83,6 +83,35 @@ RRF_K = 60
 MIN_SCORE = -3.0
 WITHIN_TOP = 3.0
 OTHER_SECTION_WITHIN = 1.5
+# The cut for a passage scored against a paraphrase of the question in the
+# base's own words (app.services.kb_paraphrase) rather than the question. A
+# short search query is what the cross-encoder was trained on, and its scores
+# run several points higher for the same passage, so its cut is higher too.
+# On the development questions that keep nothing (2026-10-25), two
+# paraphrases at 0.5 let a passage through for one question in seven the base
+# cannot answer, and for answerable ones handed over a pool without the
+# answer for every 2.4 that held it — answered from as if it did. Four
+# paraphrases at 2.0 let none of the former through and halved the latter,
+# for 5% of the pools that held the answer.
+PARAPHRASE_MIN_SCORE = 2.0
+# The same for one part of a compound question (kb_paraphrase.part_pools).
+# A part is searched with one query, not four, so it has no others to make
+# up for what a higher cut drops: at 2.0 it lost a quarter of the answer
+# text the parts reached.
+PART_MIN_SCORE = 1.5
+# The fused candidates a paraphrase or part query has the cross-encoder read
+# (RERANK_POOL for the question itself). Every passage those queries kept on
+# the development questions was among their first 8; reading 30 tripled the
+# cost of a turn that falls back on them.
+RESCUE_RERANK_POOL = 8
+# The cut for the chunk either side of a passage handed over, in the same
+# section of the same source (kb_grounding.with_neighbours). The section has
+# already cleared the relevance cut; its next lines often hold the rest of
+# the answer or the exception to it. On the development questions this
+# reached 5 points more of the answer text and 3 more of its governing
+# context for 1.7 more passages per question; admitting every neighbour
+# added 0.9 more passages for almost nothing.
+NEIGHBOUR_MIN_SCORE = -5.0
 # Title routing: cosine of the expanded query to a section title, and its
 # lead over the best title of any other section (all-MiniLM-L6-v2 scale).
 ROUTE_MIN_SIMILARITY = 0.75
@@ -590,12 +619,13 @@ def rerank(index: KbIndex, expanded: str, results: list[dict]) -> list[dict]:
     return sorted(results, key=lambda r: -r["rerank_score"])
 
 
-def keep(scored: list[dict], *, anchor_section: Optional[str], index: KbIndex, top: Optional[float] = None) -> list[dict]:
+def keep(scored: list[dict], *, anchor_section: Optional[str], index: KbIndex, top: Optional[float] = None,
+         min_score: float = MIN_SCORE) -> list[dict]:
     """The relevance cut over reranked results (best first)."""
     if not scored:
         return []
     top = scored[0]["rerank_score"] if top is None else top
-    kept = [r for r in scored if r["rerank_score"] >= MIN_SCORE and r["rerank_score"] >= top - WITHIN_TOP]
+    kept = [r for r in scored if r["rerank_score"] >= min_score and r["rerank_score"] >= top - WITHIN_TOP]
     if not kept:
         return []
     # The section of the first passage handed over (a section the query named

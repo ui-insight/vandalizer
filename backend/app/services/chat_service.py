@@ -3036,6 +3036,12 @@ def _recent_turns(
     return turns[-max_turns:]
 
 
+def _previous_question(recent: list[tuple[str, str]]) -> Optional[str]:
+    """The last user turn of ``recent`` (:func:`_recent_turns`): the question
+    a follow-up follows."""
+    return next((text for role, text in reversed(recent) if role == "user" and text.strip()), None)
+
+
 _MANIFEST_MAX_ENTRIES = 60
 _MANIFEST_MAX_CHARS = 3000
 
@@ -3796,6 +3802,7 @@ async def _retrieve_kb_results(
     # search query using recent turns; the raw message still drives the answer
     # prompt and rerank scoring.
     retrieval_query: Optional[str] = None
+    previous_question: Optional[str] = None
     if history and _looks_anaphoric(message):
         recent = _recent_turns(history)
         if recent:
@@ -3803,6 +3810,7 @@ async def _retrieve_kb_results(
                 message, recent, model_name,
             )
             retrieval_query = _keep_own_terms(message, retrieval_query)
+            previous_question = _previous_question(recent)
 
     # Honour the KB's tuned retrieval knobs (k, min_similarity, query
     # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
@@ -3822,21 +3830,51 @@ async def _retrieve_kb_results(
     # cross-encoder and kept only above its relevance cut, so a question the
     # base cannot answer hands over nothing rather than the nearest text. It
     # has its own section and identifier lanes, so chat's pins are not added
-    # on top. None when it cannot run here (store, reranker or setting): the
-    # tuned vector pipeline below stands.
-    from app.services import kb_grounding, kb_retrieval
+    # on top. A question that keeps nothing is asked again in the base's own
+    # words (kb_paraphrase). None when it cannot run here (store, reranker or
+    # setting): the tuned vector pipeline below stands.
+    from app.services import kb_grounding, kb_paraphrase, kb_retrieval
     from app.services.document_manager import get_document_manager
 
     rag_cfg = await resolve_kb_rag_config(kb_uuid)
+    precise_queries = sub_questions or [retrieval_query or message]
+    # A follow-up is also searched with the question it follows, the second
+    # pool after the condensed one. The condensed query is one model call's
+    # reading of the conversation and differs from call to call; the earlier
+    # question's passages are what the answer being followed up rests on,
+    # and often hold the rule the follow-up turns on (a second extension
+    # after "the one-time extension"). On the KB accuracy eval's development
+    # follow-ups this raised answer recall from 0.74 to 0.82 and the
+    # governing context reached from 0.56 to 0.73, and the same follow-up
+    # retrieved the same answer text from run to run more often.
+    if previous_question and previous_question not in precise_queries:
+        precise_queries = precise_queries + [previous_question]
     precise_pools: list = []
     if kb_retrieval.enabled():
         dm = get_document_manager()
+        # A question that asks several things is also searched part by part
+        # (kb_paraphrase): searched whole, it hands over the passages of
+        # whichever part scores best. The split is asked for while the
+        # question itself is searched. A multi-KB question that does not read
+        # as compound is not split: on the development questions its parts
+        # never reached answer text the question had not.
+        asked = retrieval_query or message
+        split = (
+            asyncio.ensure_future(kb_paraphrase.parts(asked, model_name))
+            if kb_paraphrase.looks_compound(asked) else None
+        )
         precise_pools = await asyncio.gather(*[
-            asyncio.to_thread(
-                kb_grounding._precise_pool, dm, kb_uuid, q, k=rag_cfg.k, floor=rag_cfg.min_similarity,
+            kb_paraphrase.precise_pool(
+                dm, kb_uuid, q, k=rag_cfg.k, floor=rag_cfg.min_similarity, model_name=model_name,
             )
-            for q in (sub_questions or [retrieval_query or message])
+            for q in precise_queries
         ])
+        if split is not None:
+            parts = await split
+            if parts and all(pool is not None for pool in precise_pools):
+                precise_pools = list(precise_pools) + await kb_paraphrase.part_pools(
+                    dm, kb_uuid, asked, parts, k=rag_cfg.k, floor=rag_cfg.min_similarity,
+                )
     precise = bool(precise_pools) and all(pool is not None for pool in precise_pools)
 
     pinned_results: list[dict] = []

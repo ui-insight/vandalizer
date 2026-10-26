@@ -268,7 +268,8 @@ CONDENSE_QUERY_SYSTEM_PROMPT = (
     "You rewrite the final message of a conversation as a standalone search "
     "query. Resolve pronouns and references ('it', 'that section', 'the "
     "second one') using the conversation. Keep every distinctive term — "
-    "names, filenames, numbers, dates. Output ONLY the rewritten query: no "
+    "names, filenames, numbers, dates. Keep acronyms and abbreviations exactly "
+    "as written; never spell one out. Output ONLY the rewritten query: no "
     "prose, no quotes, no explanation."
 )
 

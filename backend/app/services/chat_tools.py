@@ -685,7 +685,7 @@ async def search_knowledge_base(
     # Autovalidate-tuned knobs (k, min_similarity floor, query rewriting,
     # rerank) apply on the agentic path too. A raw top-k vector query here
     # would silently skip the relevance floor the platform advertises.
-    from app.services import kb_grounding, kb_lead_in, kb_retrieval
+    from app.services import kb_grounding, kb_lead_in, kb_paraphrase, kb_retrieval
     from app.services.document_manager import get_document_manager
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
@@ -697,14 +697,16 @@ async def search_knowledge_base(
         await _ensure_system_config_loaded()
         # Precise retrieval first, as in classic chat and workflow grounding:
         # cross-encoder-ranked and cut, so a query the base cannot answer
-        # returns nothing rather than the nearest text. None when it cannot
-        # run here; then the tuned vector pipeline answers.
+        # returns nothing rather than the nearest text; a query that keeps
+        # nothing is asked again in the base's own words, as the pre-fetch
+        # does. None when it cannot run here; then the tuned vector pipeline
+        # answers.
         rag_cfg = await resolve_kb_rag_config(uuid)
         results = None
         if kb_retrieval.enabled():
-            results = await asyncio.to_thread(
-                kb_grounding._precise_pool, get_document_manager(), uuid, query,
-                k=rag_cfg.k, floor=rag_cfg.min_similarity,
+            results = await kb_paraphrase.precise_pool(
+                get_document_manager(), uuid, query,
+                k=rag_cfg.k, floor=rag_cfg.min_similarity, model_name=context.deps.model_name,
             )
         if results is None:
             results, rag_cfg, _ = await retrieve_kb_chunks(

@@ -75,8 +75,111 @@ async def test_chat_uses_precise_retrieval_and_cites_sections(precise_on, monkey
 @pytest.mark.asyncio
 async def test_a_question_the_base_cannot_answer_gets_no_snippets(precise_on, monkeypatch):
     monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    asked = AsyncMock(return_value=[])
+    monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", asked)
     segment, sources = await _segment("Can grant funds buy beer for a lab party?", _patched())
     assert segment is None and sources == []
+    # Asked again in the base's own words, which found nothing either.
+    asked.assert_awaited_once_with("Can grant funds buy beer for a lab party?", "test-model")
+
+
+@pytest.mark.asyncio
+async def test_a_question_that_keeps_nothing_gets_what_its_paraphrase_finds(precise_on, monkeypatch):
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    monkeypatch.setattr("app.services.kb_paraphrase.paraphrases",
+                        AsyncMock(return_value=["revision of budget and program plans"]))
+    found = MagicMock(return_value=[_section_chunk(4, 1)])
+    monkeypatch.setattr(kb_grounding, "paraphrase_pool", found)
+    _, sources = await _segment("We want to move money between budget lines. Is that ok?", _patched())
+    assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1"]
+    assert found.call_args.args[3] == ["revision of budget and program plans"]
+
+
+@pytest.mark.asyncio
+async def test_a_follow_up_is_searched_with_the_question_it_follows(precise_on, monkeypatch):
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
+    pools = {
+        "second no-cost extension after the one-time extension": [_section_chunk(6, 2)],
+        "How long is the one-time no-cost extension we can take ourselves?": [_section_chunk(5, 1)],
+    }
+    asked: list[str] = []
+
+    def pool(dm, kb, q, k, floor):
+        asked.append(q)
+        return list(pools.get(q, []))
+
+    monkeypatch.setattr(kb_grounding, "_precise_pool", pool)
+    history = [
+        ModelRequest(parts=[UserPromptPart(content="How long is the one-time no-cost extension we can take ourselves?")]),
+        ModelResponse(parts=[TextPart(content="Up to 12 months.")]),
+    ]
+    mocks = _patched(**{
+        "app.services.kb_validation_service.condense_retrieval_query":
+            AsyncMock(return_value=("second no-cost extension after the one-time extension", 0)),
+    })
+    patches = [patch(target, new=mock) for target, mock in mocks.items()]
+    for p in patches:
+        p.start()
+    try:
+        _, sources = await chat_service._build_kb_segment(
+            "kb-1", "We already used it. Can we get a second extension?", "test-model", history=history,
+        )
+    finally:
+        for p in patches:
+            p.stop()
+    assert asked == list(pools)
+    # The condensed query's passages first, then the earlier question's.
+    assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 2", f"{SOURCE} · § 200.308 · part 1"]
+
+
+@pytest.mark.asyncio
+async def test_each_part_of_a_compound_question_is_searched(precise_on, monkeypatch):
+    message = "Can we rebudget into equipment, and who approves the extension?"
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [_section_chunk(4, 1)])
+    split = AsyncMock(return_value=["rebudgeting into equipment", "approval of a no-cost extension"])
+    monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
+    found = {"rebudgeting into equipment": [_section_chunk(4, 1)],
+             "approval of a no-cost extension": [_section_chunk(7, 2, section="200.309")]}
+    cuts: list = []
+    monkeypatch.setattr(kb_grounding, "paraphrase_pool",
+                        lambda dm, kb, q, phrases, k, floor, min_score=None:
+                        cuts.append(min_score) or list(found[phrases[0]]))
+    _, sources = await _segment(message, _patched())
+    split.assert_awaited_once_with(message, "test-model")
+    # Each part is held to the part cut, not the paraphrase cut.
+    assert cuts == [kb_retrieval.PART_MIN_SCORE] * 2
+    # The question's own passage, then the part the whole question missed.
+    assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1", f"{SOURCE} · § 200.309 · part 2"]
+
+
+@pytest.mark.asyncio
+async def test_a_question_asking_one_thing_is_not_split(precise_on, monkeypatch):
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [_section_chunk(4, 1)])
+    split = AsyncMock(return_value=[])
+    monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
+    await _segment("Do we need prior approval to rebudget into equipment?", _patched())
+    split.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_multi_kb_question_asking_one_thing_is_not_split(precise_on, monkeypatch):
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", AsyncMock(return_value=[]))
+    split = AsyncMock(return_value=["rebudgeting into equipment", "approval of a no-cost extension"])
+    monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
+    patches = [patch(target, new=mock) for target, mock in _patched().items()]
+    for p in patches:
+        p.start()
+    try:
+        await chat_service._build_multi_kb_segment(
+            [("kb-1", "Uniform Guidance"), ("kb-2", "UI policy")],
+            "Do we need prior approval to rebudget into equipment?", "test-model",
+        )
+    finally:
+        for p in patches:
+            p.stop()
+    split.assert_not_awaited()
 
 
 @pytest.mark.asyncio

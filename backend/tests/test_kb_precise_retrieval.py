@@ -642,3 +642,33 @@ class TestModelFiles:
         assert ce.get_cross_encoder() is None
         assert ce.get_cross_encoder() is None
         assert attempts.call_count == 1
+
+
+class TestScorer:
+    """The scorer batches pairs shortest first, so a short passage is not
+    padded to a long one, and hands the scores back in the order given."""
+
+    class _Tokenizer:
+        def encode_batch(self, pairs):
+            lens = [len(q.split()) + len(p.split()) for q, p in pairs]
+            width = max(lens)
+            return [MagicMock(ids=[1] * n + [0] * (width - n), attention_mask=[1] * n + [0] * (width - n),
+                              type_ids=[0] * width) for n in lens]
+
+    class _Session:
+        """The score of a pair is its unpadded length."""
+
+        def __init__(self):
+            self.widths = []
+
+        def run(self, _outputs, feed):
+            self.widths.append(feed["input_ids"].shape[1])
+            return [feed["attention_mask"].sum(axis=1, keepdims=True).astype(np.float32)]
+
+    def test_scores_come_back_in_the_order_given(self, monkeypatch):
+        monkeypatch.setattr(ce, "BATCH_SIZE", 2)
+        scorer = ce.CrossEncoder.__new__(ce.CrossEncoder)
+        scorer.tokenizer, scorer.session = self._Tokenizer(), self._Session()
+        scorer.input_names = {"input_ids", "attention_mask", "token_type_ids"}
+        assert scorer.scores("q", ["a b c d e f", "a", "a b c", "a b", "a b c d e"]) == [7.0, 2.0, 4.0, 3.0, 6.0]
+        assert scorer.session.widths == [3, 6, 7]
