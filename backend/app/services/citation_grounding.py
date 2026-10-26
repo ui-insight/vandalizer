@@ -75,8 +75,14 @@ _STOPWORDS = frozenset("""
 """.split())
 
 
+# Every Unicode hyphen and dash reads as "-". gpt-oss writes "direct‑cost"
+# with U+2011 (non-breaking hyphen) where the page has "direct-cost", and a
+# quoted phrase with one failed to match its own page (#1005 run 2).
+_DASHES = str.maketrans({c: "-" for c in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"})
+
+
 def _norm(text: str) -> str:
-    text = text.lower().replace("’", "'").replace("–", "-").replace("—", "-")
+    text = text.lower().replace("’", "'").translate(_DASHES)
     text = re.sub(r"[*_`#>|]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 

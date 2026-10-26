@@ -46,6 +46,11 @@ class TestSupportedCitations:
         "The notice doesn’t say whether PIs must be citizens (p. 1).",
         "The notice does not specify a page limit for the budget justification (p. 4).",
         "The sponsor deadline is 5 p.m. Pacific on November 12 (p. 2).",
+        # gpt-oss's typography (#1005 run 2): a non-breaking hyphen (U+2011)
+        # inside a quoted phrase and narrow no-break spaces (U+202F). The
+        # page says "direct-cost" with an ASCII hyphen.
+        "The \u201cmaximum direct\u2011cost request\u201d is $180,000 (p.\u202f3).",
+        "The direct\u2011cost cap is\u202f$180,000 (p. 3).",
     ])
     def test_a_claim_the_page_supports_is_found(self, answer):
         assert _chip(answer)["grounding"] == "found"
@@ -66,6 +71,7 @@ class TestUnsupportedCitations:
         # The RA test set's missing-page-limit case: the notice sets none.
         ("The budget justification is limited to 3 pages (p. 4).", "an invented limit"),
         ("The letter of support must be signed by the dean (p. 4).", "an invented signatory"),
+        ("The \u201cmaximum indirect\u2011cost request\u201d is $180,000 (p. 3).", "a quote the page doesn't contain, in gpt-oss typography"),
     ])
     def test_a_claim_the_page_does_not_support_is_not_found(self, answer, why):
         chip = _chip(answer)
