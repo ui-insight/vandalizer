@@ -90,3 +90,31 @@ The first draft of this note predicted PASS for the two sum rules. That was wron
 - **Bare page references in multi-document answers get no chip** (4 of 12), #1058. This needs a prompt rule asking for the file name with every page, or attribution by the nearest file name the answer mentions.
 - **Page numbers written in KB answers are unchecked** (#1058) (project-period (b) cites p. 3 for p. 1).
 - **Repeat for stability** once the dash fix (f16d289d) is deployed, and include the catalog workflows for path (c).
+
+## Run 3: the fixes, deployed (same day)
+
+Dev was redeployed at `v4.15.0-466-g67fbb37a`, which includes #1057, #1058 and f16d289d, with catalog 1.3.13 applied. The run used the same account, files, KB and model (`openai/gpt-oss-120b`).
+
+**Path (c): Budget Analyzer, run `deaae2f0`. Now a pass.**
+- **Extraction:** all 8 figures in the draft were read (2 in run 2): Personnel $120,000, Travel, Supplies, Subaward, Equipment $0, Total Direct Costs $200,000, Indirect $50,000, Total Project Cost $250,000.
+- **Rate:** left empty rather than derived, since the draft states none.
+- **Rule checks:**
+  - both sums **pass**;
+  - rate × base and the base exclusions are `unparseable`, correctly, because no base is stated.
+- **Answer:** the analysis says the direct costs add up ($200,000, PASS) and the total adds up ($250,000, PASS), and marks the indirect calculation NOT CHECKED.
+
+**Chat, 24 turns**
+- **Chips:** 12 of 12 attached answers had chips (8 in run 2).
+  - The model named the file every time, so the content-based fallback never fired.
+  - budget-arithmetic's chip, the run-2 false alarm, is now **found**.
+  - 7 chips were not found:
+    - **4 correct catches.** A notice figure on p. 3 cited as p. 4: direct-cost cap, budget-exception, missing-exception, indirect-rate. The run 2 answers made the same mistake.
+    - **1 strict but arguable** (deadline-amended): the sentence carries the amendment's and draft's dates, which the cited notice page doesn't have.
+    - **2 in indirect-rate** not yet examined.
+- **Regressions found and fixed in 94cb3332:**
+  - **Document IDs in the text.** One answer in 24 cited a document's ID beside its name; the page note now asks for "its file name (never its UUID)".
+  - **Raw snippet numbers.** 7 of 12 KB answers left "(S1)" or "[**S1**]" unexpanded, so the reader saw raw snippet numbers. Both forms are now expanded.
+  - **Wrong page on a summary sentence.** project-period (b) still cited the draft as p. 3. The citation closed a summary sentence with nothing to locate, so the question-matched page stood. Such a citation now shows the chunk's full range (p. 1–3).
+- **Silence answers**
+  - missing-page-limit: (a) passes; (b) reads "may be any length" again, and the warning fired.
+  - missing-eligibility: partial both ways. (a) was flagged. (b) concluded under a "**Conclusion:**" label two sentences after the silence statement and was not flagged. **Fixed in 4fa41208.** On all 24 run-3 answers, the new rule flags exactly that one and no others.
