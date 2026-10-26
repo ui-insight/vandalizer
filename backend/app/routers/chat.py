@@ -221,6 +221,7 @@ async def chat(
             user_id=user_id,
             team_id=team_id,
             conversation_id=conversation.uuid,
+            project_uuid=body.project_uuid,
         )
 
         # Always set a placeholder title from the first message so the rail
@@ -240,6 +241,10 @@ async def chat(
         activity = await _get_authorized_activity(activity_id, user)
         activity.status = ActivityStatus.RUNNING.value
         activity.last_updated_at = datetime.now(timezone.utc)
+        # A conversation opened by attaching a file or link has no project
+        # until its first message names one (authorized above).
+        if body.project_uuid and not activity.project_uuid:
+            activity.project_uuid = body.project_uuid
         await activity.save()
         conversation = await ChatConversation.find_one(
             ChatConversation.uuid == activity.conversation_id,

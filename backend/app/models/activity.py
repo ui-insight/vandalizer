@@ -30,6 +30,10 @@ class ActivityEvent(Document):
 
     user_id: str
     team_id: Optional[str] = None
+    # The project the work was done in, so Home can say which proposal or
+    # award a continuation row belongs to (#1014 item 30). Set from the
+    # chat's project scope; None for unscoped work and older events.
+    project_uuid: Optional[str] = None
 
     started_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)

@@ -269,6 +269,13 @@ describe('ReturningHome', () => {
     expect(screen.getByRole('button', { name: 'View progress: Budget review workflow' })).toBeInTheDocument()
   })
 
+  it('names the project a continuation row belongs to (#1014 item 30)', () => {
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
+      onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}
+      status={{ ...baseStatus, recent_activity: [{ ...baseStatus.recent_activity[0], project_title: 'NSF CAREER 2027' }] }} suggestionPills={[]} />)
+    expect(screen.getByText(/^NSF CAREER 2027 · /)).toBeInTheDocument()
+  })
+
   it('leaves the composer as the one way to start once there is work (#1014 items 40-41)', () => {
     render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()} onAttachFiles={vi.fn()}
       onChooseKnowledgeBase={vi.fn()} onFocusComposer={vi.fn()} onSendMessage={vi.fn()} onOpenActivity={vi.fn()}

@@ -49,6 +49,7 @@ async def activity_start(
     tags: Optional[list[str]] = None,
     document_uuids: Optional[list[str]] = None,
     source_conversation_id: Optional[str] = None,
+    project_uuid: Optional[str] = None,
 ) -> ActivityEvent:
     now = datetime.now(timezone.utc)
     ev = ActivityEvent(
@@ -65,6 +66,7 @@ async def activity_start(
         tags=tags or [],
         document_titles=await document_titles_for(document_uuids),
         source_conversation_id=source_conversation_id,
+        project_uuid=project_uuid,
         started_at=now,
         last_updated_at=now,
     )

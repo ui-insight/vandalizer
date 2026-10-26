@@ -72,6 +72,8 @@ export interface RecentActivityItem {
   item_kind?: string | null
   item_id?: string | null
   pending_review?: boolean
+  /** The project the work was done in, when the viewer can open it. */
+  project_title?: string | null
 }
 
 export interface ActiveAlertItem {

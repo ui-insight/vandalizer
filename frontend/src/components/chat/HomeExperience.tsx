@@ -446,7 +446,7 @@ export function ReturningHome({ embedded, orgName, brandIcon, disabled, onRunDem
     const label = item.pending_review ? 'Review submission' : item.type === 'conversation' ? 'Continue chat' : item.status === 'failed' ? 'Inspect failed run' : item.status === 'canceled' ? 'View canceled run' : ['running', 'queued'].includes(item.status) ? 'View progress' : item.status === 'completed' ? 'Open results' : 'View details'
     return <li key={item.id}>
       <Icon size={18} aria-hidden="true" />
-      <div><strong>{item.title}</strong><p>{activityLabel(item)}{item.relative_time ? ` · ${item.relative_time}` : ''}</p></div>
+      <div><strong>{item.title}</strong><p>{item.project_title ? `${item.project_title} · ` : ''}{activityLabel(item)}{item.relative_time ? ` · ${item.relative_time}` : ''}</p></div>
       <button type="button" className="home-text-action" onClick={() => onOpenActivity(item.id)} aria-label={`${label}: ${item.title}`}>{label}</button>
     </li>
   }

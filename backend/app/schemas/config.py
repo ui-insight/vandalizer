@@ -68,6 +68,8 @@ class RecentActivityItem(BaseModel):
     item_kind: Optional[str] = None
     item_id: Optional[str] = None
     pending_review: bool = False
+    # Title of the project the work was done in, when the viewer can open it.
+    project_title: Optional[str] = None
 
 
 class ActiveAlertItem(BaseModel):

@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -40,6 +41,7 @@ from app.services.version_service import get_current_version
 
 from app.services.home_alerts import ReviewAlertRequest
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -492,6 +494,26 @@ def _generate_action_pills(
     return pills[:4]
 
 
+async def _activity_project_titles(events: list, user: User) -> dict[str, str]:
+    """Title of each event's project, for projects the viewer can still open.
+
+    A project the viewer lost access to (or that was deleted) is left out,
+    so a continuation row never names a project they can't see.
+    """
+    from app.services import project_service
+
+    titles: dict[str, str] = {}
+    for project_uuid in {getattr(ev, "project_uuid", None) for ev in events} - {None, ""}:
+        try:
+            project = await project_service.get_authorized_project(project_uuid, user)
+        except Exception:
+            logger.warning("Could not resolve project %s for a Home activity row", project_uuid)
+            project = None
+        if project:
+            titles[project_uuid] = project.title or "Untitled project"
+    return titles
+
+
 @router.get("/onboarding-status", response_model=OnboardingStatusResponse)
 async def get_onboarding_status(user: User = Depends(get_current_user)):
     uid = user.user_id
@@ -599,6 +621,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
     # Format recent activity for frontend briefing
     from app.services.chat_service import _relative_time
 
+    project_titles = await _activity_project_titles(recent_activities[:3], user)
     recent_activity_items = [
         RecentActivityItem(
             id=str(ev.id),
@@ -609,6 +632,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
             item_kind="search_set" if ev.search_set_uuid else "workflow" if ev.workflow else None,
             item_id=ev.search_set_uuid or (str(ev.workflow) if ev.workflow else None),
             pending_review=bool((ev.meta_summary or {}).get("pending_review_uuid")),
+            project_title=project_titles.get(getattr(ev, "project_uuid", None) or ""),
         )
         for ev in recent_activities[:3]
     ]
