@@ -118,3 +118,21 @@ Dev was redeployed at `v4.15.0-466-g67fbb37a`, which includes #1057, #1058 and f
 - **Silence answers**
   - missing-page-limit: (a) passes; (b) reads "may be any length" again, and the warning fired.
   - missing-eligibility: partial both ways. (a) was flagged. (b) concluded under a "**Conclusion:**" label two sentences after the silence statement and was not flagged. **Fixed in 4fa41208.** On all 24 run-3 answers, the new rule flags exactly that one and no others.
+
+## Run 4: run 3's fixes, deployed (same day)
+
+Build `v4.15.0-469-g8a0f51eb`, same setup, 24 turns.
+
+**Fixes confirmed:**
+- **No document IDs and no raw "(S1)"/"[**S1**]" in any of the 24 answers.**
+- **KB page labels:** project-period (b) now cites the draft at p. 1 (p. 3 in runs 2 and 3), and the direct-cost cap at the notice's p. 3. A claim that can't be placed on one page shows the chunk's range (e.g. "p. 1–3") instead of a guessed page.
+- **Silence answers:** both missing-eligibility answers report the gap without reading permission into it, so both pass. missing-page-limit (a) passes; (b) said "may be any length" again and was flagged. No other answer was flagged.
+
+**Chips:** 12 of 12 attached answers had chips. 7 were not found:
+- **4 genuine catches.** The model cited the notice's p. 4 for text on p. 3: direct-cost-cap, budget-exception, indirect-rate and missing-exception.
+- **3 false alarms, fixed in this commit:**
+  - A semicolon-separated pair attributed page 1 to the wrong file.
+  - "$50,000 ÷ $200,000 = 25%" failed because the page states only the amounts.
+  - "The proposal draft does not include…" counted the document's own name as page content.
+
+Re-grading all 12 attached answers from this run with the fix: the 3 false alarms are found, and the 4 genuine catches are still not found.

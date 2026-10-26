@@ -278,6 +278,12 @@ def _cited_document(text: str, ref: tuple[int, int], named: list[tuple[list[str]
                     break
                 depth -= 1
         right = right[:close_at] if close_at >= 0 else right
+        # "(sponsor-amendment.pdf, p. 1; sponsor-notice.pdf, p. 2)" is two
+        # citations: each page looks only within its own part. Otherwise
+        # "p. 1" can take the name after the semicolon (#1005 run 4).
+        left = left[left.rfind(";") + 1:]
+        semi = right.find(";")
+        right = right[:semi] if semi >= 0 else right
     left_n, right_n = left.translate(_DASHES).lower(), right.translate(_DASHES).lower()
     best, best_distance = None, None
     for variants, doc in named:
@@ -408,7 +414,7 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
             other[0] for other in (page_text(*k) for k in alongside.get((doc_uuid, page), ()))
             if other
         )
-        grounding, passage = ground_citation(text, spans, own_text, _PAGE_REF_RE, joint)
+        grounding, passage = ground_citation(text, spans, own_text, _PAGE_REF_RE, joint, title=doc.title or "")
         citations.append({
             "document_uuid": doc.uuid,
             "document_title": doc.title,

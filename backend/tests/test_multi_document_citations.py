@@ -155,3 +155,34 @@ class TestWrongCitationsAreStillCaught:
 ])
 def test_fullwidth_citation_markup_is_rewritten(raw, expected):
     assert normalize_citation_markup(raw) == expected
+
+
+class TestRun4FalseAlarms:
+    """#1005 run 4 (gpt-oss-120b on the deployed build): three correct
+    citations marked "not found", verbatim, and the errors the fixes must
+    still catch."""
+
+    def test_semicolon_separated_citations_keep_their_own_files(self):
+        answer = (
+            "- No. The amendment states that while the sponsor deadline moved to November 19 2026, "
+            "**the institutional review deadline stays the same**—November 9 2026 at noon Pacific Time "
+            "(sponsor-amendment.pdf, p. 1; sponsor-notice.pdf, p. 2)."
+        )
+        assert _chips(answer, "notice", "amend") == [("amend", 1, "found"), ("notice", 2, "found")]
+
+    def test_a_percentage_worked_out_from_the_pages_amounts_is_found(self):
+        answer = "- **Indirect‑cost rate used:** $50,000 ÷ $200,000 = 25% **(proposal‑draft.pdf, p. 2).**"
+        assert _chips(answer, "notice", "prop") == [("prop", 2, "found")]
+
+    def test_naming_the_document_is_not_a_claim_about_its_page(self):
+        answer = "- The proposal draft does not include any documented sponsor exception (p. 3, proposal-draft.pdf)."
+        assert _chips(answer, "notice", "prop") == [("prop", 3, "found")]
+
+    @pytest.mark.parametrize("answer,why", [
+        ("The rate is $50,000 ÷ $200,000 = 30% (proposal-draft.pdf, p. 2).", "a wrongly worked percentage"),
+        ("The draft applies a 25% indirect rate (proposal-draft.pdf, p. 2).", "a percentage with nothing on the page to derive it from"),
+        ("The cap is $180,000 (sponsor-amendment.pdf, p. 1; sponsor-notice.pdf, p. 3).", "the amendment states no cap"),
+    ])
+    def test_the_errors_are_still_caught(self, answer, why):
+        chips = _chips(answer, "notice", "prop", "amend")
+        assert any(g == "not_found" for _d, _p, g in chips), why

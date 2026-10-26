@@ -115,12 +115,20 @@ def _missing_anchors(claim: str, page: str) -> tuple[int, int]:
     total = missing = 0
 
     page_money, page_pct = set(_money_values(page)), set(_percent_values(page))
-    for value in _money_values(claim):
+    claim_money = set(_money_values(claim))
+    for value in claim_money:
         total += 1
         missing += value not in page_money
+    # A percentage the answer worked out from two amounts the page states
+    # ("$50,000 ÷ $200,000 = 25%") is supported by those amounts, not missing
+    # from the page (#1005 run 4).
+    stated = claim_money & page_money
+    derived = {
+        round(100 * a / b, 4) for a in stated for b in stated if b and a != b
+    }
     for value in _percent_values(claim):
         total += 1
-        missing += value not in page_pct
+        missing += value not in page_pct and not any(abs(value - d) <= 0.5 for d in derived)
 
     page_dates = _dates(page)
     for date in _dates(claim):
@@ -138,13 +146,20 @@ def _missing_anchors(claim: str, page: str) -> tuple[int, int]:
     return total, missing
 
 
-def _judge(claim: str, page: str) -> str:
+def _judge(claim: str, page: str, title: str = "") -> str:
     anchors, missing = _missing_anchors(claim, page)
     if missing:
         return NOT_FOUND
     if anchors:
         return FOUND
+    # Naming the document ("the proposal draft does not include …") says
+    # which page, not what is on it (#1005 run 4).
+    # Only when enough remains to judge: "the notice doesn't mention
+    # citizenship" still checks "notice" against the notice's page.
     words = _content_stems(claim)
+    without_title = words - _content_stems(title.replace("-", " ").replace("_", " "))
+    if len(without_title) >= _MIN_CONTENT_WORDS:
+        words = without_title
     if len(words) < _MIN_CONTENT_WORDS:
         return UNCHECKED
     page_words = _content_stems(page)
@@ -265,6 +280,7 @@ def ground_citation(
     page_text: str,
     page_ref_re: re.Pattern,
     joint_text: str = "",
+    title: str = "",
 ) -> tuple[str, str | None]:
     """Whether the page references at *refs* (start, end) are supported by *page_text*.
 
@@ -279,9 +295,9 @@ def ground_citation(
     claims = [c for c in (_claim_for_ref(answer, r, page_ref_re) for r in refs) if c]
     verdicts = []
     for claim in claims:
-        verdict = _judge(claim, page_text)
+        verdict = _judge(claim, page_text, title)
         if verdict == NOT_FOUND and joint_text and _contributes(claim, page_text):
-            verdict = _judge(claim, page_text + "\n" + joint_text)
+            verdict = _judge(claim, page_text + "\n" + joint_text, title)
         verdicts.append(verdict)
     if FOUND in verdicts:
         supported = [c for c, v in zip(claims, verdicts) if v == FOUND]
