@@ -3,8 +3,9 @@ import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
+import { Plus, HelpCircle, MoreHorizontal, Copy, Pin, PinOff } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
+import { MAX_HOME_PINS, useHomePinnedProjects } from '../../hooks/useHomePinnedProjects'
 import { useToast } from '../../contexts/ToastContext'
 import { PROJECT_STATES } from '../../types/project'
 import type { Project, ProjectState } from '../../types/project'
@@ -26,6 +27,7 @@ export function ProjectsPanel() {
   const visibleRef = useRef(visible)
   visibleRef.current = visible
   const { projects, loading, error, refresh, create, duplicate } = useProjects()
+  const { isPinned, togglePin } = useHomePinnedProjects()
   const { toast } = useToast()
   const [newName, setNewName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
@@ -201,7 +203,7 @@ export function ProjectsPanel() {
                   className="flex w-full flex-col items-start p-3 text-left"
                 >
                   <div className="flex w-full flex-col items-start gap-2 pr-7">
-                    <span className="w-full min-w-0 break-words font-medium text-gray-900">{p.title}</span>
+                    <span className="w-full min-w-0 break-words font-medium text-gray-900">{p.title}{isPinned(p.uuid) && <span className="ml-2 text-xs font-normal text-gray-600">Pinned to Home</span>}</span>
                     <ProjectStateBadge state={p.state} />
                   </div>
                   {p.description && (
@@ -232,13 +234,23 @@ export function ProjectsPanel() {
                         className="fixed inset-0 z-40"
                         onClick={() => setMenuOpenId(null)}
                       />
-                      <div className="absolute right-0 top-8 z-50 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                      <div className="absolute right-0 top-8 z-50 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                         <button
                           onClick={() => handleDuplicate(p)}
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                         >
                           <Copy size={14} />
                           Duplicate
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpenId(null)
+                            if (!togglePin(p.uuid)) toast(`Up to ${MAX_HOME_PINS} projects can be pinned to Home. Unpin one first.`, 'info')
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          {isPinned(p.uuid) ? <PinOff size={14} /> : <Pin size={14} />}
+                          {isPinned(p.uuid) ? 'Unpin from Home' : 'Pin to Home'}
                         </button>
                       </div>
                     </>

@@ -19,6 +19,7 @@ import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 import { HomeQualityAlerts } from './HomeQualityAlerts'
 import { HomeTaskShortcuts, type TaskDocument } from './HomeTaskShortcuts'
 import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
+import { HomePinnedProjects } from './HomePinnedProjects'
 import './home-work.css'
 
 /**
@@ -468,6 +469,7 @@ export function ReturningHome({ embedded, orgName, brandIcon, disabled, onRunDem
         </div>
         {onPrepareTask && !tasksHidden && <HomeTaskShortcuts documents={documents} disabled={disabled} onPrepare={onPrepareTask} onChooseDocuments={onChooseDocuments} onHide={() => toggleTasks(true)} />}
       </div>
+      {onOpenProjects && <HomePinnedProjects disabled={disabled} />}
       {recent.length > 0 && <section className="home-activity" aria-label="Recent work">
         <h3>Recent work</h3><ul>{recent.slice(0, 3).map(activityRow)}</ul>
         {recent.length > 3 && <details className="home-other-actions"><summary>More recent work ({recent.length - 3})</summary><ul>{recent.slice(3).map(activityRow)}</ul></details>}
