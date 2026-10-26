@@ -108,3 +108,38 @@ def test_empty_answer():
 def test_both_chat_rule_sets_tell_the_model_not_to_read_silence_as_a_rule(rules):
     assert "When the sources don't address something" in rules
     assert "Recommend confirming with the sponsor" in rules
+
+
+# #1005 run 3, missing-eligibility through the KB, verbatim (gpt-oss-120b on
+# the deployed build). The silence is stated in the first bullet and the rule
+# drawn from it two sentences later, under a "Conclusion:" label.
+RUN3_ELIGIBILITY = (
+    "- The notice’s eligibility section says *“This notice does not specify citizenship eligibility.”* "
+    "[Source: sponsor-notice.pdf, p. 1]  \n"
+    "- Neither the amendment nor the draft proposal contains any statement that the principal investigator "
+    "must be a U.S. citizen. [Source: sponsor-amendment.pdf, p. 1; proposal-draft.pdf, p. 3]  \n\n"
+    "**Conclusion:** The available documents do not require the PI to be a U.S. citizen."
+)
+
+
+def test_a_labelled_conclusion_after_the_silence_is_flagged():
+    assert inferences_from_silence(RUN3_ELIGIBILITY) == [
+        "Conclusion: The available documents do not require the PI to be a U.S. citizen.",
+    ]
+
+
+def test_a_labelled_conclusion_with_no_silence_above_is_not_flagged():
+    # The source itself sets the rule; nothing was read into a gap.
+    answer = (
+        "- The notice states there is no page limit for the budget justification. [Source: notice.pdf, p. 4]\n\n"
+        "**Conclusion:** The justification is not limited in length, so no page limit applies."
+    )
+    assert inferences_from_silence(answer) == []
+
+
+def test_a_labelled_summary_that_reports_the_gap_is_not_flagged():
+    answer = (
+        "- The notice does not specify citizenship eligibility. [Source: notice.pdf, p. 1]\n\n"
+        "**Conclusion:** Ask the sponsor whether citizenship is required before relying on either reading."
+    )
+    assert inferences_from_silence(answer) == []

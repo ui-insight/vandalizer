@@ -61,6 +61,12 @@ _CONCLUSION = re.compile(
 # sentence, or at a line break. "U.S. citizen" and "e.g. a cap" stay whole.
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[*_A-Z0-9→-])|\n+")
 _LEADS_ON = re.compile(r"^\W*(?:→|therefore|so\b|thus|hence|this\s+means|that\s+means|meaning)", re.IGNORECASE)
+# A labelled summary draws on everything above it, so it counts after a
+# silence statement anywhere earlier in the answer, not only the one before
+# it. #1005 run 3: "This notice does not specify citizenship eligibility",
+# a bullet about the other files, then "Conclusion: The available documents
+# do not require the PI to be a U.S. citizen."
+_SUMMARY = re.compile(r"^\W*(?:conclusion|bottom\s+line|in\s+(?:summary|short|sum)|overall|summary)\b\W", re.IGNORECASE)
 
 
 _CITATION_MARKUP = re.compile(r"【[^】]*】|\[(?:p\.|pp\.|Source:)[^\]]*\]|\((?:see\s+)?[^()]*\bp\.\s*\d[^()]*\)")
@@ -84,9 +90,17 @@ def inferences_from_silence(answer: str) -> list[str]:
     sentences = [_clean(s) for s in _SENTENCE_END.split(text)]
     sentences = [s for s in sentences if s]
     flagged: list[str] = []
+    silent_before = False
     for i, sentence in enumerate(sentences):
+        if silent_before and _SUMMARY.search(sentence) and not _SILENCE.search(sentence) \
+                and _CONCLUSION.search(sentence) and sentence not in flagged:
+            flagged.append(sentence[:_MAX_CHARS])
+            if len(flagged) >= _MAX_FLAGS:
+                break
+            continue
         if not _SILENCE.search(sentence):
             continue
+        silent_before = True
         conclusion = None
         if _CONCLUSION.search(_SILENCE.sub(" ", sentence)):
             conclusion = sentence
