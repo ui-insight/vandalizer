@@ -248,6 +248,8 @@ async def test_full_course_requires_all_original_outcomes_and_graduates_once(rep
             params = {'enrollment_id': learner.uuid, 'request_id': uuid4().hex, 'expected_attempts': reviewed_attempts}
             body = {'consent': 'complete_selected_saved_outcomes', **selection}
             endpoint = f'/certification/modules/{module.id}/complete'
+            # Completing a module opens after its lessons (3d50e7ae).
+            await base.pass_lessons(client, learner.user_id, module.id, {'enrollment_id': learner.uuid})
             if module.id == 'governance':
                 # Complete practical capstone work alone cannot replace its
                 # separately required recognition outcome.

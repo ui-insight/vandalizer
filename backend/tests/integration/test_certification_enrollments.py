@@ -7829,3 +7829,25 @@ async def test_connected_capture_package_rejects_a_rehashed_but_mismatched_assig
     path.write_text(json.dumps(registry))
     with pytest.raises(CourseCatalogError, match='integrity'):
         repo.catalog.load(source.course_version)
+
+
+async def pass_lessons(client, user_id: str, module_id: str, params: dict | None = None) -> None:
+    """Pass a module's lessons the way a learner does, so its exercise steps
+    open: each knowledge check answered correctly, in order, over HTTP.
+    Completing, checking or setting up a module's lab is gated on this
+    (3d50e7ae). The lessons are read from the learner's own pinned course,
+    the only way course content may be read."""
+    from app.services import certification_service as svc
+    from app.services.certification_versions import runtime
+
+    @runtime.course_operation()
+    async def pinned_lessons(user_id: str, enrollment_id: str | None = None):
+        return (svc.get_lessons(module_id) or {}).get('lessons', [])
+
+    for lesson in await pinned_lessons(user_id, (params or {}).get('enrollment_id')):
+        check = svc.lesson_check(lesson)
+        choice = next(i for i, o in enumerate(check['options']) if o.get('correct') is True) if check else 0
+        response = await client.post('/certification/lessons/check', params=params or {},
+                                     json={'module_id': module_id, 'lesson_id': lesson['id'], 'choice': choice})
+        assert response.status_code == 200, (module_id, lesson['id'], response.text)
+        assert response.json()['correct'] is True

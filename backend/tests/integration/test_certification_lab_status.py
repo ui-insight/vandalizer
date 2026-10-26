@@ -129,6 +129,8 @@ async def test_http_setup_persists_assignment_then_reads_worker_states_without_r
     app.dependency_overrides[get_settings] = lambda: {}
     params = {'enrollment_id': learner.uuid} if versioned else {}
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        # Setting up the lab opens after the module's lessons (3d50e7ae).
+        await base.pass_lessons(client, user.user_id, 'foundations', params)
         setup = await client.post('/certification/modules/foundations/provision', params=params)
         assert setup.status_code == 200, setup.text
         assigned = setup.json()['provisioned_docs']
