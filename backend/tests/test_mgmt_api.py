@@ -377,6 +377,56 @@ class TestValidationReadEndpoints:
         assert resp.json()["page"]["total"] == 0
 
 
+class TestWorkflowRunsFilter:
+    """A workflow_id filter matched nothing: WorkflowResult.workflow is an
+    ObjectId and the filter compared it with the raw string."""
+
+    def _chain(self):
+        chain = MagicMock()
+        chain.count = AsyncMock(return_value=0)
+        chain.sort.return_value.skip.return_value.limit.return_value.to_list = (
+            AsyncMock(return_value=[])
+        )
+        return chain
+
+    @pytest.mark.asyncio
+    async def test_filters_by_object_id(self, client):
+        from beanie import PydanticObjectId
+
+        key = _make_key(scopes=["workflows:read"])
+        wf_id = "69c1cacb087d19fbd759ef8a"
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+            patch("app.routers.mgmt.WorkflowResult") as MockWR,
+        ):
+            MockKey.find_one = AsyncMock(return_value=key)
+            MockWR.find = MagicMock(return_value=self._chain())
+            MockWR.start_time = MagicMock()
+            resp = await client.get(
+                f"/api/mgmt/v1/workflows/runs?workflow_id={wf_id}",
+                headers={"X-API-Key": "vk_live_x"},
+            )
+        assert resp.status_code == 200
+        (filters,), _ = MockWR.find.call_args
+        assert filters["workflow"] == PydanticObjectId(wf_id)
+        assert isinstance(filters["workflow"], PydanticObjectId)
+
+    @pytest.mark.asyncio
+    async def test_rejects_a_malformed_id(self, client):
+        key = _make_key(scopes=["workflows:read"])
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+        ):
+            MockKey.find_one = AsyncMock(return_value=key)
+            resp = await client.get(
+                "/api/mgmt/v1/workflows/runs?workflow_id=not-an-id",
+                headers={"X-API-Key": "vk_live_x"},
+            )
+        assert resp.status_code == 400
+
+
 class TestValidationWriteEndpoints:
     @pytest.mark.asyncio
     async def test_create_test_case(self, client):

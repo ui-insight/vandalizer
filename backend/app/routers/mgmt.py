@@ -428,7 +428,14 @@ async def list_workflow_runs(
     if status_eq:
         filters["status"] = status_eq
     if workflow_id:
-        filters["workflow"] = workflow_id
+        from beanie import PydanticObjectId
+
+        # WorkflowResult.workflow is stored as an ObjectId; a string filter
+        # matched nothing, so every filtered listing came back empty.
+        try:
+            filters["workflow"] = PydanticObjectId(workflow_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid workflow id")
 
     query = WorkflowResult.find(filters) if filters else WorkflowResult.find_all()
     total = await query.count()
