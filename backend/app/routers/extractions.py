@@ -1899,6 +1899,10 @@ async def get_extraction_quality_status(
             created = created.replace(tzinfo=datetime.timezone.utc)
         stale = (now_utc - created).days > 14
 
+    from app.services.quality_service import item_validation_drift
+
+    drift = await item_validation_drift("search_set", latest, user_id=user.user_id, item=ss)
+
     return {
         "status": "validated",
         "score": score,
@@ -1906,6 +1910,7 @@ async def get_extraction_quality_status(
         "last_validated_at": last_at,
         "config_changed": config_changed,
         "stale": stale,
+        **drift,
         # Monitoring already decided this item regressed and nobody has looked
         # at it yet; the badge says so instead of showing the tier alone.
         "regression_pending_review": bool(meta and meta.regression_pending_review),

@@ -41,6 +41,129 @@ def compute_config_hash(config: dict) -> str:
     return hashlib.sha256(json.dumps(config or {}, sort_keys=True).encode()).hexdigest()
 
 
+def _as_utc(dt: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
+    if dt is None:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=datetime.timezone.utc)
+
+
+def validation_drift(
+    latest: Optional[dict],
+    *,
+    current_model: Optional[str],
+    configured_models: set[str],
+    test_cases: Optional[list[tuple[str, Optional[datetime.datetime]]]] = None,
+) -> dict:
+    """What has changed under a score since the run that produced it (#1013 §5).
+
+    A config hash catches edits to the item itself, but a score also depends
+    on the model it ran on and the cases it was graded against. A model
+    renamed or swapped by an admin (the qwen3.6 → 3.8 rename left KB
+    overrides pinned to a dead name) leaves the item untouched while the
+    measurement no longer describes what runs.
+
+    ``latest`` is a ``_run_to_dict`` row. ``current_model`` is the model new
+    runs of the item resolve to; ``configured_models`` the names in
+    ``SystemConfig.available_models``. ``test_cases`` (extraction only) is
+    ``[(uuid, created_at)]`` for the item's current cases. Runs that recorded
+    no single model (legacy rows, workflows graded across several models)
+    report no model drift rather than guessing.
+    """
+    out = {
+        "model_changed": False,
+        "validated_model": None,
+        "current_model": current_model or None,
+        "test_cases_changed": False,
+        "drift_reasons": [],
+    }
+    if not latest:
+        return out
+    reasons: list[str] = out["drift_reasons"]
+
+    validated_model = latest.get("model") or None
+    out["validated_model"] = validated_model
+    if validated_model:
+        if configured_models and validated_model not in configured_models:
+            out["model_changed"] = True
+            reasons.append(f"measured on {validated_model}, which is no longer configured")
+        elif current_model and validated_model != current_model:
+            out["model_changed"] = True
+            reasons.append(f"measured on {validated_model}; new runs use {current_model}")
+
+    if test_cases is not None:
+        snapshot = (latest.get("result_snapshot") or {}).get("test_cases") or []
+        graded = {tc.get("test_case_uuid") for tc in snapshot if isinstance(tc, dict)}
+        graded.discard(None)
+        if graded:
+            current = {uuid for uuid, _ in test_cases}
+            run_at = latest.get("created_at")
+            run_dt = _as_utc(datetime.datetime.fromisoformat(run_at)) if run_at else None
+            # A subset run grades only some cases, so an ungraded case counts
+            # as "added" only when it was created after the run.
+            added = [
+                uuid for uuid, created in test_cases
+                if uuid not in graded and run_dt and created and _as_utc(created) > run_dt
+            ]
+            removed = graded - current
+            if added or removed:
+                out["test_cases_changed"] = True
+                parts = []
+                if added:
+                    parts.append(f"{len(added)} added")
+                if removed:
+                    parts.append(f"{len(removed)} deleted")
+                reasons.append(f"test cases changed since the run ({', '.join(parts)})")
+    return out
+
+
+async def item_validation_drift(
+    item_kind: str,
+    latest: Optional[dict],
+    *,
+    user_id: str,
+    item,
+) -> dict:
+    """``validation_drift`` for a workflow or extraction set, resolving the
+    model the viewer's next run would use. Exception-safe: drift detection
+    failing must never break quality reporting, so any error reports none.
+    """
+    if not latest:
+        return validation_drift(None, current_model=None, configured_models=set())
+    try:
+        from app.services.config_service import get_user_model_name
+
+        sys_cfg = await SystemConfig.get_config()
+        sys_cfg_doc = sys_cfg.model_dump() if sys_cfg else {}
+        configured = {
+            m.get("name") for m in sys_cfg_doc.get("available_models") or []
+            if isinstance(m, dict) and m.get("name")
+        }
+        test_cases = None
+        if item_kind == "workflow":
+            from app.services.workflow_service import resolve_run_model
+
+            current_model = await resolve_run_model(item.input_config, user_id)
+        else:
+            from app.models.extraction_test_case import ExtractionTestCase
+            from app.services.extraction_engine import ExtractionEngine
+            from app.services.search_set_service import effective_extraction_config
+
+            current_model = ExtractionEngine(system_config_doc=sys_cfg_doc).effective_model_info(
+                effective_extraction_config(item) or None, await get_user_model_name(user_id),
+            ).get("model")
+            cases = await ExtractionTestCase.find(
+                ExtractionTestCase.search_set_uuid == latest.get("item_id"),
+            ).to_list()
+            test_cases = [(tc.uuid, tc.created_at) for tc in cases]
+        return validation_drift(
+            latest, current_model=current_model, configured_models=configured,
+            test_cases=test_cases,
+        )
+    except Exception:
+        logger.exception("Validation drift check failed for %s %s", item_kind, latest.get("item_id"))
+        return validation_drift(None, current_model=None, configured_models=set())
+
+
 async def persist_validation_run(
     item_kind: str,
     item_id: str,

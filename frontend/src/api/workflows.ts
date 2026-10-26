@@ -734,6 +734,10 @@ export interface WorkflowQualityStatus {
   regression_pending_review?: boolean
   /** A catalog author's rating with no measurement behind it; status is unvalidated. */
   tier_asserted?: string | null
+  /** The model or graded cases changed since the score was measured (#1013 §5). */
+  model_changed?: boolean
+  test_cases_changed?: boolean
+  drift_reasons?: string[]
 }
 
 export function getWorkflowQualityStatus(workflowId: string) {

@@ -940,7 +940,7 @@ export function WorkflowEditorPanel() {
           let tabDot: string | null = null
           if (tab.key === 'validate' && qualityStatus) {
             if (qualityStatus.status === 'unvalidated') tabDot = '#9ca3af'
-            else if (qualityStatus.stale) tabDot = '#eab308'
+            else if (qualityStatus.stale || qualityStatus.drift_reasons?.length) tabDot = '#eab308'
             else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#b91c1c'
           }
           return (
@@ -1091,6 +1091,11 @@ export function WorkflowEditorPanel() {
                           Workflow changed since last validation. Re-validate for accurate results.
                         </div>
                       )}
+                      {qualityStatus.drift_reasons?.length ? (
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginTop: 'var(--workspace-space-4)' }}>
+                          The score may not describe current runs: {qualityStatus.drift_reasons.join('; ')}. Re-validate to measure it again.
+                        </div>
+                      ) : null}
                       {qualityStatus.stale && !qualityStatus.config_changed && (
                         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginTop: 'var(--workspace-space-4)' }}>
                           Last validated over 2 weeks ago. Consider re-validating.
