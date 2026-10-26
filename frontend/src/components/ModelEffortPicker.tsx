@@ -145,7 +145,9 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
                   backgroundColor: '#fff',
                   transition: 'border 0.12s',
                 }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#111', minWidth: 0 }}>{model.name || model.tag}{model.name && model.name !== model.tag && <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#4b5563' }}>{model.tag}</span>}</span>
+                {/* The admin-set tag is the friendly name ("VandalAI-Fast" in
+                    production); the provider's model id stays secondary (#1014 item 47). */}
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#111', minWidth: 0 }}>{model.tag || model.name}{model.name && model.name !== model.tag && <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#4b5563' }}>{model.name}</span>}</span>
                 {model.external && (
                   <span style={{ fontSize: 12, color: '#4b5563', fontWeight: 500 }}>external</span>
                 )}
