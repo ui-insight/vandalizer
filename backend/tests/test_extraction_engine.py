@@ -201,6 +201,20 @@ class TestBuildFieldsPrompt:
         result = _engine()._build_fields_prompt(["Notes"], meta)
         assert "optional" in result
 
+    def test_description_goes_with_its_field_one_per_line(self):
+        # #1057: "Total Direct Costs" must be findable under the document's
+        # own label, without renaming the field the rules are keyed on.
+        meta = {"Total Direct Costs": {"description": "Also labelled Direct-cost total,\n or Subtotal direct costs."}}
+        result = _engine()._build_fields_prompt(["Personnel", "Total Direct Costs"], meta)
+        assert result == (
+            "\n- Personnel"
+            "\n- Total Direct Costs (meaning: Also labelled Direct-cost total, or Subtotal direct costs.)"
+        )
+
+    def test_no_description_keeps_the_comma_list(self):
+        meta = {"Status": {"enum_values": ["A"], "description": None}}
+        assert _engine()._build_fields_prompt(["Name", "Status"], meta) == "Name, Status (allowed values: A)"
+
     def test_with_enum_and_optional(self):
         meta = {"Status": {"enum_values": ["A", "B"], "is_optional": True}}
         result = _engine()._build_fields_prompt(["Status"], meta)

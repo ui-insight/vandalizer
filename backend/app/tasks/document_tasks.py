@@ -1164,16 +1164,20 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
         extraction_config = effective_extraction_config(ss_doc)
 
-        # Load field metadata
-        field_metadata = {}
-        for item in ss_items:
-            meta = {}
-            if item.get("enum_values"):
-                meta["enum_values"] = item["enum_values"]
-            if item.get("optional"):
-                meta["optional"] = True
-            if meta:
-                field_metadata[item["searchphrase"]] = meta
+        # Load field metadata, in the list shape the engine reads
+        # ({"key", ...} per field). This was a dict keyed by field name, which
+        # the engine iterated as strings: any field with allowed values or an
+        # optional flag raised TypeError. It also read "optional", a key the
+        # items don't have.
+        field_metadata = [
+            {
+                "key": item["searchphrase"],
+                "is_optional": item.get("is_optional", False),
+                "enum_values": item.get("enum_values", []),
+                "description": item.get("description"),
+            }
+            for item in ss_items
+        ]
 
         engine = ExtractionEngine(system_config_doc=sys_config)
         results = engine.extract(

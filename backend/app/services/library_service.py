@@ -1282,6 +1282,7 @@ async def _clone_underlying_object(
                 title=oi.title,
                 is_optional=oi.is_optional,
                 enum_values=list(oi.enum_values or []),
+                description=oi.description,
                 user_id=user_id,
             )
             await new_item.insert()

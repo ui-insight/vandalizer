@@ -866,11 +866,13 @@ async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(ge
     item = await svc.add_item(
         uuid, req.searchphrase, req.searchtype, req.title, user.user_id,
         is_optional=req.is_optional, enum_values=req.enum_values or [],
+        description=req.description,
     )
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
         is_optional=item.is_optional, enum_values=item.enum_values,
+        description=item.description,
     )
 
 
@@ -883,7 +885,7 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
             id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
             searchtype=item.searchtype, title=item.title,
             is_optional=item.is_optional, enum_values=item.enum_values,
-            pdf_binding=item.pdf_binding,
+            description=item.description, pdf_binding=item.pdf_binding,
         )
         for item in items
     ]
@@ -895,6 +897,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     item = await svc.update_item(
         item_id, searchphrase=req.searchphrase, title=req.title,
         is_optional=req.is_optional, enum_values=req.enum_values,
+        description=req.description,
     )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -909,6 +912,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
         is_optional=item.is_optional, enum_values=item.enum_values,
+        description=item.description,
     )
 
 

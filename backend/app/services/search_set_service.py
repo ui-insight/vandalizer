@@ -200,6 +200,7 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
             user_id=user_id,
             is_optional=item.is_optional,
             enum_values=item.enum_values,
+            description=item.description,
         )
         await new_item.insert()
 
@@ -226,6 +227,7 @@ async def update_item(
     title: str | None = None,
     is_optional: bool | None = None,
     enum_values: list[str] | None = None,
+    description: str | None = None,
 ) -> SearchSetItem | None:
     item = await SearchSetItem.get(PydanticObjectId(item_id))
     if not item:
@@ -238,6 +240,9 @@ async def update_item(
         item.is_optional = is_optional
     if enum_values is not None:
         item.enum_values = enum_values
+    if description is not None:
+        # An empty string clears it.
+        item.description = description.strip() or None
     await item.save()
     return item
 
@@ -250,6 +255,7 @@ async def add_item(
     user_id: str | None = None,
     is_optional: bool = False,
     enum_values: list[str] | None = None,
+    description: str | None = None,
 ) -> SearchSetItem:
     item = SearchSetItem(
         searchphrase=searchphrase,
@@ -259,6 +265,7 @@ async def add_item(
         user_id=user_id,
         is_optional=is_optional,
         enum_values=enum_values or [],
+        description=(description or "").strip() or None,
     )
     await item.insert()
     return item
@@ -311,6 +318,7 @@ async def get_extraction_field_metadata(search_set_uuid: str) -> list[dict]:
             "key": item.searchphrase,
             "is_optional": item.is_optional,
             "enum_values": item.enum_values,
+            "description": item.description,
         }
         for item in items
     ]

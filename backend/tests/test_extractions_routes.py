@@ -84,6 +84,7 @@ def _mock_item(**overrides):
     item.title = overrides.get("title", None)
     item.is_optional = overrides.get("is_optional", False)
     item.enum_values = overrides.get("enum_values", [])
+    item.description = overrides.get("description")
     item.pdf_binding = overrides.get("pdf_binding", None)
     return item
 

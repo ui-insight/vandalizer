@@ -122,3 +122,50 @@ async def test_a_tier_measured_on_this_install_is_kept(mongo_client):
     await _seed()
     meta = await VerifiedItemMetadata.find_one({"item_kind": "workflow", "item_id": str(wf.id)})
     assert (meta.quality_tier, meta.quality_score) == ("good", 78.0)
+
+
+# --- #1057: field descriptions map ordinary budget labels ---------------------
+
+async def _items_by_name():
+    from app.models.search_set import SearchSetItem
+
+    ss = await _extraction_set()
+    items = await SearchSetItem.find(SearchSetItem.searchset == ss.uuid).to_list()
+    return {i.searchphrase: i for i in items}
+
+
+async def test_a_new_install_describes_the_budget_fields(mongo_client):
+    assert await _seed() == "created"
+    items = await _items_by_name()
+    assert "Direct-cost total" in items["Total Direct Costs"].description
+    assert "Total request" in items["Total Project Cost"].description
+    assert items["Fringe Benefit Rate"].description is None  # not every field needs one
+
+
+async def test_an_upgrade_adds_descriptions_and_keeps_an_admins(mongo_client):
+    await _seed()
+    items = await _items_by_name()
+    # An install from before 1.3.13 has none; an admin has since written one.
+    for item in items.values():
+        item.description = None
+        await item.save()
+    items["Subcontracts"].description = "Our own wording"
+    await items["Subcontracts"].save()
+
+    assert await _seed() == "updated"
+    items = await _items_by_name()
+    assert "Direct-cost total" in items["Total Direct Costs"].description
+    assert items["Subcontracts"].description == "Our own wording"
+
+
+async def test_a_run_hands_the_descriptions_to_the_extraction_step(mongo_client, sync_mongo):
+    from app.tasks.workflow_tasks import build_steps_data
+
+    await _seed()
+    wf = sync_mongo.workflow.find_one({"resource_config.seed_id": "wf-pre-award-budget-analyzer"})
+    steps_data, _outputs = build_steps_data(sync_mongo, wf, str(wf["_id"]), {"doc_uuids": []})
+    extraction = next(
+        t for s in steps_data for t in s["tasks"] if t["name"] == "Extraction"
+    )
+    meta = {m["key"]: m for m in extraction["data"]["field_metadata"]}
+    assert "Total request" in meta["Total Project Cost"]["description"]

@@ -87,7 +87,7 @@ def _assert_built_by_the_shared_builder(steps_data):
     # Extraction carries per-field constraints -- the copies produced keys only.
     assert extraction["keys"] == ["amount"]
     assert extraction["field_metadata"] == [
-        {"key": "amount", "is_optional": True, "enum_values": []},
+        {"key": "amount", "is_optional": True, "enum_values": [], "description": None},
     ]
     # Trigger docs plus fixed documents, minus the workflow's own output.
     assert extraction["doc_texts"] == ["trigger text", "fixed text"]

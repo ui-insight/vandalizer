@@ -462,6 +462,47 @@ async def _patch_catalog_rules(wf: Workflow, seed_item: dict) -> int:
     return added
 
 
+async def _patch_field_descriptions(wf: Workflow, seed_item: dict) -> int:
+    """Give a catalog workflow's extraction fields the descriptions its seed
+    declares (#1057).
+
+    A seed's Extraction task may map field names to ``field_descriptions``:
+    what the field means and the labels documents use for it. They live on
+    the linked SearchSet's items. Only an item with no description yet is
+    filled in, so one an admin wrote or cleared and rewrote is kept. Users'
+    copies are never touched. Returns the number of items updated.
+    """
+    if wf.user_id != SYSTEM_USER:
+        return 0
+    wanted: dict[str, dict[str, str]] = {}
+    for step_data in seed_item.get("steps", []):
+        for task_data in step_data.get("tasks", []):
+            descriptions = (task_data.get("data") or {}).get("field_descriptions")
+            if task_data.get("name") == "Extraction" and descriptions:
+                wanted.setdefault(step_data["name"], {}).update(descriptions)
+    if not wanted:
+        return 0
+    updated = 0
+    for step_id in wf.steps:
+        step = await WorkflowStep.get(step_id)
+        if not step or step.name not in wanted:
+            continue
+        for task_id in step.tasks:
+            task = await WorkflowStepTask.get(task_id)
+            if not task or task.name != "Extraction" or not task.data.get("search_set_uuid"):
+                continue
+            items = await SearchSetItem.find(
+                SearchSetItem.searchset == task.data["search_set_uuid"],
+            ).to_list()
+            for item in items:
+                text = wanted[step.name].get(item.searchphrase)
+                if text and not item.description:
+                    item.description = text
+                    await item.save()
+                    updated += 1
+    return updated
+
+
 def _is_catalog_kb_query(task_data: dict) -> bool:
     """A seed task that queries a catalog KB, named by its seed id (#1009)."""
     return (
@@ -558,6 +599,9 @@ async def seed_workflow(
         rules_added = await _patch_catalog_rules(existing, item)
         if rules_added:
             print(f"    (added {rules_added} cross-field rule(s))")
+        described = await _patch_field_descriptions(existing, item)
+        if described:
+            print(f"    (described {described} extraction field(s))")
 
         changed = _reinstate_verified(existing)
         new_name = item["name"]
@@ -618,6 +662,7 @@ async def seed_workflow(
             # Materialise a SearchSet for Extraction tasks with inline searchphrases
             if task_data["name"] == "Extraction" and "searchphrases" in td:
                 raw = td.pop("searchphrases")
+                descriptions = td.pop("field_descriptions", None) or {}
                 keys = [k.strip() for k in raw.split(",") if k.strip()]
                 ss_uuid = str(uuid_mod.uuid4())
                 ss = SearchSet(
@@ -639,6 +684,7 @@ async def seed_workflow(
                         searchphrase=key,
                         searchset=ss_uuid,
                         searchtype="extraction",
+                        description=descriptions.get(key),
                     )
                     await ssi.insert()
                 td["search_set_uuid"] = ss_uuid

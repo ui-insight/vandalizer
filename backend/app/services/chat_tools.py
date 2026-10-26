@@ -3449,7 +3449,8 @@ async def propose_test_case(
         return {"error": "Extraction set has no fields defined."}
 
     field_metadata = [
-        {"key": i.searchphrase, "is_optional": i.is_optional, "enum_values": i.enum_values}
+        {"key": i.searchphrase, "is_optional": i.is_optional, "enum_values": i.enum_values,
+         "description": i.description}
         for i in items
         if i.searchphrase
     ]

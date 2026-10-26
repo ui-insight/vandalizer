@@ -280,6 +280,7 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
                             "key": item["searchphrase"],
                             "is_optional": item.get("is_optional", False),
                             "enum_values": item.get("enum_values", []),
+                            "description": item.get("description"),
                         }
                         for item in items
                     ]

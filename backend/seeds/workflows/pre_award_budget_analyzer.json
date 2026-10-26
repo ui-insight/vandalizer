@@ -90,7 +90,23 @@
                     "tolerance": 1,
                     "source": "imported"
                   }
-                ]
+                ],
+                "field_descriptions": {
+                  "Senior Personnel Costs": "Salaries and wages for senior or key personnel (PI, co-PIs). If the budget gives one Personnel, Salaries, or Salaries and Wages line that is not split by role, put that whole amount here and leave Other Personnel Costs empty.",
+                  "Other Personnel Costs": "Salaries and wages for other staff (postdocs, students, technicians) when the budget lists them separately from senior personnel.",
+                  "Fringe Benefits": "Fringe benefits amount. Also labelled Benefits or Employee Benefits.",
+                  "Travel Domestic": "Domestic travel. If the budget gives one Travel line that is not split into domestic and foreign, put that amount here.",
+                  "Travel Foreign": "Foreign or international travel, only when the budget lists it separately.",
+                  "Materials and Supplies": "Materials and supplies. Also labelled Supplies or Materials.",
+                  "Subcontracts": "Subawards or subcontracts to other organizations. Also labelled Subaward, Subawards, Subrecipient costs, or Consortium/Contractual costs.",
+                  "Consultant Costs": "Consultant services. Also labelled Consultants or Consulting.",
+                  "Other Direct Costs": "Direct costs listed under Other or Other Direct Costs that fit none of the other categories.",
+                  "Total Direct Costs": "The budget's stated total of direct costs. Also labelled Direct-cost total, Total direct, Subtotal direct costs, or TDC. Copy the amount the document states; do not add lines up to produce it.",
+                  "Indirect Costs": "Indirect costs amount. Also labelled F&A, Facilities and Administrative costs, or Overhead.",
+                  "Indirect Cost Rate": "The indirect (F&A) rate as the document states it, such as 25% or 56.5%. Leave empty if no rate is stated; do not divide the amounts to derive one.",
+                  "Indirect Cost Base": "The dollar base the indirect rate is applied to, as stated. Also labelled MTDC, Modified Total Direct Costs, or base. Leave empty if the document does not state it.",
+                  "Total Project Cost": "The budget's stated grand total, direct plus indirect. Also labelled Total request, Total budget, Total costs, Grand total, or Total amount requested. Copy the amount the document states; do not add lines up to produce it."
+                }
               }
             },
             {

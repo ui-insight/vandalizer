@@ -927,6 +927,11 @@ class ExtractionEngine:
             fm = (meta_map or {}).get(key, {})
             desc = key
             annotations = []
+            # The field's own description: what it means and the other labels
+            # documents use for it, so "Total Direct Costs" is found under
+            # "Direct-cost total" (#1057).
+            if fm.get("description"):
+                annotations.append(f"meaning: {' '.join(str(fm['description']).split())}")
             enum_vals = fm.get("enum_values", [])
             if enum_vals:
                 annotations.append(f"allowed values: {', '.join(enum_vals)}")
@@ -940,6 +945,11 @@ class ExtractionEngine:
             if annotations:
                 desc = f"{key} ({'; '.join(annotations)})"
             parts.append(desc)
+        # A description is prose with its own commas; one field per line keeps
+        # it from running into the next field. Without one, the comma list the
+        # tuned prompt baselines were measured on is unchanged.
+        if any((meta_map or {}).get(k, {}).get("description") for k in keys):
+            return "\n" + "\n".join(f"- {p}" for p in parts)
         return ", ".join(parts)
 
     def _describe_content(self, content: ExtractionContent) -> str:

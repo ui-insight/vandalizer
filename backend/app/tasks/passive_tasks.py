@@ -1099,7 +1099,8 @@ def process_extraction_outputs(
         field_metadata = [
             {"key": item["searchphrase"],
              "is_optional": item.get("is_optional", False),
-             "enum_values": item.get("enum_values", [])}
+             "enum_values": item.get("enum_values", []),
+             "description": item.get("description")}
             for item in ss_items
         ]
 

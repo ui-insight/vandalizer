@@ -6,6 +6,8 @@ export interface SearchSetItem {
   title: string | null;
   is_optional: boolean;
   enum_values: string[];
+  /** What the field means and other labels documents use for it; sent to the model with the name. */
+  description?: string | null;
   pdf_binding?: string | null;
 }
 

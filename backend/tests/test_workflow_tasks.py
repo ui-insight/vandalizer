@@ -1134,8 +1134,8 @@ class TestBuildStepsData:
         task_data = steps_data[1]["tasks"][0]["data"]
         assert task_data["keys"] == ["amount", "status"]
         assert task_data["field_metadata"] == [
-            {"key": "amount", "is_optional": True, "enum_values": []},
-            {"key": "status", "is_optional": False, "enum_values": ["open", "closed"]},
+            {"key": "amount", "is_optional": True, "enum_values": [], "description": None},
+            {"key": "status", "is_optional": False, "enum_values": ["open", "closed"], "description": None},
         ]
 
     def test_fixed_documents_are_merged(self):

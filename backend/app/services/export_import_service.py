@@ -90,6 +90,7 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
                         "title": it.title,
                         "is_optional": it.is_optional,
                         "enum_values": it.enum_values,
+                        "description": it.description,
                     }
                     for it in items
                 ],
@@ -229,6 +230,7 @@ async def _reconstruct_task_references(
                 user_id=user_id,
                 is_optional=field.get("is_optional", False),
                 enum_values=field.get("enum_values", []),
+            description=field.get("description"),
             )
             await new_item.insert()
 
@@ -435,6 +437,7 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
             "title": it.title,
             "is_optional": it.is_optional,
             "enum_values": it.enum_values,
+            "description": it.description,
         })
 
     # Text-only test cases
@@ -514,6 +517,7 @@ async def import_search_set(
             user_id=user_id,
             is_optional=field.get("is_optional", False),
             enum_values=field.get("enum_values", []),
+            description=field.get("description"),
         )
         await new_item.insert()
 

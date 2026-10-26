@@ -51,7 +51,7 @@ export function listItems(searchSetUuid: string) {
   return apiFetch<SearchSetItem[]>(`/api/extractions/search-sets/${searchSetUuid}/items`)
 }
 
-export function updateItem(itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) {
+export function updateItem(itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[]; description?: string }) {
   return apiFetch<SearchSetItem>(`/api/extractions/items/${itemId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

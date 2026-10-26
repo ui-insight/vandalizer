@@ -19,6 +19,11 @@ class SearchSetItem(Document):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    # What the field means and other labels a document may use for it
+    # ("Direct-cost total", "Subtotal direct costs"). Sent to the model with
+    # the field name; unlike the instructions it never renames the field, so
+    # cross-field rules keyed on the name keep working (#1057).
+    description: Optional[str] = None
 
     class Settings:
         name = "search_set_item"

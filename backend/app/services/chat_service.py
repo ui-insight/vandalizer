@@ -996,7 +996,8 @@ async def _run_scripted_demo(
         items = await ss.get_extraction_items() if ss else []
         keys = [item.searchphrase for item in items if item.searchphrase]
         field_metadata = [
-            {"key": item.searchphrase, "is_optional": item.is_optional, "enum_values": item.enum_values}
+            {"key": item.searchphrase, "is_optional": item.is_optional, "enum_values": item.enum_values,
+             "description": item.description}
             for item in items if item.searchphrase
         ]
 

@@ -1432,7 +1432,7 @@ export function DocumentWarningsStrip({ warnings }: { warnings: DocumentWarning[
   )
 }
 
-function DesignTab({
+export function DesignTab({
   onAddFields,
   onOpenTools,
   onValidate,
@@ -1463,7 +1463,7 @@ function DesignTab({
   onAddFields: (text: string) => Promise<void>
   onOpenTools: () => void
   onValidate: () => void
-  items: { id: string; title?: string | null; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
+  items: { id: string; title?: string | null; searchphrase: string; is_optional: boolean; enum_values: string[]; description?: string | null }[]
   itemsLoading: boolean
   results: Record<string, string>
   hasResults: boolean
@@ -1475,7 +1475,7 @@ function DesignTab({
   onExportCopy: () => void
   onSaveToProject?: () => void
   onRemoveItem: (id: string) => void
-  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => Promise<unknown> | void
+  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[]; description?: string }) => Promise<unknown> | void
   onReorder: (itemIds: string[]) => void
   searchSetUuid?: string
   onValueClick: (field: string, value: string) => void
@@ -1508,11 +1508,15 @@ function DesignTab({
     return () => document.removeEventListener('mousedown', handler)
   }, [exportMenuOpen])
   const [enumDraft, setEnumDraft] = useState('')
+  const [descriptionDraft, setDescriptionDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
-  const toggleSettings = (item: { id: string; enum_values: string[] }) => {
+  const toggleSettings = (item: { id: string; enum_values: string[]; description?: string | null }) => {
     setExpandedSettingsId(prev => {
       const opening = prev !== item.id
-      if (opening) setEnumDraft(item.enum_values.join(', '))
+      if (opening) {
+        setEnumDraft(item.enum_values.join(', '))
+        setDescriptionDraft(item.description ?? '')
+      }
       return opening ? item.id : null
     })
   }
@@ -2029,6 +2033,35 @@ function DesignTab({
                       />
                       <div style={{ color: '#526071', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-4)' }}>
                         Comma-separated. LLM will pick from these values.
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 'var(--workspace-space-8)' }}>
+                      <label htmlFor={`field-description-${item.id}`} style={{ display: 'block', color: '#374151', fontWeight: 500, marginBottom: 'var(--workspace-space-4)' }}>Meaning and other labels</label>
+                      <textarea
+                        id={`field-description-${item.id}`}
+                        aria-describedby={`field-description-help-${item.id}`}
+                        value={descriptionDraft}
+                        rows={2}
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        onBlur={() => {
+                          const next = descriptionDraft.trim()
+                          if (next !== (item.description ?? '')) onUpdateItem(item.id, { description: next })
+                        }}
+                        placeholder="e.g. Also labelled Direct-cost total or Subtotal direct costs"
+                        style={{
+                          width: '100%',
+                          fontSize: 'var(--workspace-font-meta)',
+                          fontFamily: 'inherit',
+                          color: '#202124',
+                          border: "1px solid var(--workspace-border)",
+                          borderRadius: 'var(--workspace-radius-small)',
+                          padding: "var(--workspace-space-4) var(--workspace-space-8)",
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                        }}
+                      />
+                      <div id={`field-description-help-${item.id}`} style={{ color: '#526071', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-4)' }}>
+                        Sent to the model with the field name, so it finds the value under the document's own wording. The field keeps its name.
                       </div>
                     </div>
                   </div>
