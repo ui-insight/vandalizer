@@ -63,6 +63,12 @@ describe('ChatMessage page citations on attached documents', () => {
     expect(screen.getByText(/top of the page, not a supporting passage/)).toBeInTheDocument()
   })
 
+  it('says when the page was matched to the file by its content (#1058)', () => {
+    render(<ChatMessage message={answer({ content: 'The cap is $180,000 [p. 3].', citations: [{ ...cite('found'), document_uuid: null, attribution: 'content' as const }] })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'notice-v1.pdf · p. 3' }))
+    expect(screen.getByText(/without naming a file/)).toBeInTheDocument()
+  })
+
   it('leaves knowledge-base chips, which carry no grounding field, unmarked', () => {
     render(<ChatMessage message={answer({ citations: [cite(undefined)] })} />)
     expect(screen.getByRole('button', { name: 'notice-v1.pdf · p. 3' })).toBeInTheDocument()

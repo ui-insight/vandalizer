@@ -770,6 +770,11 @@ export function ChatMessage({
                         return loc ? ` · ${loc}` : ''
                       })()}
                     </div>
+                    {open.attribution === 'content' && (
+                      <p role="note" style={{ margin: '0 0 var(--workspace-space-6)', color: '#526071' }}>
+                        The assistant gave this page number without naming a file. It is shown here because this is the only attached document whose page supports what the assistant said.
+                      </p>
+                    )}
                     {(open.grounding === 'not_found' || open.grounding === 'unchecked') && (
                       <p role="note" style={{ margin: '0 0 var(--workspace-space-6)', color: '#92400e', fontWeight: 500 }}>
                         {open.grounding === 'not_found'

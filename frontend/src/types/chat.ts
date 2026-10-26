@@ -194,6 +194,9 @@ export interface Citation {
    *  Only 'found' is shown as an ordinary source; absent on KB and web chips,
    *  which come from retrieval rather than the model. */
   grounding?: 'found' | 'not_found' | 'unchecked'
+  /** 'content' when the answer gave a page without a file name and the page
+   *  was matched to the one attached document that supports the claim (#1058). */
+  attribution?: 'content'
   // User-verifiable provenance for the KB source (origin URL / citation).
   source_reference?: string | null
   // Set when the KB source is a URL — citation chip links out to it.

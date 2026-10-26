@@ -304,9 +304,11 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
     Attribution has to be unambiguous to be honest. A reference that names an
     attached file ("sponsor-notice.pdf, p. 2", "[p. 3 of proposal-draft.pdf]")
     belongs to that file (#1011). A bare "p. 3" belongs to the only attached
-    document with page markers, and to none when there are several: "p. 3"
-    does not say whose page 3, and a chip pointing at the wrong document is
-    worse than no chip. Pages outside the document are ignored, and an
+    document with page markers. With several, "p. 3" does not say whose page
+    3, and a chip pointing at the wrong document is worse than no chip, so it
+    goes to a document only when exactly one attached document's page 3
+    supports the claim (#1058); that chip says ``attribution: "content"``.
+    Pages outside the document are ignored, and an
     interpolated page keeps its ``page_approximate`` hedge through to the
     viewer.
     """
@@ -328,6 +330,7 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
     # Every reference, grouped by the (document, page) it cites, in order.
     refs: dict[tuple[str, int], list[tuple[int, int]]] = {}
     ordered: list[tuple[tuple[int, int], tuple[str, int]]] = []
+    bare: list[tuple[tuple[int, int], int]] = []
     for match in _PAGE_REF_RE.finditer(text):
         try:
             page = int(match.group(1))
@@ -336,7 +339,10 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
         doc = _cited_document(text, match.span(), named)
         if doc is None:
             doc = only
-        if doc is None or doc.uuid not in candidates:
+        if doc is None:
+            bare.append((match.span(), page))
+            continue
+        if doc.uuid not in candidates:
             continue
         refs.setdefault((doc.uuid, page), []).append(match.span())
         ordered.append((match.span(), (doc.uuid, page)))
@@ -363,6 +369,21 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
             if i + 1 < len(order):
                 end = ends[order[i + 1]]
         return raw[start:end], offset, approximate
+
+    # A bare page with several documents attached: the one document whose
+    # page supports the claim, or none. Never a guess between two.
+    by_content: set[tuple[str, int]] = set()
+    for span, page in bare:
+        supporting = [
+            uuid for uuid in candidates
+            if (found := page_text(uuid, page)) is not None
+            and ground_citation(text, [span], found[0], _PAGE_REF_RE)[0] == "found"
+        ]
+        if len(supporting) == 1:
+            key = (supporting[0], page)
+            if key not in refs:
+                by_content.add(key)
+            refs.setdefault(key, []).append(span)
 
     # References written side by side ("(proposal, p. 2) (notice, p. 3)") cite
     # one claim together; each is judged with the others' pages alongside.
@@ -400,12 +421,16 @@ def derive_document_citations(text: str, documents: list) -> list[dict]:
             # ordinary source: the page number came from the model (#998).
             "grounding": grounding,
         })
+        if (doc_uuid, page) in by_content:
+            # No file was named; the page was matched to the one attached
+            # document that supports the claim.
+            citations[-1]["attribution"] = "content"
         if len(citations) >= _MAX_DERIVED_CITATIONS:
             break
     return citations
 
 
-def page_note_for(markers: list[dict] | None, *, annotated: bool) -> str:
+def page_note_for(markers: list[dict] | None, *, annotated: bool, title: str | None = None) -> str:
     """The instruction that tells the model how to cite pages in this document.
 
     Returns "" when the document got no page markers — promising citations the
@@ -433,14 +458,21 @@ def page_note_for(markers: list[dict] | None, *, annotated: bool) -> str:
         return (
             "\n_`[p. ~N]` marks the *estimated* start of page N — this document "
             "was scanned, so page positions are approximate. Always give pages "
-            "as approximate, e.g. \"around p. 4\". Never state a page as exact "
+            f"as approximate, e.g. \"{_cite_example(title, 'around p. 4')}\". Never state a page as exact "
             "and never say a passage is \"explicitly\" or \"clearly\" on a given "
             "page._\n"
         )
     return (
         "\n_`[p. N]` marks the start of page N. Cite the page for every fact you "
-        "take from this document, e.g. \"p. 3\"._\n"
+        f"take from this document, with the document's name, e.g. \"{_cite_example(title, 'p. 3')}\"._\n"
     )
+
+
+def _cite_example(title: str | None, page: str) -> str:
+    """The citation the page note asks for. Naming the file is what lets a
+    chip be made when several documents are attached (#1058): a bare "p. 3"
+    does not say whose page 3."""
+    return f"{title}, {page}" if title else page
 
 
 def _has_page_markers(markers: list[dict] | None) -> bool:
@@ -477,7 +509,7 @@ def build_document_segments(
         if doc.raw_text:
             markers = getattr(doc, "text_markers", None)
             body = annotate_pages(doc.raw_text, markers)
-            page_note = page_note_for(markers, annotated=body != doc.raw_text)
+            page_note = page_note_for(markers, annotated=body != doc.raw_text, title=doc.title)
             segments.append(DocumentSegment(
                 label=f"doc:{doc.title or doc.uuid}",
                 text=f"\n\n## Document: {doc.title}\n{page_note}{body}",

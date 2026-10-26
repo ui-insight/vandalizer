@@ -84,12 +84,45 @@ class TestAnswersFromTheMeasuredRun:
         )
         assert _chips(answer, "notice", "prop") == [("prop", 2, "found"), ("notice", 3, "found")]
 
-    def test_bare_pages_with_two_files_attached_still_make_no_chip(self):
+
+
+class TestBarePagesWithSeveralFiles:
+    """#1058: run 2 had four multi-file answers that wrote "[p. 3]" with no
+    file name and got no chip. A bare page now goes to the one attached
+    document whose page supports the claim, and to none otherwise."""
+
+    def test_budget_exception_from_run_2(self):
         answer = (
-            "- The sponsor notice caps the maximum direct‑cost request at **$180,000** [p. 3].\n"
-            "- The proposal draft lists a **direct‑cost total of $200,000** [p. 2]."
+            "**Answer:** No, the draft exceeds the sponsor\u2019s direct\u2011cost cap.\n\n"
+            "- Sponsor notice: maximum direct\u2011cost request is **$180,000** [p. 3].\n"
+            "- Proposal draft: **direct\u2011cost total $200,000** (Personnel $120k + Travel $30k + "
+            "Supplies $20k + Subaward $30k) [p. 2]."
         )
-        assert _chips(answer, "notice", "prop") == []
+        docs = _sources()
+        chips = derive_document_citations(answer, [docs["notice"], docs["prop"]])
+        assert [(c["document_uuid"], c["page"], c["grounding"], c.get("attribution")) for c in chips] == [
+            ("notice", 3, "found", "content"), ("prop", 2, "found", "content"),
+        ]
+
+    def test_required_material_from_run_2(self):
+        answer = (
+            "- **Budget justification** \u2013 the draft notes that it \u201cis not yet attached\u201d (p. 3).\n"
+            "- **Signed community\u2011partner letter** \u2013 a partner \u201chas promised a letter, but a "
+            "signed letter has not been received\u201d (p. 3)."
+        )
+        assert _chips(answer, "notice", "prop") == [("prop", 3, "found")]
+
+    def test_a_named_reference_keeps_its_named_attribution(self):
+        docs = _sources()
+        chips = derive_document_citations("The cap is $180,000 (sponsor-notice.pdf, p. 3).", [docs["notice"], docs["prop"]])
+        assert "attribution" not in chips[0]
+
+    def test_a_claim_two_documents_support_on_that_page_makes_no_chip(self):
+        # Every fixture's first page carries the same QA header.
+        assert _chips("These are fictional QA materials, not a real funding opportunity (p. 1).", "notice", "amend") == []
+
+    def test_a_wrong_page_makes_no_chip_rather_than_a_guess(self):
+        assert _chips("The direct-cost cap is $180,000 [p. 2].", "notice", "prop") == []
 
 
 class TestWrongCitationsAreStillCaught:
