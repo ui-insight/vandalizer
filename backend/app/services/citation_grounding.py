@@ -291,6 +291,23 @@ def ground_citation(
     return UNCHECKED, None
 
 
+def page_holding_claim(
+    answer: str, ref: tuple[int, int], ref_re: re.Pattern, pages: list[tuple[int, str]],
+) -> int | None:
+    """The one page of *pages* (``[(page, text)]``) that supports the claim the
+    reference at *ref* (start, end) closes, or None when none or several do.
+
+    A retrieved chunk that crosses a page break is labelled before the answer
+    exists, by the page that best matches the question; the claim the answer
+    then cites it for can sit on the other page (#1058).
+    """
+    claim = _claim_for_ref(answer, ref, ref_re)
+    if not claim:
+        return None
+    found = [page for page, text in pages if _judge(claim, text) == FOUND]
+    return found[0] if len(found) == 1 else None
+
+
 def _contributes(claim: str, page: str) -> bool:
     """Whether *page* states at least one of the claim's anchors."""
     total, missing = _missing_anchors(claim, page)

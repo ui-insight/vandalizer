@@ -623,6 +623,10 @@ class DocumentSegment:
     label: str
     text: str
     required: bool = False  # required segments are never trimmed
+    # KB segment only: snippet number -> [(page, text)] for a snippet whose
+    # chunk crosses a page break, so its citation can name the page that
+    # holds the claim the answer makes (#1058). Never sent to the model.
+    page_segments: dict = field(default_factory=dict)
 
 
 @dataclass

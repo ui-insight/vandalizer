@@ -63,6 +63,7 @@ from app.services.model_routing import (
 from app.services.native_token_count import count_natively, native_count_for
 from app.services.page_locator import (
     annotate_chunk_pages,
+    chunk_page_segments,
     cited_pages,
     format_page_range,
     locator_for_meta,
@@ -1802,6 +1803,7 @@ async def chat_stream(
     if not active_kbs and kb_uuid:
         active_kbs = [(kb_uuid, "")]
     kb_sources: list[dict] = []
+    kb_page_segments: dict[int, list[tuple[int, str]]] = {}
     kb_manifest: list[dict] = []
     kb_retrieval_failed = False
     # Titles of attached KBs that could not be searched this turn while
@@ -1838,6 +1840,7 @@ async def chat_stream(
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
+                kb_page_segments = kb_segment.page_segments
         except Exception as e:
             logger.error(
                 "KB context retrieval failed for kb_uuids=%s: %s",
@@ -2646,7 +2649,7 @@ async def chat_stream(
                 used_refs = _mark_used_citations(assistant_message, streamed_citations)
                 if used_refs is not None:
                     if kb_sources:
-                        assistant_message = expand_snippet_refs(assistant_message, kb_sources)
+                        assistant_message = expand_snippet_refs(assistant_message, kb_sources, kb_page_segments)
                     yield json.dumps({
                         "kind": "sources_used",
                         "content": "",
@@ -2661,7 +2664,7 @@ async def chat_stream(
                             _THINK_BLOCK_RE.sub("", seg["content"]).strip()
                         )
                         if cleaned and kb_sources:
-                            cleaned = expand_snippet_refs(cleaned, kb_sources)
+                            cleaned = expand_snippet_refs(cleaned, kb_sources, kb_page_segments)
                         if cleaned:
                             cleaned_segments.append({"kind": "text", "content": cleaned})
                     else:
@@ -3869,10 +3872,14 @@ async def _render_kb_segment(
     any_approximate = False
     any_spanning = False
     any_amendment = False
+    page_segments: dict[int, list[tuple[int, str]]] = {}
     for ref, r in enumerate(kb_results, start=1):
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
         src = meta.get("source_name", "Unknown")
+        pages_in_chunk = chunk_page_segments(content, meta)
+        if len(pages_in_chunk) > 1:
+            page_segments[ref] = pages_in_chunk
         sheet = meta.get("sheet")
         # A chunk that crosses a page break is cited by the page of the
         # passage that matches the question, or as a range when that is
@@ -3968,7 +3975,7 @@ async def _render_kb_segment(
     # cannot fit the KB evidence, failing loudly (over-budget notice) is the
     # honest outcome — an answer wearing citation chips for evidence the model
     # never saw is not.
-    return DocumentSegment(label="kb", text=kb_text, required=True), kb_sources
+    return DocumentSegment(label="kb", text=kb_text, required=True, page_segments=page_segments), kb_sources
 
 
 # The optional "[S3] " prefix is the snippet number a numbered rendering puts

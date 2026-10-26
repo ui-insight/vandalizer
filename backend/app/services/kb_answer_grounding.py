@@ -387,15 +387,37 @@ def used_snippet_refs(answer: str, sources: list[dict]) -> list[int]:
     return sorted(used)
 
 
-def expand_snippet_refs(answer: str, sources: list[dict]) -> str:
+def expand_snippet_refs(
+    answer: str,
+    sources: list[dict],
+    page_segments: dict[int, list[tuple[int, str]]] | None = None,
+) -> str:
     """Replace ``[S3]`` with the readable ``[Source: PAPPG.pdf, p. 54]``.
 
     The numbers mean something only within the turn that showed them, so the
     stored answer must not keep them: the next turn numbers its own snippets
     from 1 and reads this one back as history. A reference to a number no
     snippet carries is left as written rather than silently erased.
+
+    *page_segments* maps a snippet whose chunk crosses a page break to its
+    pages' text. Its label was chosen from the question; here each citation
+    of it names the page holding the claim it closes, when exactly one does
+    (#1058). When every citation of a snippet agrees, its chip moves to that
+    page too.
     """
+    from app.services.citation_grounding import page_holding_claim
+    from app.services.page_locator import format_page
+
     by_ref = _by_ref(sources)
+    page_segments = page_segments or {}
+    chosen: dict[int, set[int | None]] = {}
+
+    def label_for(n: int, s: dict, page: int | None) -> str:
+        if page is None:
+            return s.get("cite_label") or s.get("document_title") or f"S{n}"
+        locator = format_page(page, s.get("page_approximate"))
+        title = s.get("document_title") or f"S{n}"
+        return f"{title}, {locator}" if locator else title
 
     def expand(m: re.Match) -> str:
         labels: list[str] = []
@@ -403,7 +425,17 @@ def expand_snippet_refs(answer: str, sources: list[dict]) -> str:
             s = by_ref.get(n)
             if s is None:
                 return m.group(0)
-            labels.append(s.get("cite_label") or s.get("document_title") or f"S{n}")
+            page = None
+            if n in page_segments:
+                page = page_holding_claim(answer, m.span(), _SNIPPET_REF_RE, page_segments[n])
+                chosen.setdefault(n, set()).add(page)
+            labels.append(label_for(n, s, page))
         return f"[Source: {'; '.join(dict.fromkeys(labels))}]"
 
-    return _SNIPPET_REF_RE.sub(expand, answer)
+    expanded = _SNIPPET_REF_RE.sub(expand, answer)
+    for n, pages in chosen.items():
+        if len(pages) == 1 and None not in pages:
+            s = by_ref[n]
+            s["page"], s["page_end"] = pages.pop(), None
+            s["cite_label"] = label_for(n, s, s["page"])
+    return expanded
