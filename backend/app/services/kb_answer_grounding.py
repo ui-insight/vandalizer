@@ -338,8 +338,13 @@ def unsupported_citations(
 # those are the answer's sources; the rest were searched but not used.
 
 # "[S3]", "[S1, S3]", "[S1; S3]" or "[S1, 3]". Adjacent "[S1][S3]" are two
-# matches.
-_SNIPPET_REF_RE = re.compile(r"\[\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\]")
+# matches. gpt-oss also writes "(S1)" and bolds the number, "[**S1**]": seven
+# of twelve KB answers in #1005 run 3 left those raw, so the reader saw
+# "(S1)" where a source should be and the snippet never counted as used.
+_SNIPPET_REF_RE = re.compile(
+    r"\[\s*\**\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\**\s*\]"
+    r"|\(\s*\**\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\**\s*\)"
+)
 _DIGITS_RE = re.compile(r"\d+")
 # The filename form the prompt asked for before snippets were numbered, which
 # a model can still fall back on, e.g. after seeing it in earlier turns.
@@ -402,21 +407,27 @@ def expand_snippet_refs(
     *page_segments* maps a snippet whose chunk crosses a page break to its
     pages' text. Its label was chosen from the question; here each citation
     of it names the page holding the claim it closes, when exactly one does
-    (#1058). When every citation of a snippet agrees, its chip moves to that
-    page too.
+    (#1058). When none can be told — a summary sentence such as "these dates
+    are in the draft" carries nothing to locate — it names the chunk's whole
+    range rather than the page the question happened to match. When every
+    citation of a snippet agrees, its chip moves to that page or range too.
     """
     from app.services.citation_grounding import page_holding_claim
-    from app.services.page_locator import format_page
+    from app.services.page_locator import format_page, format_page_range
 
     by_ref = _by_ref(sources)
     page_segments = page_segments or {}
     chosen: dict[int, set[int | None]] = {}
 
     def label_for(n: int, s: dict, page: int | None) -> str:
-        if page is None:
-            return s.get("cite_label") or s.get("document_title") or f"S{n}"
-        locator = format_page(page, s.get("page_approximate"))
         title = s.get("document_title") or f"S{n}"
+        if n in page_segments and page is None:
+            pages = [p for p, _text in page_segments[n]]
+            locator = format_page_range(pages[0], pages[-1], s.get("page_approximate"))
+            return f"{title}, {locator}" if locator else title
+        if page is None:
+            return s.get("cite_label") or title
+        locator = format_page(page, s.get("page_approximate"))
         return f"{title}, {locator}" if locator else title
 
     def expand(m: re.Match) -> str:
@@ -434,8 +445,13 @@ def expand_snippet_refs(
 
     expanded = _SNIPPET_REF_RE.sub(expand, answer)
     for n, pages in chosen.items():
-        if len(pages) == 1 and None not in pages:
-            s = by_ref[n]
-            s["page"], s["page_end"] = pages.pop(), None
-            s["cite_label"] = label_for(n, s, s["page"])
+        if len(pages) != 1:
+            continue
+        s, page = by_ref[n], pages.pop()
+        if page is None:
+            span = [p for p, _text in page_segments[n]]
+            s["page"], s["page_end"] = span[0], span[-1]
+        else:
+            s["page"], s["page_end"] = page, None
+        s["cite_label"] = label_for(n, s, page)
     return expanded

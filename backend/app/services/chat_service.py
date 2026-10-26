@@ -465,7 +465,7 @@ def page_note_for(markers: list[dict] | None, *, annotated: bool, title: str | N
         )
     return (
         "\n_`[p. N]` marks the start of page N. Cite the page for every fact you "
-        f"take from this document, with the document's name, e.g. \"{_cite_example(title, 'p. 3')}\"._\n"
+        f"take from this document, with its file name (never its UUID), e.g. \"{_cite_example(title, 'p. 3')}\"._\n"
     )
 
 

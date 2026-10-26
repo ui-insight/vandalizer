@@ -35,11 +35,22 @@ def test_two_claims_on_two_pages_each_get_their_page_and_the_chip_stays():
     assert src["page"] == 3
 
 
-def test_a_claim_neither_page_supports_keeps_the_label():
+def test_a_claim_no_page_can_be_told_names_the_whole_range():
+    # Run 3 (deployed fix): the citation closed a summary sentence with
+    # nothing to locate, and kept the page the question had matched.
+    src = _source()
+    out = expand_snippet_refs(
+        "These dates are given in the proposal draft and confirmed in the sponsor notice [S1].",
+        [src], {1: [(1, DATES), (2, "Draft budget"), (3, NOTES)]},
+    )
+    assert out.endswith("[Source: proposal-draft.pdf, p. 1–3].")
+    assert (src["page"], src["page_end"]) == (1, 3)
+
+
+def test_an_unsupported_claim_also_gets_the_range_not_a_guess():
     src = _source()
     out = expand_snippet_refs("Equipment is $5,000 [S1].", [src], {1: [(1, DATES), (3, NOTES)]})
-    assert out == "Equipment is $5,000 [Source: proposal-draft.pdf, p. 3]."
-    assert src["page"] == 3
+    assert out == "Equipment is $5,000 [Source: proposal-draft.pdf, p. 1–3]."
 
 
 def test_a_single_page_snippet_is_unchanged():

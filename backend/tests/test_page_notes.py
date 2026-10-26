@@ -141,7 +141,9 @@ class TestNamesTheDocument:
     def test_measured_note_example_names_the_file(self):
         note = page_note_for(_pages(), annotated=True, title="sponsor-notice.pdf")
         assert '"sponsor-notice.pdf, p. 3"' in note
-        assert "with the document's name" in note
+        # Run 3 on the deployed note: one answer in 24 cited the document's
+        # UUID from the scope list beside its name.
+        assert "with its file name (never its UUID)" in note
 
     def test_interpolated_note_example_names_the_file(self):
         note = page_note_for(_pages(approximate=True), annotated=True, title="scan.pdf")
