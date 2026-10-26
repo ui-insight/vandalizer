@@ -8,6 +8,8 @@ Use a separate development workspace with controlled accounts. The [three fictio
 
 **First run recorded:** [2026-10-08, `gpt-oss-120b`, chat paths a and b](2026-10-08-ra-expected-checks.md). 21 of 24 passed, 3 partial, 0 failed. Path (c) and the participant sessions below are still open.
 
+**Second run recorded:** [2026-10-26, `gpt-oss-120b`, chat paths a and b, plus Budget Analyzer for path c](2026-10-26-ra-expected-checks-run2.md). Chat: 23 of 24 passed, 1 partial, 0 failed. Chips appeared on 8 of 12 attached answers, and the #1012 silence flag fired only on the one answer that read permission into silence. Budget Analyzer failed: its extraction missed the draft's ordinary budget labels, so no arithmetic rule could run.
+
 Use the configured development model to answer all 12 cases in `expected-checks.json`. Record model/configuration, exact source scope, answer, cited passage, missing/conflicting evidence, run ID and final outcome. Check dates, time zones, the $20,000 cap overrun and the difference between a promised and a signed letter manually. Mark each mismatch explicitly; a fluent answer or a high quality score is not a pass.
 
 Repeat representative cases through KB, workflow and extraction validation. Verify cancel, refresh/resume, persisted history and apply/revert without manufacturing successful scores. For agent actions, record the persisted before/after state and test approval, rejection/cancellation, denied access, interrupted streaming, refresh and retry. One accepted action must create one intended effect. Complete the model-backed learning labs and course using actual work, not seeded completion flags.
