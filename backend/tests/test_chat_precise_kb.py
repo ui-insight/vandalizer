@@ -67,6 +67,9 @@ async def test_chat_uses_precise_retrieval_and_cites_sections(precise_on, monkey
     assert [s["cite_label"] for s in sources] == [s["label"] for s in sources]
     assert sources[1]["content"] == pool[1]["content"]
     assert f"**[S2] Source: {SOURCE} · § 200.308 · part 2**" in segment.text
+    # The question found these itself: no rewording caution.
+    assert chat_service.RESCUED_SNIPPET_MARK not in segment.text
+    assert chat_service.RESCUED_SNIPPETS_NOTE not in segment.text
     # Precise retrieval stands in for the vector pool and chat's own pins.
     mocks["app.services.kb_validation_service.retrieve_kb_chunks"].assert_not_awaited()
     mocks["app.services.chat_service._retrieve_pinned_chunks"].assert_not_awaited()
@@ -90,9 +93,12 @@ async def test_a_question_that_keeps_nothing_gets_what_its_paraphrase_finds(prec
                         AsyncMock(return_value=["revision of budget and program plans"]))
     found = MagicMock(return_value=[_section_chunk(4, 1)])
     monkeypatch.setattr(kb_grounding, "paraphrase_pool", found)
-    _, sources = await _segment("We want to move money between budget lines. Is that ok?", _patched())
+    segment, sources = await _segment("We want to move money between budget lines. Is that ok?", _patched())
     assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1"]
     assert found.call_args.args[3] == ["revision of budget and program plans"]
+    # The question as asked found none of it, and the model is told so.
+    assert f"**[S1] Source: {SOURCE} · § 200.308 · part 1**\n{chat_service.RESCUED_SNIPPET_MARK}\n" in segment.text
+    assert chat_service.RESCUED_SNIPPETS_NOTE in segment.text
 
 
 @pytest.mark.asyncio
@@ -122,7 +128,7 @@ async def test_a_follow_up_is_searched_with_the_question_it_follows(precise_on, 
     for p in patches:
         p.start()
     try:
-        _, sources = await chat_service._build_kb_segment(
+        segment, sources = await chat_service._build_kb_segment(
             "kb-1", "We already used it. Can we get a second extension?", "test-model", history=history,
         )
     finally:
@@ -131,6 +137,41 @@ async def test_a_follow_up_is_searched_with_the_question_it_follows(precise_on, 
     assert asked == list(pools)
     # The condensed query's passages first, then the earlier question's.
     assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 2", f"{SOURCE} · § 200.308 · part 1"]
+    # The follow-up kept passages of its own, so none is marked.
+    assert chat_service.RESCUED_SNIPPET_MARK not in segment.text
+
+
+@pytest.mark.asyncio
+async def test_a_follow_up_only_its_earlier_question_finds_is_marked(precise_on, monkeypatch):
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
+    earlier = "How long is the one-time no-cost extension we can take ourselves?"
+    monkeypatch.setattr(kb_grounding, "_precise_pool",
+                        lambda dm, kb, q, k, floor: [_section_chunk(5, 1)] if q == earlier else [])
+    monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", AsyncMock(return_value=[]))
+    history = [
+        ModelRequest(parts=[UserPromptPart(content=earlier)]),
+        ModelResponse(parts=[TextPart(content="Up to 12 months.")]),
+    ]
+    mocks = _patched(**{
+        "app.services.kb_validation_service.condense_retrieval_query":
+            AsyncMock(return_value=("second no-cost extension after the one-time extension", 0)),
+    })
+    patches = [patch(target, new=mock) for target, mock in mocks.items()]
+    for p in patches:
+        p.start()
+    try:
+        segment, sources = await chat_service._build_kb_segment(
+            "kb-1", "We already used it. Can we get a second extension?", "test-model", history=history,
+        )
+    finally:
+        for p in patches:
+            p.stop()
+    # The earlier question's passage is about the first extension, not the
+    # second one asked about now.
+    assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1"]
+    assert chat_service.RESCUED_SNIPPET_MARK in segment.text
+    assert chat_service.RESCUED_SNIPPETS_NOTE in segment.text
 
 
 @pytest.mark.asyncio
@@ -145,12 +186,14 @@ async def test_each_part_of_a_compound_question_is_searched(precise_on, monkeypa
     monkeypatch.setattr(kb_grounding, "paraphrase_pool",
                         lambda dm, kb, q, phrases, k, floor, min_score=None:
                         cuts.append(min_score) or list(found[phrases[0]]))
-    _, sources = await _segment(message, _patched())
+    segment, sources = await _segment(message, _patched())
     split.assert_awaited_once_with(message, "test-model")
     # Each part is held to the part cut, not the paraphrase cut.
     assert cuts == [kb_retrieval.PART_MIN_SCORE] * 2
     # The question's own passage, then the part the whole question missed.
     assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1", f"{SOURCE} · § 200.309 · part 2"]
+    # Beside a passage the question kept, a part's passages are not marked.
+    assert chat_service.RESCUED_SNIPPET_MARK not in segment.text
 
 
 @pytest.mark.asyncio

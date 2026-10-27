@@ -414,6 +414,16 @@ def test_kb_chat_prompt_has_numeric_and_consistency_guardrails():
     assert "same field, period, and unit" in KB_CHAT_SYSTEM_PROMPT
 
 
+def test_kb_chat_prompt_keeps_a_rule_as_its_snippet_states_it():
+    from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
+
+    assert "State a rule with its own qualifiers" in KB_CHAT_SYSTEM_PROMPT
+    assert "Keep the snippet's force and scope" in KB_CHAT_SYSTEM_PROMPT
+    assert "Add nothing to a rule" in KB_CHAT_SYSTEM_PROMPT
+    assert "Answer every part" in KB_CHAT_SYSTEM_PROMPT
+    assert "never a condition or exception it does" in KB_CHAT_SYSTEM_PROMPT
+
+
 # ---------------------------------------------------------------------------
 # Conversation-aware retrieval query (condense)
 # ---------------------------------------------------------------------------

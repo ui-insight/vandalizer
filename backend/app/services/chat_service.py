@@ -3837,7 +3837,8 @@ async def _retrieve_kb_results(
     from app.services.document_manager import get_document_manager
 
     rag_cfg = await resolve_kb_rag_config(kb_uuid)
-    precise_queries = sub_questions or [retrieval_query or message]
+    asked_queries = sub_questions or [retrieval_query or message]
+    precise_queries = list(asked_queries)
     # A follow-up is also searched with the question it follows, the second
     # pool after the condensed one. The condensed query is one model call's
     # reading of the conversation and differs from call to call; the earlier
@@ -3879,6 +3880,13 @@ async def _retrieve_kb_results(
 
     pinned_results: list[dict] = []
     if precise:
+        # When the question as asked kept nothing, every passage is one a
+        # reworded search, a part of the question or the earlier question
+        # found, and is marked so: on the development questions such a
+        # pool missed the answer text in a third of the turns, and an answer
+        # then read a neighbouring rule as the one asked about.
+        if not any(not r.get(kb_paraphrase.RESCUED) for pool in precise_pools[:len(asked_queries)] for r in pool):
+            precise_pools = [kb_paraphrase.mark_rescued(pool) for pool in precise_pools]
         kb_results = kb_grounding.merge_pools([precise_pools], rag_cfg.k)
     elif sub_questions:
         pools = await asyncio.gather(*[
@@ -3968,6 +3976,25 @@ async def _retrieve_kb_results(
     return kb_results
 
 
+# A snippet the question as asked did not find (kb_paraphrase.RESCUED) is
+# marked, and the turn told what the mark means. On the KB accuracy eval's
+# development questions (2026-10-25) such pools missed the answer text in a
+# third of the turns, and most of those answers came back wrong with a
+# citation: the 30-day report rule given for a risk ORI must hear of at once,
+# the dependent-care rule for a dependent's travel. Without the note the model
+# reads whatever was handed over as the answer.
+RESCUED_SNIPPET_MARK = "_(Found by a reworded search, not by the question as asked.)_"
+RESCUED_SNIPPETS_NOTE = (
+    "A snippet marked *found by a reworded search* matched no search on the question as "
+    "asked: it was found by searching the question in other words, one part of it, or the "
+    "earlier question. It may state a neighbouring rule — another cost, case, party, report "
+    "or deadline — rather than the one asked about. Answer from such a snippet only when it "
+    "states the rule for the case the question asks about. When no snippet does, say that the "
+    "search found related text but not this rule, say in a line what the snippets cover, "
+    "cite none of them, and do not fill the gap from memory."
+)
+
+
 async def _render_kb_segment(
     kb_results: list[dict],
     message: str,
@@ -3984,6 +4011,7 @@ async def _render_kb_segment(
 
     from app.services.kb_grounding import CITATION_CONTENT_CHARS, _passage_label
     from app.services.kb_lead_in import with_lead_in
+    from app.services.kb_paraphrase import RESCUED
     from app.services.kb_validation_service import AMENDMENT_INSTRUCTION, amendment_label
 
     kb_sources: list[dict] = []
@@ -3991,6 +4019,7 @@ async def _render_kb_segment(
     any_approximate = False
     any_spanning = False
     any_amendment = False
+    any_rescued = False
     for ref, r in enumerate(kb_results, start=1):
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
@@ -4013,10 +4042,14 @@ async def _render_kb_segment(
         any_approximate = any_approximate or approximate
         annotated = annotate_chunk_pages(content, meta)
         any_spanning = any_spanning or annotated != content
+        rescued = bool(r.get(RESCUED)) and bool(RESCUED_SNIPPETS_NOTE)
+        any_rescued = any_rescued or rescued
         # Numbered so the answer can say which snippets it used: a filename
         # can't, when one document contributes several.
         snippet_blocks.append(
-            f"\n**[S{ref}] Source: {label}**\n{with_lead_in(annotated, r.get('lead_in'))}\n"
+            f"\n**[S{ref}] Source: {label}**\n"
+            + (f"{RESCUED_SNIPPET_MARK}\n" if rescued else "")
+            + f"{with_lead_in(annotated, r.get('lead_in'))}\n"
         )
         kb_sources.append({
             "ref": ref,
@@ -4071,6 +4104,8 @@ async def _render_kb_segment(
         )
     if any_amendment:
         kb_text += f"_{AMENDMENT_INSTRUCTION}_\n"
+    if any_rescued:
+        kb_text += f"_{RESCUED_SNIPPETS_NOTE}_\n"
     if any_spanning:
         kb_text += (
             "_A snippet that runs across pages carries `[p. N]` where the next "

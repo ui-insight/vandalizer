@@ -254,6 +254,7 @@ class TestPrecisePool:
         pool = await kp.precise_pool(_store(), KB, "program income earned by the recipient", k=4, floor=0.0,
                                      model_name="m")
         assert pool and agent.calls == 0
+        assert not any(r.get(kp.RESCUED) for r in pool)
 
     @pytest.mark.asyncio
     async def test_a_question_that_keeps_nothing_is_asked_again(self, precise, agent):
@@ -261,6 +262,19 @@ class TestPrecisePool:
         pool = await kp.precise_pool(_store(), KB, PLAIN, k=4, floor=0.0, model_name="m")
         assert agent.calls == kp.CALLS
         assert pool and all("program income" in r["content"] for r in pool)
+        # What a paraphrase found is marked as found by rewording.
+        assert all(r[kp.RESCUED] for r in pool)
+
+    @pytest.mark.asyncio
+    async def test_the_cached_passages_are_not_marked(self, precise, agent):
+        agent.output = "program income earned by the recipient\ndisposition of fees"
+        store = _store()
+        await kp.precise_pool(store, KB, PLAIN, k=4, floor=0.0, model_name="m")
+        # The same pool, from the cache: another question may keep these
+        # passages itself.
+        cached = kg.paraphrase_pool(store, KB, PLAIN, ["program income earned by the recipient",
+                                                      "disposition of fees"], k=4, floor=0.0)
+        assert cached and not any(r.get(kp.RESCUED) for r in cached)
 
     @pytest.mark.asyncio
     async def test_without_a_model_or_paraphrases_the_empty_pool_stands(self, precise, agent):

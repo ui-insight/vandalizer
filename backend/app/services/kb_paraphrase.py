@@ -215,18 +215,32 @@ async def part_pools(dm, kb_uuid: str, query: str, queries: list[str], *, k: int
     return [p for p in pools if p is not None]
 
 
+# Set on a passage the question as asked did not keep: a paraphrase of it,
+# one part of it or the question it follows found it ("rescued"). Such a pool
+# misses the answer more often than one the question kept, and an answer then
+# rests on similar text of another rule (see chat_service._render_kb_segment).
+RESCUED = "rescued"
+
+
+def mark_rescued(pool: list[dict]) -> list[dict]:
+    """Copies of ``pool``'s passages marked :data:`RESCUED`; the pools are
+    cached, so the passages themselves are left as they are."""
+    return [{**r, RESCUED: True} for r in pool]
+
+
 async def precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
                        model_name: Optional[str]) -> Optional[list[dict]]:
     """The precise pool for ``query`` (:func:`kb_grounding._precise_pool`);
-    when it keeps nothing, the passages paraphrases of ``query`` find. Either
-    way followed by its passages' neighbours in their sections
-    (:func:`kb_grounding.with_neighbours`). None when precise retrieval
-    cannot run here."""
+    when it keeps nothing, the passages paraphrases of ``query`` find, marked
+    :data:`RESCUED`. Either way followed by its passages' neighbours in their
+    sections (:func:`kb_grounding.with_neighbours`). None when precise
+    retrieval cannot run here."""
     from app.services import kb_grounding
 
     pool = await asyncio.to_thread(kb_grounding._precise_pool, dm, kb_uuid, query, k=k, floor=floor)
     if pool is None:
         return None
+    rescued = False
     if not pool and model_name:
         phrases = await paraphrases(query, model_name)
         if phrases:
@@ -236,6 +250,7 @@ async def precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
             logger.info("KB question kept no passage; %d found through %d paraphrases",
                         len(found or []), len(phrases))
             pool = found if found is not None else pool
+            rescued = bool(pool)
     if pool:
         pool = await asyncio.to_thread(kb_grounding.with_neighbours, dm, kb_uuid, query, pool, k=k)
-    return pool
+    return mark_rescued(pool) if rescued else pool
