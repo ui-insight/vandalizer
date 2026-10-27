@@ -529,7 +529,7 @@
       "issued_at": "2026-10-27",
       "paragraphs": [
         "Library items previously called Prompts are now Skills: saved instructions that can guide agentic chat. Workflow Prompt steps retain their name and purpose. A Skill is reusable guidance, not a new workflow node or an executable package of arbitrary tools.",
-        "Open a Skill in the Library and choose Use Skill, or use Choose Skill in chat. Inspect instructions before sending your task. Selecting a Skill does not send a message or run the task. One Skill is active at a time; Change Skill or Remove Skill changes the guidance for subsequent turns.",
+        "Open a Skill in the Library and choose Use Skill. Inspect instructions before sending your task. Selecting a Skill does not send a message or run the task. One Skill is active at a time; Change Skill or Remove Skill changes the guidance for subsequent turns.",
         "The conversation pins the selected instructions. Editing the Library item does not silently update an active conversation; select the Skill again to use the edit. The application checks access again when the Skill is used. If access is lost, resolve the selection instead of assuming the saved instructions still grant access.",
         "Your current request and application rules take precedence over a Skill. Its instructions cannot approve actions, expand document access, override confirmation gates or enable unavailable tools. Inspect the actual scope and result even when a trusted colleague supplied the Skill."
       ],

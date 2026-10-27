@@ -16,6 +16,6 @@ it('shows the pinned instructions as text and lets the user change or remove the
 })
 
 it('disables selection during a turn or pending request', () => {
-  render(<ActiveSkillBar skill={null} busy onChoose={vi.fn()} onRemove={vi.fn()} />)
-  expect(screen.getByRole('button', { name: 'Choose Skill' })).toBeDisabled()
+  render(<ActiveSkillBar skill={{ uuid: 's', version: 'v', title: 'Review', instructions: 'Review the award.' }} busy onChoose={vi.fn()} onRemove={vi.fn()} />)
+  expect(screen.getByRole('button', { name: 'Change Skill' })).toBeDisabled()
 })

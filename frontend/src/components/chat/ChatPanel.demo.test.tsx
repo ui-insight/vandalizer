@@ -93,10 +93,9 @@ describe('Show me what you can do', () => {
     expect(mocks.send).not.toHaveBeenCalled()
   })
 
-  it('opens the Library from the Skill chooser', () => {
+  it('keeps the empty Skill selector out of chat', () => {
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Skill' }))
-    expect(mocks.workspace.setActiveRightTab).toHaveBeenCalledWith('library')
+    expect(screen.queryByLabelText('Chat Skill')).not.toBeInTheDocument()
   })
 
   it('keeps supporting Assistant guidance compact beside Files', () => {
