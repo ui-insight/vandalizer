@@ -139,31 +139,32 @@ describe('LibraryTab prompt preview', () => {
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Summarize Award'))
     expect(await screen.findByText('Summarize the key terms of this award.')).toBeTruthy()
-    expect(screen.getByText('Use in Assistant')).toBeTruthy()
+    expect(screen.getByText('Use Skill')).toBeTruthy()
     expect(sendChatMessage).not.toHaveBeenCalled()
     expect(touchItem).not.toHaveBeenCalled()
   })
 
-  it('sends the prompt to the assistant from the Use in Assistant button', async () => {
+  it('selects the Skill without sending its instructions as a message', async () => {
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Summarize Award'))
     await screen.findByText('Summarize the key terms of this award.')
-    fireEvent.click(screen.getByText('Use in Assistant'))
-    expect(sendChatMessage).toHaveBeenCalledWith('Summarize the key terms of this award.', {
+    fireEvent.click(screen.getByText('Use Skill'))
+    expect(sendChatMessage).toHaveBeenCalledWith('', {
+      skillUuid: 'ss-uuid-1',
       documentUuids: ['doc-1'],
       folderUuids: [],
     })
     expect(touchItem).toHaveBeenCalledWith('li-1')
     // Modal closes after launching
-    expect(screen.queryByText('Use in Assistant')).toBeNull()
+    expect(screen.queryByText('Use Skill')).toBeNull()
   })
 
-  it('disables Use in Assistant and explains when the prompt has no content', async () => {
+  it('disables Use Skill and explains when the prompt has no content', async () => {
     vi.mocked(listSearchSetItems).mockResolvedValue([] as Awaited<ReturnType<typeof listSearchSetItems>>)
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Summarize Award'))
-    expect(await screen.findByText('This prompt has no content yet — click Edit to add some.')).toBeTruthy()
-    const useBtn = screen.getByText('Use in Assistant') as HTMLButtonElement
+    expect(await screen.findByText('This Skill has no content yet — click Edit to add some.')).toBeTruthy()
+    const useBtn = screen.getByText('Use Skill') as HTMLButtonElement
     expect(useBtn.disabled).toBe(true)
     fireEvent.click(useBtn)
     expect(sendChatMessage).not.toHaveBeenCalled()
@@ -174,8 +175,8 @@ describe('LibraryTab prompt preview', () => {
     fireEvent.click(screen.getByText('Summarize Award'))
     await screen.findByText('Summarize the key terms of this award.')
     fireEvent.click(screen.getByText('Edit'))
-    expect(await screen.findByText('Edit Prompt')).toBeTruthy()
-    const textarea = screen.getByPlaceholderText('Write your prompt here') as HTMLTextAreaElement
+    expect(await screen.findByText('Edit Skill')).toBeTruthy()
+    const textarea = screen.getByPlaceholderText('Write your Skill instructions here') as HTMLTextAreaElement
     expect(textarea.value).toBe('Summarize the key terms of this award.')
   })
 
@@ -228,10 +229,10 @@ describe('LibraryTab last used', () => {
     render(<LibraryTab />)
     fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
     await screen.findByText('Content unavailable')
-    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Use Skill' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Retry item content' }))
     await screen.findByText('Summarize the key terms of this award.')
-    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Use Skill' })).toBeEnabled()
   })
   it('ignores a late prompt read after closing and opening a different item', async () => {
     let release!: (value: Awaited<ReturnType<typeof listSearchSetItems>>) => void

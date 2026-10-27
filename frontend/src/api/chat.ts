@@ -1,5 +1,28 @@
 import { apiFetch, rawFetch } from './client'
-import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk } from '../types/chat'
+import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
+
+export interface ExportMessage {
+  role: 'user' | 'assistant'
+  content: string
+  tools: string[]
+  evidence: string
+}
+
+export async function exportChat(format: 'html' | 'docx' | 'xlsx', messages: ExportMessage[]): Promise<Blob> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 60_000)
+  try {
+    const res = await rawFetch('/api/chat/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, messages }), signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new Error(typeof body?.detail === 'string' ? body.detail : 'Could not export this chat. Try fewer messages or another format.')
+    }
+    return await res.blob()
+  } finally { clearTimeout(timer) }
+}
 
 export async function streamChat(
   message: string,
@@ -15,6 +38,8 @@ export async function streamChat(
   signal?: AbortSignal,
   projectUuid?: string,
   onStarted?: (identity: { conversationUuid: string; activityId: string }) => void,
+  skillUuid?: string | null,
+  skillVersion?: string,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -22,6 +47,8 @@ export async function streamChat(
     signal,
     body: JSON.stringify({
       message,
+      ...(skillUuid !== undefined ? { skill_uuid: skillUuid } : {}),
+      ...(skillVersion ? { skill_version: skillVersion } : {}),
       document_uuids: documentUuids,
       activity_id: activityId || null,
       // Several knowledge bases can be attached to one turn; retrieval fans
@@ -186,6 +213,7 @@ export interface ChatHistoryScope {
 }
 
 export interface ChatHistory {
+  active_skill?: SkillSnapshot | null
   messages: ChatMessage[]
   url_attachments: UrlAttachment[]
   file_attachments: FileAttachment[]
@@ -200,6 +228,17 @@ export interface ChatHistory {
 
 export function getHistory(conversationUuid: string) {
   return apiFetch<ChatHistory>(`/api/chat/history/${conversationUuid}`)
+}
+
+export function previewSkill(skillUuid: string) {
+  return apiFetch<SkillSnapshot>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+}
+
+export function selectConversationSkill(conversationUuid: string, skillUuid: string | null) {
+  return apiFetch<{ active_skill: SkillSnapshot | null }>(`/api/chat/history/${encodeURIComponent(conversationUuid)}/skill`, {
+    method: 'PUT',
+    body: JSON.stringify({ skill_uuid: skillUuid }),
+  })
 }
 
 export function deleteHistory(conversationUuid: string) {

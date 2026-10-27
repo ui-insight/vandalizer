@@ -25,7 +25,7 @@ def test_recognition_results_cover_the_three_declared_ai_literacy_outcomes_witho
     result = BANK.grade(answers(), expected_sha256=BANK.digest)
     assert result['passed'] is True
     assert result['credit_awarded'] is False
-    assert len(result['checks']) == 9
+    assert len(result['checks']) == 12
     assert all(check['role'] == 'required' for check in result['checks'])
     assert all(outcome['passed'] for outcome in result['outcomes'])
 
@@ -61,6 +61,19 @@ def test_unknown_submission_identities_are_rejected(submitted):
 def test_changed_requirement_digest_cannot_grade_an_old_submission():
     with pytest.raises(ValueError, match='pinned assessment bank'):
         BANK.grade(answers(), expected_sha256='0' * 64)
+
+
+def test_skills_and_exports_require_new_answers_and_reject_the_previous_bank_digest():
+    new_ids = {'ai_literacy.skill_authority', 'ai_literacy.skill_revision', 'ai_literacy.export_evidence'}
+    assert new_ids <= {question.id for question in BANK.questions}
+    assert BANK.revision == 2
+    previous_digest = 'a23e247725108465f8ea94c2de804e811e822e991ddab507a7767193250f92b0'
+    with pytest.raises(ValueError, match='pinned assessment bank'):
+        BANK.grade(answers(), expected_sha256=previous_digest)
+    previous_answers = {key: value for key, value in answers().items() if key not in new_ids}
+    result = BANK.grade(previous_answers, expected_sha256=BANK.digest)
+    assert result['passed'] is False and result['credit_awarded'] is False
+    assert {check['id'] for check in result['checks'] if not check['passed']} == new_ids
 
 
 def test_public_definition_does_not_expose_answer_keys_or_feedback():

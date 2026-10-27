@@ -78,6 +78,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContai
 import { QualityBadge } from '../library/QualityBadge'
 import { QualitySparkline } from '../library/QualitySparkline'
 import { SaveWorkflowOutputDialog } from './SaveWorkflowOutputDialog'
+import { WorkflowArtifactAction } from './WorkflowArtifactAction'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { EditorShareCallout } from '../library/EditorShareCallout'
@@ -3729,7 +3730,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                       <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
-                        From saved prompt, edit in the Library
+                        From saved Skill, edit in the Library
                       </span>
                       <button
                         type="button"
@@ -5717,6 +5718,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               Save to folder
             </button>
           </div>
+          {sessionId && <WorkflowArtifactAction key={sessionId} sessionId={sessionId} />}
           {showSaveToFolder && sessionId && (
             <SaveWorkflowOutputDialog
               sessionId={sessionId}
@@ -6647,6 +6649,11 @@ function OutputConfigCard({
 
   return (
     <fieldset disabled={!canManage} style={{ padding: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)", margin: 0, minWidth: 0 }}>
+      <label className="mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={!!(oc?.artifact as { enabled?: boolean } | undefined)?.enabled} onChange={async e => {
+        if (!openWorkflowId) return
+        try { await updateWorkflow(openWorkflowId, { output_config: { ...(oc || {}), artifact: { enabled: e.target.checked } } }); onRefresh() }
+        catch (error) { toast(describeConfigSaveError(error, 'artifact output'), 'error') }
+      }} />Create a private HTML Artifact after each completed run</label>
       <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
         <input
           type="checkbox"

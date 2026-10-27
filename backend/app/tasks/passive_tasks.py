@@ -833,6 +833,12 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     # deliverables — see the docstring.
     run_succeeded = result_doc.get("status") == "completed"
 
+    from app.services.artifacts import deliver_workflow_artifact, output_enabled
+    if run_succeeded and output_enabled(output_config):
+        outputs["artifact"] = deliver_workflow_artifact(db, result_doc, (automation or {}).get("user_id") or workflow["user_id"])
+        if trigger_event:
+            db.workflow_trigger_event.update_one({"_id": trigger_event["_id"]}, {"$set": {"output_delivery.artifact": outputs["artifact"]}})
+
     # 1. Local storage
     storage_cfg = output_config.get("storage", {})
     if run_succeeded and storage_cfg.get("enabled"):

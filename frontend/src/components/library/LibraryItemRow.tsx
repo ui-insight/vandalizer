@@ -77,7 +77,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
     item.kind === 'workflow'
       ? 'Workflow'
       : item.set_type === 'prompt'
-        ? 'Prompt'
+        ? 'Skill'
         : item.set_type === 'formatter'
           ? 'Formatter'
           : 'Extraction'

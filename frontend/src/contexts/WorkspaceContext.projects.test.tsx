@@ -136,3 +136,30 @@ describe('Project scope boundaries', () => {
     expect(result.current.activeProjectUuid).toBeNull()
   })
 })
+
+it('opens a page source conversation and consumes its navigation parameter', async () => {
+  mocks.search = { conversation: 'origin-chat' }
+  const { result } = setup()
+  await waitFor(() => expect(result.current.loadConversationId).toBe('origin-chat'))
+  expect(mocks.navigate.mock.lastCall![0].search(mocks.search)).toEqual(expect.objectContaining({ conversation: undefined, mode: 'chat' }))
+  expect(result.current.pendingChatMessage).toBeNull()
+})
+
+it('waits for the project scope before handing a pinned Skill to chat', async () => {
+  let finish!: (value: ProjectOverview) => void
+  mocks.getProject.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  mocks.search = { project: 'a', skill: 'skill-a' }
+  const { result } = setup()
+  expect(result.current.pendingChatMessage).toBeNull()
+  await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('a'))
+  await act(async () => { finish(project('a')) })
+  await waitFor(() => expect(result.current.pendingChatMessage).toEqual(expect.objectContaining({ message: '', skillUuid: 'skill-a' })))
+  expect(result.current.activeProjectUuid).toBe('a')
+})
+
+it('retains a page source workflow run until the editor consumes it once', () => {
+  mocks.search = { workflow: 'workflow-a', run: 'run-a', mode: 'files' }
+  const { result } = setup()
+  expect(result.current.consumeWorkflowSession()).toBe('run-a')
+  expect(result.current.consumeWorkflowSession()).toBeNull()
+})

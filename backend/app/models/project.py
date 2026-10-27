@@ -12,7 +12,7 @@ PROJECT_STATES = ("draft", "active", "submitted", "awarded", "closeout", "archiv
 # Capability kinds a project can pin. Pins are *references* to existing
 # user/team-owned artifacts — pinning never moves or copies the artifact, so a
 # workflow can be pinned into many projects and stay in the owner's library.
-PIN_TYPES = ("workflow", "extraction", "automation", "knowledge_base")
+PIN_TYPES = ("workflow", "extraction", "automation", "knowledge_base", "skill", "artifact")
 
 # Project-local collaborator roles. Deliberately lighter than Team roles: a
 # Project ACL is for sharing one unit of work (read-mostly), not running an org.
@@ -42,6 +42,7 @@ class Project(Document):
     # collection auto-ingests every file dropped into the project, so
     # "chat with this project" works with no KB-building. Set at creation.
     kb_uuid: Optional[str] = None
+    default_skill_uuid: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 

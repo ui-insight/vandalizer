@@ -110,3 +110,6 @@ export function listProjectMembers(uuid: string) {
 export function removeProjectMember(uuid: string, memberUserId: string) {
   return apiFetch<{ ok: boolean }>(`/api/projects/${uuid}/members/${memberUserId}`, { method: 'DELETE' })
 }
+
+export const getProjectDefaultSkill = (uuid: string) => apiFetch<{ active_skill: import('../types/chat').SkillSnapshot | null }>(`/api/projects/${encodeURIComponent(uuid)}/default-skill`)
+export const setProjectDefaultSkill = (uuid: string, skillUuid: string | null) => apiFetch(`/api/projects/${encodeURIComponent(uuid)}/default-skill`, { method: 'PUT', body: JSON.stringify({ skill_uuid: skillUuid }) })

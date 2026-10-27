@@ -20,9 +20,39 @@ You can still ask the chat free-form questions. The difference shows up when the
 
 ---
 
+## Reusing instructions with Skills
+
+Library **Skills** replace the former Library Prompts. Existing saved instructions keep their content, links, and sharing. Workflow **Prompt** nodes remain reasoning steps in the workflow editor.
+
+Open **Library → Skills**, preview an item, and choose **Use Skill**. This attaches the instructions to the current chat without sending a message or running tools. Then enter the task you want the Assistant to perform. Above the composer, **Inspect instructions** shows the saved instructions; **Change Skill** opens the Library and **Remove Skill** detaches them.
+
+One Skill can be active at a time. The conversation keeps the selected instruction version across follow-up messages and reopening. Editing the Library item does not change an existing chat's version; select it again to use the edits. New chats start without a Skill. If access is removed or the item is deleted, select another Skill or remove it before continuing.
+
+Skills guide the Assistant's use of its existing tools. They do not grant access to additional documents, approve actions, or install executable scripts. Automatic Skill discovery and bundled resources are later roadmap work.
+
+In project details, **Skills → Pin a Skill** keeps reusable instructions close to the work. **Use in chat** selects one without submitting a message. Project owners and editors can select and save one **Default Skill** for new project chats. Each new chat loads the accessible current version; existing conversations keep their selected version, including an explicit removal. Changing or removing a default never rewrites earlier chats. If the default is unavailable, retry, choose another Skill, or explicitly continue without one. Project membership and pinning do not grant access to a private Skill.
+
+## Copying and exporting chats
+
+Each completed message has **Copy** and **Export** controls. The composer also offers these controls for the full conversation. Choose **HTML page**, **Word (.docx)**, or **Excel (.xlsx)**; PDF, CSV, and Text remain available. Conversation exports are available once the response finishes or is stopped.
+
+HTML is a standalone downloadable transcript. Word preserves headings, lists, tables, code, and readable link destinations. Excel includes the full transcript on a Conversation sheet and each Markdown table on its own numbered sheet. Plain numeric table values become numbers; identifiers with leading zeros and formula-like text remain text. Long transcript entries are split into numbered parts. Very long table cells return a clear error so you can choose HTML or Word instead.
+
+Exports include readable tool summaries, recorded sources, and warnings about unconfirmed claims or interrupted responses. They omit thinking traces and hidden Skill instructions. Exporting uses no model credits and creates no public link.
+
+The rating buttons have been removed. Use the existing **Support** control for help; historical ratings remain in Support Center.
+
+## Hosted Artifacts
+
+Choose **Export → Save as Artifact**, or ask the Assistant to create an HTML report. The Assistant previews the page and asks for approval before saving it privately. Ask for changes to create a new revision. Open the saved card to inspect, edit, download, or share it; find saved pages through **Files → Pages** or **Library → Open saved Artifacts**. Search, sort, and paginate to return to older pages. Project details include their own Pages section, and owners see links back to a recorded originating chat or workflow run. Adding a page to a project preserves its existing access restrictions.
+
+Private links require sign-in and your permission. You can grant one team read access, or explicitly publish the selected revision for anyone with its public link. New edits do not change the published revision until you publish again. **Unpublish and revoke link** disables the public URL. Downloads and already loaded copies cannot be recalled.
+
+Workflows also offer **Save as Artifact** on completed results and an output setting that creates a private artifact after each run. Pages support static HTML/CSS and embedded raster images; scripts, forms, and remote assets are blocked. See [Hosted HTML Artifacts](./HTML_ARTIFACTS.md) for limits and sharing details.
+
 ## What you can ask the chat to do
 
-The chat has 49 tools at its disposal. You don't need to know the tool names — describing what you want is enough.
+The chat has tools for the tasks below. You don't need to know the tool names — describing what you want is enough.
 
 ### Finding things
 

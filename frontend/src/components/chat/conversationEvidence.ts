@@ -38,6 +38,8 @@ export function conversationEvidence(message: ChatMessage, names: Record<string,
   }
   if (message.interruption) lines.push(message.interruption === 'stopped' ? 'Response stopped; this is partial output. Server work may continue.' : 'Connection interrupted; this is partial output. Server work may continue.')
   if (message.unsupported_figures?.length) lines.push(`Unconfirmed figures: ${message.unsupported_figures.join(', ')}. Check these against the source.`)
+  if (message.unsupported_citations?.length) lines.push(`Unsupported citations: ${message.unsupported_citations.join(', ')}. The retrieved text does not support the claim; check the originals.`)
+  if (message.silence_inferences?.length) lines.push(`Inferences from missing information: ${message.silence_inferences.join(' ')}. A gap in the sources does not establish a rule.`)
   if (message.citations?.length) {
     lines.push('Source references (inspect the originals before relying on the answer):')
     message.citations.forEach((source, index) => {

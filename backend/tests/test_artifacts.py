@@ -1,0 +1,286 @@
+"""Artifact contracts, authorization and immutable-publication boundaries."""
+from copy import deepcopy
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from bs4 import BeautifulSoup
+from fastapi import HTTPException
+
+from app.config import Settings
+from app.dependencies import get_current_user, get_settings
+from app.services import artifacts
+from app.services.access_control import TeamAccessContext
+from tests.test_chat_routes import _auth, _make_user
+
+
+class Collection:
+    def __init__(self):
+        self.docs = []
+
+    def matches(self, doc, query):
+        for key, value in query.items():
+            if key == "$or":
+                if not any(self.matches(doc, q) for q in value):
+                    return False
+            elif isinstance(value, dict) and "$in" in value:
+                if doc.get(key) not in value["$in"]:
+                    return False
+            elif doc.get(key) != value:
+                return False
+        return True
+
+    def find_one(self, query):
+        return deepcopy(next((d for d in self.docs if self.matches(d, query)), None))
+
+    def find_one_and_update(self, query, update, upsert=False, **kwargs):
+        doc = next((d for d in self.docs if self.matches(d, query)), None)
+        if doc is None and upsert:
+            doc = {**query, **deepcopy(update.get("$setOnInsert", {}))}
+            self.docs.append(doc)
+        if doc is None:
+            return None
+        doc.update(deepcopy(update.get("$set", {})))
+        for key, value in update.get("$push", {}).items():
+            doc.setdefault(key, []).append(deepcopy(value))
+        for key, value in update.get("$addToSet", {}).items():
+            if value not in doc.setdefault(key, []):
+                doc[key].append(value)
+        for key, value in update.get("$pull", {}).items():
+            doc[key] = [v for v in doc.get(key, []) if v != value]
+        return deepcopy(doc)
+
+    def update_one(self, query, update):
+        return self.find_one_and_update(query, update)
+
+
+@pytest.fixture
+def db():
+    return SimpleNamespace(html_artifacts=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
+
+
+def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):
+    return artifacts.create(db, owner, "Review", html, key, {"kind": "chat", "conversation_uuid": "private-chat"})
+
+
+def test_sanitized_self_contained_html_has_no_active_or_remote_elements():
+    html, warnings = artifacts.clean_html('''<html><head><base href="https://evil.test"><style>body{color:red;background:url(https://evil.test/track)}</style></head><body onload="steal()"><script>steal()</script><iframe src="/api/auth/me"></iframe><form action="https://evil.test"><input name="secret"></form><svg onload="steal()"></svg><img src="https://evil.test/track"><img src="data:image/png;base64,AAAA"><a href="javascript:steal()">bad</a><h1>Report</h1></body></html>''', 'Test <script>')
+    soup = BeautifulSoup(html, "html.parser")
+    assert not soup.select("script, iframe, form, input, svg, base")
+    assert "onload" not in html
+    assert soup.select_one('a').get("href") is None
+    assert all(not img.get("src", "").startswith("http") for img in soup.select("img"))
+    csp = soup.select_one('meta[http-equiv="Content-Security-Policy"]')["content"]
+    assert "sandbox" in csp and "script-src 'none'" in csp and "connect-src 'none'" in csp
+    assert "style-src 'unsafe-inline'" in csp and "img-src data:" in csp
+    assert soup.h1.text == "Report" and warnings
+
+
+def test_create_retry_and_revision_cas_and_public_pin(db):
+    doc = make(db)
+    assert make(db)["uuid"] == doc["uuid"] and len(db.html_artifacts.docs) == 1
+    with pytest.raises(HTTPException) as exc:
+        make(db, html="<p>Different payload</p>")
+    assert exc.value.status_code == 409
+    published = artifacts.publish(db, doc, doc["latest_revision"])
+    changed = artifacts.revise(db, published, "Changed", "<p>New private content</p>", published["latest_revision"])
+    assert changed["published_revision"] == doc["latest_revision"]
+    assert "Original" in artifacts.revision(changed, changed["published_revision"])["html"]
+    assert "New private content" in artifacts.revision(changed)["html"]
+    retry = artifacts.revise(db, changed, "Changed", "<p>New private content</p>", published["latest_revision"])
+    assert len(retry["revisions"]) == 2
+    with pytest.raises(HTTPException) as exc:
+        artifacts.revise(db, published, "Competing edit", "<p>Conflict</p>", published["latest_revision"])
+    assert exc.value.status_code == 409
+
+
+def test_size_revision_limit_and_html_workflow_inputs(db):
+    with pytest.raises(HTTPException, match="256 KiB"):
+        artifacts.clean_html("é" * 140000, "Large")
+    with pytest.raises(HTTPException, match="valid Unicode"):
+        artifacts.clean_html("\ud800", "Invalid")
+    assert 'href=' not in artifacts.clean_html('<a href="https://[">Malformed link</a>', "Links")[0]
+    doc = make(db)
+    doc["revisions"] *= 25
+    with pytest.raises(HTTPException, match="25 revisions"):
+        artifacts.revise(db, doc, "Next", "<p>Next</p>", doc["latest_revision"])
+    assert artifacts.workflow_html('```html\n<main>Report</main>\n```', "Report") == "<main>Report</main>"
+    assert "<table>" in artifacts.workflow_html([{"Amount": 25}], "Report")
+    with pytest.raises(HTTPException, match="binary file"):
+        artifacts.workflow_html({"type": "file_download", "data": "base64"}, "Report")
+
+
+def test_workflow_delivery_retry_has_one_private_artifact_and_provenance(db):
+    db.workflow.docs.append({"_id": "wf1", "name": "Award review", "user_id": "testuser"})
+    result = {"_id": "run1", "workflow": "wf1", "session_id": "session1", "status": "completed", "final_output": {"output": "<main><h1>Workflow</h1></main>"}}
+    db.workflow_result.docs.append(deepcopy(result))
+    first = artifacts.deliver_workflow_artifact(db, result, "testuser")
+    second = artifacts.deliver_workflow_artifact(db, result, "testuser")
+    assert first == second and first["status"] == "completed"
+    assert len(db.html_artifacts.docs) == 1
+    doc = artifacts.get(db, first["artifact_uuid"])
+    assert doc["public_token"] is None and doc["team_id"] is None
+    assert artifacts.revision(doc)["source"]["session_id"] == "session1"
+    assert db.workflow_result.docs[0]["hosted_artifact_uuid"] == doc["uuid"]
+    result["status"] = "failed"
+    failure = artifacts.deliver_workflow_artifact(db, result, "testuser")
+    assert failure["status"] == "failed" and db.workflow_result.docs[0]["delivery_failures"]
+
+
+@pytest.fixture
+def route_env(db):
+    from app.main import app
+    user = _make_user()
+    settings = Settings(artifact_public_sharing_enabled=True)
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_settings] = lambda: settings
+    access = AsyncMock(return_value=TeamAccessContext())
+    with patch("app.routers.artifacts.get_sync_db", return_value=db), patch("app.routers.artifacts.access_control.get_team_access_context", access):
+        yield SimpleNamespace(user=user, settings=settings, access=access)
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_settings, None)
+
+
+@pytest.mark.asyncio
+async def test_private_access_team_membership_and_owner_only_mutations(client, db, route_env):
+    doc = make(db)
+    uid, rev = doc["uuid"], doc["latest_revision"]
+    cookies, headers = _auth()
+    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 200
+    route_env.user.user_id = "other-user"
+    for suffix in ["", f"/revisions/{rev}/content", f"/revisions/{rev}/source"]:
+        assert (await client.get(f"/api/artifacts/{uid}{suffix}")).status_code == 404
+    db.html_artifacts.update_one({"uuid": uid}, {"$set": {"team_id": "team-a"}})
+    route_env.access.return_value = TeamAccessContext(team_uuids={"team-a"})
+    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 200
+    assert (await client.get(f"/api/artifacts/{uid}/revisions/{rev}/content")).status_code == 200
+    assert (await client.get(f"/api/artifacts/{uid}/revisions/{rev}/source")).status_code == 404
+    assert (await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 404
+    route_env.access.return_value = TeamAccessContext()
+    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_public_revision_no_private_metadata_revocation_rotation_and_operator_switch(client, db, route_env):
+    doc = make(db)
+    uid, rev = doc["uuid"], doc["latest_revision"]
+    cookies, headers = _auth()
+    response = await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
+    token = response.json()["public_token"]
+    artifacts.revise(db, artifacts.get(db, uid), "Secret draft", "<p>Not published</p>", rev)
+    response = await client.get(f"/api/artifacts/public/{token}")
+    assert response.json() == {"title": "Review", "revision": rev}
+    content = await client.get(f"/api/artifacts/public/{token}/content")
+    assert "Original" in content.text and "Not published" not in content.text
+    assert "private-chat" not in content.text
+    assert content.headers["cache-control"] == "no-store"
+    assert content.headers["x-frame-options"] == "SAMEORIGIN"
+    assert content.headers["content-security-policy"] == artifacts.CONTENT_CSP
+    route_env.settings.artifact_public_sharing_enabled = False
+    assert (await client.get(f"/api/artifacts/public/{token}/content")).status_code == 404
+    assert (await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 403
+    route_env.settings.artifact_public_sharing_enabled = True
+    assert (await client.delete(f"/api/artifacts/{uid}/publication", cookies=cookies, headers=headers)).status_code == 200
+    assert (await client.get(f"/api/artifacts/public/{token}/content")).status_code == 404
+    response = await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
+    assert response.json()["public_token"] != token
+    assert (await client.delete(f"/api/artifacts/{uid}", cookies=cookies, headers=headers)).status_code == 200
+    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 404
+    assert (await client.get(f'/api/artifacts/public/{response.json()["public_token"]}/content')).status_code == 404
+    with pytest.raises(HTTPException) as exc:
+        make(db)
+    assert exc.value.status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_private_denied_public_allowed(client, db):
+    doc = make(db)
+    public = artifacts.publish(db, doc, doc["latest_revision"])
+    with patch("app.routers.artifacts.get_sync_db", return_value=db):
+        assert (await client.get(f'/api/artifacts/{doc["uuid"]}')).status_code == 401
+        response = await client.get(f'/api/artifacts/public/{public["public_token"]}/content')
+        assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_chat_tool_approval_is_bound_to_exact_html_and_keeps_skill_provenance(db):
+    from app.services.chat_artifact_tools import create_html_artifact, revise_html_artifact
+    from app.services.chat_deps import AgenticChatDeps
+    conversation = SimpleNamespace(uuid="chat1", pending_confirmations=[], save=AsyncMock(), active_skill=SimpleNamespace(uuid="skill1", version="v1"))
+    deps = AgenticChatDeps(user=_make_user(), user_id="testuser", team_id=None, team_access=TeamAccessContext(), organization_id=None, system_config_doc={}, model_name="test", conversation=conversation, turn_marker=1)
+    context = SimpleNamespace(deps=deps)
+    with patch("app.services.chat_artifact_tools.get_sync_db", return_value=db):
+        preview = await create_html_artifact(context, "Report", "<h1>Approved content</h1>", confirmed=True)
+        assert preview["needs_confirmation"] and not db.html_artifacts.docs
+        deps.turn_marker = 2
+        changed = await create_html_artifact(context, "Report", "<h1>Changed secretly</h1>", confirmed=True)
+        assert changed["needs_confirmation"] and not db.html_artifacts.docs
+        saved = await create_html_artifact(context, "Report", "<h1>Approved content</h1>", confirmed=True)
+        assert saved["artifact_uuid"]
+        doc = artifacts.get(db, saved["artifact_uuid"])
+        assert artifacts.revision(doc)["source"]["skill"] == {"uuid": "skill1", "version": "v1"}
+        assert not doc["public_token"]
+        deps.user_id = "other"
+        denied = await revise_html_artifact(context, doc["uuid"], doc["latest_revision"], "Hijack", "<h1>Hijack</h1>", True)
+        assert "error" in denied
+
+
+@pytest.mark.parametrize("passive", [False, True])
+def test_manual_worker_delivers_only_manual_runs_to_the_launcher(passive):
+    from tests.test_workflow_tasks import _mock_db, _make_workflow_doc, _make_result_doc, _fake_oid
+    from app.tasks.workflow_tasks import execute_workflow_task
+    workflow = _make_workflow_doc(step_ids=[])
+    workflow["output_config"] = {"artifact": {"enabled": True}}
+    result = _make_result_doc(workflow_id=workflow["_id"])
+    result["is_passive"] = passive
+    db = _mock_db(workflow_doc=workflow, result_doc=result, smart_docs=[{"uuid": "uuid1", "raw_text": "text"}])
+    db.activity_event.find_one.return_value = {"user_id": "launcher"}
+    def update(query, changes):
+        result.update(changes.get("$set", {}))
+        return SimpleNamespace(modified_count=1)
+    db.workflow_result.update_one.side_effect = update
+    engine = MagicMock()
+    engine.execute.return_value = ("<main>Result</main>", [])
+    engine.usage = SimpleNamespace(tokens_in=0, tokens_out=0)
+    with patch("app.tasks.workflow_tasks._get_db", return_value=db), patch("app.services.workflow_engine.build_workflow_engine", return_value=engine), patch("app.services.artifacts.deliver_workflow_artifact") as deliver, patch("app.tasks.quality_tasks.auto_validate_workflow"), patch("app.tasks.activity_tasks.generate_activity_description_task"):
+        execute_workflow_task(workflow_result_id=str(result["_id"]), workflow_id=str(workflow["_id"]), trigger_step_data={"doc_uuids": ["uuid1"]}, model="test", activity_id=str(_fake_oid()))
+    if passive:
+        deliver.assert_not_called()
+    else:
+        deliver.assert_called_once_with(db, result, "launcher")
+        assert result["status"] == "completed"
+
+
+@pytest.mark.parametrize("status", ["completed", "failed"])
+def test_passive_output_delivery_uses_the_workflow_owner_and_never_publishes(status):
+    from bson import ObjectId
+    from app.tasks.passive_tasks import process_outputs
+    db = MagicMock()
+    result = {"_id": ObjectId(), "workflow": ObjectId(), "session_id": "passive-1", "status": status}
+    db.workflow_result.find_one.return_value = result
+    db.workflow.find_one.return_value = {"_id": result["workflow"], "user_id": "owner", "output_config": {"artifact": {"enabled": True}}}
+    db.workflow_trigger_event.find_one.return_value = None
+    db.automation.find_one.return_value = None
+    with patch("app.tasks.passive_tasks.get_sync_db", return_value=db), patch("app.services.artifacts.deliver_workflow_artifact", return_value={"status": "completed", "artifact_uuid": "private"}) as deliver:
+        output = process_outputs(str(result["_id"]))
+    if status == "completed":
+        deliver.assert_called_once_with(db, result, "owner")
+        assert output["artifact"]["artifact_uuid"] == "private"
+    else:
+        deliver.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_workflow_save_route_authorizes_before_reading_run_output(client, db, route_env):
+    cookies, headers = _auth()
+    run = {"workflow": "wf1", "session_id": "run1", "status": "completed", "final_output": {"output": "<main>Run output</main>"}}
+    with patch("app.services.workflow_service._get_authorized_workflow_result", AsyncMock(return_value=None)) as authorize:
+        response = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
+        assert response.status_code == 404 and not db.html_artifacts.docs
+        authorize.return_value = SimpleNamespace(model_dump=lambda: run)
+        first = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
+        again = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
+    assert first.status_code == again.status_code == 200
+    assert first.json()["uuid"] == again.json()["uuid"]
+    assert first.json()["source"]["session_id"] == "run1"
+    assert first.json()["public_token"] is None

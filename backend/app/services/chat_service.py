@@ -1500,6 +1500,7 @@ async def chat_stream(
     user: Optional[User] = None,
     team_access: Optional[TeamAccessContext] = None,
     onboarding_context=None,
+    active_skill=None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2077,7 +2078,7 @@ async def chat_stream(
     # (the whole conversation is a distinct behavioral mode); everything else
     # uses ONE base per agent type so the cached prefix never shifts when the
     # user attaches a doc or a KB lookup hits/misses mid-conversation.
-    if is_first_session and not (kb_sources or have_context or active_kbs):
+    if is_first_session and not (kb_sources or have_context or active_kbs or active_skill):
         instruction_base = FIRST_SESSION_SYSTEM_PROMPT
     elif user and team_access:
         instruction_base = AGENTIC_CHAT_SYSTEM_PROMPT
@@ -2087,6 +2088,9 @@ async def chat_stream(
     # Branding is deployment-stable, so branded instructions stay byte-stable.
     _org_name = (sys_config_doc or {}).get("org_name") or ""
     instructions_text = _brand_org_text(instruction_base, _org_name)
+    from app.services.skill_service import skill_instructions
+
+    instructions_text += skill_instructions(active_skill)
     reminder_bundle = "\n\n".join(
         _wrap_system_reminder(b) for b in reminder_blocks if b and b.strip()
     )

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 const STEPS = [
   {
     title: 'Welcome to Vandalizer 5.0',
-    body: 'Use the Assistant to ask questions and carry out tasks. Open Files alongside the Library to run a saved prompt, extraction or workflow on your documents. On smaller screens, use the pane buttons to switch between them.',
+    body: 'Use the Assistant to ask questions and carry out tasks. Open the Library to select a Skill that guides your chat, or run an extraction or workflow on your documents. On smaller screens, use the pane buttons to switch between them.',
   },
   {
     title: 'Start with your sources',

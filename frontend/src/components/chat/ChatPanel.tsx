@@ -1,6 +1,4 @@
-import DOMPurify from 'dompurify'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
-import { marked } from 'marked'
 import { approvalHistoryFor } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
@@ -9,7 +7,7 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
-import { conversationToCsv, conversationToText, exportMessageParts, exportRoleLabel } from './conversationExport'
+import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { RAInbox } from './RAInbox'
@@ -20,6 +18,7 @@ import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { PlanChecklist } from './PlanChecklist'
 import { MemoryPanel } from './MemoryPanel'
+import { ActiveSkillBar } from './ActiveSkillBar'
 import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { AttachKBModal } from './AttachKBModal'
@@ -27,7 +26,6 @@ import { useChat } from '../../hooks/useChat'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { isCertificationWriteResult } from '../../lib/certificationEvents'
 import { useChatWriteAnnouncer } from '../../lib/chatWrites'
-import { openPrintPage } from '../../lib/printPage'
 import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
 import { CertificationChatRecovery } from '../certification/CertificationChatRecovery'
 import { useProject } from '../../hooks/useProjects'
@@ -139,17 +137,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     send,
     stop,
     loadHistory,
+    activeSkill,
+    initializeProjectSkill,
+    projectSkillBlocked,
+    selectSkill,
+    isSelectingSkill,
     setActivity,
   } = useChat({ onLiveToolResult: result => {
     if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, setActiveRightTab, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
   const { project: scopedProject } = useProject(activeProjectUuid ?? '')
+  useEffect(() => {
+    if (!conversationToLoad && !pendingMessage?.skillUuid) void initializeProjectSkill(activeProjectUuid)
+  }, [activeProjectUuid, conversationToLoad, pendingMessage?.skillUuid, initializeProjectSkill])
+
   const projectFileCount = scopedProject?.capabilities?.files.count ?? 0
   const projectIndexed = scopedProject?.capabilities?.knowledge.documents ?? 0
   const projectEmpty = !!activeProjectUuid && projectFileCount === 0
@@ -431,14 +438,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
-    if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
+    if (pendingMessage && pendingMessage !== pendingHandled.current && (!projectSkillBlocked || !!pendingMessage.skillUuid) && !isStreaming && !isLoadingHistory && !isSelectingSkill) {
       pendingHandled.current = pendingMessage
       const docs = pendingMessage.documentUuids ?? selectedDocUuids
       const folders = pendingMessage.folderUuids ?? selectedFolderUuids
-      send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
+      if (pendingMessage.skillUuid) {
+        void selectSkill(pendingMessage.skillUuid).then(selected => { if (selected) focusChat() })
+      } else {
+        send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
+      }
       onPendingMessageConsumed?.()
     }
-  }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
+  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, selectSkill, focusChat, send, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids])
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
@@ -544,7 +555,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [justDroppedUuids])
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    if (isLoadingHistory || isStreaming) return false
+    if (isLoadingHistory || isStreaming || isSelectingSkill || projectSkillBlocked) return false
     if (conversationUuid && !activityId) {
       toast('Reopen this conversation from Activity before sending.', 'info')
       return false
@@ -596,7 +607,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleRunDemo = () => {
     // Once the user brings their own sources, demonstrate value on those
     // sources through the normal send path (including processing readiness).
-    if (hasDocContext || activeKBs.length > 0 || activeProjectUuid) {
+    if (hasDocContext || activeKBs.length > 0 || activeProjectUuid || activeSkill) {
       handleSend('Show me what you can do with the content attached to this chat. Start with a brief summary, extract the most useful facts or action items, and cite the sources. Suggest a relevant next step based on what you find.')
       return
     }
@@ -631,11 +642,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // errored out counts as "ready" (isDocReady), so the turn fires and the
   // backend explains the failure rather than the message hanging forever.
   useEffect(() => {
-    if (!heldMessage || anySelectedProcessing || chatUploads.uploading || linkLoading || isStreaming) return
+    if (!heldMessage || projectSkillBlocked || anySelectedProcessing || chatUploads.uploading || linkLoading || isStreaming || isSelectingSkill || isLoadingHistory) return
     const { message, includeOnboardingContext } = heldMessage
     setHeldMessage(null)
     handleSendRef.current(message, includeOnboardingContext)
-  }, [heldMessage, anySelectedProcessing, chatUploads.uploading, linkLoading, isStreaming])
+  }, [heldMessage, projectSkillBlocked, anySelectedProcessing, chatUploads.uploading, linkLoading, isStreaming, isSelectingSkill, isLoadingHistory])
 
   const attachLoading = chatUploads.uploading || linkLoading
   const handleAttachFile = (files: File[]) => {
@@ -767,31 +778,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (activeProjectUuid && activeProjectTitle) scopeNamesRef.current[activeProjectUuid] = activeProjectTitle
   }, [selectedDocNames, selectedFolderNames, activeKBs, activeProjectUuid, activeProjectTitle])
 
-  const handleExport = (format: string) => {
-    const names = scopeNamesRef.current
-    if (format === 'text') {
-      const blob = new Blob([conversationToText(messages, names)], { type: 'text/plain' })
-      downloadBlob(blob, 'conversation.txt')
-    } else if (format === 'csv') {
-      const blob = new Blob([conversationToCsv(messages, names)], { type: 'text/csv' })
-      downloadBlob(blob, 'conversation.csv')
-    } else if (format === 'pdf') {
-      const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-      const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
-      table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px;text-align:left;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere}h1,h2,h3{break-after:avoid}.evidence{margin-top:12px;border-top:1px solid #ccc;padding-top:8px;font-size:12px;overflow-wrap:anywhere}.msg{overflow-wrap:anywhere;margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
-      .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}
-      .tool-data{color:#4b5563;font-size:12px;margin:8px 0;overflow-wrap:anywhere}</style></head>
-      <body>${messages.map(m => {
-        const { tools, evidence } = exportMessageParts(m, names)
-        const parts = [DOMPurify.sanitize(marked.parse(m.content, { async: false }))]
-        for (const line of tools) parts.push(`<div class="tool-data">${escHtml(line)}</div>`)
-        if (evidence) parts.push(`<div class="evidence">${escHtml(evidence)}</div>`)
-        return `<div class="msg ${m.role}"><div class="role">${exportRoleLabel(m)}</div><div>${parts.join('')}</div></div>`
-      }).join('')}</body></html>`
-      openPrintPage(html)
-    }
-  }
-
   const homeActionsDisabled = isLoadingHistory || attachLoading || !!processingDoc
   const showFirstSessionHome = workspaceMode === 'chat' && effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
   const showReturningHome = workspaceMode === 'chat' && !effectiveFirstSession
@@ -911,6 +897,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {isLoadingHistory && <div role="status" className="px-4 py-3 text-sm text-gray-600">Loading conversation…</div>}
       {/* Keep one composer mounted across home, source selection, and chat. */}
       <div className="chat-composer-slot">
+        {projectSkillBlocked && <div className="flex gap-3 px-4 py-2 text-sm"><button className="underline" onClick={() => void initializeProjectSkill(activeProjectUuid, true)}>Retry default Skill</button><button className="underline" onClick={() => void selectSkill(null)}>Continue without Skill</button></div>}
+        <ActiveSkillBar
+          skill={activeSkill ?? null}
+          busy={isStreaming || isLoadingHistory || isSelectingSkill}
+          onChoose={() => setActiveRightTab('library')}
+          onRemove={() => { void selectSkill(null) }}
+        />
+        {isSelectingSkill && <p role="status" className="px-4 py-2 text-sm">Updating Skill…</p>}
         {showHome && <div className="home-compose-heading">
           <p className="home-eyebrow">{branding.orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</p>
           <h2>What would you like to get done?</h2>
@@ -933,13 +927,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           onAttachLink={handleAttachLink}
           onAddKnowledge={() => setShowAttachKB(true)}
           disabled={false}
-          sendDisabled={attachLoading || isLoadingHistory}
+          sendDisabled={attachLoading || isLoadingHistory || isSelectingSkill || projectSkillBlocked}
           isStreaming={isStreaming}
           onStop={stop}
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           onModelsLoaded={modelPreference.setModels}
-          onExport={handleExport}
+          exportActions={<ChatExportActions messages={messages} scope="conversation" names={scopeNamesRef.current} artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }} disabled={isStreaming || isLoadingHistory} />}
           onNewChat={() => { triggerNewChat(); focusChat() }}
           hasMessages={messages.length > 0}
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
@@ -1271,10 +1265,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 )}
                 <div style={isExcluded ? { opacity: 0.5 } : undefined}>
                   <ChatMessage
+                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
                     message={msg}
-                    messageIndex={i}
+                    exportNames={scopeNamesRef.current}
                     approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming)}
-                    conversationUuid={conversationUuid || undefined}
                     onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
                   />
                 </div>
@@ -1292,6 +1286,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Streaming: thinking-only phase (no text or tools yet) */}
         {isStreaming && thinkingContent && !streamingContent && segments.length === 0 && (
           <ChatMessage
+                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: '' }}
             streamingThinking={thinkingContent}
             activeToolCalls={activeToolCalls}
@@ -1304,6 +1299,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Streaming: segments have started (text and/or tools) */}
         {isStreaming && segments.length > 0 && (
           <ChatMessage
+                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: streamingContent }}
             streamingThinking={thinkingContent || undefined}
             thinkingDuration={thinkingDuration}
@@ -1644,13 +1640,4 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       />
     </div>
   )
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
 }

@@ -726,6 +726,7 @@ class TestExplicitSampleDemo:
             activity = MagicMock()
             activity.id = 'activity-1'
             activity.title = 'Chat'
+            activity.save = AsyncMock()
             mock_activity.activity_start = AsyncMock(return_value=activity)
             mock_activity.get_activity = AsyncMock(return_value=None)
             response = await client.post('/api/chat', json={

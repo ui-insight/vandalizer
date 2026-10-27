@@ -82,7 +82,36 @@ async def list_pins(project_uuid: str, user: User = Depends(get_current_user)):
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return await project_service.list_pins(project)
+    return await project_service.list_pins(project, user)
+
+
+class DefaultSkillRequest(BaseModel):
+    skill_uuid: str | None = None
+
+
+@router.get("/{project_uuid}/default-skill")
+async def get_default_skill(project_uuid: str, user: User = Depends(get_current_user)):
+    from app.services.skill_service import snapshot_skill
+    project = await project_service.get_authorized_project(project_uuid, user)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    uuid = getattr(project, "default_skill_uuid", None)
+    return {"active_skill": await snapshot_skill(uuid, user) if uuid else None}
+
+
+@router.put("/{project_uuid}/default-skill")
+async def set_default_skill(project_uuid: str, body: DefaultSkillRequest, user: User = Depends(get_current_user)):
+    from app.services.skill_service import snapshot_skill
+    project = await project_service.get_authorized_project(project_uuid, user)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    if not await project_service.can_manage_project(project, user):
+        raise HTTPException(403, "Only a project owner or editor can change the default Skill")
+    if body.skill_uuid:
+        await snapshot_skill(body.skill_uuid, user)
+        await project_service.add_pin(project, "skill", body.skill_uuid, user)
+    await project.set({"default_skill_uuid": body.skill_uuid})
+    return {"default_skill_uuid": body.skill_uuid}
 
 
 @router.post("/{project_uuid}/pins")

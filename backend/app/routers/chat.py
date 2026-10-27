@@ -40,6 +40,10 @@ from app.schemas.chat import (
 from app.services import access_control, organization_service
 from app.services import activity_service, audit_service
 from app.services.chat_service import chat_stream
+from app.schemas.skills import SelectSkillRequest, SkillSnapshot
+from app.schemas.chat_export import ChatExportRequest
+from app.services.chat_export import MIME_TYPES, render_chat_export
+from app.services import skill_service
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +195,29 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
+    # Authorize Skill selection before creating activities or persisting a
+    # message. Existing snapshots stay pinned even if the author edits them.
+    if activity_id and len(str(activity_id).strip()) >= 10:
+        activity = await _get_authorized_activity(activity_id, user)
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == activity.conversation_id,
+            ChatConversation.user_id == user_id,
+        )
+    current_skill = getattr(conversation, "active_skill", None)
+    requested_skill = body.skill_uuid
+    explicit_skill = "skill_uuid" in body.model_fields_set
+    if conversation is None and body.project_uuid and not explicit_skill:
+        requested_skill = getattr(project, "default_skill_uuid", None)
+        explicit_skill = bool(requested_skill)
+    active_skill = await skill_service.resolve_active_skill(
+        user, current_skill if isinstance(current_skill, SkillSnapshot) else None,
+        requested_skill, explicit=explicit_skill,
+    )
+    if body.skill_version and (not active_skill or active_skill.version != body.skill_version):
+        raise HTTPException(status_code=409, detail="The selected Skill changed. Select it again before sending.")
+    if active_skill and body.run_demo:
+        raise HTTPException(status_code=422, detail="Remove the active Skill before running the sample demo.")
+
     # Only the explicit sample-demo action sets run_demo. Natural-language
     # requests such as "show me my workflows" belong to the assistant.
 
@@ -223,6 +250,7 @@ async def chat(
             conversation_id=conversation.uuid,
             project_uuid=body.project_uuid,
         )
+        activity.meta_summary = {"chat_turn_started": True}
 
         # Always set a placeholder title from the first message so the rail
         # shows something immediately while the AI title generates in the background.
@@ -235,21 +263,20 @@ async def chat(
             if len(short) > 80:
                 short = short[:77].rstrip() + "..."
             activity.title = short
-            await activity.save()
+        await activity.save()
     else:
         # Resume existing conversation
-        activity = await _get_authorized_activity(activity_id, user)
         activity.status = ActivityStatus.RUNNING.value
         activity.last_updated_at = datetime.now(timezone.utc)
+        activity.meta_summary = {
+            **(activity.meta_summary if isinstance(activity.meta_summary, dict) else {}),
+            "chat_turn_started": True,
+        }
         # A conversation opened by attaching a file or link has no project
         # until its first message names one (authorized above).
         if body.project_uuid and not activity.project_uuid:
             activity.project_uuid = body.project_uuid
         await activity.save()
-        conversation = await ChatConversation.find_one(
-            ChatConversation.uuid == activity.conversation_id,
-            ChatConversation.user_id == user_id,
-        )
         if not conversation:
             conversation = ChatConversation(
                 title=message.strip(),
@@ -277,6 +304,10 @@ async def chat(
     conversation.scope_document_uuids = selected_document_uuids
     conversation.scope_folder_uuids = selected_folder_uuids
     conversation.scope_knowledge_base_uuids = selected_kb_uuids
+    if current_skill != active_skill:
+        conversation.last_context_tokens = 0
+        conversation.last_context_message_count = -1
+    conversation.active_skill = active_skill
     await conversation.add_message(
         ChatRole.USER, message, source_documents=source_documents or None,
     )
@@ -299,6 +330,7 @@ async def chat(
                 user=user,
                 team_access=team_access,
                 onboarding_context=onboarding_ctx,
+                active_skill=active_skill,
             ):
                 yield chunk
         finally:
@@ -785,6 +817,37 @@ async def _restore_scope(
     }
 
 
+@router.get("/skills/{skill_uuid}")
+async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)):
+    return await skill_service.snapshot_skill(skill_uuid, user)
+
+
+@router.put("/history/{conversation_uuid}/skill")
+async def select_conversation_skill(
+    conversation_uuid: str,
+    body: SelectSkillRequest,
+    user: User = Depends(get_current_user),
+):
+    conversation = await ChatConversation.find_one({"uuid": conversation_uuid, "user_id": user.user_id})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    running = await ActivityEvent.find_one({
+        "conversation_id": conversation_uuid, "user_id": user.user_id,
+        "status": {"$in": [ActivityStatus.RUNNING.value, ActivityStatus.QUEUED.value]},
+    })
+    # Attachment-only chats also have a RUNNING activity, but no model turn.
+    # They must still allow selecting a Skill before the first question.
+    if running and isinstance(running.meta_summary, dict) and running.meta_summary.get("chat_turn_started"):
+        raise HTTPException(status_code=409, detail="Wait for the current response before changing Skills.")
+    selected = await skill_service.snapshot_skill(body.skill_uuid, user) if body.skill_uuid else None
+    # Update only these fields, without replacing a stale conversation object.
+    await conversation.set({
+        "active_skill": selected.model_dump() if selected else None,
+        "last_context_tokens": 0, "last_context_message_count": -1,
+    })
+    return {"active_skill": selected}
+
+
 @router.get("/history/{conversation_uuid}")
 async def get_chat_history(
     conversation_uuid: str,
@@ -834,6 +897,10 @@ async def get_chat_history(
         "context_mode": conversation.context_mode,
         "context_cutoff_index": conversation.context_cutoff_index,
         "active_plan": conversation.active_plan,
+        "active_skill": (
+            conversation.active_skill.model_dump()
+            if isinstance(conversation.active_skill, SkillSnapshot) else None
+        ),
         "scope": await _restore_scope(conversation, messages, user),
     }
 
@@ -878,6 +945,28 @@ async def delete_chat_history(
         detail={"messages_deleted": message_count},
     )
     return {"success": True, "message": "Conversation deleted successfully"}
+
+
+@router.post("/export")
+@limiter.limit("10/minute")
+async def export_chat(
+    request: Request,
+    body: ChatExportRequest,
+    user: User = Depends(get_current_user),
+):
+    """Download the supplied visible transcript; does not publish or fetch content."""
+    try:
+        data = await anyio.to_thread.run_sync(render_chat_export, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return StreamingResponse(
+        io.BytesIO(data), media_type=MIME_TYPES[body.format],
+        headers={
+            "Content-Disposition": f'attachment; filename="chat-export.{body.format}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/download")

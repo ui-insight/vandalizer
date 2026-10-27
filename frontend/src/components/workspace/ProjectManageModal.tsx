@@ -12,6 +12,8 @@ import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { ProjectSummaryStats } from '../projects/ProjectSummaryStats'
 import { ProjectStateBadge } from '../projects/ProjectStateBadge'
+import { ProjectSkillsSection } from '../projects/ProjectSkillsSection'
+import { PagesBrowser } from '../artifacts/PagesBrowser'
 import { ProjectPinsSection } from '../projects/ProjectPinsSection'
 import {
   deleteProject,
@@ -392,6 +394,8 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
           )}
 
           {/* Pinned tools */}
+          <ProjectSkillsSection key={`skills:${uuid}`} projectUuid={uuid} defaultSkillUuid={project.default_skill_uuid} canManage={canManage} onChange={() => { void qc.invalidateQueries({ queryKey: ['project', uuid] }) }} />
+          <PagesBrowser key={`pages:${uuid}`} projectUuid={uuid} canManage={canManage} />
           {canManage && (
             <ProjectPinsSection projectUuid={uuid} onChange={() => qc.invalidateQueries({ queryKey: ['project', uuid] })} onOpen={onClose} />
           )}

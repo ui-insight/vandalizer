@@ -65,7 +65,7 @@ const KIND_FILTERS = [
   { value: 'all', label: 'All types' },
   { value: 'workflow', label: 'Workflows' },
   { value: 'extraction', label: 'Extractions' },
-  { value: 'prompt', label: 'Prompts' },
+  { value: 'prompt', label: 'Skills' },
   { value: 'formatter', label: 'Formatters' },
 ] as const
 
@@ -311,7 +311,7 @@ export function LibraryTab() {
   }
   // Prompts/formatters are search_set items — label them by set_type.
   const itemKindLabel = (item: { kind: string; set_type: string | null }) =>
-    item.kind === 'search_set' ? (item.set_type || 'extraction') : (KIND_LABEL[item.kind] ?? 'item')
+    item.kind === 'search_set' ? (item.set_type === 'prompt' ? 'Skill' : item.set_type || 'extraction') : (KIND_LABEL[item.kind] ?? 'item')
 
   const handleRemove = async (itemId: string) => {
     const item = items.find((i) => i.id === itemId)
@@ -507,9 +507,7 @@ export function LibraryTab() {
         if (version !== editLoadVersion.current) return
         if (items.length > 0) {
           setEditItemId(items[0].id)
-          if (items[0].searchphrase?.trim() || !(item.description || '').trim()) {
-            setEditContent(items[0].searchphrase)
-          }
+          setEditContent(items[0].searchphrase)
         }
       } catch (reason) {
         if (version === editLoadVersion.current) setEditLoadError(reason instanceof Error ? reason.message : 'Could not load this item.')
@@ -534,13 +532,18 @@ export function LibraryTab() {
 
   const usePromptInAssistant = () => {
     if (!editingItem || editLoading || editLoadError) return
+    if (editingItem.set_type === 'prompt' && !editingItem.item_uuid) return
     const content = editContent.trim()
     if (!content) return
     markUsed(editingItem.id)
     const docs = selectedDocUuids
     const folderUuids = selectedFolderUuids
     closeEditModal()
-    sendChatMessage(content, { documentUuids: docs, folderUuids })
+    if (editingItem.set_type === 'prompt' && editingItem.item_uuid) {
+      sendChatMessage('', { documentUuids: docs, folderUuids, skillUuid: editingItem.item_uuid })
+    } else {
+      sendChatMessage(content, { documentUuids: docs, folderUuids })
+    }
   }
 
   const handleEditSave = async () => {
@@ -556,7 +559,7 @@ export function LibraryTab() {
       .filter((i) => i.id !== editingItem.id && matchesKindFilter(i, editKind))
       .map((i) => i.name)
     if (isDuplicateName(cleanTitle, siblingNames)) {
-      setEditError(`You already have a ${editKind} named "${cleanTitle}". Choose a different name.`)
+      setEditError(`You already have a ${editKind === 'prompt' ? 'Skill' : editKind} named "${cleanTitle}". Choose a different name.`)
       return
     }
     setEditSaving(true)
@@ -591,7 +594,7 @@ export function LibraryTab() {
     }
     const cleanName = normalizeName(createName)
     if (createModalType && isDuplicateName(cleanName, items.filter((i) => matchesKindFilter(i, createModalType)).map((i) => i.name))) {
-      setCreateError(`You already have a ${createModalType} named "${cleanName}". Choose a different name.`)
+      setCreateError(`You already have a ${createModalType === 'prompt' ? 'Skill' : createModalType} named "${cleanName}". Choose a different name.`)
       return
     }
     setCreating(true)
@@ -607,7 +610,7 @@ export function LibraryTab() {
         refreshItems()
         openWorkflow(wf.id)
       } else {
-        // extraction, prompt, or formatter — all stored as SearchSets
+        // extraction, Skill, or formatter — all stored as SearchSets
         const config = createDesc.trim() ? { content: createDesc.trim() } : undefined
         const ss = await createSearchSet({ title: cleanName, set_type: createModalType ?? 'extraction', extraction_config: config })
         if (personalLib) {
@@ -643,10 +646,10 @@ export function LibraryTab() {
       descPlaceholder: '',
     },
     prompt: {
-      title: 'Prompt creation',
-      namePlaceholder: 'Title your prompt',
+      title: 'Skill creation',
+      namePlaceholder: 'Title your Skill',
       showDesc: true,
-      descPlaceholder: 'Write your prompt here',
+      descPlaceholder: 'Write your Skill instructions here',
     },
     formatter: {
       title: 'Formatter creation',
@@ -743,13 +746,14 @@ export function LibraryTab() {
                   <p className="library-new-destination">Create in Mine</p>
                   <NewMenuItem icon={<Workflow style={{ width: 18, height: 18 }} />} label="New Workflow" description="Connect steps into a repeatable process" onClick={() => { setNewMenuOpen(false); openCreateModal('workflow') }} />
                   <NewMenuItem icon={<Filter style={{ width: 18, height: 18 }} />} label="New Extraction" description="Pull structured fields from documents" onClick={() => { setNewMenuOpen(false); openCreateModal('extraction') }} />
-                  <NewMenuItem icon={<Terminal style={{ width: 18, height: 18 }} />} label="New Prompt" description="Reuse instructions in the Assistant" onClick={() => { setNewMenuOpen(false); openCreateModal('prompt') }} />
+                  <NewMenuItem icon={<Terminal style={{ width: 18, height: 18 }} />} label="New Skill" description="Reuse instructions in the Assistant" onClick={() => { setNewMenuOpen(false); openCreateModal('prompt') }} />
                   <NewMenuItem icon={<Code style={{ width: 18, height: 18 }} />} label="New Formatter" description="Give responses a consistent structure" onClick={() => { setNewMenuOpen(false); openCreateModal('formatter') }} />
                 </div>
               )}
             </div>
       }>
         {/* Saved ownership views and shared discovery. */}
+        <a href="/artifacts" className="mb-2 inline-block text-sm underline">Open saved Artifacts</a>
         <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, margin: 0 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },
@@ -1399,7 +1403,7 @@ export function LibraryTab() {
                 <p style={{ margin: "var(--workspace-space-12) 0 var(--workspace-space-20)", color: '#5f6368', fontSize: 'var(--workspace-font-control)', lineHeight: 1.55 }}>
                   {hasActiveFilters
                     ? selectedFolder && !search.trim() && kindFilter === 'all' ? 'Move tools here from their item actions, or return to all items.' : 'Try clearing a filter or searching with a different term.'
-                    : scope === 'team' ? 'Use Share in a tool’s actions in Mine to send a team copy. New tools start in Mine.' : 'Create a workflow, extraction, prompt, or formatter, or explore shared tools for a starting point.'}
+                    : scope === 'team' ? 'Use Share in a tool’s actions in Mine to send a team copy. New tools start in Mine.' : 'Create a workflow, extraction, Skill, or formatter, or explore shared tools for a starting point.'}
                 </p>
                 {hasActiveFilters ? (
                   <button
@@ -1675,7 +1679,7 @@ export function LibraryTab() {
                 {creating
                   ? 'Creating...'
                   : createModalType === 'workflow' ? 'Create Workflow'
-                  : createModalType === 'prompt' ? 'Create Prompt'
+                  : createModalType === 'prompt' ? 'Create Skill'
                   : createModalType === 'formatter' ? 'Create Formatter'
                   : 'Create Extraction'}
               </button>
@@ -1699,7 +1703,7 @@ export function LibraryTab() {
                   <button
                     onClick={() => uploadInputRef.current?.click()}
                     disabled={creating || uploading}
-                    title={`Upload a ${createModalType} JSON definition`}
+                    title={`Upload a ${createModalType === 'prompt' ? 'Skill' : createModalType} JSON definition`}
                     style={{
                       marginLeft: 'auto',
                       display: 'inline-flex',
@@ -1775,7 +1779,7 @@ export function LibraryTab() {
                   {editingItem.name}
                 </h2>
                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#70757a', marginBottom: 'var(--workspace-space-16)' }}>
-                  {editingItem.set_type === 'formatter' ? 'Formatter · Shape the structure of an answer' : 'Prompt · Reusable instructions for the Assistant'}
+                  {editingItem.set_type === 'formatter' ? 'Formatter · Shape the structure of an answer' : 'Skill · Reusable instructions that guide the Assistant'}
                 </div>
                 <div
                   role="region"
@@ -1800,12 +1804,12 @@ export function LibraryTab() {
                     ? 'Loading…'
                     : editContent.trim()
                       ? editContent
-                      : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'prompt'} has no content yet — click Edit to add some.`}
+                      : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'Skill'} has no content yet — click Edit to add some.`}
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
                   <button
                     onClick={usePromptInAssistant}
-                    disabled={editLoading || !!editLoadError || !editContent.trim()}
+                    disabled={editLoading || !!editLoadError || !editContent.trim() || (editingItem.set_type === 'prompt' && !editingItem.item_uuid)}
                     style={{
                       padding: "var(--workspace-space-12) var(--workspace-space-20)",
                       fontSize: 'var(--workspace-font-body)',
@@ -1819,7 +1823,7 @@ export function LibraryTab() {
                       opacity: editLoading || !editContent.trim() ? 0.5 : 1,
                     }}
                   >
-                    Use in Assistant
+                    {editingItem.set_type === 'prompt' ? 'Use Skill' : 'Use in Assistant'}
                   </button>
                   <button
                     disabled={editLoading || !!editLoadError}
@@ -1857,7 +1861,7 @@ export function LibraryTab() {
             ) : (
               <>
             <h2 style={{ margin: "0 0 var(--workspace-space-20)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124' }}>
-              Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
+              Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Skill'}
             </h2>
             <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <label className="library-field-label" htmlFor="library-edit-title">Name</label>
@@ -1889,7 +1893,7 @@ export function LibraryTab() {
                 disabled={editLoading || !!editLoadError || editSaving}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                placeholder={editingItem.set_type === 'formatter' ? 'Write your formatting instructions here' : 'Write your prompt here'}
+                placeholder={editingItem.set_type === 'formatter' ? 'Write your formatting instructions here' : 'Write your Skill instructions here'}
                 rows={10}
                 style={{
                   width: '100%',

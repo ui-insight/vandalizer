@@ -608,7 +608,36 @@ Stores a reflective module's self-assessment answers. The agent asks the questio
 
 ---
 
+## Explicit Library Skill selection
+
+Skill selection is a user control, not an agent tool. It does not change the tool catalog or its authorization/confirmation gates. The initial implementation for [roadmap #1059](https://github.com/ui-insight/vandalizer/issues/1059) supports one explicitly selected Skill per conversation.
+
+| API | Contract |
+| --- | --- |
+| `GET /api/chat/skills/{uuid}` | Authorize an existing Library prompt and return its instruction snapshot for preview |
+| `PUT /api/chat/history/{uuid}/skill` | Select the latest version using `skill_uuid`, or remove it with `null`; requires conversation ownership and no running/queued chat turn; attachment-only chats can select a Skill |
+| `POST /api/chat` | Omitted `skill_uuid` retains the existing pin; `null` removes it; a different UUID authorizes and snapshots that Skill |
+| `GET /api/chat/history/{uuid}` | Includes the saved `active_skill`; historical messages retain the snapshot that guided them |
+
+Snapshots contain `uuid`, `title`, `instructions`, and a SHA-256 content `version`. The server resolves instructions; the client cannot submit a trusted instruction body. Supplying `skill_version` on a chat request rejects a changed selection with HTTP 409 before saving a message or calling the model. Reselecting through the selection endpoint explicitly adopts Library edits. Every turn rechecks access to the original Library item; removal remains possible after access is revoked.
+
+Legacy storage remains `SearchSet.set_type = "prompt"`. Edited `SearchSetItem.searchphrase` takes precedence over creation-time `extraction_config.content`, including deliberately empty edits. No bulk database rename is needed, and existing identifiers, links, workflow references, and sharing rules remain intact. Empty instructions and instructions over 32,000 characters cannot activate. Only Library prompt records qualify; extraction/formatter records are not silently promoted.
+
+The active snapshot is added to runtime instructions before model routing and context budgeting, independently of replayed message history. It survives compaction; changing/removing it invalidates cached context estimates. Application rules and the user's current request take precedence over Skill guidance. Automatic discovery, multi-Skill composition, and resources/scripts are later phases.
+
+Certification release work must distinguish Library Skills from workflow Prompt nodes. This initial implementation does not modify published course packages, change grading requirements, transfer credit, or reset enrollments. Review the visible controls against supported courses before release, then author new Skill/artifact competencies through the existing versioned course process.
+
+## Chat downloads
+
+`POST /api/chat/export` accepts an authenticated request with `format: html | docx | xlsx` and an ordered `messages` array of `{role: user | assistant, content, tools: string[], evidence}`. The client normalizes visible messages, removes thinking blocks, and includes recorded provenance and warnings. The server deterministically renders those supplied contents; it does not load conversations, retrieve files, call a model, or publish anything. This is a transcript download, not a verified record of database history.
+
+Limits: 1–1,000 messages, 500,000 total characters, 100 tables, 20,000 table cells, and 100 columns per table. The endpoint is rate limited to 10 requests/minute. Unsupported control characters and oversized content return 422; responses use `Cache-Control: no-store` and attachment disposition. Rendering runs outside the event loop.
+
+HTML disables raw HTML and remote images and includes a restrictive CSP. Word stores readable link destinations. Excel uses literal text cells for formula-like values and keeps the transcript plus every Markdown table; plain decimals up to 15 digits become numeric cells, while leading-zero and longer identifiers remain text. Transcript cells split at 30,000 characters; oversized table cells return 422 rather than truncate. Legacy TXT/CSV downloads and feedback APIs remain compatible with older clients; the current UI no longer submits chat ratings.
+
 ## See also
+
+- [HTML_ARTIFACTS.md](./HTML_ARTIFACTS.md) — hosted static pages; `create_html_artifact`, `get_html_artifact`, `revise_html_artifact`; workflow output delivery; revision and sharing contracts; deployment requirements
 
 - [AGENTIC_CHAT_USER_GUIDE.md](./AGENTIC_CHAT_USER_GUIDE.md) — end-user guide to what the chat can do
 - [QUALITY_SIGNALS_EXPLAINED.md](./QUALITY_SIGNALS_EXPLAINED.md) — the trust layer in depth

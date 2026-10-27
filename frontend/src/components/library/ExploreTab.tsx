@@ -75,7 +75,7 @@ const KIND_CONFIG = {
     heroBg: 'from-teal-500 to-teal-700',
   },
   prompt: {
-    label: 'Prompt', icon: MessageSquare,
+    label: 'Skill', icon: MessageSquare,
     bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200',
     heroBg: 'from-gray-600 to-gray-800',
   },

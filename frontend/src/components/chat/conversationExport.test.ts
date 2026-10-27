@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../types/chat'
-import { conversationToCsv, conversationToText } from './conversationExport'
+import { conversationToCsv, conversationToText, exportMessages } from './conversationExport'
 import { toolResultExportText } from './ToolCallDisplay'
 
 // Support ticket: a 3-message chat ("can I do certification from here")
@@ -28,6 +28,18 @@ const conversation: ChatMessage[] = [
 ]
 
 describe('conversation export', () => {
+  it('excludes thinking from old and segmented answers and preserves user code', () => {
+    const exported = exportMessages([
+      { role: 'assistant', content: '<think>private</think>Answer<thinking>unfinished' },
+      { role: 'assistant', content: 'stale', segments: [{ kind: 'text', content: '<think>secret</think>Visible' }] },
+      { role: 'user', content: '<think>example code</think>' },
+    ])
+    expect(exported.map(m => m.content)).toEqual(['Answer', 'Visible', '<think>example code</think>'])
+  })
+
+  it('protects CSV values from formula interpretation', () => {
+    expect(conversationToCsv([{ role: 'user', content: '=1+1' }])).toContain('"\'=1+1"')
+  })
   it('reads like the conversation: questions, answers and a readable line per tool', () => {
     for (const exported of [conversationToText(conversation), conversationToCsv(conversation)]) {
       expect(exported).toContain('can I do certification from here')

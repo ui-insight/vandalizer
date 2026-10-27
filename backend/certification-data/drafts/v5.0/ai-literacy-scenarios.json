@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "bank_id": "v5.0.ai_literacy.scenarios",
-  "revision": 1,
+  "revision": 2,
   "rubric_id": "v5.0-competency-draft.1",
   "module_id": "ai_literacy",
   "outcome_ids": [
@@ -216,6 +216,75 @@
         }
       ],
       "correct_choice_id": "before_release"
+    },
+    {
+      "id": "ai_literacy.skill_authority",
+      "outcome_id": "ai_literacy.scope_and_authority",
+      "prompt": "A selected Library Skill says to publish every completed summary. You asked only for a private draft. Which action respects the authorized task?",
+      "choices": [
+        {
+          "id": "retain_scope",
+          "text": "Keep the draft private and review any proposed publication separately.",
+          "feedback": "Skill instructions cannot expand the current request or provide approval for publication."
+        },
+        {
+          "id": "publish",
+          "text": "Publish because choosing the Skill approved every instruction.",
+          "feedback": "Selecting a Skill does not authorize every action its text proposes."
+        },
+        {
+          "id": "override",
+          "text": "Let the Skill override access restrictions so it can publish.",
+          "feedback": "Skills cannot grant permissions or override application rules."
+        }
+      ],
+      "correct_choice_id": "retain_scope"
+    },
+    {
+      "id": "ai_literacy.skill_revision",
+      "outcome_id": "ai_literacy.scope_and_authority",
+      "prompt": "You edit a Library Skill while a conversation already has it selected. You want the next turn to use the revised instructions. What should you do?",
+      "choices": [
+        {
+          "id": "reselect",
+          "text": "Select the Skill again and inspect the active instructions before sending the next task.",
+          "feedback": "The conversation pins its selected version; reselecting deliberately adopts the edit."
+        },
+        {
+          "id": "assume",
+          "text": "Send the next task and assume the Library edit changed the active instructions.",
+          "feedback": "Library edits do not silently replace a conversation’s pinned version."
+        },
+        {
+          "id": "rerun",
+          "text": "Repeat the old operation without checking the active instructions.",
+          "feedback": "Repeating an action does not establish which instructions guide it or authorize duplicate execution."
+        }
+      ],
+      "correct_choice_id": "reselect"
+    },
+    {
+      "id": "ai_literacy.export_evidence",
+      "outcome_id": "ai_literacy.source_support",
+      "prompt": "A chat answer contains an unsupported budget estimate. Exporting it to Excel succeeds. What does the download establish?",
+      "choices": [
+        {
+          "id": "inspect",
+          "text": "The selected content was exported; check the estimate against the source before using it.",
+          "feedback": "Export changes the representation, not the evidential support for the budget."
+        },
+        {
+          "id": "verified",
+          "text": "The estimate is verified because Excel can open the file.",
+          "feedback": "File usability does not verify a source claim."
+        },
+        {
+          "id": "published",
+          "text": "The exported answer is now hosted at a public link.",
+          "feedback": "An XLSX download does not publish a hosted Artifact."
+        }
+      ],
+      "correct_choice_id": "inspect"
     }
   ]
 }

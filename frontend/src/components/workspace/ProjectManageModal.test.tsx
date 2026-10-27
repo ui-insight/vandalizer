@@ -14,6 +14,8 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { user_id: 'user
 vi.mock('../../hooks/useTeams', () => ({ useTeams: () => ({ currentTeam: null }) }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('../shared/useConfirm', () => ({ useConfirm: () => vi.fn() }))
+vi.mock('../projects/ProjectSkillsSection', () => ({ ProjectSkillsSection: () => <div>Project Skills</div> }))
+vi.mock('../artifacts/PagesBrowser', () => ({ PagesBrowser: () => <div>Project pages</div> }))
 vi.mock('../projects/ProjectPinsSection', () => ({ ProjectPinsSection: () => <div>Pinned tools</div> }))
 vi.mock('../../api/projects', () => ({ listProjectMembers: mocks.members }))
 const setup = () => render(<QueryClientProvider client={new QueryClient()}><ProjectManageModal open onClose={mocks.close} /></QueryClientProvider>)

@@ -7,6 +7,9 @@ from pydantic import BaseModel
 
 class ChatRequest(BaseModel):
     message: str
+    # Omitted: retain the conversation's pinned Skill. Null: remove it.
+    skill_uuid: Optional[str] = None
+    skill_version: Optional[str] = None
     activity_id: Optional[str] = None
     document_uuids: list[str] = []
     folder_uuids: list[str] = []

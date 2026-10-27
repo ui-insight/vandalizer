@@ -156,6 +156,7 @@ class WorkflowResult(Document):
     # their trigger events (models/passive.py); unifying the two vocabularies
     # is deliberate follow-up work, not an accident of this field.
     delivery_failures: list[str] = []
+    hosted_artifact_uuid: Optional[str] = None
     # Machine-readable error payload set by the runner when the failure has a
     # suggested user action (e.g. oversize-context with a convert-to-KB hint).
     # Schema: {"code": "context_over_budget", "suggested_action": "convert_to_kb",

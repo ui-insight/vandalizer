@@ -6,10 +6,13 @@ import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
+  selectSkill: vi.fn(),
   uploading: false,
+  blocked: false,
   workspace: {
     workspaceMode: 'chat',
     focusChat: vi.fn(),
+    setActiveRightTab: vi.fn(),
     selectedDocUuids: [] as string[],
     selectedDocNames: {} as Record<string, string>,
     selectedFolderUuids: [] as string[],
@@ -30,7 +33,7 @@ vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
   messages: [], segments: [], queuedMessages: [], planTasks: [], contextNotices: [],
-  isStreaming: false, contextTokens: 0, send: mocks.send,
+  projectSkillBlocked: mocks.blocked, isStreaming: false, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
   uploads: [], uploading: mocks.uploading,
@@ -50,13 +53,15 @@ vi.mock('./HomeExperience', () => ({
   </>,
 }))
 
-function renderPanel() {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ChatPanel /></QueryClientProvider>)
+function renderPanel(pendingMessage?: { message: string; skillUuid?: string }) {
+  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ChatPanel pendingMessage={pendingMessage} /></QueryClientProvider>)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.selectSkill.mockResolvedValue(true)
   mocks.uploading = false
+  mocks.blocked = false
   mocks.workspace.workspaceMode = 'chat'
   mocks.workspace.selectedDocUuids = []
   mocks.workspace.selectedDocNames = {}
@@ -81,6 +86,19 @@ function expectDocumentRequest() {
 }
 
 describe('Show me what you can do', () => {
+  it('consumes a Library Skill handoff without submitting an empty message', async () => {
+    renderPanel({ message: '', skillUuid: 'award-skill' })
+    await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('award-skill'))
+    await waitFor(() => expect(mocks.workspace.focusChat).toHaveBeenCalledOnce())
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  it('opens the Library from the Skill chooser', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Skill' }))
+    expect(mocks.workspace.setActiveRightTab).toHaveBeenCalledWith('library')
+  })
+
   it('keeps supporting Assistant guidance compact beside Files', () => {
     mocks.workspace.workspaceMode = 'files'
     renderPanel()
@@ -136,4 +154,15 @@ describe('Show me what you can do', () => {
     fireEvent.click(button)
     expect(mocks.send).not.toHaveBeenCalled()
   })
+})
+
+it('keeps a pending task when the project default is unavailable, but permits an explicit Skill choice', async () => {
+  mocks.blocked = true
+  const view = renderPanel({ message: 'Keep this draft' })
+  expect(mocks.send).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Continue without Skill' })).toBeInTheDocument()
+  view.unmount()
+  renderPanel({ message: '', skillUuid: 'replacement' })
+  await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('replacement'))
+  expect(mocks.send).not.toHaveBeenCalled()
 })

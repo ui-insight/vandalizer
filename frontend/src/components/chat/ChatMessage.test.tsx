@@ -31,6 +31,22 @@ const CHUNK =
   'Recipients must retain financial records for three years after submission '
   + 'of the final expenditure report, unless the awarding agency directs otherw'
 
+it.each(['user', 'assistant'] as const)('offers Copy and Export for a %s bubble without rating controls', role => {
+  render(<ChatMessage message={{ role, content: 'Hello' }} />)
+  expect(screen.getByRole('button', { name: 'Copy message' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Export message' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Good response' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Poor response' })).not.toBeInTheDocument()
+})
+
+it('offers export for a completed tool-only response but hides actions while streaming', () => {
+  const message: ChatMessageType = { role: 'assistant', content: '', tool_results: [{ tool_name: 'some_tool', tool_call_id: 't1', content: { status: 'done' }, quality: null }] }
+  const { rerender } = render(<ChatMessage message={message} />)
+  expect(screen.getByRole('button', { name: 'Export message' })).toBeInTheDocument()
+  rerender(<ChatMessage message={message} isStreaming />)
+  expect(screen.queryByRole('button', { name: 'Export message' })).not.toBeInTheDocument()
+})
+
 function messageWith(citation: Partial<Citation>): ChatMessageType {
   return {
     role: 'assistant',

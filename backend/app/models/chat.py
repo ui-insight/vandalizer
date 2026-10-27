@@ -6,6 +6,7 @@ from typing import Optional
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+from app.schemas.skills import SkillSnapshot
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -61,6 +62,7 @@ def _cap_source_documents(docs: Optional[list[dict]]) -> Optional[list[dict]]:
 class ChatMessage(Document):
     role: ChatRole
     message: str
+    active_skill: Optional[SkillSnapshot] = None
     thinking: Optional[str] = None
     thinking_duration: Optional[float] = None
     tool_calls: Optional[list[dict]] = None
@@ -98,6 +100,8 @@ class ChatMessage(Document):
 
     def to_dict(self) -> dict:
         d = {"role": self.role.value, "content": self.message}
+        if self.active_skill:
+            d["active_skill"] = self.active_skill.model_dump()
         if self.thinking:
             d["thinking"] = self.thinking
         if self.thinking_duration is not None:
@@ -261,6 +265,7 @@ class ChatConversation(Document):
     user_id: str
     team_id: Optional[str] = None
     is_first_session: bool = False
+    active_skill: Optional[SkillSnapshot] = None
     # Set once a certification tool runs in this chat. From then on its turns
     # are metered as "certification_chat", which a trial account's own token
     # budget doesn't count (see trial_budget.BUDGET_EXEMPT_FEATURES).
@@ -370,6 +375,7 @@ class ChatConversation(Document):
         msg = ChatMessage(
             role=role,
             message=content,
+            active_skill=self.active_skill,
             thinking=thinking or None,
             thinking_duration=thinking_duration,
             tool_calls=tool_calls or None,

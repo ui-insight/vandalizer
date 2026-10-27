@@ -1,3 +1,4 @@
+import { PagesBrowser } from '../artifacts/PagesBrowser'
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, FileText, Link2, Search, X } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
@@ -24,7 +25,7 @@ export function LeftPanel() {
     setProcessingDoc, setSelectedDocsProcessing, updateDocumentReadiness, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
     focusChat, openWorkflow, openExtraction, activateKB,
-    activeProjectRootFolder, activeProjectTitle, activeProjectTeamId,
+    activeProjectRootFolder, activeProjectTitle, activeProjectTeamId, activeProjectUuid, activeProjectRole,
     workspaceMode, setOpenDocumentUuid,
   } = useWorkspace()
   const { toast } = useToast()
@@ -40,6 +41,7 @@ export function LeftPanel() {
     preserveChatScope?: boolean
     previousSelection?: { uuids: string[]; names: Record<string, string> }
   } | null>(null)
+  const [filesView, setFilesView] = useState<'documents' | 'pages'>('documents')
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -145,6 +147,7 @@ export function LeftPanel() {
   // apply it instead of the default clear, so the terms survive the open.
   useEffect(() => {
     if (viewDocumentRequest) {
+      setFilesView('documents')
       setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title, preserveChatScope: viewDocumentRequest.preserveChatScope })
       if (!viewDocumentRequest.preserveChatScope) {
         setSelectedDocUuids([viewDocumentRequest.uuid])
@@ -297,6 +300,12 @@ export function LeftPanel() {
 
   return (
     <aside aria-label="Documents" className="flex h-full min-h-0 flex-col overflow-hidden bg-panel-bg relative">
+      <nav aria-label="Files views" className="flex gap-2 border-b p-3">
+        <button className="rounded border px-3 py-2 text-sm" aria-pressed={filesView === 'documents'} onClick={() => setFilesView('documents')}>Documents</button>
+        <button className="rounded border px-3 py-2 text-sm" aria-pressed={filesView === 'pages'} onClick={() => setFilesView('pages')}>Pages</button>
+      </nav>
+      {filesView === 'pages' && <div className="min-h-0 flex-1 overflow-auto"><PagesBrowser key={activeProjectUuid ?? 'all'} projectUuid={activeProjectUuid ?? undefined} canManage={activeProjectRole === 'owner' || activeProjectRole === 'editor'} /></div>}
+      <div className="min-h-0 flex-1 flex-col" style={{ display: filesView === 'documents' ? 'flex' : 'none' }}>
       {viewingDoc && <header className="workspace-document-header">
         <button type="button" aria-label="Close document" className="workspace-header-icon"
           onClick={() => { setViewingDoc(null); if (!viewingDoc.preserveChatScope) { setSelectedDocUuids(viewingDoc.previousSelection?.uuids ?? []); setSelectedDocNames(viewingDoc.previousSelection?.names ?? {}) } setHighlightTerms([]) }}>
@@ -442,6 +451,7 @@ export function LeftPanel() {
           onClose={() => setKbPickerFolder(null)}
         />
       )}
+      </div>
     </aside>
   )
 }

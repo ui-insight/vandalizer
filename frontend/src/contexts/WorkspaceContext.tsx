@@ -85,6 +85,7 @@ const NavigationContext = createContext<NavigationContextValue | null>(null)
 
 export interface PendingChatMessage {
   message: string
+  skillUuid?: string
   documentUuids?: string[]
   folderUuids?: string[]
 }
@@ -107,7 +108,7 @@ interface ChatStateContextValue {
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[] },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string },
   ) => void
   clearPendingChatMessage: () => void
   // Knowledge bases attached to the chat. Several can be attached at once;
@@ -432,7 +433,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [verificationCompletion, setVerificationCompletion] = useState<VerificationCompletion | null>(null)
   const [openDocumentUuid, setOpenDocumentUuid] = useState<string | null>(null)
   const pendingExtractionResultsRef = useRef<PendingExtractionResults | null>(null)
-  const pendingWorkflowSessionRef = useRef<string | null>(null)
+  const pendingWorkflowSessionRef = useRef<string | null>(search.run ?? null)
   const [workflowOpenSignal, setWorkflowOpenSignal] = useState(0)
   const [extractionOpenSignal, setExtractionOpenSignal] = useState(0)
 
@@ -560,11 +561,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendChatMessage = useCallback((
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[] },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string },
   ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage({
       message,
+      skillUuid: options?.skillUuid,
       documentUuids: options?.documentUuids,
       folderUuids: options?.folderUuids,
     })
@@ -884,6 +886,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const clearViewDocumentRequest = useCallback(() => {
     setViewDocumentRequest(null)
   }, [])
+
+  // Source links and project Skill links are navigation only; they never send a prompt.
+  const handledResourceLink = useRef('')
+  useEffect(() => {
+    if (search.project && activeProjectUuid !== search.project) return
+    const identity = `${search.project ?? ''}:${search.conversation ?? ''}:${search.skill ?? ''}`
+    if ((!search.conversation && !search.skill) || handledResourceLink.current === identity) return
+    handledResourceLink.current = identity
+    if (search.conversation) setLoadConversationId(search.conversation)
+    if (search.skill) sendChatMessage('', { skillUuid: search.skill })
+    updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined }))
+  }, [search.project, search.conversation, search.skill, activeProjectUuid, sendChatMessage, updateSearch])
 
   // ── Memoized context values ─────────────────────────────────────────────
 

@@ -23,13 +23,31 @@ def test_corrections_are_bound_to_real_frozen_lessons_and_share_one_export():
     original = package.json('lessons.json')
     ids = {lesson['id'] for module in original.values() for lesson in module['lessons']}
     bodies = {lesson['id']: lesson['content'] for module in original.values() for lesson in module['lessons']}
+    current = json.loads((corrections.SOURCE.parent / 'lessons.json').read_text())
+    current_bodies = {lesson['id']: lesson['content'] for module in current.values() for lesson in module['lessons']}
     for notice in source.notices:
         assert notice.manifest_sha256 == package.manifest_sha256
         assert set(notice.lesson_ids) <= ids
         assert notice.assessment_changed is False
-        assert set(notice.unversioned_content_sha256) == {hashlib.sha256(bodies[key].encode()).hexdigest() for key in notice.lesson_ids}
+        frozen_digests = {hashlib.sha256(bodies[key].encode()).hexdigest() for key in notice.lesson_ids}
+        current_digests = {hashlib.sha256(current_bodies[key].encode()).hexdigest() for key in notice.lesson_ids}
+        assert frozen_digests <= set(notice.unversioned_content_sha256) <= frozen_digests | current_digests
     frontend = Path(__file__).resolve().parents[2] / 'frontend/src/components/certification/editorialCorrections.json'
     assert json.loads(frontend.read_text()) == json.loads(corrections.SOURCE.read_text())
+
+
+def test_skills_artifact_guidance_reaches_current_unversioned_lessons_only_by_exact_content():
+    current = json.loads((corrections.SOURCE.parent / 'lessons.json').read_text())
+    bodies = {lesson['id']: lesson['content'] for module in current.values() for lesson in module['lessons']}
+    notices = [notice for notice in corrections._load().notices if notice.issued_at == '2026-10-27']
+    assert len(notices) == 4
+    for notice in notices:
+        for lesson_id in notice.lesson_ids:
+            found = corrections.notices_for(None, lesson_id, bodies[lesson_id])
+            assert notice.id in {item['id'] for item in found}
+            assert all(item['identity_basis'] == 'preserved_lesson_text' for item in found)
+            assert corrections.notices_for(None, lesson_id, bodies[lesson_id] + ' changed') == []
+            assert corrections.notices_for('f' * 64, lesson_id, bodies[lesson_id]) == []
 
 
 def test_wrong_package_unknown_lesson_and_unversioned_content_do_not_inherit_corrections():

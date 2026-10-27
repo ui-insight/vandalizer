@@ -1493,6 +1493,14 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         }},
     )
 
+    # Artifact delivery has its own deterministic per-run identity. Retry it
+    # outside the legacy finalization claim so a worker restart can recover it.
+    from app.services.artifacts import deliver_workflow_artifact, output_enabled
+    if output_enabled(workflow_doc.get("output_config")):
+        fresh_artifact_result = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)})
+        if fresh_artifact_result and fresh_artifact_result.get("status") == "completed" and not fresh_artifact_result.get("is_passive"):
+            deliver_workflow_artifact(db, fresh_artifact_result, _activity_owner(db, activity_id) or workflow_doc["user_id"])
+
     # Everything below runs *after* execute() returned, and sits outside the
     # try — so an AutoReconnect on the $inc, or a Redis blip on the
     # auto-validate dispatch further down, retries the whole task. The resume

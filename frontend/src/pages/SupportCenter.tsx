@@ -362,7 +362,7 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>What&rsquo;s Working</h1>
           <p style={{ margin: '2px 0 0', fontSize: 13, color: '#59616b' }}>
-            The positive signal users leave — praise, high ratings, and ideas.
+            The positive signal users leave — praise, high ratings, and ideas. Chat ratings are historical; the chat toolbar now offers Copy and Export.
           </p>
         </div>
       </div>
@@ -378,11 +378,11 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
             <div style={{ fontSize: 24, fontWeight: 700, color: '#15803d' }}>
               {stats.thumbs_up_rate == null ? '—' : `${Math.round(stats.thumbs_up_rate * 100)}%`}
             </div>
-            <div style={{ fontSize: 13, color: '#59616b' }}>Chat thumbs-up rate</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Historical chat thumbs-up rate</div>
           </div>
           <div style={statCardStyle('#3b82f6')}>
             <div style={{ fontSize: 24, fontWeight: 700, color: '#1d4ed8' }}>{stats.by_source.chat}</div>
-            <div style={{ fontSize: 13, color: '#59616b' }}>Chat up-votes</div>
+            <div style={{ fontSize: 13, color: '#59616b' }}>Historical chat up-votes</div>
           </div>
           <div style={statCardStyle('#8b5cf6')}>
             <div style={{ fontSize: 24, fontWeight: 700, color: '#6d28d9' }}>{stats.by_source.extraction}</div>

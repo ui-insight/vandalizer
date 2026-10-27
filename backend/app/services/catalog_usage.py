@@ -13,7 +13,7 @@ def describe_catalog_usage(kind: str, item, steps: list | None = None) -> dict:
     elif kind == "search_set":
         if getattr(item, "set_type", None) == "prompt":
             input_text = "Review the saved instructions and provide the context they ask for."
-            output_text = "A generated response from the saved prompt."
+            output_text = "Chat responses guided by the selected Skill's saved instructions."
         else:
             input_text = "Choose the documents to extract from."
             output_text = "Structured values for the configured extraction fields."

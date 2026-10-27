@@ -28,6 +28,7 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
+from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -6721,6 +6722,9 @@ from app.services.chat_workflow_tools import get_workflow_definition, update_wor
 # ---------------------------------------------------------------------------
 
 TOOLS = [
+    create_html_artifact,
+    get_html_artifact,
+    revise_html_artifact,
     # Phase 0 — Plan/progress tracking (sequential: mutates deps.plan_state)
     update_plan,
     # Phase 1 — Read-only

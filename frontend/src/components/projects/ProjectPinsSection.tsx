@@ -44,7 +44,8 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   const { automations } = useAutomations()
   const { knowledgeBases } = useKnowledgeBases()
   const projectPins = useProjectPins(projectUuid)
-  const { pins, loading, error, refresh } = projectPins
+  const { pins: allPins, loading, error, refresh } = projectPins
+  const pins = allPins.filter(p => !['skill', 'artifact'].includes(p.pin_type))
   const [adding, setAdding] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -105,10 +106,10 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
             />
           </label>
           <PickerList title="Workflows" items={workflows.map(w => ({ id: w.id, name: w.name }))} total={workflowTotal} query={debouncedQuery} pinType="workflow" pinnedSet={pinnedSet} onPin={pin} />
-          <PickerList title="Extractions" items={searchSets.filter(s => matches(s.title)).map(s => ({ id: s.uuid, name: s.title }))} query={debouncedQuery} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Extractions" items={searchSets.filter(s => (!s.set_type || s.set_type === 'extraction') && matches(s.title)).map(s => ({ id: s.uuid, name: s.title }))} query={debouncedQuery} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
           <PickerList title="Automations" items={automations.filter(a => matches(a.name)).map(a => ({ id: a.id, name: a.name }))} query={debouncedQuery} pinType="automation" pinnedSet={pinnedSet} onPin={pin} />
           <PickerList title="Knowledge bases" items={knowledgeBases.filter(k => matches(k.title)).map(k => ({ id: k.uuid, name: k.title }))} query={debouncedQuery} pinType="knowledge_base" pinnedSet={pinnedSet} onPin={pin} />
-          {debouncedQuery && workflows.length + searchSets.filter(s => matches(s.title)).length + automations.filter(a => matches(a.name)).length + knowledgeBases.filter(k => matches(k.title)).length === 0 && (
+          {debouncedQuery && workflows.length + searchSets.filter(s => (!s.set_type || s.set_type === 'extraction') && matches(s.title)).length + automations.filter(a => matches(a.name)).length + knowledgeBases.filter(k => matches(k.title)).length === 0 && (
             <div className="text-xs text-gray-500">Nothing matches “{debouncedQuery}”.</div>
           )}
         </div>

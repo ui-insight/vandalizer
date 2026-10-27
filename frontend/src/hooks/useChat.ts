@@ -1,5 +1,7 @@
+import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
+import { streamChat, getHistory, previewSkill, selectConversationSkill, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
+import type { SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
@@ -102,6 +104,56 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const historyLoadVersion = useRef(0)
+  const [activeSkill, setActiveSkill] = useState<SkillSnapshot | null>(null)
+  const [isSelectingSkill, setIsSelectingSkill] = useState(false)
+  const skillSelectionVersion = useRef(0)
+  const manualSkillSelection = useRef(false)
+  const projectDefaultScope = useRef<string | null | undefined>(undefined)
+  const [projectSkillBlocked, setProjectSkillBlocked] = useState(false)
+
+  const initializeProjectSkill = useCallback(async (projectUuid: string | null, retry = false) => {
+    if (conversationUuid || messages.length || isLoadingHistory || manualSkillSelection.current) return
+    if (!retry && projectDefaultScope.current === projectUuid) return
+    projectDefaultScope.current = projectUuid
+    const version = ++skillSelectionVersion.current
+    setActiveSkill(null); setProjectSkillBlocked(false)
+    setIsSelectingSkill(!!projectUuid)
+    if (!projectUuid) return
+    setError(null)
+    try {
+      const { active_skill } = await getProjectDefaultSkill(projectUuid)
+      if (version === skillSelectionVersion.current) setActiveSkill(active_skill)
+    } catch {
+      if (version === skillSelectionVersion.current) {
+        setProjectSkillBlocked(true)
+        setError('Could not load the project default Skill. Retry, choose a Skill, or continue without one.')
+      }
+    } finally {
+      if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+    }
+  }, [conversationUuid, messages.length, isLoadingHistory])
+
+  const selectSkill = useCallback(async (uuid: string | null) => {
+    if (isStreaming || isLoadingHistory || isSelectingSkill) return false
+    manualSkillSelection.current = true
+    const version = ++skillSelectionVersion.current
+    setIsSelectingSkill(true)
+    setError(null)
+    try {
+      const skill = conversationUuid
+        ? (await selectConversationSkill(conversationUuid, uuid)).active_skill
+        : uuid ? await previewSkill(uuid) : null
+      if (version !== skillSelectionVersion.current) return false
+      setActiveSkill(skill)
+      setProjectSkillBlocked(false)
+      return true
+    } catch (e) {
+      if (version === skillSelectionVersion.current) setError(e instanceof Error ? e.message : 'Could not select Skill')
+      return false
+    } finally {
+      if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+    }
+  }, [conversationUuid, isStreaming, isLoadingHistory, isSelectingSkill])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -130,7 +182,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
-      if (isLoadingHistory) return
+      if (isLoadingHistory || isSelectingSkill || projectSkillBlocked) return
       if (conversationUuid && !activityId) {
         setError('This conversation could not be resumed. Reopen it from Activity before sending.')
         return
@@ -162,7 +214,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       unsupportedCitationsRef.current = []
 
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+      setMessages((prev) => [...prev, { role: 'user', content: message, ...(activeSkill ? { active_skill: activeSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
 
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure
@@ -174,7 +226,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           citationsRef.current,
         )
         if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
-        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(interruption ? { interruption } : {}) }
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(activeSkill ? { active_skill: activeSkill } : {}), ...(interruption ? { interruption } : {}) }
         if (thinkingRef.current) {
           assistantMsg.thinking = thinkingRef.current
           if (thinkingDurationRef.current != null) {
@@ -374,6 +426,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
             setConversationUuid(identity.conversationUuid)
             setActivityId(identity.activityId)
           },
+          activeSkill?.uuid ?? null,
+          activeSkill?.version,
         )
         if (!ownsView()) return
 
@@ -404,7 +458,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, conversationUuid, isLoadingHistory, clearLiveTurn],
+    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn],
   )
 
   /** Hand the view over to another conversation. The in-flight stream keeps
@@ -434,6 +488,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   // opened before this one's history arrived.
   const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
     const version = ++historyLoadVersion.current
+    manualSkillSelection.current = true
+    setProjectSkillBlocked(false)
+    skillSelectionVersion.current += 1
+    setIsSelectingSkill(false)
+    setActiveSkill(null)
     detachLiveTurn()
     setIsLoadingHistory(true)
     setError(null)
@@ -450,6 +509,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       setContextMode(data.context_mode ?? 'full')
       setContextCutoffIndex(data.context_cutoff_index ?? 0)
       setPlanTasks(data.active_plan ?? null)
+      setActiveSkill(data.active_skill ?? null)
       return data
     } catch (e) {
       if (version === historyLoadVersion.current) {
@@ -462,7 +522,13 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [detachLiveTurn])
 
   const reset = useCallback(() => {
+    manualSkillSelection.current = false
+    projectDefaultScope.current = undefined
+    setProjectSkillBlocked(false)
     historyLoadVersion.current += 1
+    skillSelectionVersion.current += 1
+    setIsSelectingSkill(false)
+    setActiveSkill(null)
     detachLiveTurn()
     setIsLoadingHistory(false)
     setMessages([])
@@ -540,6 +606,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [])
 
   return {
+    activeSkill,
+    initializeProjectSkill,
+    projectSkillBlocked,
+    selectSkill,
+    isSelectingSkill,
     messages,
     setMessages,
     streamingContent,

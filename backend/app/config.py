@@ -103,6 +103,7 @@ class Settings(BaseSettings):
 
     # File storage backend ("local" or "s3")
     storage_backend: str = "local"
+    artifact_public_sharing_enabled: bool = True
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
     s3_access_key_id: str | None = None

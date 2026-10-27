@@ -692,6 +692,7 @@ async def get_workflow_status(
         # this the field was write-only and the status poll showed a clean
         # "completed" for a run whose deliverable never left the building.
         "delivery_failures": getattr(result, "delivery_failures", None) or [],
+        "hosted_artifact_uuid": getattr(result, "hosted_artifact_uuid", None),
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
         "workflow_id": str(result.workflow) if result.workflow else None,

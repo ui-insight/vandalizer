@@ -1,4 +1,12 @@
+export interface SkillSnapshot {
+  uuid: string
+  title: string
+  version: string
+  instructions: string
+}
+
 export interface ChatMessage {
+  active_skill?: SkillSnapshot | null
   /** Local stream interruption; does not claim cancellation of server work. */
   interruption?: 'stopped' | 'connection'
   role: 'system' | 'user' | 'assistant'
@@ -90,6 +98,7 @@ export interface UrlAttachment {
 }
 
 export interface ChatConversation {
+  active_skill?: SkillSnapshot | null
   uuid: string
   title: string
   messages: ChatMessage[]

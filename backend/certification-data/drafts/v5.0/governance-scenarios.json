@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "bank_id": "v5.0.governance.scenarios",
-  "revision": 1,
+  "revision": 2,
   "rubric_id": "v5.0-competency-draft.1",
   "module_id": "governance",
   "outcome_ids": [
@@ -99,6 +99,52 @@
         }
       ],
       "correct_choice_id": "missing_evidence"
+    },
+    {
+      "id": "governance.published_revision",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "You published HTML Artifact revision 1 and later saved a corrected revision 2. Which account of the public page is accurate?",
+      "choices": [
+        {
+          "id": "review_publish",
+          "text": "The link still shows revision 1; inspect revision 2 and explicitly publish it if release is authorized.",
+          "feedback": "Saving a revision does not change the published revision or supply release approval."
+        },
+        {
+          "id": "latest",
+          "text": "The link automatically shows revision 2, so no further review is needed.",
+          "feedback": "Public access stays pinned to the published revision until the owner publishes another."
+        },
+        {
+          "id": "workspace",
+          "text": "The link now grants readers the complete source workspace.",
+          "feedback": "Public access is to the published page, not its underlying workspace."
+        }
+      ],
+      "correct_choice_id": "review_publish"
+    },
+    {
+      "id": "governance.revoke_page",
+      "outcome_id": "governance.review_and_revision",
+      "prompt": "You unpublish a hosted HTML Artifact after a reader downloaded it. What can you accurately report?",
+      "choices": [
+        {
+          "id": "link_revoked",
+          "text": "The public link is revoked, but the reader may retain the downloaded copy.",
+          "feedback": "Revocation controls subsequent access through the link; it cannot recall previously saved copies."
+        },
+        {
+          "id": "recalled",
+          "text": "Unpublishing erased every copy the reader saved.",
+          "feedback": "A previously downloaded copy is outside link revocation."
+        },
+        {
+          "id": "team_only",
+          "text": "Removing team access alone would have revoked the public link.",
+          "feedback": "Private team permissions and the public publication are separate controls."
+        }
+      ],
+      "correct_choice_id": "link_revoked"
     }
   ]
 }

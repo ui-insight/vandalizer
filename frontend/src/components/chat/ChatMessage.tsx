@@ -1,14 +1,13 @@
 import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
-import { submitChatFeedback } from '../../api/feedback'
+import { ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
+import { ChatExportActions } from './ChatExportActions'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { useToast } from '../../contexts/ToastContext'
-import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, toolResultToText } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, recoveredCallIds } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -81,8 +80,8 @@ function CitationMenuItem({ icon, label, onClick }: {
 
 interface Props {
   message: ChatMessageType
-  messageIndex?: number
-  conversationUuid?: string
+  exportNames?: Record<string, string>
+  artifactSource?: { project_uuid?: string; conversation_uuid?: string }
   streamingThinking?: string
   thinkingDuration?: number | null
   isStreaming?: boolean
@@ -129,16 +128,11 @@ export function menuAlignmentFor(
 }
 
 export function ChatMessage({
-  message, messageIndex, conversationUuid, streamingThinking,
+  message, exportNames, artifactSource, streamingThinking,
   thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
   toolResults, streamSegments, onSendMessage, approvalHistory,
 }: Props) {
   const isUser = message.role === 'user'
-  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [showComment, setShowComment] = useState(false)
-  const [comment, setComment] = useState('')
-  const [commentSent, setCommentSent] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [openCitation, setOpenCitation] = useState<number | null>(null)
   const [showUnusedSources, setShowUnusedSources] = useState(false)
@@ -154,7 +148,6 @@ export function ChatMessage({
   const citationsRef = useRef<HTMLDivElement>(null)
   const certPanel = useCertificationPanel()
   const { setWorkspaceMode, viewDocument, openDocumentUuid } = useWorkspace()
-  const { toast } = useToast()
 
   const thinkingText = streamingThinking || message.thinking || ''
   const duration = thinkingDuration ?? message.thinking_duration ?? null
@@ -196,42 +189,6 @@ export function ChatMessage({
     // instead of the click dead-ending.
     else if (route.kind === 'send' && onSendMessage) onSendMessage(route.message)
   }, [certPanel, setWorkspaceMode, viewDocument, onSendMessage])
-
-  const handleFeedback = async (rating: 'up' | 'down') => {
-    const prev = feedback
-    setFeedback(rating)
-    try {
-      await submitChatFeedback({
-        conversation_uuid: conversationUuid,
-        message_index: messageIndex,
-        rating,
-      })
-    } catch {
-      // Revert the optimistic highlight so the user knows it didn't save.
-      setFeedback(prev)
-      toast('Could not save your feedback. Please try again.', 'error')
-      return
-    }
-    // Invite a comment for BOTH sentiments — positive feedback is worth capturing,
-    // not just complaints. The prompt copy flips with the rating below.
-    if (!commentSent) setShowComment(true)
-  }
-
-  const handleSubmitComment = async () => {
-    if (!comment.trim() || !feedback) return
-    try {
-      await submitChatFeedback({
-        conversation_uuid: conversationUuid,
-        message_index: messageIndex,
-        rating: feedback,
-        comment: comment.trim(),
-      })
-      setCommentSent(true)
-      setShowComment(false)
-    } catch {
-      toast('Could not send your comment. Please try again.', 'error')
-    }
-  }
 
   // Open the cited document in the viewer and highlight the cited passage.
   // Close the citation chooser on an outside click or Escape, so it never
@@ -303,38 +260,6 @@ export function ChatMessage({
       // interpolated page, so the viewer's fallback must not drop the hedge.
       pageApproximate: citation.page_approximate ?? false,
     }, { preserveChatScope: true })
-  }
-
-  const handleCopy = async () => {
-    // Build full message text including tool results
-    const segs = segments || message.segments
-    let text: string
-    if (segs && segs.length > 0) {
-      const parts: string[] = []
-      for (const seg of segs) {
-        if (seg.kind === 'text') {
-          const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '').trim()
-          if (cleaned) parts.push(cleaned)
-        } else if (seg.kind === 'tool_result') {
-          const body = toolResultToText(seg.result.tool_name, seg.result.content)
-          if (body) parts.push(body)
-        }
-      }
-      text = parts.join('\n\n')
-    } else {
-      // Fallback: message.content + any tool results
-      const parts = [message.content]
-      for (const r of (message.tool_results || [])) {
-        const body = toolResultToText(r.tool_name, r.content)
-        if (body) parts.push(body)
-      }
-      text = parts.join('\n\n')
-    }
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { toast('Could not copy the response. Select the text to copy it, or try again.', 'error') }
   }
 
   // Build a result lookup from both streaming and persisted sources
@@ -814,100 +739,12 @@ export function ChatMessage({
           {message.interruption && <p role="status" style={{ marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)", background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#785411', lineHeight: 1.5 }}>
             {message.interruption === 'stopped' ? 'Response stopped.' : 'Connection interrupted.'} Partial output is preserved. An action already started may still finish; check its result before retrying.
           </p>}
-          {/* Feedback bar - hidden during streaming */}
-          {!isStreamingProp && message.content && <div style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-12)',
-            paddingTop: 'var(--workspace-space-8)', borderTop: '1px solid #00000010',
-          }}>
-            <button
-              type="button"
-              onClick={() => handleFeedback('up')}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                background: feedback === 'up' ? '#dcfce7' : 'transparent',
-                color: feedback === 'up' ? '#16a34a' : '#6b7280',
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-              title="Good response"
-              aria-label="Good response"
-            >
-              <ThumbsUp size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFeedback('down')}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                background: feedback === 'down' ? '#fee2e2' : 'transparent',
-                color: feedback === 'down' ? '#dc2626' : '#6b7280',
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-              title="Poor response"
-              aria-label="Poor response"
-            >
-              <ThumbsDown size={14} />
-            </button>
-            <div style={{ flex: 1 }} />
-            <button
-              type="button"
-              onClick={handleCopy}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                background: 'transparent', color: copied ? '#16a34a' : '#6b7280',
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-              title="Copy message"
-              aria-label="Copy message"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </button>
-          </div>}
 
-          {/* Comment form — shown after either thumbs-up or thumbs-down */}
-          {!isStreamingProp && showComment && !commentSent && (
-            <div style={{
-              marginTop: 'var(--workspace-space-8)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'flex-start',
-            }}>
-              <input
-                autoFocus
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSubmitComment() }}
-                placeholder={feedback === 'up' ? 'What worked well? (optional)' : 'What went wrong? (optional)'}
-                aria-label={feedback === 'up' ? 'What worked well? (optional)' : 'What went wrong? (optional)'}
-                style={{
-                  flex: 1, padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
-                  border: "1px solid var(--workspace-border)", fontSize: 'var(--workspace-font-control)',
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleSubmitComment}
-                style={{
-                  padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', border: 'none',
-                  background: '#374151', color: '#fff', fontSize: 'var(--workspace-font-meta)',
-                  fontWeight: 600, cursor: 'pointer',
-                }}
-              >
-                Send
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowComment(false)}
-                style={{
-                  padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
-                  background: '#fff', fontSize: 'var(--workspace-font-meta)', cursor: 'pointer',
-                }}
-              >
-                Skip
-              </button>
-            </div>
-          )}
         </>
       )}
+      {!isStreamingProp && <div className="mt-3 flex justify-end border-t border-current/10 pt-2">
+        <ChatExportActions messages={[{ ...message, segments: segments || undefined }]} names={exportNames} artifactSource={artifactSource} />
+      </div>}
     </div>
   )
 }

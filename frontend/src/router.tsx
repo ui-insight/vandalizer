@@ -38,6 +38,8 @@ const ReviewDetail = lazy(() => import('./pages/ReviewDetail'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Present = lazy(() => import('./pages/present/Present'))
+const ArtifactPage = lazy(() => import('./pages/Artifacts'))
+const ArtifactsHome = lazy(() => import('./pages/Artifacts').then(module => ({ default: module.ArtifactsHome })))
 
 // Certification runs in chat — /certification (old bookmarks, emails, links)
 // opens the workspace chat and starts or continues the course there.
@@ -201,6 +203,9 @@ const indexRoute = createRoute({
     // which may also carry `docs` and `folders` (see buildChatSetupUrl).
     kb: (search.kb as string) || undefined,
     // Optional, so the many links that spell out the full search needn't name them.
+    ...(typeof search.skill === 'string' && search.skill ? { skill: search.skill } : {}),
+    ...(typeof search.conversation === 'string' && search.conversation ? { conversation: search.conversation } : {}),
+    ...(typeof search.run === 'string' && search.run ? { run: search.run } : {}),
     ...(search.docs ? { docs: search.docs as string } : {}),
     ...(search.folders ? { folders: search.folders as string } : {}),
     ...((search.courseEditor === '1' || search.courseEditor === 1) ? { courseEditor: '1' as const } : {}),
@@ -491,7 +496,20 @@ const demoResendRoute = createRoute({
   component: DemoResend,
 })
 
+const artifactsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/artifacts', component: () => <ProtectedRoute><ArtifactsHome /></ProtectedRoute> })
+const artifactRoute = createRoute({ getParentRoute: () => rootRoute, path: '/artifacts/$uuid', component: () => {
+  const { uuid } = artifactRoute.useParams()
+  return <ProtectedRoute><ArtifactPage key={uuid} uuid={uuid} /></ProtectedRoute>
+} })
+const publicArtifactRoute = createRoute({ getParentRoute: () => rootRoute, path: '/a/$token', component: () => {
+  const { token } = publicArtifactRoute.useParams()
+  return <ArtifactPage key={token} publicToken={token} />
+} })
+
 const routeTree = rootRoute.addChildren([
+  artifactsRoute,
+  artifactRoute,
+  publicArtifactRoute,
   landingRoute,
   loginRoute,
   registerRoute,

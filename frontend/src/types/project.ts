@@ -23,6 +23,7 @@ export interface Project {
   team_id: string | null
   state: ProjectState
   root_folder_uuid: string
+  default_skill_uuid?: string | null
   kb_uuid: string | null
   created_at: string
   updated_at: string

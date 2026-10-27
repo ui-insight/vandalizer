@@ -30,7 +30,7 @@ def test_empty_workflow_and_unindexed_kb_do_not_advertise_usable_output():
 
 
 def test_prompt_is_not_described_as_an_extraction():
-    assert "saved prompt" in describe_catalog_usage("search_set", Row(set_type="prompt"))["output"]
+    assert "selected Skill" in describe_catalog_usage("search_set", Row(set_type="prompt"))["output"]
     assert "extraction fields" in describe_catalog_usage("search_set", Row(set_type="extraction"))["output"]
 
 
@@ -73,5 +73,5 @@ async def test_public_catalog_includes_definition_summaries_and_real_prompt_type
     assert by_id["wf"]["description"] == wf.description
     assert by_id["wf"]["usage"]["output_names"] == ["Review findings"]
     assert by_id["prompt"]["set_type"] == "prompt"
-    assert "saved prompt" in by_id["prompt"]["usage"]["output"]
+    assert "selected Skill" in by_id["prompt"]["usage"]["output"]
     assert by_id["kb"]["usage"]["input"] == "Ask a question about the indexed sources."

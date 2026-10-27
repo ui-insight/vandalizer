@@ -516,6 +516,97 @@
         "e8ee10a208c237d02a08cdc345b04b794c1a9a0e93438f7a2299645de20470da",
         "2ecf76aa1351d15021dadb3e0818d5239fd549676182c28b98298e6b54d9eb15"
       ]
+    },
+    {
+      "id": "skills-chat-2026-10-27.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "ai_literacy.what-ai-is-genuinely-good-at",
+        "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+        "governance.organizing-for-reuse"
+      ],
+      "title": "Library Skills and the active chat version",
+      "issued_at": "2026-10-27",
+      "paragraphs": [
+        "Library items previously called Prompts are now Skills: saved instructions that can guide agentic chat. Workflow Prompt steps retain their name and purpose. A Skill is reusable guidance, not a new workflow node or an executable package of arbitrary tools.",
+        "Open a Skill in the Library and choose Use Skill, or use Choose Skill in chat. Inspect instructions before sending your task. Selecting a Skill does not send a message or run the task. One Skill is active at a time; Change Skill or Remove Skill changes the guidance for subsequent turns.",
+        "The conversation pins the selected instructions. Editing the Library item does not silently update an active conversation; select the Skill again to use the edit. The application checks access again when the Skill is used. If access is lost, resolve the selection instead of assuming the saved instructions still grant access.",
+        "Your current request and application rules take precedence over a Skill. Its instructions cannot approve actions, expand document access, override confirmation gates or enable unavailable tools. Inspect the actual scope and result even when a trusted colleague supplied the Skill."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "19671dc7e93ab084d9808e9d3e6b773ac0e29a5c71e0d257378e8c719c68907a",
+        "1798e6dd0315aa05c02a2e3ccea494f67bbace78cc9d52cdb3db6df6a50cd59e",
+        "d8018585113437959dd8d554effb4cda001ab256dfe402f056bc238e60fb757d",
+        "d74b8df8eae4d374d5443d91e5e88d48990b1e0ff8d5362fe0c2c8e6953f7ef2",
+        "d6f1aade7487e0469f533f12a56edbf6f1a04011d8f410402f0497e9fb3649f3",
+        "103a5b4900455d3d98be8176206daefbac80a9f4059dfd99c2629468c02b1b2f"
+      ]
+    },
+    {
+      "id": "chat-exports-2026-10-27.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "output_delivery.from-analysis-to-deliverables",
+        "output_delivery.glossary-review"
+      ],
+      "title": "Chat exports and hosted pages",
+      "issued_at": "2026-10-27",
+      "paragraphs": [
+        "Beside Copy, the Export menu is available for an individual chat message and for the full conversation. HTML page, Word (.docx) and Excel (.xlsx) produce downloaded files. Word means a DOCX download, not a Google Docs integration. The old thumbs-up/down bubble actions have been removed.",
+        "Choose the scope before exporting. A full conversation can include both your messages and assistant replies; a message export includes only that message. Inspect the downloaded content, citations, tool results and any incomplete-evidence warnings. Export preserves the selected content; it does not perform a new analysis or validate its claims.",
+        "An Excel download contains a transcript and separate sheets for detected Markdown tables. Prose does not automatically become an analysis table, and text that looks like a formula is exported as text rather than executed. Check identifiers, units, row boundaries and completeness in the actual workbook.",
+        "Downloading an HTML page does not create a hosted link. Choose Save as Artifact to save the selected chat content as a private hosted HTML page, then open and review that page before deciding who can access it."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "b2ea55ab45cf76677e1eaeba6bbf098fa77adba4473e75e72bb5e7ed8e5185f0",
+        "896ef31ef324090392b74b342f4bf4a6fb9d6ef40304988892a158985dcf79cb",
+        "68ceacfd6d69af6cc77a810881f591913bdf2341036493cb013b615351858f10",
+        "ce802c8d899e20f8b4a792b1f6847d0a0ffbd847f5c214550d3f9d1936f9b6f8"
+      ]
+    },
+    {
+      "id": "hosted-page-sharing-2026-10-27.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "output_delivery.designing-end-to-end-deliverable-workflows",
+        "governance.sharing-with-everyone"
+      ],
+      "title": "HTML Artifact revisions and audience",
+      "issued_at": "2026-10-27",
+      "paragraphs": [
+        "A hosted HTML Artifact is a saved, versioned page. New pages are private to their owner. Copy private link does not grant access: the reader must sign in as the owner or belong to the team granted access. The owner can select a team under Private access and choose Save access.",
+        "Publishing is a separate owner action: select the inspected revision and choose Publish selected revision. Anyone with the public link can read that published page without signing in, including any source quotations embedded in it. This does not grant access to the source workspace. Public sharing may be disabled on a deployment.",
+        "Later edits create a new private revision; the public link continues to show the published revision until the owner publishes another selected revision. Unpublish revokes access through the public link. It does not recall files or copies readers already saved. Changing team access is separate from unpublishing.",
+        "These Artifacts support static HTML and CSS. Scripts, forms, frames and remote assets are blocked. Review the rendered page and sanitization warnings; a page that depends on JavaScript or a remote chart is not a supported interactive app. Private creation or revision through chat still follows the tool confirmation gate; the Skill cannot confirm it for you."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "69a9b4f3ed11c48cdeffb0202b28204576f38dcf2ec382b701678d7a8ec538b9",
+        "e8ee10a208c237d02a08cdc345b04b794c1a9a0e93438f7a2299645de20470da",
+        "d232276b33873fc33741fe2b4936bf0a43172f5984f3d7f943cb1620b3be0f3f",
+        "1c002e0a3b3d4e607a3b2d6a9d28fa1ae21ba8014bf1c84593101eb998e7184f"
+      ]
+    },
+    {
+      "id": "workflow-html-output-2026-10-27.1",
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195",
+      "lesson_ids": [
+        "output_delivery.build-a-deliverable-workflow"
+      ],
+      "title": "Private HTML output from a completed workflow",
+      "issued_at": "2026-10-27",
+      "paragraphs": [
+        "A completed workflow can also be saved as an HTML Artifact using Save as Artifact in its results. To create one after each completed run, enable Create a private HTML Artifact after each completed run in the workflow output settings and save the workflow. This is an output setting, not a new graph node.",
+        "Inspect the created Artifact link and the actual completed output. A file-download payload is not itself HTML content; a workflow that produces only binary deliverables needs a suitable text or structured result for the hosted page. Artifact delivery can fail even when execution completed; inspect the delivery status before claiming the page exists. Creation never automatically publishes the page.",
+        "These interface updates do not change this historical course version’s assigned formats, assessment requirements or earned credit. Follow the exercise attached to your enrollment."
+      ],
+      "assessment_changed": false,
+      "unversioned_content_sha256": [
+        "6e5468977f08e728e9f17f2f33392c02a0c60741176b8c52568bdae7e31f3618",
+        "7f07a5560d7db41ca77e489059f9c30fa84940e87389b895323369691032017f"
+      ]
     }
   ],
   "module_notices": [

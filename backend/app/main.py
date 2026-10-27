@@ -15,6 +15,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
+from app.routers import artifacts
 from app.rate_limit import limiter
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
@@ -161,11 +162,14 @@ class SecurityHeadersMiddleware:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 headers["X-Content-Type-Options"] = "nosniff"
-                headers["X-Frame-Options"] = "DENY"
-                headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                headers["X-Frame-Options"] = headers.get("X-Frame-Options", "DENY")
+                headers["Referrer-Policy"] = headers.get("Referrer-Policy", "strict-origin-when-cross-origin")
+                if scope.get("path", "").startswith("/api/artifacts"):
+                    headers["Cache-Control"] = "no-store"
+                    headers["X-Robots-Tag"] = "noindex, nofollow"
                 headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
                 headers["X-XSS-Protection"] = "1; mode=block"
-                headers["Content-Security-Policy"] = (
+                headers["Content-Security-Policy"] = headers.get("Content-Security-Policy") or (
                     "default-src 'self'; "
                     "script-src 'self'; "
                     "style-src 'self' 'unsafe-inline'; "
@@ -226,6 +230,7 @@ app.include_router(extractions.router, prefix="/api/extractions", tags=["extract
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])

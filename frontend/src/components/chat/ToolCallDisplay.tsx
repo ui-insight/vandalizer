@@ -19,6 +19,7 @@ import { useCertificationPanelOptional } from '../../contexts/CertificationPanel
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
+import { WorkflowArtifactAction } from '../workspace/WorkflowArtifactAction'
 import { announceWorkflowEdited } from '../../lib/workflowEdits'
 import type { WorkflowStatus } from '../../types/workflow'
 
@@ -77,6 +78,9 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   apply_optimization:    { label: 'Applying optimized config',  category: 'write' },
   regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
   save_to_folder:        { label: 'Saving to folder',         category: 'write' },
+  create_html_artifact:  { label: 'Creating artifact',        category: 'write' },
+  revise_html_artifact:  { label: 'Revising artifact',        category: 'write' },
+  get_html_artifact:     { label: 'Reading artifact',         category: 'read' },
   create_project:        { label: 'Creating project',         category: 'write' },
   list_project_documents:{ label: 'Listing project files',    category: 'read' },
   run_pin_on_project:    { label: 'Running pinned item',      category: 'workflow' },
@@ -408,6 +412,11 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'regenerate_validation_plan':
       return { text: obj.message ? String(obj.message) : 'Done', qualityHint }
 
+    case 'create_html_artifact':
+    case 'revise_html_artifact':
+      return { text: `Saved private artifact: ${String(obj.title || 'HTML page')}`, qualityHint }
+    case 'get_html_artifact':
+      return { text: `Read artifact: ${String(obj.title || 'HTML page')}`, qualityHint }
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
       return { text: `Saved ${t}`, qualityHint }
@@ -1150,6 +1159,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
       {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
       {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
       {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
+      {effective === 'completed' && <WorkflowArtifactAction sessionId={sessionId} />}
       {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
     </section>
   )
@@ -1463,6 +1473,11 @@ export function ToolStatusLine({
       </div>
 
       {/* Auto-shown rich content (copy/export buttons are inside each block) */}
+      {result && !isError && ['create_html_artifact', 'revise_html_artifact'].includes(name) && <div className="my-3 rounded-lg border bg-white p-3">
+        {needsConfirmation && typeof obj?.artifact_preview_html === 'string' && <iframe title="Proposed artifact preview" srcDoc={obj.artifact_preview_html} sandbox="" referrerPolicy="no-referrer" className="h-64 w-full border" />}
+        {!needsConfirmation && typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) && <a className="font-medium underline" href={`/artifacts/${obj.artifact_uuid}`} target="_blank" rel="noreferrer">Open artifact · review and share</a>}
+        <p className="mt-2 text-xs text-gray-600">Saved revisions do not change a public link until you publish them in the artifact viewer.</p>
+      </div>}
       {result && name === 'run_extraction' && obj?.entities != null && (
         <ExtractionContent content={obj} actions={kbActions} />
       )}
