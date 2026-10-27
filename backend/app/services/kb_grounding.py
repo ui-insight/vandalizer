@@ -840,6 +840,62 @@ def with_neighbours(dm, kb_uuid: str, query: str, pool: list[dict], *, k: int) -
     return pool + attach_lead_ins(dm, kb_uuid, added) if added else pool
 
 
+def with_adjacent(dm, passages: list[dict], *, n: Optional[int] = None) -> list[dict]:
+    """``passages`` (a turn's final snippets, each tagged with its
+    ``kb_uuid``) with the chunks either side of each base's first ``n``
+    (``kb_retrieval.ADJACENT_PASSAGES``) passages — same source, same
+    section, not already handed over — each right after its passage.
+
+    :func:`with_neighbours` admits a neighbour only while its pool is below
+    ``k`` and only when it scores above ``NEIGHBOUR_MIN_SCORE``; the rest of
+    a rule cut across chunks sits next to the best passage and is often kept
+    out by one or the other. These are not scored, and the caps the pools
+    were cut to have already been applied."""
+    from app.services import kb_retrieval as kr
+    from app.services.kb_paraphrase import RESCUED
+
+    n = kr.ADJACENT_PASSAGES if n is None else n
+    if not passages or n <= 0 or not kr.ready():
+        return passages
+    by_kb: dict[str, list[int]] = {}
+    for at, r in enumerate(passages):
+        if r.get("kb_uuid"):
+            by_kb.setdefault(r["kb_uuid"], []).append(at)
+    beside: dict[int, list[dict]] = {}
+    for kb_uuid, ats in by_kb.items():
+        index = kr.index_for(dm, kb_uuid)
+        if index is None:
+            continue
+        held: set[int] = set()
+        for at in ats:
+            r = passages[at]
+            for cid in (str(r.get("chunk_id")), *(r.get("_covers") or ())):
+                if cid in index.position:
+                    held.add(index.position[cid])
+
+        def source(i: int):
+            return (index.chunks[i].get("metadata") or {}).get("source_id")
+
+        added: list[dict] = []
+        for at in ats[:n]:
+            r = passages[at]
+            i = index.position.get(str(r.get("chunk_id")))
+            if i is None:
+                continue   # a section passage, or a chunk another lane read
+            for j in (i - 1, i + 1):
+                if 0 <= j < len(index.chunks) and j not in held and j not in index.excluded \
+                        and index.keys[j] == index.keys[i] and source(j) == source(i):
+                    held.add(j)
+                    nb = kr._chunk_result(index, j)
+                    nb.update({key: r[key] for key in ("kb_uuid", "kb_title", RESCUED) if key in r})
+                    beside.setdefault(at, []).append(nb)
+                    added.append(nb)
+        attach_lead_ins(dm, kb_uuid, added)
+    if not beside:
+        return passages
+    return [x for at, r in enumerate(passages) for x in (r, *beside.get(at, ()))]
+
+
 def precise_cut(dm, kb_uuid: str, query: str, results: list[dict]) -> Optional[list[dict]]:
     """Chunks another lane found — a source the message names, a passage
     that amends one retrieved — scored by the cross-encoder against

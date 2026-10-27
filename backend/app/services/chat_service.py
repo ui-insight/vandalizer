@@ -3734,7 +3734,7 @@ async def _build_multi_kb_segment(
             return None, []
         for r in results:
             r["kb_uuid"] = kb_uuid
-        return await _render_kb_segment(results, message, user_id=user_id)
+        return await _render_kb_segment(await _with_adjacent(results), message, user_id=user_id)
 
     pools = await asyncio.gather(*[
         _retrieve_kb_results(
@@ -3769,7 +3769,21 @@ async def _build_multi_kb_segment(
             "KB query returned no results across %d knowledge bases", len(kbs),
         )
         return None, []
-    return await _render_kb_segment(merged, message, user_id=user_id)
+    return await _render_kb_segment(await _with_adjacent(merged), message, user_id=user_id)
+
+
+async def _with_adjacent(results: list[dict]) -> list[dict]:
+    """The turn's snippets with the chunks either side of each base's best
+    passages (kb_grounding.with_adjacent), added after every cap: the rest
+    of a rule cut across chunks is what they hold."""
+    from app.services import kb_grounding
+    from app.services.document_manager import get_document_manager
+
+    try:
+        return await asyncio.to_thread(kb_grounding.with_adjacent, get_document_manager(), results)
+    except Exception as e:  # noqa: BLE001 — the snippets stand without them
+        logger.warning("Adjacent KB chunks not added: %s", e)
+        return results
 
 
 async def _retrieve_kb_results(

@@ -302,3 +302,39 @@ def test_ui_sidecars_leave_the_result_the_model_reads():
     # Popped in place: the next model request sends this very object.
     assert same is content and content == {"status": "completed", "output": "x"}
     assert chat_service._pop_ui_sidecars(["not", "a", "dict"]) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_a_turn_s_snippets_get_their_adjacent_chunks_after_the_multi_kb_budget(monkeypatch):
+    pools = {
+        kb: [{**_section_chunk(n, 1, section=f"{100 + i}.{n}", parts=1), "chunk_id": f"{kb}_chunk_{n}"} for n in range(8)]
+        for i, kb in enumerate(("kb-a", "kb-b"))
+    }
+
+    async def retrieve(kb_uuid, message, model_name, **kw):
+        return [dict(r) for r in pools[kb_uuid]]
+
+    seen = []
+
+    def adjacent(dm, passages, n=None):
+        seen.append([p["kb_uuid"] for p in passages])
+        first = passages[0]
+        return [first, {**first, "chunk_id": "beside", "content": "the rest of the rule"}, *passages[1:]]
+
+    monkeypatch.setattr(chat_service, "_retrieve_kb_results", retrieve)
+    monkeypatch.setattr(kb_grounding, "with_adjacent", adjacent)
+    monkeypatch.setattr("app.services.document_manager.get_document_manager", lambda: MagicMock())
+    patches = [patch(target, new=mock) for target, mock in _patched().items()]
+    for p in patches:
+        p.start()
+    try:
+        _, two = await chat_service._build_multi_kb_segment([("kb-a", "A"), ("kb-b", "B")], "q", "test-model")
+        _, one = await chat_service._build_multi_kb_segment([("kb-a", "A")], "q", "test-model")
+    finally:
+        for p in patches:
+            p.stop()
+    # The budget cut first; the adjacent chunk comes on top of it, beside its passage.
+    assert len(two) == chat_service.MULTI_KB_SNIPPET_BUDGET + 1
+    assert [s["content"] for s in two][1] == "the rest of the rule"
+    assert len(one) == 9 and one[1]["content"] == "the rest of the rule"
+    assert seen[0].count("kb-a") == seen[0].count("kb-b") == 6 and set(seen[1]) == {"kb-a"}

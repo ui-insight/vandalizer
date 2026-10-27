@@ -112,6 +112,16 @@ RESCUE_RERANK_POOL = 8
 # context for 1.7 more passages per question; admitting every neighbour
 # added 0.9 more passages for almost nothing.
 NEIGHBOUR_MIN_SCORE = -5.0
+# The passages of each base, best first, whose same-section chunks either side
+# are handed over whatever they score and beyond any cap
+# (kb_grounding.with_adjacent). On the KB accuracy eval (Phase 3 after-run,
+# 2026-10-26) the answer text a pool missed sat one or two chunks from a passage
+# it held, in the same section, in 47% of the turns that reached only part of
+# their answer; the neighbour cut and the pool's cap kept it out about equally
+# often. Beside the best two passages this reached all the answer text in 15
+# more such turns for 1.2 more passages per turn; beside every passage, 16 for
+# 2.7.
+ADJACENT_PASSAGES = 2
 # Title routing: cosine of the expanded query to a section title, and its
 # lead over the best title of any other section (all-MiniLM-L6-v2 scale).
 ROUTE_MIN_SIMILARITY = 0.75

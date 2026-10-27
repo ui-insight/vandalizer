@@ -248,6 +248,76 @@ class TestNeighbours:
         assert kg.with_neighbours(store, KB, "budget revision prior approval", pool, k=1) == pool
 
 
+class TestAdjacent:
+    """The chunks either side of a base's best passages, after every cap."""
+
+    def _at(self, store, same_both_sides=True):
+        index = kr.index_for(store, KB)
+        for i in range(1, len(index.keys) - 1):
+            same = (index.keys[i - 1] == index.keys[i], index.keys[i + 1] == index.keys[i])
+            if same == ((True, True) if same_both_sides else (False, True)):
+                return index, i
+        raise AssertionError("no such chunk in the fake corpus")
+
+    def _passage(self, index, i, **extra):
+        return {**kr._chunk_result(index, i), "kb_uuid": KB, **extra}
+
+    def test_the_section_s_chunks_either_side_follow_the_best_passage_unscored(self, precise):
+        store = _store()
+        index, i = self._at(store)
+        best = self._passage(index, i)
+        out = kg.with_adjacent(store, [best])
+        assert out[0] is best
+        assert [index.position[r["chunk_id"]] for r in out[1:]] == [i - 1, i + 1]
+        assert all(r["kb_uuid"] == KB and r["score"] is None for r in out[1:])
+
+    def test_they_sit_right_after_their_passage_and_add_to_the_pool(self, precise):
+        store = _store()
+        index, i = self._at(store)
+        other = next(j for j in range(len(index.keys)) if index.keys[j] != index.keys[i])
+        pool = [self._passage(index, i), self._passage(index, other)]
+        out = kg.with_adjacent(store, pool, n=1)
+        assert out[0] is pool[0] and out[-1] is pool[1]
+        assert len(out) == 4
+
+    def test_only_each_base_s_first_passages_get_them(self, precise):
+        store = _store()
+        index, i = self._at(store)
+        other = next(j for j in range(len(index.keys)) if abs(j - i) > 2 and index.keys[j] != index.keys[i])
+        pool = [self._passage(index, i), self._passage(index, other)]
+        out = kg.with_adjacent(store, pool, n=1)
+        assert [r["chunk_id"] for r in out].index(pool[1]["chunk_id"]) == len(out) - 1
+
+    def test_a_chunk_already_handed_over_is_not_repeated(self, precise):
+        store = _store()
+        index, i = self._at(store)
+        pool = [self._passage(index, i), self._passage(index, i + 1)]
+        ids = [r["chunk_id"] for r in kg.with_adjacent(store, pool)]
+        assert len(ids) == len(set(ids))
+        assert index.chunks[i - 1]["chunk_id"] in ids
+
+    def test_a_chunk_of_another_section_is_left_out(self, precise):
+        store = _store()
+        index, i = self._at(store, same_both_sides=False)
+        out = kg.with_adjacent(store, [self._passage(index, i)])
+        assert [index.position[r["chunk_id"]] for r in out[1:]] == [i + 1]
+
+    def test_a_rescued_passage_s_chunks_are_marked_rescued_too(self, precise):
+        store = _store()
+        index, i = self._at(store)
+        out = kg.with_adjacent(store, [self._passage(index, i, **{kp.RESCUED: True})])
+        assert len(out) == 3 and all(r.get(kp.RESCUED) for r in out)
+
+    def test_nothing_is_added_without_precise_retrieval_or_a_base(self, precise, monkeypatch):
+        store = _store()
+        index, i = self._at(store)
+        untagged = [kr._chunk_result(index, i)]
+        assert kg.with_adjacent(store, untagged) == untagged
+        monkeypatch.setattr(kr, "ready", lambda: False)
+        pool = [self._passage(index, i)]
+        assert kg.with_adjacent(store, pool) == pool
+
+
 class TestPrecisePool:
     @pytest.mark.asyncio
     async def test_a_question_that_keeps_passages_asks_no_model(self, precise, agent):
