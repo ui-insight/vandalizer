@@ -375,8 +375,8 @@ async def test_the_section_pick_is_asked_alongside_retrieval_and_added_after_eve
         asked_first.append(bool(asked))
         return [dict(r) for r in pools[kb_uuid]]
 
-    async def pick_section(kbs, message, model_name, history=None):
-        asked.append([u for u, _ in kbs])
+    async def pick_section(kbs, message, model_name, history=None, effort=None):
+        asked.append(([u for u, _ in kbs], effort))
         return ("kb-b", "picked")
 
     def with_section(dm, passages, picked, query, kb_title=None):
@@ -387,8 +387,9 @@ async def test_the_section_pick_is_asked_alongside_retrieval_and_added_after_eve
                           pick_section=pick_section, with_section=with_section)
     _, one = await _multi([("kb-a", "A")], monkeypatch, retrieve=retrieve,
                           pick_section=pick_section, with_section=with_section)
-    # Asked before the pools came back; added after the budget cut, last.
-    assert asked == [["kb-a", "kb-b"], ["kb-a"]] and all(asked_first)
+    # Asked both ways before the pools came back; added after the budget cut, last.
+    assert asked == [(["kb-a", "kb-b"], None), (["kb-a", "kb-b"], "low"), (["kb-a"], None), (["kb-a"], "low")]
+    assert all(asked_first)
     assert len(two) == chat_service.MULTI_KB_SNIPPET_BUDGET + 1 and two[-1]["content"] == "the governing rule"
     assert seen[0] == (chat_service.MULTI_KB_SNIPPET_BUDGET, ("kb-b", "picked"), "B")
     assert len(one) == 9 and one[-1]["content"] == "the governing rule" and seen[1][2] is None
@@ -402,11 +403,11 @@ async def test_a_turn_with_no_passage_cancels_the_section_pick(monkeypatch):
         await asyncio.sleep(0)
         return []
 
-    async def pick_section(kbs, message, model_name, history=None):
+    async def pick_section(kbs, message, model_name, history=None, effort=None):
         try:
             await asyncio.sleep(10)
         except asyncio.CancelledError:
-            cancelled.append(len(kbs))
+            cancelled.append((len(kbs), effort))
             raise
 
     def with_section(*a, **k):
@@ -416,7 +417,7 @@ async def test_a_turn_with_no_passage_cancels_the_section_pick(monkeypatch):
         assert await _multi(kbs, monkeypatch, retrieve=retrieve, pick_section=pick_section,
                             with_section=with_section) == (None, [])
     await asyncio.sleep(0)
-    assert cancelled == [1, 2]
+    assert cancelled == [(1, None), (1, "low"), (2, None), (2, "low")]
 
 
 @pytest.mark.asyncio
@@ -426,13 +427,13 @@ async def test_the_snippets_stand_when_the_picked_section_cannot_be_added(monkey
     async def retrieve(kb_uuid, message, model_name, **kw):
         return [dict(r) for r in pools[kb_uuid]]
 
-    async def pick_section(kbs, message, model_name, history=None):
+    async def pick_section(kbs, message, model_name, history=None, effort=None):
         return ("kb-a", "picked")
 
     def with_section(*a, **k):
         raise RuntimeError("index gone")
 
-    async def no_pick(kbs, message, model_name, history=None):
+    async def no_pick(kbs, message, model_name, history=None, effort=None):
         return None
 
     _, failed = await _multi([("kb-a", "A")], monkeypatch, retrieve=retrieve, pick_section=pick_section,
@@ -450,8 +451,8 @@ async def test_the_pick_reads_the_bases_indexes_and_the_question_a_follow_up_fol
 
     calls = []
 
-    async def pick(bases, question, previous, model_name):
-        calls.append(([(u, t, ix) for u, t, ix in bases], question, previous, model_name))
+    async def pick(bases, question, previous, model_name, effort=None):
+        calls.append(([(u, t, ix) for u, t, ix in bases], question, previous, model_name, effort))
         return ("kb-a", "200.307")
 
     monkeypatch.setattr(kb_sections, "pick", pick)
@@ -470,6 +471,57 @@ async def test_the_pick_reads_the_bases_indexes_and_the_question_a_follow_up_fol
     found = await chat_service._pick_section([("kb-a", "A"), ("kb-gone", "G")], "what about year 2?", "m", history)
     assert found == ("kb-a", "200.307") and loaded.await_count == 1
     assert calls[0] == ([("kb-a", "A", "ix-kb-a")], "what about year 2?",
-                        "Can we charge outsiders for the core facility?", "m")
+                        "Can we charge outsiders for the core facility?", "m", None)
     await chat_service._pick_section([("kb-a", "A")], "Under 2 CFR 200, may a university keep the program income a core facility earns from outside users during a federal award?", "m", history)
     assert calls[1][2] is None
+    await chat_service._pick_section([("kb-a", "A")], "what about year 2?", "m", history, effort="low")
+    assert calls[2][4] == "low"
+
+
+def _gated_picks(monkeypatch):
+    """A stand-in _pick_section whose two calls (by effort) return what the
+    test sets on their gate, when it sets it; and which of them were cancelled."""
+    gates, cancelled = {}, []
+
+    async def pick_section(kbs, message, model_name, history=None, effort=None):
+        gates[effort] = asyncio.get_running_loop().create_future()
+        try:
+            return await gates[effort]
+        except asyncio.CancelledError:
+            cancelled.append(effort)
+            raise
+
+    monkeypatch.setattr(chat_service, "_pick_section", pick_section)
+    return gates, cancelled
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("back, then, picked, cancelled", [
+    # back when the bases have been searched | back after | the turn takes | cancelled
+    ({None: ("kb-a", "full"), "low": ("kb-a", "fast")}, {}, ("kb-a", "full"), []),
+    ({"low": ("kb-a", "fast")}, {}, ("kb-a", "fast"), [None]),
+    ({}, {None: ("kb-a", "full")}, ("kb-a", "full"), ["low"]),
+    ({}, {"low": ("kb-a", "fast")}, ("kb-a", "fast"), [None]),
+    ({"low": None}, {None: ("kb-a", "full")}, ("kb-a", "full"), []),
+    ({None: None}, {"low": ("kb-a", "fast")}, ("kb-a", "fast"), []),
+    ({None: None, "low": None}, {}, None, []),
+])
+async def test_the_turn_takes_the_default_pick_if_back_else_whichever_next_names_a_section(
+        monkeypatch, back, then, picked, cancelled):
+    from app.services import kb_sections
+
+    gates, was_cancelled = _gated_picks(monkeypatch)
+    picks = chat_service._SectionPicks([("kb-a", "A")], "q", "m")
+    await asyncio.sleep(0)
+    assert set(gates) == {None, kb_sections.FAST_EFFORT} == {None, "low"}
+    for effort, found in back.items():
+        gates[effort].set_result(found)
+    await asyncio.sleep(0)
+    taking = asyncio.ensure_future(picks.result())
+    await asyncio.sleep(0)
+    assert not taking.done() or not then
+    for effort, found in then.items():
+        gates[effort].set_result(found)
+    assert await taking == picked
+    await asyncio.sleep(0)
+    assert was_cancelled == cancelled

@@ -3721,8 +3721,8 @@ async def _build_multi_kb_segment(
     if not kbs:
         return None, []
     # The section the chat model names from the bases' table of contents is
-    # asked for while they are searched (kb_sections).
-    picking = asyncio.ensure_future(_pick_section(kbs, message, model_name, history))
+    # asked for, both ways at once, while they are searched (kb_sections).
+    picking = _SectionPicks(kbs, message, model_name, history)
     if len(kbs) == 1:
         # One KB reads exactly as it always has: naming it on every snippet
         # and citation would relabel every existing chat, where there is no
@@ -3780,16 +3780,49 @@ async def _build_multi_kb_segment(
     return await _render_kb_segment(merged, message, user_id=user_id)
 
 
+class _SectionPicks:
+    """The turn's section pick, asked for twice at once: at the model's
+    default reasoning effort, which names the governing section more often,
+    and at a low one (kb_sections.FAST_EFFORT), which answers in about half
+    the time. Once the bases have been searched the turn takes the first if
+    it is back, and otherwise whichever of the two next names a section."""
+
+    def __init__(self, kbs: list[tuple[str, str]], message: str, model_name: str,
+                 history: Optional[list[ModelMessage]] = None) -> None:
+        from app.services import kb_sections
+
+        self.full = asyncio.ensure_future(_pick_section(kbs, message, model_name, history))
+        self.fast = asyncio.ensure_future(
+            _pick_section(kbs, message, model_name, history, effort=kb_sections.FAST_EFFORT))
+
+    def cancel(self) -> None:
+        self.full.cancel()
+        self.fast.cancel()
+
+    async def result(self) -> Optional[tuple[str, str]]:
+        pending = {self.full, self.fast}
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            # The default pick first when both are back.
+            for task in sorted(done, key=lambda t: t is not self.full):
+                if not task.cancelled() and task.result() is not None:
+                    for other in pending:
+                        other.cancel()
+                    return task.result()
+        return None
+
+
 async def _pick_section(
     kbs: list[tuple[str, str]],
     message: str,
     model_name: str,
     history: Optional[list[ModelMessage]] = None,
+    effort: Optional[str] = None,
 ) -> Optional[tuple[str, str]]:
     """(kb_uuid, section key) of the section the chat model names first from
-    the table of contents of the turn's bases (kb_sections.pick), with the
-    question a follow-up follows; None when precise retrieval cannot run here
-    or the model names none."""
+    the table of contents of the turn's bases (kb_sections.pick) at reasoning
+    ``effort``, with the question a follow-up follows; None when precise
+    retrieval cannot run here or the model names none."""
     from app.services import kb_retrieval, kb_sections
     from app.services.document_manager import get_document_manager
     from app.services.kb_validation_service import _ensure_system_config_loaded
@@ -3806,7 +3839,7 @@ async def _pick_section(
         if history and _looks_anaphoric(message):
             previous = _previous_question(_recent_turns(history))
         bases = [(kb_uuid, title, index) for (kb_uuid, title), index in zip(kbs, indexes) if index is not None]
-        return await kb_sections.pick(bases, message, previous, model_name)
+        return await kb_sections.pick(bases, message, previous, model_name, effort=effort)
     except Exception as e:  # noqa: BLE001 — the turn goes on without it
         logger.warning("KB section pick failed: %s", e)
         return None
@@ -3814,7 +3847,7 @@ async def _pick_section(
 
 async def _with_section(
     results: list[dict],
-    picking: "asyncio.Future[Optional[tuple[str, str]]]",
+    picking: _SectionPicks,
     message: str,
     titles: Optional[dict[str, str]] = None,
 ) -> list[dict]:
@@ -3826,7 +3859,7 @@ async def _with_section(
     from app.services.document_manager import get_document_manager
 
     try:
-        picked = await picking
+        picked = await picking.result()
         if picked is None:
             return results
         return await asyncio.to_thread(

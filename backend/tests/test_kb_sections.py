@@ -201,6 +201,31 @@ class TestPick:
         await ks.pick([(KB, "", index)], "q?", "an earlier question", "m")
         assert agent.calls == 2 and "earlier question: an earlier question" in agent.prompts[1]
 
+    @pytest.mark.asyncio
+    async def test_a_low_effort_pick_is_a_call_and_an_answer_of_its_own(self, precise, agent):
+        agent.output = '{"sections": ["A|200.307"]}'
+        index = _index(_store())
+        assert await ks.pick([(KB, "", index)], "q?", None, "m") == (KB, "200.307")
+        assert await ks.pick([(KB, "", index)], "q?", None, "m", effort=ks.FAST_EFFORT) == (KB, "200.307")
+        assert agent.calls == 2
+        (purpose, _, _, settings), (low_purpose, _, _, low_settings) = agent.built
+        assert purpose == "kb_section_picker" and "openai_reasoning_effort" not in settings
+        assert low_purpose == "kb_section_picker_low"
+        assert low_settings == {**settings, "openai_reasoning_effort": "low"}
+
+    @pytest.mark.asyncio
+    async def test_a_table_of_contents_of_three_lines_or_fewer_is_not_asked_about(self, agent):
+        def index(*keys):
+            return SimpleNamespace(keys=list(keys), excluded=set(), prefixes=list(keys), section_titles={},
+                                   chunks=[{} for _ in keys])
+
+        a_line_per_source = index("source:Guide", "source:Policy", "source:FAQ")
+        assert await ks.pick([("kb-a", "", a_line_per_source)], "q?", None, "m") is None
+        assert agent.calls == 0
+        agent.output = '{"sections": ["A|source:Policy"]}'
+        found = await ks.pick([("kb-a", "", a_line_per_source), ("kb-b", "", index("source:Notice"))], "q?", None, "m")
+        assert found == ("kb-a", "source:Policy") and agent.calls == 1
+
 
 # ---------------------------------------------------------------------------
 # Adding the section's chunks

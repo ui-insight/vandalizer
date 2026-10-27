@@ -16,8 +16,8 @@ sections already handed over reached it rarely.
 Given the bases' section numbers and titles, one per line, the chat model named
 the governing section first for 25 of 50 such development questions and 9 of 16
 held-out ones (within its three picks, 76% and 62%), and for 74 of 100 that
-were answered right. So while the bases are searched, the model is asked once
-for the section, and that section's best chunks join the passages after every
+were answered right. So while the bases are searched, the model is asked for
+the section, and that section's best chunks join the passages after every
 cap (:func:`app.services.kb_grounding.with_section`). Only its first pick is
 used: all three added more than twice the passages for 1.4 times the answer
 text. The call is made at temperature 0 and given ``TIMEOUT_S``; one
@@ -26,6 +26,23 @@ that fails, times out or names no section of these bases adds nothing.
 Its weak spot is a big section: where the first pick was right, its best two
 chunks held all the answer text in 9 of 10 sections of up to three chunks and
 7 of 16 of nine or more.
+
+The call often outlasts the search, and the turn waits for it: a mean 1.2 s
+and up to 8 s on the eval's development questions (2026-10-27). At a low
+reasoning effort (``FAST_EFFORT``) the same call took a median 1.7 s instead
+of 4.0 s, but named the governing section first for 33% of the questions that
+need it instead of 45%. So it is asked both ways at once
+(``chat_service._SectionPicks``): once the bases have been searched, a turn
+takes the default call's pick if it is back, and otherwise whichever call
+next names a section. On the development set that cut the wait to a mean
+0.02 s when the model endpoint was quick and 0.15 s (replayed from measured
+call times) when it was slow. Over all turns the answers' grades moved no
+more than between two runs of the same code; where the low-effort call named
+a section the default one would not have, they graded worse (5 better, 17
+worse of 72 turns). A table of contents of ``SMALL_TOC_LINES`` lines or
+fewer, a line per source, is not asked about: there the pick added nothing in
+20 of 28 such turns (its source was already handed over), and the low-effort
+call named no section in 10 of 28.
 """
 
 from __future__ import annotations
@@ -53,6 +70,9 @@ SYSTEM_PROMPT = (
 # at most, for a median 1,053 prompt and 283 completion tokens.
 TIMEOUT_S = 10.0
 MAX_TOKENS = 3000
+# The second call's reasoning effort (pydantic-ai's openai_reasoning_effort).
+FAST_EFFORT = "low"
+SMALL_TOC_LINES = 3
 CACHE_SIZE = 256
 TITLE_MAX_CHARS = 110
 # A source without section numbers is one line, with the sub-headings it covers.
@@ -152,25 +172,33 @@ _CACHE: "OrderedDict[tuple, Optional[tuple[str, str]]]" = OrderedDict()
 
 
 async def pick(bases: list[tuple[str, str, object]], question: str, previous: Optional[str],
-               model_name: Optional[str]) -> Optional[tuple[str, str]]:
+               model_name: Optional[str], effort: Optional[str] = None) -> Optional[tuple[str, str]]:
     """(kb_uuid, section key) of the section ``model_name`` names first for
     ``question`` from the table of contents of ``bases`` — ``[(kb_uuid, title,
-    index)]``; None without a model or a base, when the call fails or times out,
-    or when its first pick is no section of these bases."""
+    index)]``, at reasoning ``effort`` (the model's default when None); None
+    without a model or a base, without a call when their table of contents is
+    ``SMALL_TOC_LINES`` lines or fewer, when the call fails or times out, or
+    when its first pick is no section of these bases."""
     question = (question or "").strip()
     if not question or not model_name or not bases:
         return None
     contents = [Contents(string.ascii_uppercase[n % 26], kb_uuid, title or "", table_of_contents(index))
                 for n, (kb_uuid, title, index) in enumerate(bases)]
-    key = (model_name, question, previous or "", tuple((u, getattr(ix, "built_at", 0.0)) for u, _, ix in bases))
+    if sum(len(c.lines) for c in contents) <= SMALL_TOC_LINES:
+        return None
+    key = (model_name, effort, question, previous or "",
+           tuple((u, getattr(ix, "built_at", 0.0)) for u, _, ix in bases))
     if key in _CACHE:
         _CACHE.move_to_end(key)
         return _CACHE[key]
     try:
         from app.services.kb_validation_service import _get_or_build_agent
 
-        agent = _get_or_build_agent("kb_section_picker", model_name, SYSTEM_PROMPT,
-                                    model_settings={"temperature": 0.0, "max_tokens": MAX_TOKENS})
+        settings: dict = {"temperature": 0.0, "max_tokens": MAX_TOKENS}
+        if effort:
+            settings["openai_reasoning_effort"] = effort
+        agent = _get_or_build_agent("kb_section_picker" + (f"_{effort}" if effort else ""), model_name,
+                                    SYSTEM_PROMPT, model_settings=settings)
         run = await asyncio.wait_for(agent.run(prompt(contents, question, previous)), timeout=TIMEOUT_S)
         picks = parse(str(run.output or ""))
     except Exception as e:  # noqa: BLE001 — the turn goes on without it
