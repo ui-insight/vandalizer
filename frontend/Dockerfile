@@ -2,7 +2,8 @@
 # Node 24 bundles npm 11, which is required to read this package-lock.json
 # (see the note above `npm ci` below). Build-stage only — the runtime image
 # is nginx, so this does not affect what is served.
-FROM docker.io/library/node:24-alpine AS builder
+# Keep aligned with .nvmrc; 24.22.1 fixes CVE-2026-111497 (Node2Shell).
+FROM docker.io/library/node:24.22.1-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +31,7 @@ ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
     SENTRY_ORG=${SENTRY_ORG} \
     SENTRY_PROJECT=${SENTRY_PROJECT}
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 # package-lock.json is generated with npm 11 (dev machines, dependabot);
 # npm 10 (bundled with Node 22) rejects its optional-dep shape (@emnapi/*).
 # Do NOT reintroduce `npm install -g npm@11` here: on the alpine image npm

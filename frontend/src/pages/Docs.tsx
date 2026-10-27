@@ -109,7 +109,7 @@ function GettingStarted() {
           <span className="text-[#f1b300]">&#x2022;</span> Python &ge; 3.11, &lt; 3.13
         </li>
         <li>
-          <span className="text-[#f1b300]">&#x2022;</span> Node.js &ge; 20
+          <span className="text-[#f1b300]">&#x2022;</span> Node.js 24.22.1 or newer in the 24.x line
         </li>
         <li>
           <span className="text-[#f1b300]">&#x2022;</span> Docker & Docker Compose
