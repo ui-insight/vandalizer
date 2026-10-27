@@ -218,7 +218,7 @@ release-check: backend-static ci security-gate docker-build helm-lint
 # Install: brew install trivy  (or see https://trivy.dev/latest/getting-started/installation/)
 
 TRIVY ?= trivy
-# Base images to scan. The frontend *builder* (node:24-alpine) is deliberately
+# Base images to scan. The frontend *builder* (node:24.22.1-alpine) is deliberately
 # absent: its packages never reach a shipped artifact, and including it would
 # put findings in front of reviewers that they cannot act on and should not
 # care about. Scan what runs in production.

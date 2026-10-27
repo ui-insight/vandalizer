@@ -61,6 +61,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          pull: true
           # The Sentry args are only consumed by the frontend Dockerfile;
           # the backend image declares no matching ARG and ignores them.
           # Empty secrets pass through as empty strings, which makes

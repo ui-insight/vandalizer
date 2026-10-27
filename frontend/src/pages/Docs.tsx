@@ -82,6 +82,8 @@ function Installation() {
         your infrastructure.
       </p>
 
+      <p className="text-gray-300 text-sm">Local frontend development requires Node.js 24.22.1 or newer in the 24.x line. Use the version pinned in <code>.nvmrc</code>.</p>
+
       <h3 className="text-xl font-bold text-white mt-8">Environment Variables</h3>
       <p className="text-gray-400 text-sm mb-4">
         Copy{' '}

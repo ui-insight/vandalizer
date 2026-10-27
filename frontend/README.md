@@ -14,8 +14,12 @@ React 19 single-page application for the Vandalizer document intelligence platfo
 ## Getting Started
 
 ```bash
+# Select the patched Node version from the repository .nvmrc
+nvm install
+nvm use
+
 # Install dependencies
-npm install
+npm ci
 
 # Copy environment config
 cp .env.example .env

@@ -9,7 +9,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 ## Prerequisites
 
 - Python >= 3.11, < 3.13
-- Node.js >= 20
+- Node.js >= 24.22.1, < 25 (the project version is pinned in `.nvmrc`)
 - Docker & Docker Compose
 - [`uv`](https://docs.astral.sh/uv/) for Python package management
 - `npm` for frontend package management
@@ -53,11 +53,19 @@ cd backend
 
 ### 4. Frontend
 
+Use the patched Node 24 version in `.nvmrc` (with npm 11). From the repository root:
+
 ```bash
+nvm install
+nvm use
 make frontend-install
 cd frontend
 npm run dev
 ```
+
+Dependency installs reject unsupported Node versions. Node 24.22.1 includes the
+[CVE-2026-111497 (Node2Shell) fix](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+Keep `.nvmrc`, the frontend Docker build image, and the package engine minimum aligned when updating Node.
 
 The frontend dev server runs on `http://localhost:5173` and proxies API requests to the backend.
 

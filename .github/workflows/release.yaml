@@ -26,7 +26,8 @@ jobs:
           # rejects its optional-dep shape). Taking npm from the toolchain
           # avoids an unpinned `npm install -g npm@11` from the registry on
           # every run -- an install-scripted fetch in a token-bearing runner.
-          node-version: "24"
+          # Includes the CVE-2026-111497 (Node2Shell) fix.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -93,6 +94,7 @@ jobs:
           # Empty for most entries, which builds the Dockerfile's final stage.
           target: ${{ matrix.target || '' }}
           push: true
+          pull: true
           # The Sentry args are only consumed by the frontend Dockerfile;
           # the backend image declares no matching ARG and ignores them.
           # Empty secrets pass through as empty strings, which makes
