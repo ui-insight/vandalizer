@@ -896,6 +896,65 @@ def with_adjacent(dm, passages: list[dict], *, n: Optional[int] = None) -> list[
     return [x for at, r in enumerate(passages) for x in (r, *beside.get(at, ()))]
 
 
+def with_section(dm, passages: list[dict], picked: tuple[str, str], query: str, *,
+                 kb_title: Optional[str] = None) -> list[dict]:
+    """``passages`` (a turn's final snippets, each tagged with its
+    ``kb_uuid``) followed by the best chunks of ``picked`` — (kb_uuid,
+    section key), the section the chat model named from the bases' table of
+    contents (:mod:`app.services.kb_sections`) — at most
+    ``kb_retrieval.SECTION_PICK_CHUNKS``, each scoring at least
+    ``SECTION_MIN_SCORE`` against ``query``, after every cap.
+
+    Nothing is added to a turn with no passage — it is refused, and a pick
+    from the contents alone is no evidence — nor when a passage already comes
+    from that section: of that base, or under the same section number in
+    another, which holds the same rule (2 CFR 200's cost principles are in
+    more than one base). A source without section numbers counts as present
+    when any passage comes from it."""
+    from app.services import kb_retrieval as kr
+
+    if not passages or kr.SECTION_PICK_CHUNKS <= 0 or not kr.ready():
+        return passages
+    kb_uuid, key = picked
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or key not in index.keys:
+        return passages
+    held_keys: set[str] = set()
+    held_sources: set[str] = set()
+    held_text = {_content_key(r.get("content") or "") for r in passages}
+    for r in passages:
+        meta = r.get("metadata") or {}
+        if meta.get("section_key"):
+            held_keys.add(str(meta["section_key"]))
+        if r.get("kb_uuid") == kb_uuid and meta.get("source_id"):
+            held_sources.add(str(meta["source_id"]))
+        other = index if r.get("kb_uuid") == kb_uuid else (kr.index_for(dm, r["kb_uuid"]) if r.get("kb_uuid") else None)
+        if other is None:
+            continue
+        for cid in (str(r.get("chunk_id")), *(r.get("_covers") or ())):
+            section = other.section_of(cid)
+            if section:
+                held_keys.add(section)
+    if key in held_keys:
+        return passages
+    if key.startswith("source:") and any(
+            str((index.chunks[j].get("metadata") or {}).get("source_id")) in held_sources
+            for j, k in enumerate(index.keys) if k == key):
+        return passages
+    expanded = kr.expand(index, query)
+    found = [r for r in kr.candidates(dm, index, kb_uuid, expanded, floor=0.0, within=key)
+             if _content_key(r.get("content") or "") not in held_text]
+    scored = kr.rerank(index, expanded, found)
+    added = [r for r in scored if r["rerank_score"] >= kr.SECTION_MIN_SCORE][:kr.SECTION_PICK_CHUNKS]
+    if not added:
+        return passages
+    for r in added:
+        r["kb_uuid"] = kb_uuid
+        if kb_title:
+            r["kb_title"] = kb_title
+    return passages + attach_lead_ins(dm, kb_uuid, added)
+
+
 def precise_cut(dm, kb_uuid: str, query: str, results: list[dict]) -> Optional[list[dict]]:
     """Chunks another lane found — a source the message names, a passage
     that amends one retrieved — scored by the cross-encoder against

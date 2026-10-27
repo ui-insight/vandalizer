@@ -122,6 +122,18 @@ NEIGHBOUR_MIN_SCORE = -5.0
 # more such turns for 1.2 more passages per turn; beside every passage, 16 for
 # 2.7.
 ADJACENT_PASSAGES = 2
+# The section the chat model names first from the bases' table of contents
+# (kb_sections) joins a turn's passages after every cap through its best
+# chunks, at most SECTION_PICK_CHUNKS, each scoring at least SECTION_MIN_SCORE
+# (kb_grounding.with_section) — unless a passage already comes from it, or the
+# turn has none. On the KB accuracy eval (2026-10-27, offline over the Phase 3
+# after-run's pools) this reached all the answer text in 36 of 155 turns whose
+# passages held none of it, for 0.26 more passages per turn on questions
+# answered right and 0.28 on questions the bases cannot answer; without the
+# score cut 40, for 0.45 and 0.51. The chunks that held answer text scored a
+# median -2.7, those added where there is no answer -7.5.
+SECTION_PICK_CHUNKS = 2
+SECTION_MIN_SCORE = -8.0
 # Title routing: cosine of the expanded query to a section title, and its
 # lead over the best title of any other section (all-MiniLM-L6-v2 scale).
 ROUTE_MIN_SIMILARITY = 0.75

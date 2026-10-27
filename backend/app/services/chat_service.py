@@ -3720,6 +3720,9 @@ async def _build_multi_kb_segment(
     """
     if not kbs:
         return None, []
+    # The section the chat model names from the bases' table of contents is
+    # asked for while they are searched (kb_sections).
+    picking = asyncio.ensure_future(_pick_section(kbs, message, model_name, history))
     if len(kbs) == 1:
         # One KB reads exactly as it always has: naming it on every snippet
         # and citation would relabel every existing chat, where there is no
@@ -3731,10 +3734,12 @@ async def _build_multi_kb_segment(
             manifest=(manifests or {}).get(kb_uuid), history=history,
         )
         if not results:
+            picking.cancel()
             return None, []
         for r in results:
             r["kb_uuid"] = kb_uuid
-        return await _render_kb_segment(await _with_adjacent(results), message, user_id=user_id)
+        results = await _with_section(await _with_adjacent(results), picking, message)
+        return await _render_kb_segment(results, message, user_id=user_id)
 
     pools = await asyncio.gather(*[
         _retrieve_kb_results(
@@ -3759,6 +3764,8 @@ async def _build_multi_kb_segment(
         failed_kbs.extend(failed)
 
     merged = _round_robin_merge(tagged)[:MULTI_KB_SNIPPET_BUDGET]
+    if not merged:
+        picking.cancel()
     if failed and not merged:
         raise KBRetrievalFailed(
             f"retrieval failed for {len(failed)} of {len(kbs)} knowledge bases "
@@ -3769,7 +3776,66 @@ async def _build_multi_kb_segment(
             "KB query returned no results across %d knowledge bases", len(kbs),
         )
         return None, []
-    return await _render_kb_segment(await _with_adjacent(merged), message, user_id=user_id)
+    merged = await _with_section(await _with_adjacent(merged), picking, message, titles=dict(kbs))
+    return await _render_kb_segment(merged, message, user_id=user_id)
+
+
+async def _pick_section(
+    kbs: list[tuple[str, str]],
+    message: str,
+    model_name: str,
+    history: Optional[list[ModelMessage]] = None,
+) -> Optional[tuple[str, str]]:
+    """(kb_uuid, section key) of the section the chat model names first from
+    the table of contents of the turn's bases (kb_sections.pick), with the
+    question a follow-up follows; None when precise retrieval cannot run here
+    or the model names none."""
+    from app.services import kb_retrieval, kb_sections
+    from app.services.document_manager import get_document_manager
+    from app.services.kb_validation_service import _ensure_system_config_loaded
+
+    if not kb_retrieval.enabled():
+        return None
+    try:
+        # A task of its own, started before retrieval loads the config the
+        # model is built from: it loads it into its own context.
+        await _ensure_system_config_loaded()
+        dm = get_document_manager()
+        indexes = await asyncio.gather(*[asyncio.to_thread(kb_retrieval.index_for, dm, kb_uuid) for kb_uuid, _ in kbs])
+        previous = None
+        if history and _looks_anaphoric(message):
+            previous = _previous_question(_recent_turns(history))
+        bases = [(kb_uuid, title, index) for (kb_uuid, title), index in zip(kbs, indexes) if index is not None]
+        return await kb_sections.pick(bases, message, previous, model_name)
+    except Exception as e:  # noqa: BLE001 — the turn goes on without it
+        logger.warning("KB section pick failed: %s", e)
+        return None
+
+
+async def _with_section(
+    results: list[dict],
+    picking: "asyncio.Future[Optional[tuple[str, str]]]",
+    message: str,
+    titles: Optional[dict[str, str]] = None,
+) -> list[dict]:
+    """The turn's snippets with the best chunks of the section the chat model
+    named (kb_grounding.with_section), added after every cap; the snippets as
+    they are when it named none or one they already hold. ``titles`` labels
+    them in a multi-KB turn."""
+    from app.services import kb_grounding
+    from app.services.document_manager import get_document_manager
+
+    try:
+        picked = await picking
+        if picked is None:
+            return results
+        return await asyncio.to_thread(
+            kb_grounding.with_section, get_document_manager(), results, picked, message,
+            kb_title=(titles or {}).get(picked[0]),
+        )
+    except Exception as e:  # noqa: BLE001 — the snippets stand without them
+        logger.warning("Picked KB section not added: %s", e)
+        return results
 
 
 async def _with_adjacent(results: list[dict]) -> list[dict]:

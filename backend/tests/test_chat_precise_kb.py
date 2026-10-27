@@ -3,6 +3,7 @@ precise retrieval when it can run — and cites them by the same source line,
 so the passages of a page-less source ("§ 200.308 · part 2") are told apart
 instead of all reading as the bare source name."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -338,3 +339,137 @@ async def test_a_turn_s_snippets_get_their_adjacent_chunks_after_the_multi_kb_bu
     assert [s["content"] for s in two][1] == "the rest of the rule"
     assert len(one) == 9 and one[1]["content"] == "the rest of the rule"
     assert seen[0].count("kb-a") == seen[0].count("kb-b") == 6 and set(seen[1]) == {"kb-a"}
+
+
+def _two_pools():
+    return {
+        kb: [{**_section_chunk(n, 1, section=f"{100 + i}.{n}", parts=1), "chunk_id": f"{kb}_chunk_{n}"} for n in range(8)]
+        for i, kb in enumerate(("kb-a", "kb-b"))
+    }
+
+
+async def _multi(kbs, monkeypatch, *, retrieve, pick_section, with_section=None):
+    monkeypatch.setattr(chat_service, "_retrieve_kb_results", retrieve)
+    monkeypatch.setattr(chat_service, "_pick_section", pick_section)
+    monkeypatch.setattr(kb_grounding, "with_adjacent", lambda dm, passages, n=None: passages)
+    if with_section is not None:
+        monkeypatch.setattr(kb_grounding, "with_section", with_section)
+    monkeypatch.setattr("app.services.document_manager.get_document_manager", lambda: MagicMock())
+    patches = [patch(target, new=mock) for target, mock in _patched().items()]
+    for p in patches:
+        p.start()
+    try:
+        return await chat_service._build_multi_kb_segment(kbs, "q", "test-model")
+    finally:
+        for p in patches:
+            p.stop()
+
+
+@pytest.mark.asyncio
+async def test_the_section_pick_is_asked_alongside_retrieval_and_added_after_every_cap(monkeypatch):
+    pools = _two_pools()
+    asked, asked_first, seen = [], [], []
+
+    async def retrieve(kb_uuid, message, model_name, **kw):
+        await asyncio.sleep(0)
+        asked_first.append(bool(asked))
+        return [dict(r) for r in pools[kb_uuid]]
+
+    async def pick_section(kbs, message, model_name, history=None):
+        asked.append([u for u, _ in kbs])
+        return ("kb-b", "picked")
+
+    def with_section(dm, passages, picked, query, kb_title=None):
+        seen.append((len(passages), picked, kb_title))
+        return passages + [{**passages[0], "chunk_id": "picked", "content": "the governing rule"}]
+
+    _, two = await _multi([("kb-a", "A"), ("kb-b", "B")], monkeypatch, retrieve=retrieve,
+                          pick_section=pick_section, with_section=with_section)
+    _, one = await _multi([("kb-a", "A")], monkeypatch, retrieve=retrieve,
+                          pick_section=pick_section, with_section=with_section)
+    # Asked before the pools came back; added after the budget cut, last.
+    assert asked == [["kb-a", "kb-b"], ["kb-a"]] and all(asked_first)
+    assert len(two) == chat_service.MULTI_KB_SNIPPET_BUDGET + 1 and two[-1]["content"] == "the governing rule"
+    assert seen[0] == (chat_service.MULTI_KB_SNIPPET_BUDGET, ("kb-b", "picked"), "B")
+    assert len(one) == 9 and one[-1]["content"] == "the governing rule" and seen[1][2] is None
+
+
+@pytest.mark.asyncio
+async def test_a_turn_with_no_passage_cancels_the_section_pick(monkeypatch):
+    cancelled = []
+
+    async def retrieve(kb_uuid, message, model_name, **kw):
+        await asyncio.sleep(0)
+        return []
+
+    async def pick_section(kbs, message, model_name, history=None):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            cancelled.append(len(kbs))
+            raise
+
+    def with_section(*a, **k):
+        raise AssertionError("nothing to add to")
+
+    for kbs in ([("kb-a", "A")], [("kb-a", "A"), ("kb-b", "B")]):
+        assert await _multi(kbs, monkeypatch, retrieve=retrieve, pick_section=pick_section,
+                            with_section=with_section) == (None, [])
+    await asyncio.sleep(0)
+    assert cancelled == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_the_snippets_stand_when_the_picked_section_cannot_be_added(monkeypatch):
+    pools = _two_pools()
+
+    async def retrieve(kb_uuid, message, model_name, **kw):
+        return [dict(r) for r in pools[kb_uuid]]
+
+    async def pick_section(kbs, message, model_name, history=None):
+        return ("kb-a", "picked")
+
+    def with_section(*a, **k):
+        raise RuntimeError("index gone")
+
+    async def no_pick(kbs, message, model_name, history=None):
+        return None
+
+    _, failed = await _multi([("kb-a", "A")], monkeypatch, retrieve=retrieve, pick_section=pick_section,
+                             with_section=with_section)
+    _, none = await _multi([("kb-a", "A")], monkeypatch, retrieve=retrieve, pick_section=no_pick,
+                           with_section=with_section)
+    assert len(failed) == len(none) == 8
+
+
+@pytest.mark.asyncio
+async def test_the_pick_reads_the_bases_indexes_and_the_question_a_follow_up_follows(monkeypatch):
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
+    from app.services import kb_sections
+
+    calls = []
+
+    async def pick(bases, question, previous, model_name):
+        calls.append(([(u, t, ix) for u, t, ix in bases], question, previous, model_name))
+        return ("kb-a", "200.307")
+
+    monkeypatch.setattr(kb_sections, "pick", pick)
+    loaded = AsyncMock()
+    monkeypatch.setattr("app.services.kb_validation_service._ensure_system_config_loaded", loaded)
+    monkeypatch.setattr(kb_retrieval, "index_for", lambda dm, kb_uuid: None if kb_uuid == "kb-gone" else f"ix-{kb_uuid}")
+    monkeypatch.setattr("app.services.document_manager.get_document_manager", lambda: MagicMock())
+    history = [ModelRequest(parts=[UserPromptPart(content="Can we charge outsiders for the core facility?")]),
+               ModelResponse(parts=[TextPart(content="Yes, as program income.")])]
+
+    monkeypatch.setattr(kb_retrieval, "enabled", lambda: False)
+    assert await chat_service._pick_section([("kb-a", "A")], "what about year 2?", "m", history) is None
+    assert calls == []
+
+    monkeypatch.setattr(kb_retrieval, "enabled", lambda: True)
+    found = await chat_service._pick_section([("kb-a", "A"), ("kb-gone", "G")], "what about year 2?", "m", history)
+    assert found == ("kb-a", "200.307") and loaded.await_count == 1
+    assert calls[0] == ([("kb-a", "A", "ix-kb-a")], "what about year 2?",
+                        "Can we charge outsiders for the core facility?", "m")
+    await chat_service._pick_section([("kb-a", "A")], "Under 2 CFR 200, may a university keep the program income a core facility earns from outside users during a federal award?", "m", history)
+    assert calls[1][2] is None
