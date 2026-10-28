@@ -120,7 +120,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
     >
       {/* Name column */}
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 'var(--workspace-space-16)' }}>
-        <button type="button" aria-label={`Open ${item.name}`}
+        <button type="button" aria-label={`${item.set_type === 'prompt' ? 'Run' : 'Open'} ${item.name}`}
           style={{
             padding: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
             fontWeight: 500,

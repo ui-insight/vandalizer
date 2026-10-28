@@ -19,7 +19,6 @@ import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { PlanChecklist } from './PlanChecklist'
 import { MemoryPanel } from './MemoryPanel'
-import { ActiveSkillBar } from './ActiveSkillBar'
 import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { AttachKBModal } from './AttachKBModal'
@@ -106,7 +105,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, setActiveRightTab, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -408,13 +407,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: pendingMessage.message }))
         focusChat()
       } else if (pendingMessage.skillUuid) {
-        void selectSkill(pendingMessage.skillUuid).then(selected => { if (selected) focusChat() })
+        void send(pendingMessage.message, docs, selectedModel || undefined,
+          activeKBs.map(kb => kb.uuid), undefined, folders, undefined, undefined,
+          activeProjectUuid || undefined, pendingMessage.skillUuid)
+        focusChat()
       } else {
         send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
       }
       onPendingMessageConsumed?.()
     }
-  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, selectSkill, focusChat, send, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids])
+  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid])
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
@@ -863,13 +865,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {/* Keep one composer mounted across home, source selection, and chat. */}
       <div className="chat-composer-slot">
         {projectSkillBlocked && <div className="flex gap-3 px-4 py-2 text-sm"><button className="underline" onClick={() => void initializeProjectSkill(activeProjectUuid, true)}>Retry default Skill</button><button className="underline" onClick={() => void selectSkill(null)}>Continue without Skill</button></div>}
-        <ActiveSkillBar
-          skill={activeSkill ?? null}
-          busy={isStreaming || isLoadingHistory || isSelectingSkill}
-          onChoose={() => setActiveRightTab('library')}
-          onRemove={() => { void selectSkill(null) }}
-        />
-        {isSelectingSkill && <p role="status" className="px-4 py-2 text-sm">Updating Skill…</p>}
         {showHome && <div className="home-compose-heading">
           <p className="home-eyebrow">{branding.orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</p>
           <h2>What would you like to get done?</h2>

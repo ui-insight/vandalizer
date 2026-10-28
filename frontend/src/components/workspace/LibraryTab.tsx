@@ -473,9 +473,8 @@ export function LibraryTab() {
     }
   }
 
-  // Preview/Edit modal state (prompts / formatters). A row click opens the
-  // modal in 'preview' (read-only body + Use in Assistant); the row menu's
-  // Edit opens straight to 'edit'.
+  // Formatter rows open a preview; Skill rows run immediately. Both kinds
+  // keep their instruction editor available from the row menu.
   const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
   const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
@@ -1459,10 +1458,11 @@ export function LibraryTab() {
                     // last-used comes from its run history (server-side).
                     if (it.kind === 'workflow') {
                       openWorkflow(it.item_id)
-                    } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
-                      // Preview first — the prompt only launches into the
-                      // Assistant (an LLM call) from the modal's Use button,
-                      // which is also what bumps last-used.
+                    } else if (it.set_type === 'prompt') {
+                      if (!it.item_uuid) return
+                      markUsed(it.id)
+                      sendChatMessage('', { documentUuids: selectedDocUuids, folderUuids: selectedFolderUuids, skillUuid: it.item_uuid })
+                    } else if (it.set_type === 'formatter') {
                       openPromptModal(it, 'preview')
                     } else if (it.kind === 'search_set') {
                       openExtraction(it.item_uuid || it.item_id)
@@ -1822,7 +1822,7 @@ export function LibraryTab() {
                       opacity: editLoading || !editContent.trim() ? 0.5 : 1,
                     }}
                   >
-                    {editingItem.set_type === 'prompt' ? 'Use Skill' : 'Use in Assistant'}
+                    {editingItem.set_type === 'prompt' ? 'Run Skill' : 'Use in Assistant'}
                   </button>
                   <button
                     disabled={editLoading || !!editLoadError}

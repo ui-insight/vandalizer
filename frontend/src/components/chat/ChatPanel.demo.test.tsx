@@ -112,11 +112,11 @@ describe('Show me what you can do', () => {
     expect(mocks.selectSkill).not.toHaveBeenCalled()
   })
 
-  it('consumes a Library Skill handoff without submitting an empty message', async () => {
+  it('runs a Library Skill handoff exactly once', async () => {
     renderPanel({ message: '', skillUuid: 'award-skill' })
-    await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('award-skill'))
+    await waitFor(() => expect(mocks.send).toHaveBeenCalledWith('', [], undefined, [], undefined, [], undefined, undefined, undefined, 'award-skill'))
     await waitFor(() => expect(mocks.workspace.focusChat).toHaveBeenCalledOnce())
-    expect(mocks.send).not.toHaveBeenCalled()
+    expect(mocks.send).toHaveBeenCalledOnce()
   })
 
   it('keeps the empty Skill selector out of chat', () => {
@@ -188,8 +188,7 @@ it('keeps a pending task when the project default is unavailable, but permits an
   expect(screen.getByRole('button', { name: 'Continue without Skill' })).toBeInTheDocument()
   view.unmount()
   renderPanel({ message: '', skillUuid: 'replacement' })
-  await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('replacement'))
-  expect(mocks.send).not.toHaveBeenCalled()
+  await waitFor(() => expect(mocks.send).toHaveBeenCalledWith('', [], undefined, [], undefined, [], undefined, undefined, undefined, 'replacement'))
 })
 
 it('does not replace a live stream when the scope remembers the same conversation', async () => {

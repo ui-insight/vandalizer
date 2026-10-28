@@ -13,7 +13,7 @@ vi.mock('../api/chat', () => ({
 const skill = { uuid: 'skill-1', title: 'Award review', version: 'v1', instructions: 'Check dates.' }
 const history = { activity_id: 'a1', messages: [], url_attachments: [], file_attachments: [], active_skill: skill }
 
-it.each([skill, null])('syncs a confirmed tool selection (%j) into the bar, transcript and follow-up', async selected => {
+it.each([skill, null])('syncs a confirmed tool selection (%j) into the transcript and follow-up', async selected => {
   const old = { ...skill, uuid: 'old', instructions: 'Old instructions.' }
   vi.mocked(getHistory).mockResolvedValueOnce({ ...history, active_skill: old })
   const { result } = renderHook(() => useChat())
@@ -49,7 +49,7 @@ it.each([
 })
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   vi.mocked(getProjectDefaultSkill).mockResolvedValue({ active_skill: skill })
   vi.mocked(previewSkill).mockResolvedValue(skill)
   vi.mocked(getHistory).mockResolvedValue(history)
@@ -157,4 +157,40 @@ it('discards a late default after switching projects or opening history', async 
   await act(async () => { await result.current.loadHistory('older') })
   await act(async () => { finish({ active_skill: skill }); await pending })
   expect(result.current.activeSkill).toBeNull()
+})
+
+
+it.each([false, true])('runs a Skill with its resolved snapshot (existing chat: %s)', async existing => {
+  const replacement = { ...skill, uuid: 'replacement', title: 'Budget review', version: 'v2' }
+  vi.mocked(previewSkill).mockResolvedValueOnce(replacement)
+  vi.mocked(selectConversationSkill).mockResolvedValueOnce({ active_skill: replacement })
+  const { result } = renderHook(() => useChat())
+  if (existing) await act(async () => { await result.current.loadHistory('c1') })
+  await act(async () => { await result.current.send('', ['doc'], 'model', ['kb'], undefined, ['folder'], undefined, undefined, 'project', 'replacement') })
+  expect(streamChat).toHaveBeenCalledOnce()
+  const args = vi.mocked(streamChat).mock.calls[0]
+  expect(args[0]).toBe('Run the Budget review skill.')
+  expect(args[1]).toEqual(['doc'])
+  expect(args.slice(13)).toEqual(['replacement', 'v2'])
+  expect(result.current.messages[0].active_skill).toEqual(replacement)
+})
+
+it('does not send when the invoked Skill is unavailable', async () => {
+  vi.mocked(previewSkill).mockRejectedValueOnce(new Error('Skill not found'))
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'missing') })
+  expect(streamChat).not.toHaveBeenCalled()
+  expect(result.current.messages).toEqual([])
+  expect(result.current.error).toBe('Skill not found')
+})
+
+it('discards a pending Skill run when the user starts a new chat', async () => {
+  let resolve!: (value: typeof skill) => void
+  vi.mocked(previewSkill).mockImplementationOnce(() => new Promise(r => { resolve = r }))
+  const { result } = renderHook(() => useChat())
+  let pending!: Promise<void>
+  act(() => { pending = result.current.send('', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'skill-1') })
+  act(() => result.current.reset())
+  await act(async () => { resolve(skill); await pending })
+  expect(streamChat).not.toHaveBeenCalled()
 })

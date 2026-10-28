@@ -56,6 +56,7 @@ type SendArgs = [
   isFirstSession?: boolean,
   runDemo?: boolean,
   projectUuid?: string,
+  skillUuid?: string,
 ]
 
 interface ChatEvents {
@@ -183,15 +184,38 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
-      if (isLoadingHistory || isSelectingSkill || projectSkillBlocked) return
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string) => {
+      if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
       if (conversationUuid && !activityId) {
         setError('This conversation could not be resumed. Reopen it from Activity before sending.')
         return
       }
-      const deliveredResults = new Set<string>()
       let turnSkill = activeSkill
-      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
+      if (skillUuid) {
+        // Resolve and run in one operation: React state updates from selection
+        // must not make this turn use the previous Skill's snapshot.
+        manualSkillSelection.current = true
+        const version = ++skillSelectionVersion.current
+        setIsSelectingSkill(true)
+        setError(null)
+        try {
+          turnSkill = conversationUuid
+            ? (await selectConversationSkill(conversationUuid, skillUuid)).active_skill
+            : await previewSkill(skillUuid)
+          if (version !== skillSelectionVersion.current) return
+          if (!turnSkill) throw new Error('Could not load Skill')
+          setActiveSkill(turnSkill)
+          setProjectSkillBlocked(false)
+          message = message.trim() || `Run the ${turnSkill.title} skill.`
+        } catch (e) {
+          if (version === skillSelectionVersion.current) setError(toFriendlyError(e))
+          return
+        } finally {
+          if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+        }
+      }
+      const deliveredResults = new Set<string>()
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid]
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
@@ -217,8 +241,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
 
+      // Capture the invocation before tool results can change turnSkill.
+      const invokedSkill = turnSkill
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message, ...(activeSkill ? { active_skill: activeSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+      setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
 
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure
@@ -448,8 +474,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
             setConversationUuid(identity.conversationUuid)
             setActivityId(identity.activityId)
           },
-          activeSkill?.uuid ?? null,
-          activeSkill?.version,
+          turnSkill?.uuid ?? null,
+          turnSkill?.version,
         )
         if (!ownsView()) return
 
