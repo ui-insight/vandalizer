@@ -190,6 +190,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         return
       }
       const deliveredResults = new Set<string>()
+      let turnSkill = activeSkill
       lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
@@ -229,7 +230,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           citationsRef.current,
         )
         if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
-        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(activeSkill ? { active_skill: activeSkill } : {}), ...(interruption ? { interruption } : {}) }
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(turnSkill ? { active_skill: turnSkill } : {}), ...(interruption ? { interruption } : {}) }
         if (thinkingRef.current) {
           assistantMsg.thinking = thinkingRef.current
           if (thinkingDurationRef.current != null) {
@@ -334,6 +335,18 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
                 tool_call_id: chunk.tool_call_id!,
                 content: chunk.content,
                 quality: chunk.quality || null,
+              }
+              if (res.tool_name === 'select_skill' && res.content && typeof res.content === 'object') {
+                const selected = res.content as { status?: string; active_skill?: SkillSnapshot | null }
+                const skill = selected.active_skill
+                if (selected.status === 'selected' && (skill === null || (skill &&
+                  typeof skill.uuid === 'string' && typeof skill.title === 'string' &&
+                  typeof skill.version === 'string' && typeof skill.instructions === 'string'))) {
+                  turnSkill = skill
+                  manualSkillSelection.current = true
+                  setActiveSkill(skill)
+                  setContextTokens(0)
+                }
               }
               // Dispatch before rendering: React may batch the call, result and
               // end-of-stream into one mount. Transcript replay never enters here.

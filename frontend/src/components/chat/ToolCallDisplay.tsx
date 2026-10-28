@@ -355,6 +355,12 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Saved private page: ${String(obj.title || 'HTML page')}`, qualityHint }
     case 'get_html_artifact':
       return { text: `Read page: ${String(obj.title || 'HTML page')}`, qualityHint }
+    case 'list_skills':
+      return { text: Array.isArray(content) ? `Found ${content.length} Skill${content.length === 1 ? '' : 's'}` : 'Skills', qualityHint: '' }
+    case 'get_skill':
+      return { text: 'Skill instructions inspected; selection unchanged', qualityHint: '' }
+    case 'select_skill':
+      return { text: typeof obj.message === 'string' ? obj.message : 'Skill selection', qualityHint: '' }
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
       return { text: `Saved ${t}`, qualityHint }
@@ -1257,10 +1263,11 @@ export function ToolStatusLine({
   const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
+    : name === 'select_skill' && obj?.status === 'selected' ? 'Completed'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  const actionLabel = ({ select_skill: 'Apply Skill selection', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
@@ -1393,6 +1400,10 @@ export function ToolStatusLine({
       {needsConfirmation && !approvalHistory && (
         <section className="agent-approval" aria-label="Review proposed action">
           <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
+          {name === 'select_skill' && typeof obj?.skill_instructions === 'string' && <details>
+            <summary>Inspect Skill instructions</summary>
+            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">{obj.skill_instructions}</pre>
+          </details>}
           <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>
           {decision && <p>Check the Assistant’s next response for the outcome.</p>}
           {decisionError && <p role="alert">{decisionError}</p>}

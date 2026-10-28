@@ -610,7 +610,15 @@ Stores a reflective module's self-assessment answers. The agent asks the questio
 
 ## Explicit Library Skill selection
 
-Skill selection is a user control, not an agent tool. It does not change the tool catalog or its authorization/confirmation gates. The initial implementation for [roadmap #1059](https://github.com/ui-insight/vandalizer/issues/1059) supports one explicitly selected Skill per conversation.
+Skill selection supports both direct UI controls and agent tools, with one explicitly selected Skill per conversation. It does not grant tools or bypass authorization/confirmation gates.
+
+| Agent tool | Contract |
+| --- | --- |
+| `list_skills(search="")` | Search accessible Library Skills by name/tags; return descriptions and versions, with access rechecked. Discovery does not activate instructions. |
+| `get_skill(skill_uuid)` | Read the current authorized instruction snapshot without selecting it. |
+| `select_skill(skill_uuid, confirmed=false)` | Preview selection/replacement, or removal with `null`. Approval on a later user turn pins the exact reviewed snapshot, rechecks access, updates the composer, and applies it to subsequent model requests in the same turn and later turns. Does not change a project's default. |
+
+Skills are reusable guidance for flexible chat work. Extractions are typed document schemas with validation. Workflows are explicit processing stages with defined inputs/outputs. Extraction listings exclude Skills and formatters; generic Library search retains legacy `set_type` labels (`prompt` means Skill).
 
 | API | Contract |
 | --- | --- |
@@ -623,7 +631,7 @@ Snapshots contain `uuid`, `title`, `instructions`, and a SHA-256 content `versio
 
 Legacy storage remains `SearchSet.set_type = "prompt"`. Edited `SearchSetItem.searchphrase` takes precedence over creation-time `extraction_config.content`, including deliberately empty edits. No bulk database rename is needed, and existing identifiers, links, workflow references, and sharing rules remain intact. Empty instructions and instructions over 32,000 characters cannot activate. Only Library prompt records qualify; extraction/formatter records are not silently promoted.
 
-The active snapshot is added to runtime instructions before model routing and context budgeting, independently of replayed message history. It survives compaction; changing/removing it invalidates cached context estimates. Application rules and the user's current request take precedence over Skill guidance. Automatic discovery, multi-Skill composition, and resources/scripts are later phases.
+The initial active snapshot is counted before model routing and context budgeting. Runtime instructions resolve the current pin on every model request, independently of replayed message history. It survives compaction; changing/removing it invalidates cached context estimates. Application rules and the user's current request take precedence over Skill guidance. Automatic activation, multi-Skill composition, and resources/scripts are not supported.
 
 Certification release work must distinguish Library Skills from workflow Prompt nodes. This initial implementation does not modify published course packages, change grading requirements, transfer credit, or reset enrollments. Review the visible controls against supported courses before release, then author new Skill/artifact competencies through the existing versioned course process.
 

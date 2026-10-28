@@ -30,6 +30,7 @@ from app.models.verification_session import VerificationField, VerificationSessi
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
+from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -311,6 +312,7 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
 # frontend/src/components/chat/ToolCallDisplay.tsx so the assistant can name
 # the button the user actually sees.
 _APPROVE_BUTTON_LABELS = {
+    "select_skill": "Apply Skill selection",
     "create_workflow": "Create workflow",
     "update_workflow": "Update workflow",
     "create_automation": "Create automation",
@@ -1074,6 +1076,7 @@ async def list_extraction_sets(
     user_id = context.deps.user_id
 
     filters: dict = {
+        "set_type": {"$in": ["extraction", None]},
         "$or": [
             {"user_id": user_id},
             {"verified": True},
@@ -1419,7 +1422,11 @@ async def search_library(
     query: str,
     kind: Optional[str] = None,
 ) -> list[dict]:
-    """Search the library for extraction sets, workflows, or knowledge bases by name or tags.
+    """Search Library items by name or tags, including Skills and extraction templates.
+
+    Search-set results with set_type='prompt' are Skills: use get_skill and
+    select_skill for those, never run_extraction. set_type='formatter' is an
+    output formatter. Only set_type='extraction' (or legacy unset) is an extraction.
 
     Args:
         context: The call context.
@@ -1934,6 +1941,9 @@ async def run_extraction(
         if not (team_id and ss.team_id == team_id):
             return {"error": "You do not have access to this extraction set."}
 
+    if isinstance(ss.set_type, str) and ss.set_type != "extraction":
+        return _err("This Library item is not an extraction template.",
+                    hint="For a Skill, use get_skill and select_skill. Use list_extraction_sets to find typed extraction templates.")
     return await _execute_extraction(context, ss, document_uuids)
 
 
@@ -6752,6 +6762,9 @@ from app.services.chat_workflow_tools import get_workflow_definition, update_wor
 # ---------------------------------------------------------------------------
 
 TOOLS = [
+    list_skills,
+    get_skill,
+    select_skill,
     create_html_artifact,
     get_html_artifact,
     revise_html_artifact,
@@ -6833,6 +6846,8 @@ TOOLS = [
 # (get_workflow_status, get_optimization_run) stay out too — their results are
 # small and anchor in-flight processes.
 COMPACTABLE_TOOLS: frozenset[str] = frozenset({
+    "list_skills",
+    "get_skill",
     "search_documents",
     "list_documents",
     "list_folders",

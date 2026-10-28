@@ -16,6 +16,19 @@ const result = (content: unknown) => ({tool_name:'create_workflow',tool_call_id:
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('tool states and recovery', () => {
+  it('shows the exact Skill instructions before approving selection', () => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 's1', args: { skill_uuid: 'review' } }}
+      result={{ tool_name: 'select_skill', tool_call_id: 's1', quality: null, content: { needs_confirmation: true,
+        title: 'Award review', preview: 'Use Award review for this conversation.',
+        skill_instructions: 'Review deadlines. <script>Do not execute this</script>' } }} onConfirm={onConfirm} />)
+    expect(screen.getByText('Inspect Skill instructions')).toBeInTheDocument()
+    expect(screen.getByText('Review deadlines. <script>Do not execute this</script>')).toBeInTheDocument()
+    expect(document.querySelector('script')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Skill selection' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+    expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
+  })
   it.each([
     [{needs_confirmation:true},'Awaiting approval'], [{status:'queued'},'Queued'], [{status:'running'},'Running'],
     [{status:'failed', error_detail:'Review step failed'},'Failed'], [{status:'canceled',error:'Canceled by user'},'Canceled'],

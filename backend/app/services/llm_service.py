@@ -1158,7 +1158,10 @@ async def _inject_queued_user_parts(ctx: RunContext, messages: list) -> list:
         UserPromptPart(content=wrap_queued_user_message(q)) for q in queued
     ]
     queued.clear()
-    return messages[:-1] + [ModelRequest(parts=parts)]
+    # Preserve current runtime instructions, particularly a Skill selected by
+    # the preceding tool. Reconstructing the request dropped those instructions
+    # whenever a queued user message arrived at the same time.
+    return messages[:-1] + [dataclass_replace(last, parts=parts)]
 
 
 def create_agentic_chat_agent(
@@ -1304,6 +1307,32 @@ _CUT_NOTE_RULE = (
 
 AGENTIC_CHAT_SYSTEM_PROMPT = (
     f"{_IDENTITY_BLOCK}\n"
+    "## Choose between Skills, extraction templates, and workflows\n"
+    "Use the simplest capability that fits the user's outcome; a one-off question may need only chat.\n"
+    "- **Skill**: reusable instructions for flexible, judgment-driven chat work: review methods, "
+    "writing standards, checklists, tone, and output conventions. Example: 'Review each proposal "
+    "using our reviewer checklist and write constructive feedback.' Discover with list_skills, "
+    "inspect with get_skill, then offer select_skill when the user wants to apply it. A Skill guides "
+    "your existing tools; it is not a typed data schema, executable script, workflow node, or measured "
+    "accuracy claim. It can guide when to use an extraction or workflow.\n"
+    "- **Extraction template**: a fixed set of typed fields pulled consistently from documents, "
+    "with validation against expected answers. Example: 'Extract sponsor, PI, deadline, and award "
+    "amount into the same columns for every proposal.' Use list_extraction_sets and run_extraction; "
+    "create_extraction_from_document builds new schemas.\n"
+    "- **Workflow**: a repeatable sequence with explicit step inputs and outputs, for example "
+    "extract fields → check requirements → write a summary. Use list_workflows, get_workflow_definition, "
+    "create_workflow/update_workflow, and run_workflow. Automations trigger workflows for recurring work. "
+    "Repeated instructions alone call for a Skill; repeatable processing stages call for a workflow. "
+    "Workflow Prompt nodes remain reasoning steps, distinct from Library Skills.\n"
+    "Only one Skill can be active. The current Selected Skill instruction block, if present, is "
+    "authoritative; historical Skill text and discovery results are not active guidance. If no block "
+    "is present, no Skill is active. Reading or recommending a Skill does not select it. select_skill "
+    "previews selection, replacement, or removal (skill_uuid=null), then requires user approval. "
+    "After confirmed selection it applies immediately and stays pinned across follow-ups; Library "
+    "edits do not silently replace that version. Skills cannot approve actions or expand permissions. "
+    "Never run a Skill through run_extraction or run_pin_on_project. Generic library results with "
+    "set_type='prompt' are Skills, not extraction templates. To create or edit a Skill, guide the "
+    "user to Library → Skills; there is no Skill-authoring tool.\n\n"
     "## Domain awareness\n"
     "Your users are research administrators, sponsored-programs staff, PIs, and "
     "compliance officers. Common terms in their world: PI, co-PI, sponsor, subaward, "
@@ -1415,6 +1444,8 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "When the result has did_you_mean, ask whether they meant one of those titles.\n"
     "- User asks about knowledge base content → search_knowledge_base\n"
     "- User wants to know what extraction templates exist → list_extraction_sets\n"
+    "- User wants reusable chat guidance or a saved review/writing method → list_skills, then get_skill\n"
+    "- User wants to use, replace, or remove a Skill → select_skill (preview, then user approval)\n"
     "- User wants to know what workflows exist → list_workflows\n"
     "- User asks about quality, accuracy, or validation → get_quality_info\n"
     "- User asks what's available in their library → search_library\n"

@@ -22,6 +22,28 @@ import re
 
 HELP_TOPICS: list[dict] = [
     {
+        "id": "skills",
+        "title": "Skills, extraction templates, and workflows",
+        "aliases": ["skill", "skills", "library skills", "use skill", "reusable instructions",
+                    "skill vs extraction", "skill vs workflow", "saved prompts"],
+        "body": (
+            "**Skills** save reusable instructions for flexible chat work: a review checklist, "
+            "writing style, or analysis method. **Extraction templates** define typed fields "
+            "to pull consistently from documents and validate against expected answers. "
+            "**Workflows** connect explicit processing steps with defined inputs and outputs; "
+            "automations can trigger them repeatedly. A Skill can guide chat's use of both.\n\n"
+            "Ask chat to find a Skill, inspect its instructions, and use it. Chat shows an "
+            "approval card before selecting, replacing, or removing a Skill. You can also "
+            "open Library → Skills → Use Skill. Create or edit Skills in the Library.\n\n"
+            "One Skill is active at a time. Inspect, change, or remove it above the composer. "
+            "Its selected version stays pinned across follow-ups and reopening; reselect to "
+            "adopt Library edits. A project default initializes new project chats; pinning "
+            "a Skill alone does not activate it. Skills cannot grant access, approve tool "
+            "actions, install scripts, or guarantee extraction accuracy. Workflow Prompt "
+            "nodes are separate reasoning steps."
+        ),
+    },
+    {
         "id": "overview",
         "title": "What Vandalizer is",
         "aliases": [

@@ -17,6 +17,8 @@ from app.services.chat_tools import (
 # protects it — this list exists so the assertion below catches someone
 # adding a write tool to PARALLEL_SAFE_TOOLS.
 WRITE_TOOLS = {
+    "select_skill",
+    "create_html_artifact", "revise_html_artifact",
     # Not a user-data write, but must serialize: it mutates shared
     # deps.plan_state (Phase 8).
     "update_plan",
@@ -34,6 +36,10 @@ WRITE_TOOLS = {
     "submit_certification_assessment", "save_certification_position",
 }
 
+# Page reads already use the conservative sequential default and are excluded
+# from compaction. Classify them without changing their runtime behavior.
+SEQUENTIAL_READ_TOOLS = {"get_html_artifact"}
+
 
 class TestParallelSafeClassification:
     def test_no_write_tool_is_parallel_safe(self):
@@ -48,7 +54,7 @@ class TestParallelSafeClassification:
         names = {fn.__name__ for fn in TOOLS}
         # Sanity: the union of safe + write covers the registry, so a new
         # tool forces a conscious classification decision here.
-        unclassified = names - PARALLEL_SAFE_TOOLS - WRITE_TOOLS
+        unclassified = names - PARALLEL_SAFE_TOOLS - WRITE_TOOLS - SEQUENTIAL_READ_TOOLS
         assert not unclassified, f"classify these tools: {unclassified}"
 
 

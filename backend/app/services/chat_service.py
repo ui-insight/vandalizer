@@ -2517,7 +2517,12 @@ async def chat_stream(
             # model with nothing baked in, whereas the non-agentic agent gets
             # the same text baked at construction (run-level instructions
             # APPEND to baked ones — passing both would duplicate the base).
-            iter_kwargs["instructions"] = instructions_text
+            # Re-evaluated for each model request: selecting/removing a Skill
+            # must replace its instructions immediately, not leave the old pin
+            # in force until the next user turn. Initial budgeting above still
+            # counts the same base plus the initial selected snapshot.
+            from app.services.chat_skill_tools import conversation_instructions
+            iter_kwargs["instructions"] = conversation_instructions(_brand_org_text(instruction_base, _org_name))
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
@@ -4472,7 +4477,9 @@ async def _build_project_context(project_uuid: str, user: User) -> str:
     )
     if pins:
         lines.append(
-            "Pinned capabilities (pass pin_type + target_id to run_pin_on_project):"
+            "Pinned items: run_pin_on_project accepts only workflow and extraction pins. "
+            "For a skill pin, use get_skill to inspect its target_id, then select_skill "
+            "if the user wants it active. Pinning alone does not activate a Skill."
         )
         for p in pins:
             lines.append(
@@ -4564,6 +4571,9 @@ async def _build_workspace_inventory(
         wf_filter = {"user_id": user_id}
         kb_filter = {"user_id": user_id}
 
+    skill_filter = {**ss_filter, "set_type": "prompt"}
+    ss_filter = {**ss_filter, "set_type": {"$in": ["extraction", None]}}
+
     # Parallel queries — lightweight counts + limited name lists
     (
         doc_count,
@@ -4574,6 +4584,8 @@ async def _build_workspace_inventory(
         recent_activity,
         ss_count,
         wf_count,
+        skills,
+        skill_count,
     ) = await asyncio.gather(
         SmartDocument.find(doc_filter).count(),
         SmartDocument.find(doc_filter)
@@ -4591,11 +4603,13 @@ async def _build_workspace_inventory(
         .to_list(),
         SearchSet.find(ss_filter).count(),
         Workflow.find(wf_filter).count(),
+        SearchSet.find(skill_filter).sort("-created_at").limit(5).to_list(),
+        SearchSet.find(skill_filter).count(),
     )
 
     # Quick check: if the user has nothing, return empty
     total_items = (
-        doc_count + len(search_sets) + len(workflows) + len(knowledge_bases)
+        doc_count + len(search_sets) + len(workflows) + len(knowledge_bases) + len(skills)
     )
     if total_items == 0:
         _inventory_cache[cache_key] = (now, "")
@@ -4604,7 +4618,7 @@ async def _build_workspace_inventory(
     # Detect post-demo state: only onboarding sample docs, no real content
     all_onboarding = doc_count > 0 and all(
         getattr(d, "is_onboarding_sample", False) for d in recent_docs
-    ) and not search_sets and not workflows
+    ) and not search_sets and not workflows and not skills
 
     # Fetch validation scores for extraction sets (if any)
     quality_map: dict[str, float] = {}  # ss_uuid → score
@@ -4650,6 +4664,11 @@ async def _build_workspace_inventory(
             f"{'s' if ss_count != 1 else ''} (newest: "
             + ", ".join(ss_parts) + ")"
         )
+
+    if skills:
+        names = ", ".join(f'"{skill.title}" (uuid: {skill.uuid})' for skill in skills[:3])
+        lines.append(f"- {skill_count} Skill{'s' if skill_count != 1 else ''} (newest: {names}). "
+                     "Reusable chat guidance; inspect with get_skill. Listed Skills are not automatically active.")
 
     # Workflows
     if workflows:
