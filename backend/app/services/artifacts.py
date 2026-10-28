@@ -96,7 +96,7 @@ def create(db, user_id, title, html, request_id, source=None):
     revision = _revision(title, html, source=source)
     now = datetime.now(timezone.utc)
     doc = db.html_artifacts.find_one_and_update({"uuid": uid}, {"$setOnInsert": {
-        "uuid": uid, "user_id": user_id, "team_id": None, "revisions": [revision],
+        "uuid": uid, "user_id": user_id, "team_id": None, "team_revision": None, "revisions": [revision],
         "title": title, "source": source or {"kind": "editor"}, "project_uuid": (source or {}).get("project_uuid"),
         "latest_revision": revision["uuid"], "published_revision": None, "public_token": None,
         "created_at": now, "updated_at": now, "deleted_at": None,
@@ -128,6 +128,7 @@ def revise(db, doc, title, html, base_revision, source=None):
         return doc  # a retried save must not append again
     if len(doc["revisions"]) >= MAX_REVISIONS:
         raise HTTPException(422, "This page has 25 revisions. Create a new page to continue.")
+    _pin_legacy_team_revision(db, doc)
     saved = db.html_artifacts.find_one_and_update({
         "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
         "latest_revision": base_revision,
@@ -142,11 +143,70 @@ def revise(db, doc, title, html, base_revision, source=None):
     return saved
 
 
+def team_revision(doc):
+    """Existing shares default to publication (or latest), never all history."""
+    if not doc.get("team_id"):
+        return None
+    return doc.get("team_revision") or doc.get("published_revision") or doc["latest_revision"]
+
+
+def team_view(doc):
+    selected = team_revision(doc)
+    if not selected:
+        raise HTTPException(404, "Page not found")
+    visible = revision(doc, selected)
+    number = visible.get("version") or next(i for i, r in enumerate(doc["revisions"], 1) if r["uuid"] == selected)
+    return {**doc, "title": visible["title"], "latest_revision": selected,
+            "team_revision": selected, "revisions": [{**visible, "version": number}],
+            "published_revision": selected if selected == doc.get("published_revision") else None,
+            "updated_at": visible["created_at"]}
+
+
+def _pin_legacy_team_revision(db, doc):
+    # Freeze old shares before changing latest/publication. Otherwise removing a
+    # public link or saving a draft would silently expose a different revision.
+    if doc.get("team_id") and not doc.get("team_revision"):
+        db.html_artifacts.update_one({"uuid": doc["uuid"], "deleted_at": None,
+            "team_id": doc["team_id"], "team_revision": None,
+            "latest_revision": doc["latest_revision"], "published_revision": doc.get("published_revision")},
+            {"$set": {"team_revision": team_revision(doc)}})
+
+
+def share_team(db, doc, team_id, selected=None):
+    selected = (selected or team_revision(doc) or doc.get("published_revision") or doc["latest_revision"]) if team_id else None
+    if selected:
+        revision(doc, selected)
+    saved = db.html_artifacts.find_one_and_update({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
+        {"$set": {"team_id": team_id, "team_revision": selected}}, return_document=ReturnDocument.AFTER)
+    if not saved:
+        raise HTTPException(404, "Page not found")
+    return saved
+
+
+def visible_metadata_stages(user_id):
+    """Select the visible title/date BEFORE search, sort, and pagination."""
+    owner = {"$eq": ["$user_id", user_id]}
+    selected = {"$cond": [owner, "$latest_revision",
+        {"$ifNull": ["$team_revision", {"$ifNull": ["$published_revision", "$latest_revision"]}]}]}
+    return [
+        {"$project": {"revisions.html": 0}},
+        {"$addFields": {"_visible_revision": {"$arrayElemAt": [{"$filter": {
+            "input": "$revisions", "as": "revision", "cond": {"$eq": ["$$revision.uuid", selected]},
+        }}, 0]}}},
+        {"$addFields": {"title": "$_visible_revision.title",
+            "updated_at": {"$cond": [owner, "$updated_at", "$_visible_revision.created_at"]}}},
+    ]
+
+
 def metadata(doc, owner=False):
+    if not owner:
+        doc = team_view(doc)
     current = revision(doc)
     result = {"uuid": doc["uuid"], "title": current["title"], "latest_revision": doc["latest_revision"],
               "team_id": doc.get("team_id"), "can_manage": owner, "published_revision": doc.get("published_revision"),
-              "revisions": [{k: r[k] for k in ("uuid", "title", "created_at", "warnings")} for r in doc["revisions"]]}
+              "team_revision": team_revision(doc),
+              "revisions": [{**{k: r[k] for k in ("uuid", "title", "created_at", "warnings")},
+                             "version": r.get("version", i)} for i, r in enumerate(doc["revisions"], 1)]}
     result["created_at"] = doc.get("created_at")
     result["updated_at"] = doc.get("updated_at")
     if owner:
@@ -157,9 +217,16 @@ def metadata(doc, owner=False):
 
 def publish(db, doc, selected):
     revision(doc, selected)
+    _pin_legacy_team_revision(db, doc)
     return db.html_artifacts.find_one_and_update({"uuid": doc["uuid"], "deleted_at": None}, {
         "$set": {"published_revision": selected, "public_token": doc.get("public_token") or secrets.token_urlsafe(32)},
     }, return_document=ReturnDocument.AFTER)
+
+
+def unpublish(db, doc):
+    _pin_legacy_team_revision(db, doc)
+    db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
+        {"$set": {"public_token": None, "published_revision": None}})
 
 
 def workflow_html(output, title):

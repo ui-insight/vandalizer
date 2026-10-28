@@ -25,6 +25,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [teams, setTeams] = useState<{ uuid: string; name: string }[]>([])
   const [teamError, setTeamError] = useState(false)
   const [team, setTeam] = useState('')
+  const [teamRevision, setTeamRevision] = useState('')
   const [sharing, setSharing] = useState(() => window.location.hash === '#share')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
@@ -37,7 +38,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         if (publicToken) { const info = await api.getPublicArtifact(publicToken); if (live) setPublicInfo(info) }
         else if (uuid) {
           const item = await api.getArtifact(uuid)
-          if (live) { setArtifact(item); setSelected(item.latest_revision); setTeam(item.team_id || '') }
+          if (live) { setArtifact(item); setSelected(item.latest_revision); setTeam(item.team_id || ''); setTeamRevision(item.team_revision || item.published_revision || item.latest_revision) }
           if (item.can_manage) {
             try { const all = await listTeams(); if (live) setTeams(all) } catch { if (live) setTeamError(true) }
           }
@@ -52,12 +53,13 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     pending.current = true; setBusy(true); setError(''); setNotice('')
     try { await fn() } catch (e) { setError(errorMessage(e)) } finally { pending.current = false; setBusy(false) }
   }
-  const reload = async () => { if (uuid) { const item = await api.getArtifact(uuid); setArtifact(item); setTeam(item.team_id || ''); return item } }
+  const reload = async () => { if (uuid) { const item = await api.getArtifact(uuid); setArtifact(item); setTeam(item.team_id || ''); setTeamRevision(item.team_revision || item.published_revision || item.latest_revision); return item } }
   const revision = artifact?.revisions.find(r => r.uuid === selected)
-  const version = artifact ? artifact.revisions.findIndex(r => r.uuid === selected) + 1 : 1
-  const publishedVersion = artifact?.published_revision ? artifact.revisions.findIndex(r => r.uuid === artifact.published_revision) + 1 : 0
+  const versionNumber = (id: string) => artifact?.revisions.find(r => r.uuid === id)?.version ?? (artifact ? artifact.revisions.findIndex(r => r.uuid === id) + 1 : 1)
+  const version = versionNumber(selected)
+  const publishedVersion = artifact?.published_revision ? versionNumber(artifact.published_revision) : 0
   const selectedIsPublished = !!artifact?.published_revision && selected === artifact.published_revision
-  const hasDraft = !!artifact?.published_revision && artifact.latest_revision !== artifact.published_revision
+  const hasDraft = !!artifact?.can_manage && !!artifact.published_revision && artifact.latest_revision !== artifact.published_revision
   const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
   const title = publicInfo?.title || revision?.title || artifact?.title || 'Page'
   const backUrl = pagesUrl(artifact?.source?.project_uuid)
@@ -70,7 +72,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
     <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
       {(artifact || publicInfo) && <div className="page-meta">
-        {publicToken ? <PageBadge published>Published · anyone with the link</PageBadge> : <>
+        {publicToken ? <PageBadge published>Published · anyone with the link</PageBadge> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
           {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
           {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
           {artifact?.published_revision && <span>Workspace access: {artifact.team_id ? 'you and your team' : 'only you'}</span>}
@@ -87,7 +89,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
     {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar"><label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label><a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       <PagePreview key={contentUrl} src={contentUrl} title={title} />
@@ -105,8 +107,9 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       <p>Choose who can open <strong>{title}</strong>.</p>{feedback}
       <section className="page-share-section"><h3><LockKeyhole size={17} />Workspace access</h3><p>This link opens the saved page for you{artifact.team_id ? ' and your team' : ''}. It does not make the page public.</p>
         <label>Who can access<select aria-label="Workspace page access" value={team} disabled={busy || teamError} onChange={e => setTeam(e.target.value)}><option value="">Only me</option>{teams.map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
+        {team && <><label>Version shared with team<select aria-label="Version shared with team" value={teamRevision} disabled={busy} onChange={e => setTeamRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label><p>Team members can view and download only the selected version. Other versions and future drafts stay owner-only until you select a different version and save access.</p>{artifact.team_revision && <p>Currently shared: version {versionNumber(artifact.team_revision)}.</p>}</>}
         {teamError && <p role="alert">Team options could not be loaded. <button className="underline" onClick={() => void action(async () => { setTeams(await listTeams()); setTeamError(false) })}>Retry teams</button></p>}
-        <div className="page-actions"><button className="page-button" disabled={busy || teamError || team === (artifact.team_id || '')} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
+        <div className="page-actions"><button className="page-button" disabled={busy || teamError || (team === (artifact.team_id || '') && (!team || teamRevision === (artifact.team_revision || artifact.published_revision || artifact.latest_revision)))} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null, team ? teamRevision : undefined); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
       </section>
       <section className="page-share-section"><h3><Globe2 size={17} />Public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
         <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>

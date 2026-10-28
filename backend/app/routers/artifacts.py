@@ -49,8 +49,7 @@ async def browse_artifacts(
     def query(db):
         # Match access first and remove HTML before sorting. Early pages without
         # a denormalized title remain searchable without a data migration.
-        pipeline = [{"$match": {"$and": conditions}}, {"$project": {"revisions.html": 0}},
-                    {"$addFields": {"title": {"$ifNull": ["$title", {"$arrayElemAt": ["$revisions.title", -1]}]}}}]
+        pipeline = [{"$match": {"$and": conditions}}, *artifacts.visible_metadata_stages(user.user_id)]
         if search.strip():
             pipeline.append({"$match": {"title": {"$regex": re.escape(search.strip()), "$options": "i"}}})
         pipeline.append({"$facet": {
@@ -72,7 +71,7 @@ async def authorized(uuid, user, manage=False):
     if doc["user_id"] == user.user_id:
         return doc
     if not manage and access_control.can_view_team(doc.get("team_id"), await access_control.get_team_access_context(user)):
-        return doc
+        return artifacts.team_view(doc)
     raise HTTPException(404, "Page not found")
 
 
@@ -86,13 +85,8 @@ def content_response(rev, download=False):
 
 @router.get("")
 async def list_artifacts(user: User = Depends(get_current_user)):
-    access = await access_control.get_team_access_context(user)
-    def query(db):
-        docs = db.html_artifacts.find({"deleted_at": None, "$or": [
-            {"user_id": user.user_id}, {"team_id": {"$in": list(access.team_uuids | access.team_object_ids)}},
-        ]}).sort("updated_at", -1).limit(100)
-        return [artifacts.metadata(doc, doc["user_id"] == user.user_id) for doc in docs]
-    return await run(query)
+    result = await browse_artifacts(search="", sort="updated", page=1, page_size=100, project_uuid=None, user=user)
+    return result["items"]
 
 
 @router.post("")
@@ -178,10 +172,10 @@ async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactReque
 
 @router.put("/{uuid}/team")
 async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends(get_current_user)):
-    await authorized(uuid, user, manage=True)
+    doc = await authorized(uuid, user, manage=True)
     if body.team_id and not access_control.can_view_team(body.team_id, await access_control.get_team_access_context(user)):
         raise HTTPException(404, "Team not found")
-    await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id, "deleted_at": None}, {"$set": {"team_id": body.team_id}}))
+    await run(artifacts.share_team, doc, body.team_id, body.revision)
     return {"ok": True}
 
 
@@ -198,8 +192,8 @@ async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(
 
 @router.delete("/{uuid}/publication")
 async def unpublish(uuid: str, user: User = Depends(get_current_user)):
-    await authorized(uuid, user, manage=True)
-    await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id}, {"$set": {"public_token": None, "published_revision": None}}))
+    doc = await authorized(uuid, user, manage=True)
+    await run(artifacts.unpublish, doc)
     return {"ok": True}
 
 

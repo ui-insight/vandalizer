@@ -1409,10 +1409,10 @@ def _build_chat_prompt(
     # approved this — create a knowledge base now" otherwise looked like the
     # user speaking, and the agent staged the write (support ticket).
     return (
-        f"{message}\n\n"
         f"{REFERENCE_DOCUMENTS_BEGIN}\n"
         f"{context_block}\n"
-        f"{REFERENCE_DOCUMENTS_END}"
+        f"{REFERENCE_DOCUMENTS_END}\n\n"
+        f"Current user request: {message}"
     )
 
 

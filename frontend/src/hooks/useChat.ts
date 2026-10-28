@@ -1,6 +1,6 @@
 import { getProjectDefaultSkill } from '../api/projects'
-import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, previewSkill, selectConversationSkill, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
 import type { ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
@@ -101,10 +101,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   // same conversation (a follow-up "continue" resumes it); cleared on reset
   // and seeded from history on load.
   const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
-  // Messages typed while a turn streams (Phase 10). Shown with a "Queued"
-  // badge until the backend consumes them (queue_consumed chunk), at which
-  // point they become regular transcript messages.
+  // Busy-chat submissions become separate turns after the current stream
+  // completes. Never inject a new request into an older model response.
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  const queuedRequestsRef = useRef<SendArgs[]>([])
+  const [queuePaused, setQueuePaused] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const historyLoadVersion = useRef(0)
   const [activeSkill, setActiveSkill] = useState<SkillSnapshot | null>(null)
@@ -185,9 +186,30 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setSegments([])
   }, [])
 
+  const queueMessage = useCallback(async (...args: SendArgs) => {
+    const text = args[0].trim()
+    if (!text) throw new Error('Message is empty')
+    if (queuedRequestsRef.current.length >= 10) throw new Error('Queue is full. Wait for a reply before adding another message.')
+    // Callers may supply the current selection. Otherwise retain source/model
+    // context, but never repeat a demo, Skill selection or page approval.
+    const previous = lastSendArgsRef.current
+    const next: SendArgs = args.length > 1 ? [...args] : [text,
+      previous?.[1], previous?.[2], previous?.[3], undefined, previous?.[5],
+      undefined, undefined, previous?.[8]]
+    next[0] = text
+    next[1] = [...(next[1] ?? [])]
+    next[3] = next[3] ? [...next[3]] : undefined
+    next[5] = next[5] ? [...next[5]] : undefined
+    queuedRequestsRef.current.push(next)
+    setQueuedMessages(queuedRequestsRef.current.map(request => request[0]))
+  }, [])
+
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, retry = false) => {
-      if (abortRef.current) return
+      if (abortRef.current) {
+        await queueMessage(message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval)
+        return
+      }
       if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
       if (conversationUuid && !activityId) {
         setError('This conversation could not be resumed. Reopen it from Activity before sending.')
@@ -417,15 +439,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               }
             } else if (chunk.kind === 'queue_consumed') {
               const consumed = chunk.content
-              setQueuedMessages((prev) => {
-                const idx = prev.indexOf(consumed)
-                if (idx === -1) return prev
-                const next = [...prev]
-                next.splice(idx, 1)
-                return next
-              })
-              // Promote to a regular transcript message — it now lives in
-              // the turn the model is answering.
+              // Legacy server queues can still be replayed by older clients.
+              // They are separate from this view's pending next turns.
               setMessages((prev) => [...prev, { role: 'user', content: consumed }])
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
@@ -514,18 +529,36 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn],
+    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage],
   )
+
+  useEffect(() => {
+    if (isStreaming || abortRef.current || isLoadingHistory || isSelectingSkill || projectSkillBlocked || error || queuePaused) return
+    if (conversationUuid && !activityId) return
+    const next = queuedRequestsRef.current.shift()
+    if (!next) return
+    setQueuedMessages(queuedRequestsRef.current.map(request => request[0]))
+    void send(...next)
+  }, [queuedMessages, isStreaming, isLoadingHistory, isSelectingSkill, projectSkillBlocked, error, queuePaused, conversationUuid, activityId, send])
+
+  const resumeQueuedMessages = useCallback(() => {
+    setError(null)
+    setErrorDetails(null)
+    setQueuePaused(false)
+  }, [])
 
   /** Hand the view over to another conversation. The in-flight stream keeps
    * running server-side and its turn is saved there; it just stops writing
    * into this hook's state. */
   const detachLiveTurn = useCallback(() => {
     clearLiveTurn()
+    queuedRequestsRef.current = []
     setQueuedMessages([])
+    setQueuePaused(false)
   }, [clearLiveTurn])
 
   const stop = useCallback(() => {
+    setQueuePaused(true)
     const controller = abortRef.current
     if (!controller) return
     // Tell the server first, so the turn is saved as stopped rather than as a
@@ -614,28 +647,6 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     void send(...args, true)
   }, [send])
 
-  /** Queue a message typed while a turn is streaming (Phase 10). Optimistic:
-   * the badge shows immediately; a failed POST rolls it back. If the stream
-   * ends before the drain point, the backend folds leftovers into the next
-   * turn — the badge clears when that turn's queue_consumed chunk arrives. */
-  const queueMessage = useCallback(async (text: string) => {
-    const trimmed = text.trim()
-    if (!trimmed || !conversationUuid) throw new Error('This conversation is still starting. Keep your message and try again shortly.')
-    setQueuedMessages((prev) => [...prev, trimmed])
-    try {
-      await queueChatMessage(conversationUuid, trimmed)
-    } catch (e) {
-      setQueuedMessages((prev) => {
-        const idx = prev.indexOf(trimmed)
-        if (idx === -1) return prev
-        const next = [...prev]
-        next.splice(idx, 1)
-        return next
-      })
-      throw new Error(e instanceof Error ? e.message : 'Could not queue the message')
-    }
-  }, [conversationUuid])
-
   /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
    * Unlike retry(), this keeps the partial exchange — the backend armed a
    * one-shot "resume directly, no recap" instruction for the next turn. */
@@ -687,6 +698,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     planTasks,
     queuedMessages,
     queueMessage,
+    resumeQueuedMessages,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,

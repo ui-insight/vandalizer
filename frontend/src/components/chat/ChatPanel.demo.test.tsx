@@ -7,6 +7,7 @@ import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
+  resumeQueuedMessages: vi.fn(),
   selectSkill: vi.fn(),
   uploading: false,
   conversationUuid: null as string | null,
@@ -46,7 +47,7 @@ vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
   messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
-  projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
+  projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill, resumeQueuedMessages: mocks.resumeQueuedMessages,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
   uploads: [], uploading: mocks.uploading,
@@ -229,7 +230,7 @@ it('does not replace a live stream when the scope remembers the same conversatio
   expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
 })
 
-it('marks queued delivery unconfirmed when a stream fails instead of implying it is still running', () => {
+it('keeps queued requests visibly unsent when a stream fails and offers to resume', () => {
   mocks.isStreaming = true
   mocks.queuedMessages = ['What should I report to support?']
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -242,8 +243,11 @@ it('marks queued delivery unconfirmed when a stream fails instead of implying it
   mocks.error = 'The response stalled.'
   rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   expect(screen.queryByText('Queued')).not.toBeInTheDocument()
-  expect(screen.getByText('Delivery unconfirmed')).toBeInTheDocument()
+  expect(screen.getByText('Waiting for next turn')).toBeInTheDocument()
+  expect(screen.getByText('These messages have not been sent yet.')).toBeInTheDocument()
   expect(screen.getByText('What should I report to support?')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Send queued messages' }))
+  expect(mocks.resumeQueuedMessages).toHaveBeenCalledOnce()
 })
 
 it('does not add a second progress indicator alongside an existing thinking or active-tool entry', () => {

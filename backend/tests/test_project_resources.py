@@ -34,20 +34,49 @@ class BrowseCollection(Collection):
 
     def aggregate(self, pipeline):
         assert pipeline[1] == {'$project': {'revisions.html': 0}}
-        assert pipeline[2] == {'$addFields': {'title': {'$ifNull': ['$title', {'$arrayElemAt': ['$revisions.title', -1]}]}}}
         docs = [deepcopy(d) for d in self.docs if self.matches(d, pipeline[0]['$match'])]
-        for doc in docs:
-            for revision in doc['revisions']:
-                revision.pop('html')
-            doc.setdefault('title', doc['revisions'][-1]['title'])
-        for step in pipeline[3:-1]:
-            docs = [doc for doc in docs if self.matches(doc, step['$match'])]
+        for step in pipeline[1:-1]:
+            if '$project' in step:
+                for doc in docs:
+                    for revision in doc['revisions']:
+                        revision.pop('html', None)
+            elif '$addFields' in step:
+                for doc in docs:
+                    doc.update({key: self.expression(value, doc) for key, value in step['$addFields'].items()})
+            else:
+                docs = [doc for doc in docs if self.matches(doc, step['$match'])]
         total = len(docs)
         operations = pipeline[-1]['$facet']['items']
         for key, direction in reversed(list(operations[0]['$sort'].items())):
             docs.sort(key=lambda d: d[key], reverse=direction < 0)
         offset, limit = operations[1]['$skip'], operations[2]['$limit']
         return iter([{'items': docs[offset:offset + limit], 'total': [{'value': total}]}])
+
+    def expression(self, value, doc, variables=None):
+        """Evaluate the small Mongo expression subset used by browse tests."""
+        variables = variables or {}
+        if isinstance(value, str) and value.startswith('$'):
+            current = variables if value.startswith('$$') else doc
+            for key in value.lstrip('$').split('.'):
+                current = current.get(key) if isinstance(current, dict) else None
+            return current
+        if not isinstance(value, dict):
+            return value
+        operator, args = next(iter(value.items()))
+        evaluate = lambda expr: self.expression(expr, doc, variables)
+        if operator == '$eq':
+            return evaluate(args[0]) == evaluate(args[1])
+        if operator == '$ifNull':
+            left = evaluate(args[0])
+            return left if left is not None else evaluate(args[1])
+        if operator == '$cond':
+            return evaluate(args[1] if evaluate(args[0]) else args[2])
+        if operator == '$arrayElemAt':
+            items, index = evaluate(args[0]), evaluate(args[1])
+            return items[index] if items else None
+        if operator == '$filter':
+            return [item for item in evaluate(args['input']) if self.expression(args['cond'], doc, {**variables, args['as']: item})]
+        raise AssertionError(f'Unsupported expression: {operator}')
 
 
 @pytest.mark.asyncio
@@ -131,7 +160,10 @@ def test_page_edits_keep_origin_and_workflow_pages_keep_project(db):
     changed = artifacts.revise(db, doc, 'Edited', '<p>Edited</p>', doc['latest_revision'])
     assert artifacts.metadata(changed, True)['source'] == source
     assert changed['project_uuid'] == 'p1'
-    assert 'source' not in artifacts.metadata(changed, False)
+    with pytest.raises(HTTPException):
+        artifacts.metadata(changed, False)
+    shared = artifacts.share_team(db, changed, 'team-a')
+    assert 'source' not in artifacts.metadata(shared, False)
     db.activity_event.docs.append({'workflow_session_id': 'run1', 'user_id': 'testuser', 'project_uuid': 'p1'})
     saved = artifacts.from_workflow(db, {'workflow': 'wf1', 'session_id': 'run1', 'status': 'completed', 'final_output': {'output': '<p>Result</p>'}}, 'testuser')
     assert saved['project_uuid'] == 'p1'

@@ -11,6 +11,7 @@ class Artifact(Document):
     uuid: str
     user_id: str
     team_id: Optional[str] = None
+    team_revision: Optional[str] = None
     title: str = ""
     project_uuid: Optional[str] = None
     source: dict = Field(default_factory=dict)

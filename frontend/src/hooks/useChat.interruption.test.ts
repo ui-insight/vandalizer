@@ -110,12 +110,9 @@ describe('interrupted agent responses', () => {
 })
 
 
-it('rolls back a failed queued message and rejects to the composer without marking the active run failed', async () => {
-  vi.mocked(streamChat).mockResolvedValue({ conversationUuid: 'conversation', activityId: 'activity' })
-  vi.mocked(queueChatMessage).mockRejectedValueOnce(new Error('Queue unavailable'))
+it('rejects an empty queued message without marking the active run failed', async () => {
   const { result } = renderHook(() => useChat())
-  await act(async () => { await result.current.send('Start') })
-  await act(async () => { await expect(result.current.queueMessage('Next instruction')).rejects.toThrow('Queue unavailable') })
+  await act(async () => { await expect(result.current.queueMessage('  ')).rejects.toThrow('Message is empty') })
   expect(result.current.queuedMessages).toEqual([])
   expect(result.current.error).toBeNull()
 })
@@ -132,7 +129,8 @@ it('accepts first-turn identity before completion so queueing and Stop preserve 
   act(() => { void result.current.send('Start') })
   expect(result.current.conversationUuid).toBe('first-conversation')
   await act(async () => { await result.current.queueMessage('Next instruction') })
-  expect(queueChatMessage).toHaveBeenLastCalledWith('first-conversation', 'Next instruction')
+  expect(queueChatMessage).not.toHaveBeenCalled()
+  expect(result.current.queuedMessages).toEqual(['Next instruction'])
   act(() => result.current.stop())
   await waitFor(() => expect(result.current.isStreaming).toBe(false))
   expect(result.current.conversationUuid).toBe('first-conversation')

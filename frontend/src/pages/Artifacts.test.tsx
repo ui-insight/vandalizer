@@ -59,7 +59,7 @@ it('requires explicit access saving and respects the deployment publish switch',
   fireEvent.change(screen.getByLabelText('Workspace page access'), { target: { value: 'team-a' } })
   expect(api.shareArtifactTeam).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Save access' }))
-  await waitFor(() => expect(api.shareArtifactTeam).toHaveBeenCalledWith('a1', 'team-a'))
+  await waitFor(() => expect(api.shareArtifactTeam).toHaveBeenCalledWith('a1', 'team-a', 'r1'))
   expect(screen.getByRole('button', { name: 'Publish updates · version 2' })).toBeDisabled()
 })
 
@@ -82,4 +82,46 @@ it('distinguishes a live publication from an unpublished draft beside the title'
   fireEvent.click(screen.getByRole('button', { name: 'Share' }))
   expect(screen.getByRole('button', { name: 'Published' })).toBeDisabled()
   expect(api.publishArtifact).not.toHaveBeenCalled()
+})
+
+it('shows only the shared version to a team member without owner notices or controls', async () => {
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, can_manage: false, team_id: 'team-a',
+    team_revision: 'r1', latest_revision: 'r1', title: 'Published report',
+    revisions: [{ ...item.revisions[0], version: 2 }],
+  })
+  render(<ArtifactPage uuid="a1" />)
+  await screen.findByText('Team access · version 2')
+  expect(screen.getByText('Shared version 2')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Page version')).not.toBeInTheDocument()
+  expect(screen.queryByText('Unpublished changes')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Publish updates when/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Share only when/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Workspace access:.*you/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Delete page' })).not.toBeInTheDocument()
+  expect(screen.getByTitle('Page preview')).toHaveAttribute('src', '/api/pages/a1/revisions/r1/content')
+  expect(screen.getByRole('link', { name: 'Download HTML' })).toHaveAttribute('href', '/api/pages/a1/revisions/r1/content?download=true')
+})
+
+it('lets the owner change the team version explicitly and explains the sharing boundary', async () => {
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, team_id: 'team-a', team_revision: 'r1' })
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  expect(screen.getByLabelText('Version shared with team')).toHaveValue('r1')
+  expect(screen.getByText(/Other versions and future drafts stay owner-only/)).toBeInTheDocument()
+  expect(screen.getByText('Currently shared: version 1.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save access' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Version shared with team'), { target: { value: 'r2' } })
+  expect(api.shareArtifactTeam).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Save access' }))
+  await waitFor(() => expect(api.shareArtifactTeam).toHaveBeenCalledWith('a1', 'team-a', 'r2'))
+})
+
+it('defaults a new team share to the latest saved version when nothing is published', async () => {
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, published_revision: null, public_token: null })
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  await screen.findByRole('option', { name: 'Research team' })
+  fireEvent.change(screen.getByLabelText('Workspace page access'), { target: { value: 'team-a' } })
+  expect(screen.getByLabelText('Version shared with team')).toHaveValue('r2')
 })

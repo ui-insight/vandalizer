@@ -24,6 +24,7 @@ class PublishArtifactRequest(BaseModel):
 
 class ShareArtifactRequest(BaseModel):
     team_id: Optional[str] = Field(default=None, max_length=200)
+    revision: Optional[str] = Field(default=None, min_length=1, max_length=64)
 
 
 class ChatArtifactRequest(BaseModel):

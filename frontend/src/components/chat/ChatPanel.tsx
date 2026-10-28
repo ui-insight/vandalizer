@@ -87,6 +87,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     planTasks,
     queuedMessages,
     queueMessage,
+    resumeQueuedMessages,
     suggestedModel,
     setContextTokens,
     setContextMode,
@@ -870,8 +871,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <h2>What would you like to get done?</h2>
         </div>}
         {(attachLoading || anySelectedProcessing || isLoadingHistory) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : isLoadingHistory ? 'Loading this conversation. Keep typing; Send becomes available when it has loaded.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
-        {/* Input. Typing stays enabled while a turn streams (Phase 10):
-            submits mid-run queue into the current turn instead of sending. */}
+        {/* Busy-chat submissions wait for their own turn. */}
         {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
         {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
         {!showHome && <CertificationRefreshNotice />}
@@ -880,7 +880,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           draftInsertion={draftInsertion}
           onDraftChange={onDraftChange}
           onSend={async (msg) => {
-            if (isStreaming) await queueMessage(msg)
+            if (isStreaming) await queueMessage(msg, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), undefined, selectedFolderUuids, undefined, undefined, activeProjectUuid || undefined)
             else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
           }}
           onAttachFile={handleAttachFile}
@@ -1407,17 +1407,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Messages typed while the turn streams (Phase 10) — badge clears
-            when the backend consumes them into the run. */}
+        {/* Pending requests wait for their own turns. */}
         {queuedMessages.length > 0 && (
           <div className="mt-2 space-y-1">
-            {!isStreaming && <p className="text-xs text-gray-600">{error ? 'The connection ended before delivery was confirmed. Check the conversation before sending these messages again.' : 'These messages are waiting for the next turn. Send a follow-up to continue.'}</p>}
+            {!isStreaming && <div className="text-xs text-gray-600"><p>These messages have not been sent yet.</p><button type="button" className="underline" onClick={resumeQueuedMessages}>Send queued messages</button></div>}
             {queuedMessages.map((m, i) => (
               <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
                   {m}
                   <span className="ml-2 text-xs font-medium uppercase tracking-wide text-gray-600">
-                    {isStreaming ? 'Queued' : error ? 'Delivery unconfirmed' : 'Waiting for next turn'}
+                    {isStreaming ? 'Queued' : 'Waiting for next turn'}
                   </span>
                 </div>
               </div>
