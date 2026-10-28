@@ -17,7 +17,7 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString()
 }
 
-export function QualityBadge({ quality }: { quality: QualityMeta }) {
+export function QualityBadge({ quality, showGrade = false }: { quality: QualityMeta; showGrade?: boolean }) {
   const [showTooltip, setShowTooltip] = useState(false)
   const badgeRef = useRef<HTMLButtonElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -61,10 +61,11 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
       <button
+        className={showGrade ? "agent-quality-badge" : undefined}
         ref={badgeRef}
         aria-expanded={showTooltip}
         aria-controls={showTooltip ? detailsId : undefined}
-        aria-label={`${config.label}. ${presentation.evidence}. Show details.`}
+        aria-label={`${config.label}. ${presentation.evidence}.${showGrade && presentation.measured ? ` ${quality.grade ? `Grade ${quality.grade}.` : `${Math.round(quality.score!)}/100.`}` : ''} Show details.`}
         onClick={(e) => { e.stopPropagation(); setShowTooltip(!showTooltip) }}
         style={{
           display: 'inline-flex',
@@ -83,7 +84,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           fontFamily: 'inherit',
         }}
       >
-        <IconComponent size={12} />
+        {showGrade && presentation.measured ? <span className="agent-quality-score"><span>{quality.grade ? `Grade ${quality.grade}` : `${Math.round(quality.score!)}/100`}</span>{quality.grade && quality.score != null && <small>{Math.round(quality.score)}/100</small>}</span> : <IconComponent size={12} />}
         <span>{config.label}<span style={{ display: 'block', fontWeight: 400 }}>{presentation.evidence}</span></span>
         {hasAlerts && (
           // Red = critical (accuracy floor breached / run errored); amber =

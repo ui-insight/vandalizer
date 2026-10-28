@@ -164,3 +164,9 @@ describe('document links in an answer', () => {
     expect(workspace.viewDocument.mock.calls).toEqual([['doc-noa-1', 'NOA_G26AC00033-00.pdf']])
   })
 })
+
+it('uses the existing thinking disclosure to name preparation without adding another indicator', () => {
+  render(<ChatMessage message={{ role: 'assistant', content: '' }} streamingThinking="Plan the search" thinkingDuration={2} activity={{ phase: 'tool_preparing', tool_name: 'search_knowledge_base' }} isStreaming />)
+  expect(screen.getByRole('button', { name: 'Expand thinking' })).toHaveTextContent('Preparing tool · Searching knowledge base')
+  expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+})

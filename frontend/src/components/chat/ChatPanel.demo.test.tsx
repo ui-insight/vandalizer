@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatPanel } from './ChatPanel'
+import type { StreamSegment } from '../../types/chat'
 import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   error: null as string | null,
   queuedMessages: [] as string[],
   isStreaming: false,
+  segments: [] as StreamSegment[],
+  thinkingContent: '',
+  activeToolCalls: [] as { tool_name: string; tool_call_id: string; args: Record<string, unknown> }[],
   loadHistory: vi.fn(),
   blocked: false,
   workspace: {
@@ -33,12 +37,13 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => mocks.workspace }))
 vi.mock('../../contexts/BrandingContext', () => ({ useBranding: () => ({ appName: 'Vandalizer' }) }))
+vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanel: () => ({ openPanel: vi.fn() }), useCertificationPanelOptional: () => null }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('../../lib/shareLink', () => ({ useShareLink: () => vi.fn() }))
 vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }) }))
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
-  messages: [], segments: [], queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
+  messages: [], segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
@@ -70,6 +75,9 @@ beforeEach(() => {
   mocks.queuedMessages = []
   mocks.conversationUuid = null
   mocks.isStreaming = false
+  mocks.thinkingContent = ''
+  mocks.segments = []
+  mocks.activeToolCalls = []
   mocks.loadHistory.mockResolvedValue(null)
   mocks.uploading = false
   mocks.blocked = false
@@ -191,14 +199,17 @@ it('does not replace a live stream when the scope remembers the same conversatio
   const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="live-conversation" /></QueryClientProvider>)
   expect(mocks.loadHistory).not.toHaveBeenCalled()
-  const activity = screen.getByRole('region', { name: 'Live assistant activity' })
+  const activity = screen.getByRole('status', { name: 'Assistant progress' })
   expect(screen.getByRole('region', { name: 'Conversation' })).toContainElement(activity)
   expect(activity.closest('.chat-composer-slot')).toBeNull()
   rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="different-conversation" /></QueryClientProvider>)
   await waitFor(() => expect(mocks.loadHistory).toHaveBeenCalledWith('different-conversation'))
   mocks.isStreaming = false
+  mocks.thinkingContent = ''
+  mocks.segments = []
+  mocks.activeToolCalls = []
   rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="different-conversation" /></QueryClientProvider>)
-  expect(screen.queryByRole('region', { name: 'Live assistant activity' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
 })
 
 it('marks queued delivery unconfirmed when a stream fails instead of implying it is still running', () => {
@@ -208,9 +219,28 @@ it('marks queued delivery unconfirmed when a stream fails instead of implying it
   const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   expect(screen.getByText('Queued')).toBeInTheDocument()
   mocks.isStreaming = false
+  mocks.thinkingContent = ''
+  mocks.segments = []
+  mocks.activeToolCalls = []
   mocks.error = 'The response stalled.'
   rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   expect(screen.queryByText('Queued')).not.toBeInTheDocument()
   expect(screen.getByText('Delivery unconfirmed')).toBeInTheDocument()
   expect(screen.getByText('What should I report to support?')).toBeInTheDocument()
+})
+
+it('does not add a second progress indicator alongside an existing thinking or active-tool entry', () => {
+  mocks.isStreaming = true
+  mocks.thinkingContent = 'Reviewing the request'
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.getByRole('button', { name: 'Expand thinking' })).toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+  mocks.thinkingContent = ''
+  mocks.segments = []
+  mocks.activeToolCalls = [{ tool_name: 'search_knowledge_base', tool_call_id: 'search', args: { query: 'eligibility' } }]
+  mocks.segments = mocks.activeToolCalls.map(call => ({ kind: 'tool_call', call }))
+  rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.getByRole('status')).toHaveTextContent('Searching knowledge base · Running')
+  expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
 })

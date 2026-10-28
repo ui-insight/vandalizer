@@ -24,6 +24,8 @@ it('keeps preparation separate from tool execution, ignores heartbeats, and clea
   expect(result.current.activity?.phase).toBe('tool_running')
   act(() => emit({ kind: 'tool_result', content: '', tool_name: 'create_html_artifact', tool_call_id: 'page' }))
   expect(result.current.activity?.phase).toBe('reviewing')
+  expect(result.current.activity?.tool_name).toBe('create_html_artifact')
+  expect(result.current.activity?.tool_call_id).toBe('page')
   act(() => emit({ kind: 'text', content: 'Preview ready.' }))
   expect(result.current.activity?.phase).toBe('writing')
   await act(async () => { finish(); await sending })

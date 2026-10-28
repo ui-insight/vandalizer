@@ -1253,6 +1253,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <ChatMessage
                 artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: '' }}
+            exportNames={scopeNamesRef.current}
+            activity={activity}
+            compactionStatus={compactionStatus}
             streamingThinking={thinkingContent}
             activeToolCalls={activeToolCalls}
             toolResults={toolResults}
@@ -1266,6 +1269,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <ChatMessage
                 artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: streamingContent }}
+            exportNames={scopeNamesRef.current}
+            activity={activity}
+            compactionStatus={compactionStatus}
             streamingThinking={thinkingContent || undefined}
             thinkingDuration={thinkingDuration}
             activeToolCalls={activeToolCalls}
@@ -1275,7 +1281,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {isStreaming && <ChatActivityIndicator activity={activity} calls={activeToolCalls} results={toolResults} segments={segments} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
+        {isStreaming && !thinkingContent && !activeToolCalls?.length && activity?.phase !== 'writing' && <ChatActivityIndicator activity={activity} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
 
         {/* Held message: queued while attached docs finish processing. Renders
             as the user's bubble with a waiting note; auto-sends when ready. */}

@@ -8,7 +8,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   search_documents:      { label: 'Searching documents',      category: 'read' },
   list_documents:        { label: 'Listing documents',        category: 'read' },
   list_folders:          { label: 'Listing folders',          category: 'read' },
-  search_knowledge_base: { label: 'Querying knowledge base',  category: 'read' },
+  search_knowledge_base: { label: 'Searching knowledge base',  category: 'read' },
   list_knowledge_bases:  { label: 'Listing knowledge bases',  category: 'read' },
   list_extraction_sets:  { label: 'Listing extraction templates',  category: 'read' },
   list_workflows:        { label: 'Listing workflows',        category: 'read' },
@@ -69,15 +69,21 @@ export function getToolMeta(name: string) {
 /** Only show short, user-facing targets. Never display generated HTML or tool instructions. */
 export function toolTarget(call: ToolCallInfo, names: Record<string, string>): string {
   const args = call.args
-  const id = args.document_uuid
-  if (typeof id === 'string' && names[id]) return names[id]
-  const ids = args.document_uuids
-  if (Array.isArray(ids) && ids.length) return ids.length === 1 && names[String(ids[0])] ? names[String(ids[0])] : `${ids.length} documents`
-  for (const key of ['title', 'name', 'query']) {
-    const value = args[key]
-    if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 140)
+  const parts: string[] = []
+  for (const key of ['kb_uuid', 'knowledge_base_uuid', 'workflow_id', 'extraction_set_uuid', 'project_uuid', 'folder_uuid', 'document_uuid']) {
+    const id = args[key]
+    if (typeof id === 'string' && names[id]) parts.push(names[id])
   }
-  return ''
+  const ids = args.document_uuids
+  if (Array.isArray(ids) && ids.length) parts.push(ids.length === 1 && names[String(ids[0])] ? names[String(ids[0])] : `${ids.length} document${ids.length === 1 ? '' : 's'}`)
+  for (const key of ['title', 'name', 'query', 'search', 'topic']) {
+    const value = args[key]
+    if (typeof value === 'string' && value.trim()) {
+      parts.push(value.trim().slice(0, 140))
+      break
+    }
+  }
+  return [...new Set(parts)].join(' · ')
 }
 
 export function toolOutcome(result: ToolResultInfo): 'returned' | 'approval' | 'error' | 'canceled' {

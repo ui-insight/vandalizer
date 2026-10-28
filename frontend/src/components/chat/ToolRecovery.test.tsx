@@ -28,7 +28,7 @@ describe('a failed step the Assistant fixed itself', () => {
 
   it('still shows a failure nothing fixed', () => {
     render(<ToolCallDisplay toolCalls={[call('a')]} toolResults={[result('a', FAILED)]} isStreaming={false} onConfirm={vi.fn()} />)
-    expect(screen.getByText('Building workflow · Failed')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Building workflow · Failed')
     expect(screen.getByRole('button', { name: 'Review recovery options' })).toBeInTheDocument()
   })
 

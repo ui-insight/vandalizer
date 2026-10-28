@@ -1,11 +1,12 @@
-import { getToolMeta as getMeta, TOOL_META } from './toolActivity'
+import './tool-calls.css'
+import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
 import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2, Search, BookOpen, Globe, ScanText, Hammer, Workflow } from 'lucide-react'
 import { runModelLabel } from '../../lib/runModel'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
@@ -48,12 +49,7 @@ function CertificationResponseRecovery() {
   </div>
 }
 
-const CATEGORY_ACCENT: Record<ToolCategory, string> = {
-  read: '#3b82f6',
-  extract: '#f59e0b',
-  write: '#22c55e',
-  workflow: '#8b5cf6',
-}
+const CATEGORY_ICON = { read: Search, extract: ScanText, write: Hammer, workflow: Workflow } satisfies Record<ToolCategory, typeof Search>
 
 // ---------------------------------------------------------------------------
 // Context hints for ACTIVE (in-progress) tools
@@ -238,7 +234,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const count = (obj.entity_count as number) || 0
       const fields = Array.isArray(obj.fields) ? obj.fields.length : 0
       const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
-      const fieldHint = fields > 0 ? `${fields} fields` : ''
+      const fieldHint = fields > 0 ? `${fields} field${fields === 1 ? '' : 's'}` : ''
       const entityHint = `${count} entit${count !== 1 ? 'ies' : 'y'}`
       const parts = [entityHint, fieldHint].filter(Boolean).join(', ')
       return {
@@ -1212,6 +1208,7 @@ export function ToolStatusLine({
   onConfirm,
   approvalHistory,
   recovered = false,
+  names = {},
 }: {
   call?: ToolCallInfo
   result?: ToolResultInfo
@@ -1220,11 +1217,12 @@ export function ToolStatusLine({
   approvalHistory?: ApprovalRecord
   /** This call failed, and a later call to the same tool succeeded. */
   recovered?: boolean
+  names?: Record<string, string>
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
   const meta = getMeta(name)
-  const accent = CATEGORY_ACCENT[meta.category]
+  const ToolIcon = name.includes('knowledge_base') ? BookOpen : name === 'web_search' || name === 'fetch_url' ? Globe : name === 'get_document_text' ? FileText : CATEGORY_ICON[meta.category]
   const args = call?.args || {}
   const obj = (listErrorEntry(result?.content) ?? result?.content) as Record<string, unknown> | undefined
   const certificationIssue = result ? certificationPayloadIssue(name, result.content) : null
@@ -1272,10 +1270,11 @@ export function ToolStatusLine({
     : null
 
 
-  const activeHint = isActive ? getActiveHint(name, args) : ''
-  const { text: summaryText, qualityHint } = certificationIssue ? { text: certificationIssue, qualityHint: '' } : result
+  const sourceTarget = call ? toolTarget(call, names) : ''
+  const activeHint = isActive && !sourceTarget ? getActiveHint(name, args) : ''
+  const { text: summaryText } = certificationIssue ? { text: certificationIssue } : result
     ? summarizeResult(name, result.content, result.quality ?? null)
-    : { text: '', qualityHint: '' }
+    : { text: '' }
 
   const kbActions: KBSourceActions = { viewDocument, setHighlightTerms, setWorkspaceMode }
 
@@ -1329,91 +1328,25 @@ export function ToolStatusLine({
   }
 
   return (
-    <div className="agent-tool-result" data-tool-state={executionLabel}>
-      <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · {executionLabel}</p>
-      {/* Status line */}
-      <div style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-6)',
-        fontSize: 'var(--workspace-font-control)', lineHeight: '20px', minHeight: 22,
-      }}>
-        {/* Activity indicator */}
-        {isActive ? (
-          <Loader2
-            size={12}
-            style={{ animation: 'spin 1s linear infinite', color: accent, flexShrink: 0 }}
-          />
-        ) : isError ? (
-          <AlertTriangle size={13} style={{ color: '#dc2626', flexShrink: 0 }} />
-        ) : (
-          <span style={{
-            width: 5, height: 5, borderRadius: '50%',
-            background: accent,
-            flexShrink: 0, opacity: 0.5,
-          }} />
-        )}
-
-        {/* Label — active shows present tense + context hint, done shows result
-            summary. Errors get a distinct red treatment so a failed or denied
-            tool can't be mistaken for a successful one. */}
-        {isActive ? (
-          <>
-            <span style={{ color: '#374151', fontWeight: 500 }}>
-              {meta.label}
-            </span>
-            {activeHint && (
-              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                {activeHint}
-              </span>
-            )}
-          </>
-        ) : unconfirmed ? (
-          <span style={{ color: '#92400e', fontWeight: 500 }}>{meta.label} · completion not confirmed</span>
-        ) : isError ? (
-          <>
-            <span style={{ color: '#dc2626', fontWeight: 500 }}>
-              {meta.label} {certificationIssue ? 'could not be confirmed' : 'failed'}
-            </span>
-            {summaryText && (
-              <>
-                <span style={{ color: '#fca5a5' }}>&middot;</span>
-                <span style={{ color: '#b91c1c', fontStyle: 'italic' }}>
-                  {summaryText}
-                </span>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <span style={{ color: '#6b7280' }}>
-              {summaryText || meta.label}
-            </span>
-            {qualityHint && (
-              <>
-                <span style={{ color: '#d1d5db' }}>&middot;</span>
-                <span style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)' }}>
-                  {qualityHint}
-                </span>
-              </>
-            )}
-          </>
-        )}
-
-        <span style={{ flex: 1 }} />
-
-        {/* Per-result copy button — shown on status line for tools without rich content blocks */}
-        {result && !isActive && !certificationIssue && hasCopyableContent(name, result.content) &&
-          !hasRichContent(name, obj) && (
-          <CopyButton
-            text={toolResultToText(name, result.content)}
-            label="Copy result"
-          />
-        )}
-
-        {/* Quality badge — compact, with tooltip for details */}
-        {result?.quality && !certificationIssue && (
-          <QualityBadge quality={result.quality as QualityMeta} />
-        )}
+    <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
+      <div className="agent-tool-header">
+        <span className="agent-tool-icon" aria-hidden="true"><ToolIcon size={18} /></span>
+        <div className="agent-tool-identity">
+          <div className="agent-tool-heading" role="status" aria-atomic="true">
+            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : meta.label}</span>
+            <span className="sr-only"> · </span>
+            <span className="agent-tool-status">{isActive && <Loader2 size={11} className="agent-tool-spin" aria-hidden="true" />}{executionLabel}</span>
+          </div>
+          {(sourceTarget || activeHint) && <p className="agent-tool-target">{sourceTarget || activeHint}</p>}
+        </div>
       </div>
+      {(!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
+      {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
+        <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>
+      )}
+      {result && !isActive && !certificationIssue && hasCopyableContent(name, result.content) && !hasRichContent(name, obj) && (
+        <div className="agent-tool-copy"><CopyButton text={toolResultToText(name, result.content)} label="Copy result" /></div>
+      )}
 
       {/* Auto-shown rich content (copy/export buttons are inside each block) */}
       {result && name === 'run_extraction' && obj?.entities != null && (
@@ -1479,6 +1412,7 @@ export function ToolStatusLine({
 // ---------------------------------------------------------------------------
 
 interface Props {
+  names?: Record<string, string>
   toolCalls: ToolCallInfo[]
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
@@ -1486,7 +1420,7 @@ interface Props {
   approvalHistory?: Record<string, ApprovalRecord>
 }
 
-export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm, approvalHistory }: Props) {
+export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreaming, onConfirm, approvalHistory }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   if (toolCalls.length === 0 && toolResults.length === 0) return null
@@ -1522,7 +1456,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
           <div key={callId}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
               <div style={{ flex: 1 }}>
-                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} />
+                <ToolStatusLine names={names} call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} />
               </div>
               {expandable && (
                 <button

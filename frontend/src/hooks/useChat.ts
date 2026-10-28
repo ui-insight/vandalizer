@@ -327,7 +327,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               segmentsRef.current.push({ kind: 'tool_call', call })
               setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'tool_result') {
-              setActivityProgress({ phase: 'reviewing' })
+              setActivityProgress({ phase: 'reviewing', tool_name: chunk.tool_name, tool_call_id: chunk.tool_call_id })
               if (chunk.tool_name === 'update_plan') return
               const res: ToolResultInfo = {
                 tool_name: chunk.tool_name!,

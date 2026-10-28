@@ -181,3 +181,25 @@ describe('document search with no exact match', () => {
     expect(screen.getByText('No documents found')).toBeInTheDocument()
   })
 })
+
+it('keeps individual parallel calls and their source names visible', () => {
+  render(<ToolCallDisplay isStreaming names={{ kb: 'Research policies', doc: 'Proposal.pdf' }} toolResults={[]} toolCalls={[
+    { tool_name: 'search_knowledge_base', tool_call_id: 'search', args: { kb_uuid: 'kb', query: 'eligibility' } },
+    { tool_name: 'get_document_text', tool_call_id: 'read', args: { document_uuid: 'doc' } },
+  ]} />)
+  expect(screen.getAllByRole('status')).toHaveLength(2)
+  expect(screen.getByText('Research policies · eligibility')).toBeVisible()
+  expect(screen.getByText('Proposal.pdf')).toBeVisible()
+})
+
+it('surfaces recorded grades with their sample size but never attaches them to a failed call', () => {
+  const quality = { score: 94, tier: 'excellent', grade: 'A', num_test_cases: 12, last_validated_at: null }
+  const { rerender } = render(<ToolStatusLine call={call} result={{ ...result({ status: 'completed' }), quality }} />)
+  const badge = screen.getByRole('button', { name: /Grade A/ })
+  expect(badge).toHaveTextContent('Grade A')
+  expect(badge).toHaveTextContent('94/100')
+  expect(badge).toHaveTextContent('Tested on 12 examples')
+  rerender(<ToolStatusLine call={call} result={{ ...result({ error: 'Unavailable' }), quality }} />)
+  expect(screen.queryByRole('button', { name: /Grade A/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Failed')
+})

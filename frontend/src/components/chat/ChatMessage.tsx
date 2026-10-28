@@ -1,4 +1,5 @@
 import './chat-message-actions.css'
+import { activityLabel } from './ChatActivityIndicator'
 import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -11,7 +12,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { ToolCallDisplay, ToolStatusLine, recoveredCallIds } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
-import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
+import type { ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 import type { ReactNode } from 'react'
 import { formatPageLocator } from '../../utils/pageLocator'
 import { citationAnchor } from '../../utils/textMatch'
@@ -83,6 +84,8 @@ interface Props {
   message: ChatMessageType
   exportNames?: Record<string, string>
   artifactSource?: { project_uuid?: string; conversation_uuid?: string }
+  activity?: ChatActivity | null
+  compactionStatus?: string | null
   streamingThinking?: string
   thinkingDuration?: number | null
   isStreaming?: boolean
@@ -129,7 +132,7 @@ export function menuAlignmentFor(
 }
 
 export function ChatMessage({
-  message, exportNames, artifactSource, streamingThinking,
+  message, exportNames, artifactSource, streamingThinking, activity, compactionStatus,
   thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
   toolResults, streamSegments, onSendMessage, approvalHistory,
 }: Props) {
@@ -366,9 +369,13 @@ export function ChatMessage({
                     transform: thinkingExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                   }}
                 />
-                {duration != null
+                {isStreamingProp && activity && activity.phase !== 'writing' && !activeToolCalls?.length
+                  ? activityLabel(activity, [], exportNames || {}, compactionStatus)
+                  : duration != null
                   ? `Thought for ${duration < 1 ? 'less than a second' : `${Math.round(duration)} second${Math.round(duration) !== 1 ? 's' : ''}`}`
-                  : <span className="thinking-shimmer"><ThinkingLabel /></span>}
+                  : isStreamingProp && !activeToolCalls?.length
+                    ? <span className="thinking-shimmer">{activity ? activityLabel(activity, [], exportNames || {}, compactionStatus) : <ThinkingLabel />}</span>
+                    : 'Reasoning'}
               </button>
               <div className={`thinking-collapse${thinkingExpanded ? ' open' : ''}`}>
                 <div>
@@ -429,7 +436,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
-                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} />
+                      <ToolStatusLine names={exportNames} call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} />
                     </div>
                   )
                 }
@@ -441,7 +448,7 @@ export function ChatMessage({
                 (c) => !segments.some((s) => s.kind === 'tool_call' && s.call.tool_call_id === c.tool_call_id),
               ).map((c) => (
                 <div key={c.tool_call_id} style={{ margin: "var(--workspace-space-4) 0" }}>
-                  <ToolStatusLine call={c} isActive />
+                  <ToolStatusLine names={exportNames} call={c} isActive />
                 </div>
               ))}
             </div>
@@ -464,6 +471,7 @@ export function ChatMessage({
                 if (calls.length === 0 && results.length === 0) return null
                 return (
                   <ToolCallDisplay
+                    names={exportNames}
                     toolCalls={calls}
                     toolResults={results}
                     isStreaming={isStreamingProp}

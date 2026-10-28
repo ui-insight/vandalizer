@@ -1,20 +1,5 @@
-.chat-activity { margin: 4px 0 20px; color: #64748b; }
-.chat-activity-line { display: flex; align-items: center; gap: 9px; min-height: 28px; }
-.chat-activity-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: currentColor; animation: chat-activity-pulse 1.8s ease-in-out infinite; }
-.chat-activity-label { min-width: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.chat-activity .chat-activity-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 28px; min-height: 28px; margin-left: -4px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; }
-.chat-activity-toggle:hover { background: #f1f5f9; color: #334155; }
-.chat-activity-toggle .is-expanded { transform: rotate(180deg); }
-.chat-activity-steps { list-style: none; margin: 6px 0 0 3px; padding: 0 0 0 12px; border-left: 1px solid #e2e8f0; }
-.chat-activity-steps li { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; font-size: 12px; line-height: 1.5; }
-.chat-activity-steps li > svg { margin-top: 2px; flex-shrink: 0; }
-.chat-activity-steps li[data-state="error"] > svg { color: #b45309; }
-.chat-activity-steps li > div { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.chat-activity-steps strong { display: block; color: #475569; font-weight: 500; }
-.chat-activity-steps span { display: block; font-size: 11px; }
-.chat-activity-steps small { font-size: 11px; text-align: right; flex: 0 0 85px; }
-.chat-activity-spin { animation: chat-activity-spin 1.3s linear infinite; }
-@keyframes chat-activity-spin { to { transform: rotate(360deg); } }
-@keyframes chat-activity-pulse { 50% { opacity: .35; } }
-@media (pointer: coarse) { .chat-activity .chat-activity-toggle { min-width: 44px; min-height: 44px; margin-top: -8px; margin-bottom: -8px; } }
-@media (prefers-reduced-motion: reduce) { .chat-activity-dot, .chat-activity-spin { animation: none; } }
+.chat-activity-line { display:flex; align-items:center; gap:9px; min-height:28px; margin:4px 0 20px; color:#64748b; }
+.chat-activity-dot { width:6px; height:6px; flex-shrink:0; border-radius:50%; background:currentColor; animation:chat-activity-pulse 1.8s ease-in-out infinite; }
+.chat-activity-label { min-width:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+@keyframes chat-activity-pulse { 50% { opacity:.35; } }
+@media (prefers-reduced-motion:reduce) { .chat-activity-dot { animation:none; } }
