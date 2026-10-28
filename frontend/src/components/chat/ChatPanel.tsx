@@ -1,4 +1,4 @@
-import { ChatActivityCard } from './ChatActivityCard'
+import { ChatActivityIndicator } from './ChatActivityIndicator'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { approvalHistoryFor } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
@@ -880,7 +880,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
         {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
         {!showHome && <CertificationRefreshNotice />}
-        {isStreaming && <ChatActivityCard activity={activity} calls={activeToolCalls} results={toolResults} segments={segments} names={scopeNamesRef.current} compactionStatus={compactionStatus} onViewActivity={scrollToBottom} />}
         <ChatInput
           initialDraft={initialDraft}
           draftInsertion={draftInsertion}
@@ -1275,6 +1274,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             isStreaming
           />
         )}
+
+        {isStreaming && <ChatActivityIndicator activity={activity} calls={activeToolCalls} results={toolResults} segments={segments} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
 
         {/* Held message: queued while attached docs finish processing. Renders
             as the user's bubble with a waiting note; auto-sends when ready. */}

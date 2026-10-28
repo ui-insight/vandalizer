@@ -191,9 +191,14 @@ it('does not replace a live stream when the scope remembers the same conversatio
   const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="live-conversation" /></QueryClientProvider>)
   expect(mocks.loadHistory).not.toHaveBeenCalled()
-  expect(screen.getByRole('region', { name: 'Live assistant activity' })).toBeInTheDocument()
+  const activity = screen.getByRole('region', { name: 'Live assistant activity' })
+  expect(screen.getByRole('region', { name: 'Conversation' })).toContainElement(activity)
+  expect(activity.closest('.chat-composer-slot')).toBeNull()
   rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="different-conversation" /></QueryClientProvider>)
   await waitFor(() => expect(mocks.loadHistory).toHaveBeenCalledWith('different-conversation'))
+  mocks.isStreaming = false
+  rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="different-conversation" /></QueryClientProvider>)
+  expect(screen.queryByRole('region', { name: 'Live assistant activity' })).not.toBeInTheDocument()
 })
 
 it('marks queued delivery unconfirmed when a stream fails instead of implying it is still running', () => {
