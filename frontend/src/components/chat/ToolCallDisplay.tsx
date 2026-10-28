@@ -1219,7 +1219,7 @@ export function ToolStatusLine({
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
-  onConfirm?: (message: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string) => boolean | void
   approvalHistory?: ApprovalRecord
   /** This call failed, and a later call to the same tool succeeded. */
   recovered?: boolean
@@ -1249,7 +1249,10 @@ export function ToolStatusLine({
     if (!onConfirm || decisionRef.current) return
     decisionRef.current = true
     try {
-      if (onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that') === false) {
+      const accepted = value === 'approved' && ['create_html_artifact', 'revise_html_artifact'].includes(name) && typeof obj?.preview_id === 'string'
+        ? onConfirm('Yes, go ahead', obj.preview_id)
+        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that')
+      if (accepted === false) {
         setDecisionError('The decision could not be sent yet. Wait for the current attachment or response, then try again.')
         decisionRef.current = false
         return
@@ -1428,7 +1431,7 @@ interface Props {
   toolCalls: ToolCallInfo[]
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
-  onConfirm?: (message: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string) => boolean | void
   approvalHistory?: Record<string, ApprovalRecord>
 }
 

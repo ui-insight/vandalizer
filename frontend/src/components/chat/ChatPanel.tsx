@@ -521,7 +521,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return () => { cancelled = true; clearInterval(id) }
   }, [justDroppedUuids])
 
-  const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+  const handleSend = (message: string, includeOnboardingContext?: boolean, pageApproval?: string) => {
     if (isLoadingHistory || isStreaming || isSelectingSkill || projectSkillBlocked) return false
     if (conversationUuid && !activityId) {
       toast('Reopen this conversation from Activity before sending.', 'info')
@@ -534,13 +534,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     // Auto-hold: if the user attached document(s) that aren't readable yet,
     // don't fire a question at a file the model can't see. Queue it and let the
     // readiness effect below auto-send once text extraction finishes.
-    if (anySelectedProcessing) {
+    if (anySelectedProcessing && !pageApproval) {
       setHeldMessage({ message, includeOnboardingContext })
       return true
     }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined)
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined, undefined, pageApproval)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
     // messages.length counts both user + assistant; 4 = 2 full exchanges done.
@@ -1229,7 +1229,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     message={msg}
                     exportNames={scopeNamesRef.current}
                     approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming)}
-                    onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
+                    onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m, pageApproval) => handleSend(m, undefined, pageApproval) : undefined}
                   />
                 </div>
               </div>

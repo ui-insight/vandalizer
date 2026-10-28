@@ -57,6 +57,7 @@ type SendArgs = [
   runDemo?: boolean,
   projectUuid?: string,
   skillUuid?: string,
+  pageApproval?: string,
 ]
 
 interface ChatEvents {
@@ -185,7 +186,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, retry = false) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, retry = false) => {
       if (abortRef.current) return
       if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
       if (conversationUuid && !activityId) {
@@ -217,7 +218,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
       }
       const deliveredResults = new Set<string>()
-      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid]
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval]
       if (!retry) lastSendAcceptedRef.current = false
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
@@ -481,6 +482,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           turnSkill?.uuid ?? null,
           turnSkill?.version,
           retry && lastSendAcceptedRef.current && !!activityId,
+          pageApproval,
         )
         if (!ownsView()) return
 

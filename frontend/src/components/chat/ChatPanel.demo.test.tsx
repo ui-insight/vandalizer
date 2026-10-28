@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatPanel } from './ChatPanel'
-import type { StreamSegment } from '../../types/chat'
+import type { ChatMessage, StreamSegment } from '../../types/chat'
 import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   selectSkill: vi.fn(),
   uploading: false,
   conversationUuid: null as string | null,
+  activityId: null as string | null,
+  messages: [] as ChatMessage[],
   error: null as string | null,
   queuedMessages: [] as string[],
   isStreaming: false,
@@ -43,7 +45,7 @@ vi.mock('../../lib/shareLink', () => ({ useShareLink: () => vi.fn() }))
 vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }) }))
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
-  messages: [], segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
+  messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
@@ -74,6 +76,8 @@ beforeEach(() => {
   mocks.error = null
   mocks.queuedMessages = []
   mocks.conversationUuid = null
+  mocks.activityId = null
+  mocks.messages = []
   mocks.isStreaming = false
   mocks.thinkingContent = ''
   mocks.segments = []
@@ -98,13 +102,27 @@ beforeEach(() => {
 
 function expectDocumentRequest() {
   expect(mocks.send).toHaveBeenCalledOnce()
-  expect(mocks.send).toHaveBeenCalledWith(
+  expect(mocks.send.mock.calls[0].slice(0, 9)).toEqual([
     expect.stringContaining('content attached to this chat'), ['uploaded-doc'], undefined,
     [], undefined, [], undefined, undefined, undefined,
-  )
+  ])
 }
 
 describe('Show me what you can do', () => {
+  it('passes a page Save decision through to the request as an immutable preview ID', () => {
+    const previewId = 'b'.repeat(32)
+    mocks.conversationUuid = 'pages'
+    mocks.activityId = 'page-activity'
+    mocks.messages = [{ role: 'assistant', content: '',
+      tool_calls: [{ tool_name: 'revise_html_artifact', tool_call_id: 'page', args: { title: 'NIH dashboard', html: '<table>All rows</table>' } }],
+      tool_results: [{ tool_name: 'revise_html_artifact', tool_call_id: 'page', content: { needs_confirmation: true, preview_id: previewId, artifact_preview_html: '<table>All rows</table>' }, quality: null }],
+    }]
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Save new version' }))
+    expect(mocks.send).toHaveBeenCalledOnce()
+    expect(mocks.send.mock.calls[0][0]).toBe('Yes, go ahead')
+    expect(mocks.send.mock.calls[0][10]).toBe(previewId)
+  })
   it('prepares a page edit draft without sending a chat message', async () => {
     renderPanel({ message: 'Update this page: /pages/page-id. Make the title shorter.', draftOnly: true })
     await waitFor(() => expect(mocks.workspace.focusChat).toHaveBeenCalledOnce())
@@ -158,10 +176,10 @@ describe('Show me what you can do', () => {
     mocks.workspace.activeKBUuid = 'kb-1'
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Show me what you can do' }))
-    expect(mocks.send).toHaveBeenCalledWith(
+    expect(mocks.send.mock.calls[0].slice(0, 9)).toEqual([
       expect.stringContaining('content attached to this chat'), [], undefined,
       ['kb-1'], undefined, ['folder-1'], undefined, undefined, undefined,
-    )
+    ])
   })
 
   it('keeps the sample demo available when no content is attached', () => {

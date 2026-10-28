@@ -37,6 +37,8 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
   const output: Record<string, ApprovalRecord> = {}
   for (const preview of previews) {
     const original = calls(message).find(call => call.tool_call_id === preview.tool_call_id)
+    const previewId = object(preview.content).preview_id
+    const storedPage = typeof previewId === 'string' && ['create_html_artifact', 'revise_html_artifact'].includes(original?.tool_name ?? '')
     let record: ApprovalRecord = { label: 'Earlier action preview', detail: 'This preview is no longer actionable. See the later messages for the decision and outcome.' }
     const nextUser = following.findIndex(m => m.role === 'user')
     if (nextUser >= 0) {
@@ -51,11 +53,16 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
         const replies = responses.filter(m => m.role === 'assistant')
         const tried = replies.some(m => calls(m).some(call => call.tool_name === original.tool_name && call.args.confirmed === true))
         const interrupted = replies.some(m => m.interruption)
-        if (!replies.length) record = { label: 'Not done', detail: "The Assistant couldn't respond to your approval, so nothing was created or changed. Ask it to try again when you're ready." }
+        if (storedPage && (!replies.length || (!tried && !interrupted))) record = { label: 'Save not confirmed', detail: 'No save result reached this chat. Check Pages or retry this approval; retrying the same preview will not create an extra version.' }
+        else if (!replies.length) record = { label: 'Not done', detail: "The Assistant couldn't respond to your approval, so nothing was created or changed. Ask it to try again when you're ready." }
         else if (!tried && !interrupted) record = { label: 'Not done', detail: 'The Assistant replied without carrying out this action, so nothing was created or changed. Ask it to go ahead again if you still want it.' }
       }
       for (const response of responses) {
-        const execution = original && calls(response).find(call => call.args.confirmed === true && actionKey(call) === actionKey(original))
+        const execution = original && calls(response).find(call => call.args.confirmed === true && (
+          storedPage
+            ? call.tool_name === original.tool_name && call.args.preview_id === previewId
+            : actionKey(call) === actionKey(original)
+        ))
         const result = execution && results(response).find(r => r.tool_call_id === execution.tool_call_id)
         if (!result) continue
         const content = object(result.content)
@@ -71,7 +78,8 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
           : result.tool_name === 'run_workflow' && content.session_id ? 'Run accepted'
           : 'Result recorded'
         record = { label, detail: 'A matching confirmed action has a result below. Inspect that result for details; this preview is retained as history.' }
-        break
+        // Retry reuses the user message; the last receipt in this turn wins.
+        if (!storedPage) break
       }
     }
     output[preview.tool_call_id] = record

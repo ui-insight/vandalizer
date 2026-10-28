@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
-from app.services import artifacts
+from app.services import artifacts, chat_page_previews
 from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 
@@ -86,8 +86,6 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
     try:
         if len(title) > 200:
             return {"error": "Use a title of at most 200 characters."}
-        prepared, warnings = artifacts.clean_html(html, title)
-        digest = hashlib.sha256((title + prepared).encode()).hexdigest()
         doc = None
         if artifact_uuid:
             doc = await _call(artifacts.get, artifact_uuid)
@@ -96,23 +94,21 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
             if doc["latest_revision"] != base_revision:
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
+        snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
+            context.deps.conversation.uuid, title, html, artifact_uuid, base_revision, _source(context))
+        digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
             preview={"needs_confirmation": True, "action": name,
                      "preview": f'Save a private HTML page: {title}. This does not publish it.',
-                     "artifact_preview_html": prepared, "warnings": warnings, "rendering_note": RENDERING_NOTE,
+                     "preview_id": snapshot["_id"], "title": snapshot["title"],
+                     "artifact_preview_html": snapshot["prepared_html"], "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
                      "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES})
         if gate is not None:
             return gate
-        if doc:
-            saved = await _call(artifacts.revise, doc, title, html, base_revision, _source(context))
-        else:
-            key = f"chat:{context.deps.conversation.uuid}:{digest}"
-            saved = await _call(artifacts.create, context.deps.user_id, title, html, key, _source(context))
-        saved_revision = artifacts.revision(saved)
-        return {"artifact_uuid": saved["uuid"], "title": saved_revision["title"], "revision": saved_revision["uuid"],
-                "url": f'/pages/{saved["uuid"]}', "visibility": "private",
-                "warnings": saved_revision["warnings"], "rendering_note": RENDERING_NOTE,
+        saved = await _call(chat_page_previews.save, context.deps.user_id,
+            context.deps.conversation.uuid, snapshot["_id"])
+        return {**saved, "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES}
     except HTTPException as exc:
         return {"error": exc.detail}

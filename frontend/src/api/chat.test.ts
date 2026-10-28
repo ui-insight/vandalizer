@@ -2,6 +2,14 @@ import { expect, it, vi } from 'vitest'
 import { streamChat, exportChat } from './chat'
 import { rawFetch } from './client'
 vi.mock('./client', () => ({ rawFetch: vi.fn(), apiFetch: vi.fn() }))
+it('sends an approval receipt without resending the page HTML', async () => {
+  vi.mocked(rawFetch).mockResolvedValueOnce(new Response(''))
+  const previewId = 'c'.repeat(32)
+  await streamChat('Yes, go ahead', [], 'activity', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, previewId)
+  const body = JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)
+  expect(body.page_approval).toBe(previewId)
+  expect(body).not.toHaveProperty('html')
+})
 it('marks a retry for the server so reopening does not restore duplicate user messages', async () => {
   vi.mocked(rawFetch).mockResolvedValueOnce(new Response(''))
   await streamChat('Make a page', ['workbook'], 'activity', undefined, 'kimi-k3', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, null, undefined, true)

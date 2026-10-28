@@ -4,6 +4,16 @@ import { ToolStatusLine } from '../chat/ToolCallDisplay'
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({}) }))
 const call = { tool_name: 'create_html_artifact', tool_call_id: 'preview', args: { title: 'Award report' } }
 const result = { tool_name: call.tool_name, tool_call_id: call.tool_call_id, content: { needs_confirmation: true, artifact_preview_html: '<h1>Review this page</h1>' }, quality: null }
+it('sends the stored revision preview ID when Save new version is clicked', () => {
+  const confirm = vi.fn()
+  const previewId = 'b'.repeat(32)
+  const toolName = 'revise_html_artifact'
+  render(<ToolStatusLine call={{ ...call, tool_name: toolName, args: { title: 'NIH dashboard', html: '<table>large content</table>' } }}
+    result={{ ...result, tool_name: toolName, content: { ...result.content, preview_id: previewId } }} onConfirm={confirm} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Save new version' }))
+  expect(confirm).toHaveBeenCalledExactlyOnceWith('Yes, go ahead', previewId)
+  expect(screen.queryByRole('button', { name: 'Save new version' })).not.toBeInTheDocument()
+})
 it('lets a user inspect an isolated preview and approve exactly once', () => {
   const confirm = vi.fn()
   render(<ToolStatusLine call={call} result={result} onConfirm={confirm} />)

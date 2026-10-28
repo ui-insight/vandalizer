@@ -209,6 +209,13 @@ async def chat(
         last_user = next((m for m in reversed(history) if m["role"] == "user"), None)
         if not last_user or last_user["content"] != message:
             raise HTTPException(409, "This message can no longer be retried. Reopen the conversation and send a new message.")
+    page_preview = None
+    if body.page_approval:
+        if not conversation:
+            raise HTTPException(404, "Conversation not found")
+        from app.services import chat_page_previews
+        from app.services.chat_artifact_tools import _call
+        page_preview = await _call(chat_page_previews.get, user_id, conversation.uuid, body.page_approval)
     current_skill = getattr(conversation, "active_skill", None)
     requested_skill = body.skill_uuid
     explicit_skill = "skill_uuid" in body.model_fields_set
@@ -325,6 +332,11 @@ async def chat(
 
     async def generate():
         try:
+            if page_preview is not None:
+                from app.services.chat_page_approval import stream_save
+                async for chunk in stream_save(conversation, page_preview, str(activity.id), user_id):
+                    yield chunk
+                return
             async for chunk in chat_stream(
                 message=message,
                 document_uuids=document_uuids,

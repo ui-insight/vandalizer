@@ -56,6 +56,21 @@ it('resends a request rejected before acceptance without asking the server to re
   expect(vi.mocked(streamChat).mock.lastCall?.[15]).toBe(false)
   expect(result.current.messages.filter(message => message.content === 'Make a page')).toHaveLength(1)
 })
+
+it('retries the identical page preview after a lost save acknowledgement', async () => {
+  const previewId = 'd'.repeat(32)
+  vi.mocked(streamChat).mockImplementationOnce(async (_m, _d, _a, _chunk, _model, _kb, _o, _f, _first, _demo, _signal, _project, started) => {
+    started?.({ conversationUuid: 'pages', activityId: 'page-activity' })
+    throw new TypeError('Failed to fetch')
+  }).mockResolvedValue({ conversationUuid: 'pages', activityId: 'page-activity' })
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('Yes, go ahead', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, previewId) })
+  act(() => result.current.retry())
+  await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  expect(vi.mocked(streamChat).mock.calls.map(call => call[16])).toEqual([previewId, previewId])
+  expect(vi.mocked(streamChat).mock.lastCall?.[15]).toBe(true)
+  expect(result.current.messages.filter(message => message.role === 'user')).toHaveLength(1)
+})
 describe('interrupted agent responses', () => {
   it('retains a tool call even when stopped before text or a result arrives', async () => {
     vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, onChunk, _model, _kb, _o, _f, _first, _demo, signal) => {

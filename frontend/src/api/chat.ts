@@ -41,6 +41,7 @@ export async function streamChat(
   skillUuid?: string | null,
   skillVersion?: string,
   retry = false,
+  pageApproval?: string,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -49,6 +50,7 @@ export async function streamChat(
     body: JSON.stringify({
       message,
       ...(retry ? { retry: true } : {}),
+      ...(pageApproval ? { page_approval: pageApproval } : {}),
       ...(skillUuid !== undefined ? { skill_uuid: skillUuid } : {}),
       ...(skillVersion ? { skill_version: skillVersion } : {}),
       document_uuids: documentUuids,

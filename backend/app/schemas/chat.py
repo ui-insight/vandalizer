@@ -2,12 +2,13 @@
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
     message: str
     retry: bool = False
+    page_approval: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     # Omitted: retain the conversation's pinned Skill. Null: remove it.
     skill_uuid: Optional[str] = None
     skill_version: Optional[str] = None

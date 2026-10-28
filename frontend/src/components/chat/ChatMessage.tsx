@@ -59,7 +59,7 @@ interface Props {
   /** Ordered stream segments for interleaved rendering */
   streamSegments?: StreamSegment[]
   /** Callback to inject a message into the chat (used for confirmation buttons) */
-  onSendMessage?: (message: string) => boolean | void
+  onSendMessage?: (message: string, pageApproval?: string) => boolean | void
   approvalHistory?: Record<string, ApprovalRecord>
 }
 

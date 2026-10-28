@@ -133,6 +133,11 @@ def revise(db, doc, title, html, base_revision, source=None):
         "latest_revision": base_revision,
     }, {"$push": {"revisions": new}, "$set": {"title": title, "latest_revision": new["uuid"], "updated_at": new["created_at"]}}, return_document=ReturnDocument.AFTER)
     if not saved:
+        # Identical approvals may race. Return the winning immutable revision
+        # rather than reporting a conflict for an already-completed save.
+        latest = get(db, doc["uuid"])
+        if any(r["uuid"] == new["uuid"] for r in latest["revisions"]):
+            return latest
         raise HTTPException(409, "This page changed. Reload before saving another revision.")
     return saved
 

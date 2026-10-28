@@ -56,7 +56,7 @@ class Collection:
 
 @pytest.fixture
 def db():
-    return SimpleNamespace(html_artifacts=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
+    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
 
 
 def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):

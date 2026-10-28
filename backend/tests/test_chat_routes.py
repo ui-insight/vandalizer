@@ -58,6 +58,56 @@ class TestChatAuth:
 
 
 @pytest.mark.asyncio
+async def test_page_approval_saves_the_stored_version_without_calling_the_model(client):
+    from types import SimpleNamespace
+    from tests.test_artifacts import Collection
+    from tests.test_chat_page_approval import proposal
+    from app.services import artifacts
+
+    db = SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection())
+    doc = artifacts.create(db, 'owner', 'Original', '<p>Original</p>', 'initial')
+    preview = proposal(db, doc=doc)
+    cookies, headers = _auth('owner')
+    conversation = MagicMock(uuid='chat', pending_confirmations=[])
+    conversation.add_message = AsyncMock()
+    conversation.save = AsyncMock()
+    conversation.get_messages = AsyncMock(return_value=[{'role': 'user', 'content': 'Yes, go ahead'}])
+    activity = MagicMock(id='0123456789abcdef01234567', conversation_id='chat')
+    activity.save = AsyncMock()
+    with (
+        patch('app.dependencies.decode_token', return_value={'sub': 'owner', 'type': 'access'}),
+        patch('app.dependencies.User') as users,
+        patch('app.routers.chat.access_control.get_team_access_context', new_callable=AsyncMock),
+        patch('app.routers.chat.activity_service.get_activity', new=AsyncMock(return_value=activity)),
+        patch('app.routers.chat.ChatConversation') as conversations,
+        patch('app.routers.chat.chat_stream', side_effect=AssertionError('Approval must not invoke the model')),
+        patch('app.services.chat_artifact_tools.get_sync_db', return_value=db),
+        patch('app.services.chat_service._finalize', new_callable=AsyncMock) as finalized,
+    ):
+        users.find_one = AsyncMock(return_value=_make_user('owner'))
+        conversations.find_one = AsyncMock(return_value=conversation)
+        for retry in (False, True):
+            response = await client.post('/api/chat', json={
+                'message': 'Yes, go ahead', 'activity_id': str(activity.id),
+                'page_approval': preview['_id'], 'retry': retry,
+            }, cookies=cookies, headers=headers)
+            assert response.status_code == 200
+            assert 'needs_confirmation' not in response.text
+            assert preview['_id'] in response.text
+        assert finalized.await_count == 2
+        conversation.add_message.assert_awaited_once()
+        # A preview from another conversation is not an approval capability.
+        conversation.uuid = 'another-chat'
+        denied = await client.post('/api/chat', json={
+            'message': 'Yes, go ahead', 'activity_id': str(activity.id), 'page_approval': preview['_id'],
+        }, cookies=cookies, headers=headers)
+        assert denied.status_code == 404
+    saved = artifacts.get(db, doc['uuid'])
+    assert len(saved['revisions']) == 2
+    assert artifacts.revision(saved)['html'] == preview['prepared_html']
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("partial", [False, True])
 async def test_retry_reuses_persisted_user_message(client, partial):
     user = _make_user()
