@@ -8,6 +8,7 @@ from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
 from app.services import artifacts
+from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 
 
@@ -33,14 +34,19 @@ def _source(context):
 
 
 async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str) -> dict:
-    """Read your own page's latest saved HTML and revision before revising it."""
+    """Read your own page's latest saved HTML and revision before revising it.
+
+    Generated HTML is not source evidence. Read the original documents to verify
+    values and source notes before revising a document-based page.
+    """
     try:
         doc = await _call(artifacts.get, artifact_uuid)
         if doc["user_id"] != context.deps.user_id:
             return {"error": "Page not found or you do not own it."}
         rev = artifacts.revision(doc)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
-                "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE}
+                "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
+                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES}
     except HTTPException as exc:
         return {"error": exc.detail}
 
@@ -53,6 +59,10 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
     For dashboards, embed all data in full HTML tables and static CSS bars. No canvas,
     SVG, JavaScript charts, filter controls or sortable tables. Explain these limits
     when interactivity is requested, and disclose returned warnings before saving.
+    Read the original source and preserve every category/year value in its own
+    table cell, including repeated values. Label calculated summaries separately;
+    never invent source notes or call exact source values ranges. Compare all
+    displayed values and source claims with the original before previewing.
     """
     return await _save(context, title, html, confirmed)
 
@@ -64,6 +74,9 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     revision remains unchanged. Publication is an explicit owner action in the viewer.
     Static HTML/CSS only: embed all table rows and chart values directly in the HTML.
     JavaScript charts, filters and table sorting are unsupported. Disclose returned warnings.
+    Re-read the original source, not just the old page: preserve every category/year
+    value in separate cells, including repeated values. Label calculated summaries
+    separately and verify source notes instead of carrying forward earlier inventions.
     """
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
@@ -87,7 +100,8 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
             preview={"needs_confirmation": True, "action": name,
                      "preview": f'Save a private HTML page: {title}. This does not publish it.',
-                     "artifact_preview_html": prepared, "warnings": warnings, "rendering_note": RENDERING_NOTE})
+                     "artifact_preview_html": prepared, "warnings": warnings, "rendering_note": RENDERING_NOTE,
+                     "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES})
         if gate is not None:
             return gate
         if doc:
@@ -98,6 +112,7 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
         saved_revision = artifacts.revision(saved)
         return {"artifact_uuid": saved["uuid"], "title": saved_revision["title"], "revision": saved_revision["uuid"],
                 "url": f'/pages/{saved["uuid"]}', "visibility": "private",
-                "warnings": saved_revision["warnings"], "rendering_note": RENDERING_NOTE}
+                "warnings": saved_revision["warnings"], "rendering_note": RENDERING_NOTE,
+                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES}
     except HTTPException as exc:
         return {"error": exc.detail}

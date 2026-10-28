@@ -29,6 +29,8 @@ it('shows the pinned public page without loading private metadata or management 
 it('publishes exactly the selected saved revision and revokes an existing link', async () => {
   render(<ArtifactPage uuid="a1" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  expect(screen.getByText(/compare figures and source notes with the original documents/)).toBeInTheDocument()
+  expect(api.publishArtifact).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Publish updates · version 2' }))
   await waitFor(() => expect(api.publishArtifact).toHaveBeenCalledWith('a1', 'r2'))
   await screen.findByText('Version 2 published. Anyone with the link can view it.')

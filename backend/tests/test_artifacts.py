@@ -125,6 +125,8 @@ async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db
         assert read["html"] == preview["artifact_preview_html"]
         assert saved["warnings"] == read["warnings"] == preview["warnings"]
         assert saved["rendering_note"] == read["rendering_note"] == preview["rendering_note"]
+        from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
+        assert saved["source_fidelity_note"] == read["source_fidelity_note"] == preview["source_fidelity_note"] == PAGE_SOURCE_FIDELITY_RULES
 
         # A retry using the sanitized HTML must still report the stored warnings.
         retry_preview = await create_html_artifact(context, "Budget", read["html"])
@@ -140,6 +142,7 @@ async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db
         deps.turn_marker = 4
         revised = await revise_html_artifact(context, saved["artifact_uuid"], saved["revision"], "Budget", revised_html, confirmed=True)
         assert revised["warnings"] == revision_preview["warnings"]
+        assert revised["source_fidelity_note"] == revision_preview["source_fidelity_note"] == PAGE_SOURCE_FIDELITY_RULES
         assert revised["revision"] != saved["revision"]
 
 
@@ -214,6 +217,50 @@ def route_env(db):
         yield SimpleNamespace(user=user, settings=settings, access=access)
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_settings, None)
+
+
+@pytest.mark.asyncio
+async def test_exact_yearly_budget_values_survive_revision_and_publication(client, db, route_env, tmp_path):
+    """Reconstruct the ticket's two rows; this checks transport, not LLM accuracy."""
+    from openpyxl import Workbook
+    from app.services.document_readers import extract_text_from_xlsx
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Budget"
+    sheet.append(["Category", "Year 1", "Year 2", "Year 3", "Year 4", "Year 5"])
+    sheet.append(["Indirect", 51000, 53000, 55000, 57000, 49000])
+    sheet.append(["Other", 10000, 10000, 10000, 10000, 10000])
+    source_path = tmp_path / "budget-regression.xlsx"
+    workbook.save(source_path)
+    workbook.close()
+    source = extract_text_from_xlsx(str(source_path))
+    assert '| Indirect | 51000 | 53000 | 55000 | 57000 | 49000 |' in source
+    assert '| Other | 10000 | 10000 | 10000 | 10000 | 10000 |' in source
+    assert 'range' not in source.lower()
+
+    # The model's job is to preserve these cells. Exercise the actual static
+    # rendering and public route separately so a model regression isn't hidden
+    # by a test that merely supplies a canned model response.
+    html = artifacts.workflow_html(source, "Budget")
+    first = make(db, html="<h1>Budget draft</h1>")
+    second = artifacts.revise(db, first, "Budget", html, first["latest_revision"])
+    assert not second["published_revision"]
+    cookies, headers = _auth()
+    published = await client.put(f'/api/pages/{first["uuid"]}/publication',
+        json={"revision": second["latest_revision"]}, cookies=cookies, headers=headers)
+    assert published.status_code == 200
+    response = await client.get(f'/api/pages/public/{published.json()["public_token"]}/content')
+    assert response.status_code == 200
+    assert response.text == artifacts.revision(second)["html"]
+    soup = BeautifulSoup(response.text, 'html.parser')
+    rows = [[cell.get_text(strip=True) for cell in row.select('th, td')] for row in soup.select('tr')]
+    assert rows == [
+        ['Category', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+        ['Indirect', '51000', '53000', '55000', '57000', '49000'],
+        ['Other', '10000', '10000', '10000', '10000', '10000'],
+    ]
+    assert 'range' not in soup.get_text().lower()
 
 
 @pytest.mark.asyncio

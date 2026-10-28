@@ -25,6 +25,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import RunContext
 
 from app.services.context_budget import CUT_NOTE_PREFIX
+from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
 from app.utils.encryption import decrypt_value
 
 logger = logging.getLogger(__name__)
@@ -1470,6 +1471,7 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "page as static, never as fully interactive or sortable/filterable. Read tool warnings and the "
     "sanitized preview, disclose removals and missing content before asking to save and after saving, "
     "and revise incomplete content into static HTML. Never claim removed functionality works. "
+    + PAGE_SOURCE_FIDELITY_RULES + " "
     "For save_to_folder, render structured results as a Markdown table in the content before saving.\n"
     "- User pastes a URL or asks you to read/summarize/check a specific webpage → fetch_url. "
     "Auto-fire when the user's message contains an http(s) URL they clearly want you to look at. "

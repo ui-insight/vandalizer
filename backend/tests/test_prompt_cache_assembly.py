@@ -122,6 +122,18 @@ class TestBehavioralTransplants:
         assert "diagnose before switching tactics" in AGENTIC_CHAT_SYSTEM_PROMPT
         assert "'hint' naming the exact call" in AGENTIC_CHAT_SYSTEM_PROMPT
 
+    def test_page_source_fidelity_is_in_generation_instructions(self):
+        from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
+
+        # The response note arrives after authoring; generation must also see
+        # the policy in its instructions, including on a first-session rebuild.
+        for prompt in (AGENTIC_CHAT_SYSTEM_PROMPT, FIRST_SESSION_SYSTEM_PROMPT):
+            assert PAGE_SOURCE_FIDELITY_RULES in prompt
+        assert "including repeated values and the final year" in PAGE_SOURCE_FIDELITY_RULES
+        assert "Calculated summary" in PAGE_SOURCE_FIDELITY_RULES
+        assert "true minimum and maximum" in PAGE_SOURCE_FIDELITY_RULES
+        assert "exact source cells are not 'ranges in the source'" in PAGE_SOURCE_FIDELITY_RULES
+
     def test_routing_tools_carry_paired_examples(self):
         from app.services.chat_tools import (
             check_compliance,
