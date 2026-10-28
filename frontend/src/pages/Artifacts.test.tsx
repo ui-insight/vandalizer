@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import ArtifactPage from './Artifacts'
 import * as api from '../api/artifacts'
 
-vi.mock('../api/artifacts', async importOriginal => ({ ...await importOriginal<typeof api>(), getArtifact: vi.fn(), getPublicArtifact: vi.fn(), artifactSource: vi.fn(), reviseArtifact: vi.fn(), publishArtifact: vi.fn(), unpublishArtifact: vi.fn(), shareArtifactTeam: vi.fn() }))
+vi.mock('../api/artifacts', async importOriginal => ({ ...await importOriginal<typeof api>(), getArtifact: vi.fn(), getPublicArtifact: vi.fn(), artifactSource: vi.fn(), reviseArtifact: vi.fn(), publishArtifact: vi.fn(), unpublishArtifact: vi.fn(), shareArtifactTeam: vi.fn(), deleteArtifact: vi.fn() }))
 vi.mock('../api/teams', () => ({ listTeams: vi.fn().mockResolvedValue([{ uuid: 'team-a', name: 'Research team' }]) }))
 const item: api.Artifact = { uuid: 'a1', title: 'Private draft', latest_revision: 'r2', published_revision: 'r1', public_token: 'public-link', team_id: null, can_manage: true, public_sharing_enabled: true, revisions: [
   { uuid: 'r1', title: 'Published report', created_at: '', warnings: [] },
@@ -52,6 +52,36 @@ it('publishes exactly the selected saved revision and revokes an existing link',
   await screen.findByText('Version 2 published. Anyone with the link can view it.')
   fireEvent.click(screen.getByRole('button', { name: 'Remove public link' }))
   await waitFor(() => expect(api.unpublishArtifact).toHaveBeenCalledWith('a1'))
+})
+
+it('clears previous feedback on opening delete while still showing deletion failures', async () => {
+  const third = { ...item, latest_revision: 'r3', revisions: [...item.revisions,
+    { uuid: 'r3', title: 'Latest report', created_at: '', warnings: [] },
+  ] }
+  vi.mocked(api.getArtifact).mockResolvedValue(third)
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...third, published_revision: 'r3' })
+  fireEvent.click(screen.getByRole('button', { name: 'Publish updates · version 3' }))
+  const published = 'Version 3 published. Anyone with the link can view it.'
+  await screen.findByText(published)
+  fireEvent.click(screen.getByRole('button', { name: 'Close Share page' }))
+  fireEvent.click(screen.getByText('Advanced page options'))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete page' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'Delete this page?' }))
+  expect(dialog.getByText(/This deletes every saved version/)).toBeInTheDocument()
+  expect(dialog.queryByRole('status')).not.toBeInTheDocument()
+  expect(screen.queryByText(published)).not.toBeInTheDocument()
+  expect(api.deleteArtifact).not.toHaveBeenCalled()
+
+  vi.mocked(api.deleteArtifact).mockRejectedValueOnce(new Error('Could not delete page. Try again.'))
+  fireEvent.click(dialog.getByRole('button', { name: 'Delete permanently' }))
+  expect(await dialog.findByRole('alert')).toHaveTextContent('Could not delete page. Try again.')
+  expect(api.deleteArtifact).toHaveBeenCalledWith('a1')
+  fireEvent.click(dialog.getByRole('button', { name: 'Keep page' }))
+  expect(screen.queryByText(published)).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Delete page' }))
+  expect(within(screen.getByRole('dialog', { name: 'Delete this page?' })).queryByRole('alert')).not.toBeInTheDocument()
 })
 
 it('retains an unsaved edit when the server rejects a stale base revision', async () => {
