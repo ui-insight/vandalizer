@@ -6,7 +6,6 @@ import {
   MessageSquare,
   Workflow,
   ListChecks,
-  Trash2,
   PanelLeftClose,
   PanelLeftOpen,
   Zap,
@@ -16,9 +15,10 @@ import {
   CircleMinus,
   CircleCheck,
   SquarePen,
-  Pencil,
   ChevronDown,
   ChevronRight,
+  RefreshCw,
+  Activity,
 } from 'lucide-react'
 import { useActivities } from '../../hooks/useActivities'
 import { useMyReviewCount } from '../../hooks/useMyReviewCount'
@@ -29,6 +29,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { LEVEL_CONFIG } from '../certification/constants'
+import { ActivityActions } from './ActivityActions'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
 import {
@@ -71,9 +72,11 @@ function StatusIcon({ status }: { status: ActivityEvent['status'] }) {
 function statusMetaClass(status: ActivityEvent['status']) {
   switch (status) {
     case 'completed':
-      return 'text-[#166534]'
+      return 'text-[#64748b]'
     case 'failed':
       return 'text-[#b3261e]'
+    case 'canceled':
+      return 'text-[#64748b]'
     default:
       return 'text-[#0050d7]'
   }
@@ -199,16 +202,42 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
     chatOpen[group.chat.id] ?? (!!currentConversationUuid && group.chat.conversation_id === currentConversationUuid)
   const [otherRunsOpen, setOtherRunsOpen] = useState(true)
   const [errorOpen, setErrorOpen] = useState<Record<string, boolean>>({})
-  const { chats, otherRuns } = useMemo(
+  const [filter, setFilter] = useState<'all' | 'active' | 'issues'>('all')
+  const matchesFilter = (activity: ActivityEvent, value = filter) => {
+    if (value === 'issues') return activity.status === 'failed' || isStale(activity, staleThresholdMinutes)
+    if (value === 'active') return (activity.status === 'running' || activity.status === 'queued')
+      && !activeReviewUuid(activity) && !isStale(activity, staleThresholdMinutes)
+    return true
+  }
+  const activeCount = activities.filter(a => matchesFilter(a, 'active')).length
+  const issueCount = activities.filter(a => matchesFilter(a, 'issues')).length
+  const grouped = useMemo(
     () => groupActivities(activities, currentConversationUuid),
     [activities, currentConversationUuid],
   )
+  // Retain the parent chat when a child matches, so a filtered run never loses its context.
+  const chats = grouped.chats.filter(g => matchesFilter(g.chat) || g.runs.some(r => matchesFilter(r)))
+  const otherRuns = grouped.otherRuns.filter(r => matchesFilter(r))
+  const expandRail = forceDocked && onExpand ? onExpand : toggleRailDocked
+  const selectFilter = (value: typeof filter) => {
+    setFilter(value)
+    if (visualDocked) expandRail()
+    railRef.current?.querySelector('.activity-rail__scroll')?.scrollTo?.({ top: 0 })
+  }
 
   const { openActivity: handleClick } = useOpenActivity()
   const [returnActivity, setReturnActivity] = useState(() => {
     try { return sessionStorage.getItem('activity-return-id') } catch { return null }
   })
   const railRef = useRef<HTMLElement>(null)
+  const previousRename = useRef<string | null>(null)
+  useEffect(() => {
+    if (previousRename.current && !renaming) {
+      Array.from(railRef.current?.querySelectorAll<HTMLButtonElement>('[data-activity-id]') ?? [])
+        .find(button => button.dataset.activityId === previousRename.current)?.focus({ preventScroll: true })
+    }
+    previousRename.current = renaming?.id ?? null
+  }, [renaming])
   const previousTool = useRef(openWorkflowId || openExtractionId)
   useEffect(() => {
     const tool = openWorkflowId || openExtractionId
@@ -258,7 +287,10 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
       runKindLabel(activity), runDocumentLabel(activity), runTimeLabel(activity.started_at),
     ].filter(Boolean).join(' · ')
     const runCount = group?.runs.length ?? 0
-    const chatExpanded = group ? isChatExpanded(group) : false
+    const visibleRunCount = group?.runs.filter(run => matchesFilter(run)).length ?? 0
+    const chatExpanded = group ? filter !== 'all' ? visibleRunCount > 0 : isChatExpanded(group) : false
+    const current = isChat && !!currentConversationUuid && activity.conversation_id === currentConversationUuid
+    const tone = effectiveStatus === 'failed' ? 'issue' : awaitingReview ? 'approval' : effectiveStatus === 'running' || effectiveStatus === 'queued' ? 'active' : 'quiet'
     if (renaming?.id === activity.id && !visualDocked) {
       return (
         <div key={activity.id} className="activity-entry">
@@ -275,7 +307,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               onChange={e => setRenaming({ ...renaming, value: e.target.value })}
               onFocus={e => e.currentTarget.select()}
               onBlur={() => void saveRename()}
-              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) } }}
+              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setRenaming(null) } }}
               className="activity-entry__rename-input"
             />
           </form>
@@ -283,23 +315,14 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
       )
     }
     return (
-      <div key={activity.id}>
+      <div key={activity.id} className={cn('activity-item', `activity-item--${tone}`, current && 'activity-item--current')}>
         <div className={cn('activity-entry', nested && 'activity-entry--nested')}>
-          {!visualDocked && group && runCount > 0 && (
-            <button
-              type="button"
-              aria-expanded={chatExpanded}
-              aria-label={`${chatExpanded ? 'Hide' : 'Show'} ${runCount} run${runCount === 1 ? '' : 's'} from ${displayTitle}`}
-              onClick={() => setChatOpen(prev => ({ ...prev, [activity.id]: !chatExpanded }))}
-              className="activity-entry__toggle"
-            >
-              {chatExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
-            </button>
-          )}
           <button
             type="button"
             aria-label={`Open ${isChat ? '' : `${runKindLabel(activity)} `}${displayTitle}: ${statusLabel}`}
+            data-activity-id={activity.id}
             data-activity-return={returnActivity === activity.id || undefined}
+            aria-current={current ? 'true' : undefined}
             onClick={() => {
               setReturnActivity(activity.id)
               try { sessionStorage.setItem('activity-return-id', activity.id) } catch { /* Storage can be unavailable. */ }
@@ -311,40 +334,36 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             {!visualDocked && (
               <span className="min-w-0 flex-1">
-                <span className={cn('block text-xs leading-[1.4] break-words', nested ? 'line-clamp-1' : 'line-clamp-2')}>{displayTitle}</span>
-                <span className={cn('flex items-center gap-1 mt-1 text-xs font-semibold', statusMetaClass(effectiveStatus))}>
+                <span className="activity-entry__title line-clamp-2">{displayTitle}</span>
+                <span className={cn('activity-entry__status', awaitingReview ? 'text-[#8a5700]' : statusMetaClass(effectiveStatus))}>
                   <StatusIcon status={effectiveStatus} />{statusLabel}
-                  {runCount > 0 && <span className="font-normal text-[#59616b]">· {runCount} run{runCount === 1 ? '' : 's'}</span>}
+                  <span className="activity-entry__time">{runTimeLabel(activity.last_updated_at || activity.started_at)}</span>
                 </span>
-                {runDetail && <span className="block truncate text-xs mt-0.5 text-[#59616b]">{runDetail}</span>}
+                {runDetail && <span title={runDetail} className="activity-entry__detail">{[runKindLabel(activity), runDocumentLabel(activity)].filter(Boolean).join(' · ')}</span>}
                 {failureReason && <span className="block truncate text-xs mt-0.5 text-[#59616b]">{shortError(failureReason)}</span>}
               </span>
             )}
           </button>
-          {!visualDocked && isChat && (
-            <button
-              type="button"
-              aria-label={`Rename chat: ${displayTitle}`}
-              onClick={e => {
-                e.stopPropagation()
-                const current = activity.title || ''
-                setRenaming({ id: activity.id, value: current, original: current })
-              }}
-              className="activity-entry__rename"
-              title="Rename chat"
-            ><Pencil className="h-4 w-4" aria-hidden="true" /></button>
-          )}
-          {!visualDocked && (
-            <button
-              type="button"
-              disabled={deleting}
-              aria-label={`Delete activity: ${displayTitle}`}
-              onClick={e => handleDelete(e, activity.id)}
-              className="activity-entry__delete"
-              title="Delete activity"
-            ><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
-          )}
+          {!visualDocked && <ActivityActions title={displayTitle} disabled={deleting}
+            onRename={isChat ? () => {
+              const value = activity.title || ''
+              setRenaming({ id: activity.id, value, original: value })
+            } : undefined}
+            onDelete={e => { void handleDelete(e, activity.id) }}
+          />}
         </div>
+        {group && runCount > 0 && (
+          <button type="button" aria-expanded={chatExpanded}
+            aria-label={`${filter !== 'all' ? 'Show all' : chatExpanded ? 'Hide' : 'Show'} ${runCount} run${runCount === 1 ? '' : 's'} from ${displayTitle}`}
+            onClick={() => {
+              if (filter !== 'all') { setFilter('all'); setChatOpen(prev => ({ ...prev, [activity.id]: true })) }
+              else setChatOpen(prev => ({ ...prev, [activity.id]: !chatExpanded }))
+            }} className="activity-entry__runs-toggle">
+            {chatExpanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+            {filter !== 'all' && visibleRunCount !== runCount ? `${visibleRunCount} of ` : ''}{runCount} linked run{runCount === 1 ? '' : 's'}
+            {group.runs.some(r => matchesFilter(r, 'issues')) && <span className="activity-entry__run-issue">Issue</span>}
+          </button>
+        )}
         {!visualDocked && failureReason && (
           <div className={cn('activity-entry__error', nested && 'activity-entry__error--nested')}>
             <button
@@ -364,21 +383,18 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
     <aside
       ref={railRef}
       aria-label="Activity"
-      className="flex h-full flex-col border-l border-[#d8d8d8] bg-panel-bg"
+      className={cn('activity-rail', visualDocked && 'activity-rail--docked')}
     >
       {/* Header */}
-      <div className="border-b border-[#ddd]" style={{ padding: "17px var(--workspace-space-12)" }}>
+      <div className="activity-rail__header">
         <div className="flex items-center justify-between gap-2">
           {!visualDocked && (
-            <div className="flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5" />
-              <span className="text-sm font-bold">Activity</span>
-            </div>
+            <div><div className="flex items-center gap-2"><Zap size={16} aria-hidden="true" /><h2>Activity</h2></div><p>Your recent work, in one place</p></div>
           )}
           <button
-            onClick={forceDocked && onExpand ? onExpand : toggleRailDocked}
+            onClick={expandRail}
             className={cn(
-              'flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto',
+              'activity-rail__collapse',
               forceExpanded && 'hidden',
             )}
             title={visualDocked ? 'Expand' : 'Collapse'}
@@ -390,7 +406,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
       </div>
 
       {/* Activity list — flex-1 so cert badge footer stays at bottom */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
+      <div className="activity-rail__scroll">
         <div className="flex flex-col gap-1">
           {/* New chat button - matches Flask _app_rail.html first item */}
           <button
@@ -398,12 +414,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             aria-label="New chat"
             title={visualDocked ? 'New chat' : undefined}
             onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}
-            className={cn(
-              'flex items-center gap-2 rounded-lg cursor-pointer p-2',
-              'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
-              'transition-[background-color,box-shadow] duration-200',
-              visualDocked ? 'justify-center' : '',
-            )}
+            className="activity-rail__new"
           >
             <div className="shrink-0 w-4 text-center text-[#333]">
               <SquarePen className="h-4 w-4" />
@@ -420,54 +431,65 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             <button type="button" aria-label={`${pendingReviews} reviews waiting on you`}
               onClick={() => { onNavigate?.(); navigate({ to: '/reviews' }) }}
               title={`${pendingReviews} approval${pendingReviews === 1 ? '' : 's'} waiting on you`}
-              className={cn(
-                'flex items-center gap-2 rounded-lg cursor-pointer p-2',
-                'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
-                'transition-[background-color,box-shadow] duration-200',
-                visualDocked ? 'justify-center' : '',
-              )}
+              className="activity-rail__reviews"
             >
               <div className="relative shrink-0 w-4 text-center text-[#806600]">
                 <ClipboardCheck className="h-4 w-4" />
-                {visualDocked && (
-                  <span
-                    className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
-                    style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
-                  />
-                )}
+
               </div>
-              {!visualDocked && (
-                <>
-                  <div className="min-w-0 flex-1 text-xs leading-[1.4] text-[#111]">
-                    Reviews
-                  </div>
-                  <span
-                    className="shrink-0 rounded-full px-1.5 text-xs font-semibold text-[#111]"
-                    style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
-                  >
-                    {pendingReviews}
-                  </span>
-                </>
-              )}
+              {!visualDocked && <span className="activity-rail__review-label"><strong>Needs your review</strong><span>Open approvals</span></span>}
+              <span className="activity-rail__badge">{pendingReviews}</span>
             </button>
           )}
-          <div className="h-[5px]" />
-          {loading && activities.length === 0 && <p role="status" className="px-2 text-xs text-[#59616b]">Loading activity…</p>}
-          {error && <div role="alert" className="px-2 text-xs text-red-800">
-            {!visualDocked && <p>{error} {activities.length > 0 ? 'Showing the last loaded activity.' : ''}</p>}
-            <button type="button" aria-label="Retry activity" disabled={loading} className="underline" onClick={() => void refresh()}>{visualDocked ? 'Retry' : 'Retry activity'}</button>
+
+          {visualDocked ? <div className="activity-rail__signals">
+            {activeCount > 0 && <button type="button" className="activity-rail__signal activity-rail__signal--active"
+              aria-label={`${activeCount} activities in progress`} title={`${activeCount} activities in progress`}
+              onClick={() => selectFilter('active')}><Activity size={18} aria-hidden="true" /><span>{activeCount}</span></button>}
+            {issueCount > 0 && <button type="button" className="activity-rail__signal activity-rail__signal--issues"
+              aria-label={`${issueCount} activities with issues`} title={`${issueCount} activities with issues`}
+              onClick={() => selectFilter('issues')}><AlertTriangle size={18} aria-hidden="true" /><span>{issueCount}</span></button>}
+          </div> : activities.length > 0 && <div className="activity-rail__filters" role="group" aria-label="Filter activity">
+            <button type="button" aria-pressed={filter === 'all'} onClick={() => selectFilter('all')}>All</button>
+            <button type="button" aria-pressed={filter === 'active'} onClick={() => selectFilter('active')}>In progress <span>{activeCount}</span></button>
+            <button type="button" aria-pressed={filter === 'issues'} onClick={() => selectFilter('issues')}>Issues <span>{issueCount}</span></button>
           </div>}
-          {!loading && !error && activities.length === 0 && !visualDocked && <p className="px-2 text-xs text-[#59616b]">No activity yet. Start a conversation or run a tool to see it here.</p>}
+          {loading && activities.length === 0 && <div role="status" className="activity-rail__loading">
+            <span className="sr-only">Loading activity…</span>
+            {visualDocked ? <RefreshCw size={18} className="animate-spin" aria-hidden="true" /> : <>
+              <p>Loading your activity</p>
+              {[0, 1, 2].map(n => <div key={n} className="activity-rail__skeleton" aria-hidden="true"><span /><span /><span /></div>)}
+            </>}
+          </div>}
+          {error && <div role="alert" className="activity-rail__error">
+            {!visualDocked && <><AlertTriangle size={18} aria-hidden="true" /><strong>Activity couldn't refresh</strong>
+              <p>{activities.length > 0 ? 'Your last loaded activity is still here.' : 'Try again to load your recent work.'}</p>
+              <details><summary>Technical details</summary><p>{error}</p></details></>}
+            <button type="button" aria-label="Retry activity" title="Retry activity" disabled={loading} onClick={() => void refresh()}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />{!visualDocked && 'Try again'}
+            </button>
+          </div>}
+          {!loading && !error && activities.length === 0 && !visualDocked && <div className="activity-rail__empty">
+            <span className="activity-rail__empty-icon"><MessageSquare size={24} aria-hidden="true" /></span>
+            <h3>Your work starts here</h3><p>Conversations and tool runs will appear here, ready to pick up later.</p>
+            <button type="button" onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}>Start a conversation <ChevronRight size={14} aria-hidden="true" /></button>
+          </div>}
+          {!visualDocked && activities.length > 0 && chats.length === 0 && otherRuns.length === 0 && <div className="activity-rail__empty">
+            <CircleCheck size={24} aria-hidden="true" /><h3>{filter === 'issues' ? 'No issues to resolve' : 'Nothing in progress'}</h3>
+            <p>{filter === 'issues' ? 'Your recent activity has no failed or timed-out work.' : 'Completed work is ready to revisit in All activity.'}</p>
+            <button type="button" onClick={() => selectFilter('all')}>View all activity</button>
+          </div>}
+          {!visualDocked && chats.length > 0 && <div className="activity-rail__section-label"><span>Conversations</span><span>{chats.length}</span></div>}
 
 
           {!visualDocked && chats.map(group => {
-            const expanded = !visualDocked && group.runs.length > 0 && isChatExpanded(group)
+            const expanded = filter !== 'all' ? group.runs.some(run => matchesFilter(run)) : group.runs.length > 0 && isChatExpanded(group)
             return (
               <div key={group.chat.id}>
                 {renderEntry(group.chat, group)}
                 {expanded && (
                   <div role="group" aria-label={`Runs from ${group.chat.title || 'this chat'}`} className="activity-runs">
-                    {group.runs.map(run => renderEntry(run, undefined, true))}
+                    {group.runs.filter(run => matchesFilter(run)).map(run => renderEntry(run, undefined, true))}
                   </div>
                 )}
               </div>
@@ -477,35 +499,28 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           {otherRuns.length > 0 && !visualDocked && (
             <button
               type="button"
-              aria-expanded={otherRunsOpen}
-              onClick={() => setOtherRunsOpen(open => !open)}
+              aria-expanded={filter !== 'all' || otherRunsOpen}
+              onClick={() => { if (filter !== 'all') { setFilter('all'); setOtherRunsOpen(false) } else setOtherRunsOpen(open => !open) }}
               className="activity-section"
               title="Runs started from the editors, automations or the API"
             >
-              {otherRunsOpen ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+              {(filter !== 'all' || otherRunsOpen) ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
               <span className="flex-1">Other runs</span>
               <span className="activity-count">{otherRuns.length}</span>
             </button>
           )}
-          {!visualDocked && otherRunsOpen && otherRuns.map(run => renderEntry(run))}
+          {!visualDocked && (filter !== 'all' || otherRunsOpen) && otherRuns.map(run => renderEntry(run))}
         </div>
       </div>
 
       {/* Certification badge footer */}
-      <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
+      <div className="activity-rail__footer">
         <button
           type="button"
           aria-label="Open certification"
           onClick={() => { onNavigate?.(); openPanel() }}
           title={certCertified ? certTitle : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
-          className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
-          style={{
-            borderRadius: 'var(--ui-radius, 12px)',
-            padding: visualDocked ? '6px 10px' : '6px 12px',
-            ...(certCertified
-              ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
-              : { background: '#fff', border: "1px solid var(--workspace-border)", boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
-          }}
+          className={cn('activity-rail__certification', certCertified && 'activity-rail__certification--certified')}
         >
           <Award
             className="h-3.5 w-3.5 shrink-0"
@@ -513,7 +528,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           />
           {!visualDocked && (
             certCertified ? (
-              <span className="text-xs font-semibold text-yellow-400 title-shimmer">
+              <span className="text-xs font-semibold">
                 {certTitle}
               </span>
             ) : certStarted ? (

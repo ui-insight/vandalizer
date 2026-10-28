@@ -91,8 +91,8 @@ describe("activity list groups a chat's runs under it (ticket)", () => {
     fireEvent.click(toggle)
     const runs = within(screen.getByRole('group', { name: 'Runs from Full Life Cycle Test' }))
     expect(runs.getByText('Subaward Review Summary v2')).toBeInTheDocument()
-    expect(runs.getByText(/Workflow · NIFA\.pdf · /)).toBeInTheDocument()
-    expect(runs.getByText(/Extraction · subaward-agreement\.pdf · /)).toBeInTheDocument()
+    expect(runs.getByText(/Workflow · NIFA\.pdf/)).toBeInTheDocument()
+    expect(runs.getByText(/Extraction · subaward-agreement\.pdf/)).toBeInTheDocument()
     expect(runs.queryByText('Budget Extraction')).not.toBeInTheDocument()
   })
 
@@ -123,5 +123,58 @@ describe("activity list groups a chat's runs under it (ticket)", () => {
     expect(screen.queryByText(/Traceback/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
     expect(screen.getByText(/Traceback \(most recent call last\)/)).toBeInTheDocument()
+  })
+})
+
+describe('activity attention filters', () => {
+  it('finds a failed child without losing its parent chat, then restores the full history', () => {
+    render(<ActivityRail />)
+    fireEvent.click(screen.getByRole('button', { name: /^Issues/ }))
+    const runs = within(screen.getByRole('group', { name: 'Runs from Full Life Cycle Test' }))
+    expect(runs.getByRole('button', { name: /: Failed$/ })).toBeInTheDocument()
+    expect(runs.queryByText('Subaward Review Summary v2')).not.toBeInTheDocument()
+    expect(screen.queryByText('Budget Extraction')).not.toBeInTheDocument()
+    expect(screen.getByText('1 of 3 linked runs')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 3 runs from Full Life Cycle Test' }))
+    expect(screen.getByText('Budget Extraction')).toBeInTheDocument()
+    expect(screen.getByText('Subaward Review Summary v2')).toBeInTheDocument()
+  })
+
+  it('opens the issues filter from a docked badge and includes timeouts', () => {
+    activities.push(run({ id: 'stale', status: 'running', title: 'Stalled run' }))
+    const expand = vi.fn()
+    const view = render(<ActivityRail forceDocked onExpand={expand} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 activities with issues' }))
+    expect(expand).toHaveBeenCalledOnce()
+    view.rerender(<ActivityRail forceExpanded />)
+    expect(screen.getByRole('button', { name: /^Issues/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Open Extraction Stalled run: Timed out' })).toBeInTheDocument()
+  })
+
+  it('keeps only fresh running and queued work in progress', () => {
+    const now = new Date().toISOString()
+    activities = [
+      run({ id: 'fresh', title: 'Working now', status: 'running', last_updated_at: now }),
+      run({ id: 'queued', title: 'Next up', status: 'queued', last_updated_at: now }),
+      run({ id: 'stale', title: 'Stalled', status: 'running' }),
+      run({ id: 'done', title: 'Finished', status: 'completed' }),
+    ]
+    render(<ActivityRail />)
+    fireEvent.click(screen.getByRole('button', { name: 'In progress 2' }))
+    expect(screen.getByText('Working now')).toBeInTheDocument()
+    expect(screen.getByText('Next up')).toBeInTheDocument()
+    expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+    expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+  })
+
+  it('marks the open conversation and shows an empty filter without hiding navigation', () => {
+    currentConversationUuid = 'conv-1'
+    render(<ActivityRail />)
+    expect(screen.getByRole('button', { name: /^Open Full Life Cycle Test/ })).toHaveAttribute('aria-current', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /^In progress/ }))
+    expect(screen.getByText('Nothing in progress')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'View all activity' }))
+    expect(screen.getByText('Full Life Cycle Test')).toBeInTheDocument()
   })
 })

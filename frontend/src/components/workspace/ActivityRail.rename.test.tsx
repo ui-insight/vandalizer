@@ -51,7 +51,8 @@ beforeEach(() => {
 })
 
 function startRename() {
-  fireEvent.click(screen.getByRole('button', { name: /^Rename chat:/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Actions for/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /^Rename chat:/ }))
   return screen.getByLabelText('Chat name') as HTMLInputElement
 }
 
@@ -100,7 +101,8 @@ describe('renaming a chat in the activity list (ticket)', () => {
   it('only chats can be renamed', () => {
     activities = [chat({ id: 'run-1', type: 'workflow_run', title: 'Workflow: NOA', conversation_id: null })]
     render(<ActivityRail />)
-    expect(screen.queryByRole('button', { name: /^Rename chat:/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Actions for/ }))
+    expect(screen.queryByRole('menuitem', { name: /^Rename chat:/ })).not.toBeInTheDocument()
   })
 })
 

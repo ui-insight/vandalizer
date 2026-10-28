@@ -138,7 +138,7 @@ export function WorkspaceLayout() {
   const isKnowledge = workspaceMode === 'knowledge'
   const autoDockRail = !isCompact && viewportWidth < 1100
   const drawerOpen = (isCompact || autoDockRail) && activityOpen
-  const railWidth = isCompact ? 0 : railDocked || autoDockRail ? 64 : 220
+  const railWidth = isCompact ? 0 : railDocked || autoDockRail ? 64 : 320
   const availableWidth = Math.max(1, viewportWidth - 88 - railWidth - 6)
   const visibleSplit = fitPanelSplit(panelSplit, availableWidth)
   const splitBounds = panelSplitBounds(availableWidth)
@@ -244,7 +244,7 @@ export function WorkspaceLayout() {
           onKeyDown={event => { if (drawerOpen && event.key === 'Escape') { event.stopPropagation(); setActivityOpen(false) } }}
           style={{
             position: 'fixed',
-            top: 69,
+            top: 56,
             right: 0,
             bottom: 0,
             width: drawerOpen || isCompact ? 'min(320px, calc(100vw - 48px))' : railWidth,

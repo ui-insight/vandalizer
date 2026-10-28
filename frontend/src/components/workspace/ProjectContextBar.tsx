@@ -14,7 +14,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
 
   // The Activity rail is fixed to the right edge; reserve its width so the
   // Manage/Exit controls aren't rendered underneath (and unclickable).
-  const railWidth = fittedRailWidth ?? (railDocked ? 64 : 220)
+  const railWidth = fittedRailWidth ?? (railDocked ? 64 : 320)
 
   return (
     <div
