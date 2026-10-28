@@ -84,3 +84,10 @@ describe('shared chat export actions', () => {
     expect(screen.getByRole('button', { name: 'Export conversation' })).toBeDisabled()
   })
 })
+
+it('keeps copy on user messages without offering individual downloads', async () => {
+  render(<ChatExportActions messages={[{ role: 'user', content: 'Review the grant packet.' }]} />)
+  expect(screen.queryByRole('button', { name: 'Export message' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Copy message' }))
+  await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Review the grant packet.'))
+})

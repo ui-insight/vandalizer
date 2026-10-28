@@ -359,6 +359,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
+      // The scope remembers a new conversation after the response headers arrive.
+      // A later parent render must not reload that same live conversation and
+      // detach its stream (for example when resizing or refreshing project data).
+      if (conversationToLoad === conversationUuid) return
       loadHistory(conversationToLoad).then((data) => {
         if (data) {
           // Re-attach what the conversation was asked against (support
@@ -392,7 +396,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
-  }, [conversationToLoad, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
+  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {

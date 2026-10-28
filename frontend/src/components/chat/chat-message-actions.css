@@ -1,0 +1,9 @@
+.chat-user-message { position: relative; }
+.chat-user-actions { position: absolute; top: 8px; right: 8px; width: 32px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.chat-user-message:hover .chat-user-actions,
+.chat-user-message:focus-within .chat-user-actions { opacity: 1; pointer-events: auto; }
+.chat-user-actions button { display: grid; place-items: center; width: 32px; height: 32px; }
+.chat-user-actions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.chat-user-actions [role="alert"] { position: absolute; right: 0; top: 38px; width: min(240px, 65vw); padding: 10px; border: 1px solid #fecaca; border-radius: 8px; background: #fff; color: #991b1b; box-shadow: 0 4px 14px #0002; z-index: 2; }
+@media (hover: none), (pointer: coarse) { .chat-user-actions { opacity: 1; pointer-events: auto; } }
+@media (prefers-reduced-motion: reduce) { .chat-user-actions { transition: none; } }

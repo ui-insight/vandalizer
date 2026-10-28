@@ -1,3 +1,4 @@
+import './chat-message-actions.css'
 import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -317,9 +318,10 @@ export function ChatMessage({
 
   return (
     <div
-      className={!isUser && Array.from(resultMap.values()).some(result => result.tool_name.includes('certification')) ? 'cert-chat-message' : undefined}
+      className={isUser ? 'chat-user-message' : Array.from(resultMap.values()).some(result => result.tool_name.includes('certification')) ? 'cert-chat-message' : undefined}
       style={{
         padding: 15,
+        paddingRight: isUser ? 52 : undefined,
         marginBottom: isUser ? 10 : 15,
         color: isUser ? 'white' : 'black',
         backgroundColor: isUser ? 'var(--color-panel-dark)' : '#00000008',
@@ -742,7 +744,7 @@ export function ChatMessage({
 
         </>
       )}
-      {!isStreamingProp && <div className="mt-3 flex justify-end border-t border-current/10 pt-2">
+      {!isStreamingProp && <div className={isUser ? "chat-user-actions" : "mt-3 flex justify-end border-t border-current/10 pt-2"}>
         <ChatExportActions messages={[{ ...message, segments: segments || undefined }]} names={exportNames} artifactSource={artifactSource} />
       </div>}
     </div>

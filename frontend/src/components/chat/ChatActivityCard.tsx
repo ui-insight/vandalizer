@@ -12,7 +12,7 @@ export function activityCopy(activity: ChatActivity | null | undefined, calls: T
   if (compaction === 'started') return { title: 'Making room to continue', detail: 'Condensing earlier conversation context for the next step.' }
   if (calls.length) return { title: calls.length > 1 ? `${calls.length} tools working in parallel` : activeToolLabel(calls[0]), detail: calls.length > 1 ? calls.map(activeToolLabel).join(' · ') : 'Waiting for this tool to return its result.' }
   if (activity?.phase === 'tool_preparing') {
-    if (activity.tool_name === 'create_html_artifact' || activity.tool_name === 'revise_html_artifact') return { title: activity.tool_name === 'revise_html_artifact' ? 'Revising your page' : 'Designing your page', detail: 'Generating the HTML layout and content before the page tool runs.' }
+    if (activity.tool_name === 'create_html_artifact' || activity.tool_name === 'revise_html_artifact') return { title: activity.tool_name === 'revise_html_artifact' ? 'Revising your page' : 'Designing your page', detail: 'Building the layout and content for your preview.' }
     return { title: 'Preparing the next tool call', detail: activity.tool_name ? getToolMeta(activity.tool_name).label : 'The assistant is assembling the tool inputs.' }
   }
   if (activity?.phase === 'tool_running') return { title: getToolMeta(activity.tool_name || 'update_plan').label, detail: 'Waiting for the tool response.' }

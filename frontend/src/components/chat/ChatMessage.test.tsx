@@ -31,10 +31,11 @@ const CHUNK =
   'Recipients must retain financial records for three years after submission '
   + 'of the final expenditure report, unless the awarding agency directs otherw'
 
-it.each(['user', 'assistant'] as const)('offers Copy and Export for a %s bubble without rating controls', role => {
+it.each(['user', 'assistant'] as const)('offers role-appropriate actions for a %s bubble without rating controls', role => {
   render(<ChatMessage message={{ role, content: 'Hello' }} />)
   expect(screen.getByRole('button', { name: 'Copy message' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Export message' })).toBeInTheDocument()
+  if (role === 'user') expect(screen.queryByRole('button', { name: 'Export message' })).not.toBeInTheDocument()
+  else expect(screen.getByRole('button', { name: 'Export message' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Good response' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Poor response' })).not.toBeInTheDocument()
 })

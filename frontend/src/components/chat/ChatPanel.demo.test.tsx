@@ -8,9 +8,15 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   selectSkill: vi.fn(),
   uploading: false,
+  conversationUuid: null as string | null,
+  error: null as string | null,
+  queuedMessages: [] as string[],
+  isStreaming: false,
+  loadHistory: vi.fn(),
   blocked: false,
   workspace: {
     workspaceMode: 'chat',
+    bumpActivitySignal: vi.fn(),
     focusChat: vi.fn(),
     setActiveRightTab: vi.fn(),
     selectedDocUuids: [] as string[],
@@ -32,8 +38,8 @@ vi.mock('../../lib/shareLink', () => ({ useShareLink: () => vi.fn() }))
 vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }) }))
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
-  messages: [], segments: [], queuedMessages: [], planTasks: [], contextNotices: [],
-  projectSkillBlocked: mocks.blocked, isStreaming: false, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
+  messages: [], segments: [], queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
+  projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
   uploads: [], uploading: mocks.uploading,
@@ -60,6 +66,11 @@ function renderPanel(pendingMessage?: { message: string; skillUuid?: string; dra
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.selectSkill.mockResolvedValue(true)
+  mocks.error = null
+  mocks.queuedMessages = []
+  mocks.conversationUuid = null
+  mocks.isStreaming = false
+  mocks.loadHistory.mockResolvedValue(null)
   mocks.uploading = false
   mocks.blocked = false
   mocks.workspace.workspaceMode = 'chat'
@@ -171,4 +182,30 @@ it('keeps a pending task when the project default is unavailable, but permits an
   renderPanel({ message: '', skillUuid: 'replacement' })
   await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('replacement'))
   expect(mocks.send).not.toHaveBeenCalled()
+})
+
+it('does not replace a live stream when the scope remembers the same conversation', async () => {
+  mocks.conversationUuid = 'live-conversation'
+  mocks.isStreaming = true
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="live-conversation" /></QueryClientProvider>)
+  expect(mocks.loadHistory).not.toHaveBeenCalled()
+  expect(screen.getByRole('region', { name: 'Live assistant activity' })).toBeInTheDocument()
+  rerender(<QueryClientProvider client={client}><ChatPanel conversationToLoad="different-conversation" /></QueryClientProvider>)
+  await waitFor(() => expect(mocks.loadHistory).toHaveBeenCalledWith('different-conversation'))
+})
+
+it('marks queued delivery unconfirmed when a stream fails instead of implying it is still running', () => {
+  mocks.isStreaming = true
+  mocks.queuedMessages = ['What should I report to support?']
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.getByText('Queued')).toBeInTheDocument()
+  mocks.isStreaming = false
+  mocks.error = 'The response stalled.'
+  rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.queryByText('Queued')).not.toBeInTheDocument()
+  expect(screen.getByText('Delivery unconfirmed')).toBeInTheDocument()
+  expect(screen.getByText('What should I report to support?')).toBeInTheDocument()
 })

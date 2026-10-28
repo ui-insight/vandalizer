@@ -28,6 +28,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
   artifactSource?: { project_uuid?: string; conversation_uuid?: string }
   disabled?: boolean
 }) {
+  const canExport = scope === 'conversation' || messages.some(message => message.role !== 'user')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -96,9 +97,9 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
         setTimeout(() => setCopied(false), 2000)
       } catch { setError('Could not copy. Select the text to copy it, or try again.') }
     }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
-    <button ref={button} type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>
+    {canExport && <button ref={button} type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>}
     {busy && <span role="status" className="text-xs">Preparing export…</span>}
-    {open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
+    {canExport && open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
       if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false)
     }} onKeyDown={e => {
       if (e.key === 'Escape') { e.stopPropagation(); close() }
