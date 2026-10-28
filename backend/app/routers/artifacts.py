@@ -17,6 +17,7 @@ from app.schemas.chat_export import ChatExportRequest
 from app.services import access_control, artifacts
 from app.services.chat_export import render_chat_export
 from app.tasks import get_sync_db
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
@@ -77,10 +78,12 @@ async def authorized(uuid, user, manage=False):
 
 
 def content_response(rev, download=False):
+    title = rev["title"].strip() or "Page"
+    filename = title if title.lower().endswith(".html") else f"{title}.html"
     return HTMLResponse(rev["html"], headers={
         "Content-Security-Policy": artifacts.CONTENT_CSP, "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow",
-        **({"Content-Disposition": 'attachment; filename="page.html"'} if download else {}),
+        **({"Content-Disposition": content_disposition(filename)} if download else {}),
     })
 
 
