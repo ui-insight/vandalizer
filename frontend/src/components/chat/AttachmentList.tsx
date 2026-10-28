@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Loader2, Check, Share2 } from 'lucide-react'
-import type { FileAttachment, UrlAttachment } from '../../types/chat'
+import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Loader2, Check, Share2, Sparkles } from 'lucide-react'
+import type { FileAttachment, UrlAttachment, SkillSnapshot } from '../../types/chat'
 import type { AttachedKB } from '../../contexts/WorkspaceContext'
 
 // Documents, folders and knowledge bases all answer the same question — what is
@@ -19,6 +19,11 @@ const ICON_BTN = 'ml-1 shrink-0 rounded p-1 text-gray-600 hover:text-red-700'
 const DOCS_SHOWN_COLLAPSED = 6
 
 interface Props {
+  activeSkill?: SkillSnapshot | null
+  skillBusy?: boolean
+  onChangeSkill?: () => void
+  onRemoveSkill?: () => void
+  onInspectSkill?: () => void
   fileAttachments?: FileAttachment[]
   urlAttachments?: UrlAttachment[]
   selectedDocUuids?: string[]
@@ -36,11 +41,12 @@ interface Props {
   onDeselectFolder?: (uuid: string) => void
   onDetachKB?: (uuid: string) => void
   onShareKB?: (kb: AttachedKB) => void
-  /** Copy a link that opens a chat with these knowledge bases, documents and folders attached. */
+  /** Copy a link that opens a chat with these sources and Skill. */
   onShareSetup?: () => void
 }
 
 export function AttachmentList({
+  activeSkill, skillBusy, onChangeSkill, onRemoveSkill, onInspectSkill,
   fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames, processingByUuid, documentErrors,
   selectedFolderUuids, selectedFolderNames, knowledgeBases, knowledgeHealth,
   onRemoveFile, onRemoveUrl, onDeselectDoc, onDeselectFolder, onDetachKB, onShareKB, onShareSetup,
@@ -49,6 +55,16 @@ export function AttachmentList({
 
   // Scope chips: bounded, always visible.
   const scopeChips = [
+    ...(activeSkill ? [
+      <div key="active-skill" className={`${CHIP} border-gray-300 bg-white`}>
+        <Sparkles className="h-3 w-3 shrink-0" />
+        <span className={TAG}>Skill</span>
+        <span className="max-w-full break-words font-semibold">{activeSkill.title}</span>
+        {onChangeSkill && <button type="button" disabled={skillBusy} onClick={onChangeSkill} className="rounded px-1 underline disabled:opacity-50">Change Skill</button>}
+        {onRemoveSkill && <button type="button" disabled={skillBusy} onClick={onRemoveSkill} className="rounded px-1 underline hover:text-red-700 disabled:opacity-50">Remove Skill</button>}
+        {onInspectSkill && <button type="button" onClick={onInspectSkill} className="rounded px-1 underline">Inspect instructions</button>}
+      </div>,
+    ] : []),
     ...(knowledgeBases ?? []).map(kb => (
       <div
         key={`kb-${kb.uuid}`}
@@ -218,7 +234,7 @@ export function AttachmentList({
         <button
           type="button"
           onClick={onShareSetup}
-          title="Copy a link that opens a new chat with these knowledge bases, documents and folders attached"
+          title="Copy a link that opens a new chat with these sources and Skill"
           className={`${CHIP} ml-auto border-gray-300 bg-white font-semibold hover:bg-gray-100`}
         >
           <Share2 className="h-3 w-3 shrink-0" />

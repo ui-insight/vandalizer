@@ -87,6 +87,7 @@ export interface PendingChatMessage {
   message: string
   draftOnly?: boolean
   skillUuid?: string
+  skillSelectionOnly?: boolean
   documentUuids?: string[]
   folderUuids?: string[]
 }
@@ -109,7 +110,7 @@ interface ChatStateContextValue {
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; draftOnly?: boolean },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => void
   clearPendingChatMessage: () => void
   // Knowledge bases attached to the chat. Several can be attached at once;
@@ -562,12 +563,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendChatMessage = useCallback((
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; draftOnly?: boolean },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage({
       message,
       skillUuid: options?.skillUuid,
+      skillSelectionOnly: options?.skillSelectionOnly,
       draftOnly: options?.draftOnly,
       documentUuids: options?.documentUuids,
       folderUuids: options?.folderUuids,
@@ -897,7 +899,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if ((!search.conversation && !search.skill && !search.editPage) || handledResourceLink.current === identity) return
     handledResourceLink.current = identity
     if (search.conversation) setLoadConversationId(search.conversation)
-    if (search.skill) sendChatMessage('', { skillUuid: search.skill })
+    if (search.skill) sendChatMessage('', { skillUuid: search.skill, skillSelectionOnly: true })
     if (search.editPage) {
       let request = ''
       try { request = sessionStorage.getItem(`pages:edit-request:${search.editPage}`) || ''; sessionStorage.removeItem(`pages:edit-request:${search.editPage}`) } catch { /* A draft can still be prepared without stored details. */ }

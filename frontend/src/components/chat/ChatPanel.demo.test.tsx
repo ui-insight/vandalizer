@@ -2,13 +2,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatPanel } from './ChatPanel'
-import type { ChatMessage, StreamSegment } from '../../types/chat'
+import type { ChatMessage, StreamSegment, SkillSnapshot } from '../../types/chat'
 import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   resumeQueuedMessages: vi.fn(),
   selectSkill: vi.fn(),
+  listSearchSets: vi.fn(),
+  activeSkill: null as SkillSnapshot | null,
+  isSelectingSkill: false,
   uploading: false,
   conversationUuid: null as string | null,
   activityId: null as string | null,
@@ -42,11 +45,13 @@ vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => mocks.wo
 vi.mock('../../contexts/BrandingContext', () => ({ useBranding: () => ({ appName: 'Vandalizer' }) }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanel: () => ({ openPanel: vi.fn() }), useCertificationPanelOptional: () => null }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
-vi.mock('../../lib/shareLink', () => ({ useShareLink: () => vi.fn() }))
+vi.mock('../../lib/shareLink', async importOriginal => ({ ...await importOriginal<typeof import('../../lib/shareLink')>(), useShareLink: () => vi.fn() }))
+vi.mock('../../api/extractions', () => ({ listSearchSets: mocks.listSearchSets }))
 vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }) }))
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
   messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
+  activeSkill: mocks.activeSkill, isSelectingSkill: mocks.isSelectingSkill,
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill, resumeQueuedMessages: mocks.resumeQueuedMessages,
 }) }))
 vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uuid: string, file: File) => void) => ({
@@ -67,13 +72,16 @@ vi.mock('./HomeExperience', () => ({
   </>,
 }))
 
-function renderPanel(pendingMessage?: { message: string; skillUuid?: string; draftOnly?: boolean }) {
+function renderPanel(pendingMessage?: { message: string; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean }) {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ChatPanel pendingMessage={pendingMessage} /></QueryClientProvider>)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.selectSkill.mockResolvedValue(true)
+  mocks.activeSkill = null
+  mocks.isSelectingSkill = false
+  mocks.listSearchSets.mockResolvedValue([])
   mocks.error = null
   mocks.queuedMessages = []
   mocks.conversationUuid = null
@@ -141,6 +149,58 @@ describe('Show me what you can do', () => {
   it('keeps the empty Skill selector out of chat', () => {
     renderPanel()
     expect(screen.queryByLabelText('Chat Skill')).not.toBeInTheDocument()
+  })
+
+  it('selects a shared setup Skill without running it', async () => {
+    renderPanel({ message: '', skillUuid: 'award-skill', skillSelectionOnly: true })
+    await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('award-skill'))
+    expect(mocks.selectSkill).toHaveBeenCalledOnce()
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  it('shows the active Skill in the source bar and inspects its saved instructions', () => {
+    mocks.activeSkill = { uuid: 'award-skill', title: 'Award Review', version: 'saved-v1', instructions: 'Check the award dates.' }
+    mocks.workspace.activeKBs = [{ uuid: 'kb-1', title: 'Awards KB' }]
+    renderPanel()
+    const bar = screen.getByRole('region', { name: 'Conversation sources' })
+    expect(bar).toHaveTextContent('Award Review')
+    expect(bar).toHaveTextContent('Awards KB')
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect instructions' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Check the award dates.')
+    expect(screen.getByRole('dialog')).toHaveTextContent('saved-v1')
+    expect(mocks.listSearchSets).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Skill dialog' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Skill' }))
+    expect(mocks.selectSkill).toHaveBeenCalledWith(null)
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  it('changes the Skill in place and keeps the picker open on failure', async () => {
+    mocks.activeSkill = { uuid: 'award-skill', title: 'Award Review', version: 'v1', instructions: 'Review dates.' }
+    mocks.listSearchSets.mockResolvedValue([
+      { uuid: 'replacement', title: 'Budget Review', set_type: 'prompt' },
+      { uuid: 'extraction', title: 'Extract costs', set_type: 'extraction' },
+    ])
+    mocks.selectSkill.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Change Skill' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Budget Review' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your current Skill is still selected')
+    expect(screen.queryByRole('button', { name: 'Extract costs' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Budget Review' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mocks.selectSkill).toHaveBeenCalledWith('replacement')
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  it('shares a Skill-only setup without exposing its saved instructions', async () => {
+    mocks.activeSkill = { uuid: 'award-skill', title: 'Award Review', version: 'v1', instructions: 'Private instructions' }
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Share chat setup' }))
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(new URL(writeText.mock.calls[0][0]).search).toBe('?skill=award-skill')
   })
 
   it('keeps supporting Assistant guidance compact beside Files', () => {

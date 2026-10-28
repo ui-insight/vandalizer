@@ -153,7 +153,7 @@ it('waits for the project scope before handing a pinned Skill to chat', async ()
   expect(result.current.pendingChatMessage).toBeNull()
   await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('a'))
   await act(async () => { finish(project('a')) })
-  await waitFor(() => expect(result.current.pendingChatMessage).toEqual(expect.objectContaining({ message: '', skillUuid: 'skill-a' })))
+  await waitFor(() => expect(result.current.pendingChatMessage).toEqual(expect.objectContaining({ message: '', skillUuid: 'skill-a', skillSelectionOnly: true })))
   expect(result.current.activeProjectUuid).toBe('a')
 })
 

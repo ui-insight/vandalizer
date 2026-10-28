@@ -7,6 +7,7 @@ import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { ChatSkillDialog } from './ChatSkillDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
@@ -147,6 +148,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const modelPreference = useChatModelPreference()
   const { selectedModel, models: modelsList } = modelPreference
   const [showAttachKB, setShowAttachKB] = useState(false)
+  const [skillDialog, setSkillDialog] = useState<'change' | 'inspect' | null>(null)
   const [draftInsertion, setDraftInsertion] = useState<{ id: number; text: string }>()
   const [showContextDialog, setShowContextDialog] = useState(false)
   const [showContextNudge, setShowContextNudge] = useState(false)
@@ -407,6 +409,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (pendingMessage.draftOnly) {
         setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: pendingMessage.message }))
         focusChat()
+      } else if (pendingMessage.skillUuid && pendingMessage.skillSelectionOnly) {
+        void selectSkill(pendingMessage.skillUuid)
+        focusChat()
       } else if (pendingMessage.skillUuid) {
         void send(pendingMessage.message, docs, selectedModel || undefined,
           activeKBs.map(kb => kb.uuid), undefined, folders, undefined, undefined,
@@ -417,7 +422,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       }
       onPendingMessageConsumed?.()
     }
-  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid])
+  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, selectSkill, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid])
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
@@ -641,11 +646,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       kbUuids: activeKBs.map(kb => kb.uuid),
       docUuids: selectedDocUuids,
       folderUuids: selectedFolderUuids,
+      skillUuid: activeSkill?.uuid,
     })
     const parts = [
       activeKBs.length && `${activeKBs.length} knowledge base${activeKBs.length === 1 ? '' : 's'}`,
       selectedDocUuids.length && `${selectedDocUuids.length} document${selectedDocUuids.length === 1 ? '' : 's'}`,
       selectedFolderUuids.length && `${selectedFolderUuids.length} folder${selectedFolderUuids.length === 1 ? '' : 's'}`,
+      activeSkill && `Skill: ${activeSkill.title}`,
     ].filter(Boolean)
     const leftOut = fileAttachments.length + urlAttachments.length > 0
       ? ' Files uploaded into this chat and web links aren\u2019t included.'
@@ -807,6 +814,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
       {/* Attachments bar */}
       <AttachmentList
+        activeSkill={activeSkill}
+        skillBusy={isStreaming || isLoadingHistory || isSelectingSkill}
+        onChangeSkill={() => setSkillDialog('change')}
+        onRemoveSkill={() => void selectSkill(null)}
+        onInspectSkill={() => setSkillDialog('inspect')}
         fileAttachments={fileAttachments}
         urlAttachments={urlAttachments}
         selectedDocUuids={selectedDocUuids}
@@ -820,7 +832,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onDetachKB={detachKB}
         onShareKB={(kb) => shareLink('kb', kb.uuid, kb.title || undefined)}
         onShareSetup={
-          activeKBs.length + selectedDocUuids.length + selectedFolderUuids.length > 0
+          activeSkill || activeKBs.length + selectedDocUuids.length + selectedFolderUuids.length > 0
             ? handleShareSetup
             : undefined
         }
@@ -839,6 +851,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           setSelectedDocNames(next)
         }}
       />
+
+      {skillDialog && activeSkill && <ChatSkillDialog
+        mode={skillDialog}
+        skill={activeSkill}
+        disabled={isStreaming || isLoadingHistory || isSelectingSkill}
+        onSelect={selectSkill}
+        onClose={() => setSkillDialog(null)}
+      />}
 
       {chatUploads.uploads.length > 0 && (
         <div className="chat-upload-list" aria-label="File uploads">
